@@ -786,14 +786,14 @@ export async function getGuestUser() {
   return gStore.currentGuest || null;
 }
 
-export async function guestLogin(phone: string) {
+export async function guestLogin(phone: string, inputName?: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     const normLogin = normalizePhone(phone);
     let existing: any = null;
 
     if (!client) {
-      existing = db_guests.find((g: any) => normalizePhone(g.phone) === normLogin);
+      existing = (gStore.db_guests || db_guests).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
@@ -812,10 +812,11 @@ export async function guestLogin(phone: string) {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1', [normLogin]);
+      const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
       if ((res.rowCount ?? 0) > 0) {
         const r = res.rows[0];
         existing = {
+          templeId: r.temple_id,
           phone: r.phone,
           name: r.name,
           email: r.email,
@@ -830,8 +831,9 @@ export async function guestLogin(phone: string) {
       }
     }
 
-    const guestName = existing ? existing.name : "測試信眾";
+    const guestName = existing ? existing.name : (inputName || "測試信眾");
     const fullGuest = existing || {
+      templeId,
       phone,
       name: guestName,
       status: 'Active',
@@ -840,20 +842,21 @@ export async function guestLogin(phone: string) {
 
     if (!existing) {
       if (!client) {
-        db_guests.push(fullGuest);
-        gStore.db_guests = db_guests;
+        const currentGuests = gStore.db_guests || db_guests;
+        gStore.db_guests = [...currentGuests, fullGuest];
+        db_guests = gStore.db_guests;
       } else {
         await client.query(`
           INSERT INTO guests (temple_id, phone, name, status)
           VALUES ($1, $2, $3, $4)
-          ON CONFLICT (phone) DO NOTHING
-        `, [phone, guestName, 'Active']);
+          ON CONFLICT (temple_id, phone) DO NOTHING
+        `, [templeId, phone, guestName, 'Active']);
       }
     }
 
     gStore.currentGuest = fullGuest;
     revalidatePath('/temple/customers');
-    return { success: true, guestName, fullGuest };
+    return { success: true, guestName: fullGuest.name, fullGuest };
   });
 }
 

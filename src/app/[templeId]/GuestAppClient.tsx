@@ -128,6 +128,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   // Login States
   const [showLoginWall, setShowLoginWall] = useState(true);
   const [loginPhone, setLoginPhone] = useState("");
+  const [loginName, setLoginName] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [pendingConfirmGuest, setPendingConfirmGuest] = useState<any | null>(null);
   const [bindLineId, setBindLineId] = useState("");
@@ -293,7 +294,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     }
     
     // 2. 正常登入流程
-    const res = await guestLogin(loginPhone);
+    const res = await guestLogin(loginPhone, loginName);
     if (res.success) {
       const user = res.fullGuest || { 
         phone: loginPhone, 
@@ -507,6 +508,17 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     );
   };
 
+  // --- Intercept Feature Click ---
+  const handleFeatureClick = (viewName: 'booking' | 'lighting' | 'queue' | 'events') => {
+    if (!guestUser) return;
+    if (!guestUser.address || !guestUser.birthday) {
+      alert("請完善您的個人資料（出生日期與聯絡地址），才能使用預約與點燈等服務功能！");
+      setActiveView('profile');
+      return;
+    }
+    setActiveView(viewName);
+  };
+
   // --- Sub-Renders ---
 
   const renderHome = () => {
@@ -578,22 +590,22 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         <div className="px-5 mt-8">
           <h3 className="text-lg font-bold text-gray-900 mb-4 px-1">常用服務</h3>
           <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => setActiveView('booking')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+            <button onClick={() => handleFeatureClick('booking')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
               <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-3xl text-red-600">📅</div>
               <span className="font-bold text-gray-900">預約</span>
             </button>
             
-            <button onClick={() => setActiveView('lighting')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+            <button onClick={() => handleFeatureClick('lighting')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
               <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl text-amber-600"><IconCandle /></div>
               <span className="font-bold text-gray-900">點燈</span>
             </button>
             
-            <button onClick={() => setActiveView('queue')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+            <button onClick={() => handleFeatureClick('queue')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
               <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-3xl text-emerald-600">🎟️</div>
               <span className="font-bold text-gray-900">排隊</span>
             </button>
             
-            <button onClick={() => setActiveView('events')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+            <button onClick={() => handleFeatureClick('events')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
               <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl text-indigo-600"><IconFestive /></div>
               <span className="font-bold text-gray-900">活動</span>
             </button>
@@ -1972,6 +1984,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                 
                 <form onSubmit={handleLogin} className="space-y-6">
                   <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-2">真實姓名</label>
+                    <input 
+                      type="text" 
+                      value={loginName} 
+                      onChange={(e) => setLoginName(e.target.value)} 
+                      className="app-input mb-4" 
+                      placeholder="請輸入真實姓名" 
+                      required 
+                    />
                     <label className="block text-xs font-bold text-gray-500 mb-2">手機號碼</label>
                     <input 
                       type="tel" 
