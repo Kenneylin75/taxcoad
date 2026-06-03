@@ -2664,8 +2664,10 @@ export async function createPersonnel(formData: FormData) {
     const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4F46E5&color=fff`;
 
     if (!client) {
-      db_personnel.push({
+      const current = gStore.db_personnel || db_personnel;
+      const newPersonnel = {
         id: newId,
+        templeId,
         name,
         account,
         phone,
@@ -2675,8 +2677,9 @@ export async function createPersonnel(formData: FormData) {
         avatar,
         serviceCount: 0,
         permissions: role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers']
-      });
-      gStore.db_personnel = db_personnel;
+      };
+      gStore.db_personnel = [...current, newPersonnel];
+      db_personnel = gStore.db_personnel;
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
