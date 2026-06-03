@@ -476,7 +476,21 @@ export async function fetchAppointments() {
 // 5. 抓取與儲存服務項目
 export async function fetchServiceDefinitions() {
   const templeId = await getDynamicTempleId();
-  return [...(gStore.db_services || db_services)].filter(x => x.templeId === templeId);
+  const currentServices = gStore.db_services || db_services;
+  const myServices = currentServices.filter((x: any) => x.templeId === templeId);
+  
+  if (myServices.length === 0 && templeId) {
+     const defaultForTemple = DEFAULT_SERVICES.map(s => ({
+       ...s, 
+       templeId, 
+       id: `s-${Date.now()}-${s.id}`
+     }));
+     gStore.db_services = [...currentServices, ...defaultForTemple];
+     db_services = gStore.db_services;
+     return defaultForTemple;
+  }
+  
+  return myServices;
 }
 
 export async function saveServiceDefinition(data: any) {
@@ -507,7 +521,19 @@ export async function fetchPrintTemplates() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return [...db_print_templates.filter(t => t.templeId === templeId)];
+      const current = gStore.db_print_templates || db_print_templates;
+      const mine = current.filter((t: any) => t.templeId === templeId);
+      if (mine.length === 0 && templeId) {
+        const defaults = current.filter((t: any) => t.templeId === 'temple-1').map((t: any) => ({
+          ...t,
+          id: `t-${Date.now()}-${t.id}`,
+          templeId
+        }));
+        gStore.db_print_templates = [...current, ...defaults];
+        db_print_templates = gStore.db_print_templates;
+        return defaults;
+      }
+      return mine;
     }
     // DB impl omitted for now
     return [];
@@ -541,17 +567,33 @@ export async function deletePrintTemplate(id: string) {
 }
 
 export async function fetchForms() {
-  return [...db_forms];
+  const templeId = await getDynamicTempleId();
+  const current = gStore.db_forms || db_forms;
+  const mine = current.filter((f: any) => f.templeId === templeId);
+  if (mine.length === 0 && templeId) {
+    const defaults = current.filter((f: any) => f.templeId === 'temple-1').map((f: any) => ({
+      ...f,
+      id: `f-${Date.now()}-${f.id}`,
+      templeId
+    }));
+    gStore.db_forms = [...current, ...defaults];
+    db_forms = gStore.db_forms;
+    return defaults;
+  }
+  return mine;
 }
 
 export async function saveForm(data: any) {
+  const templeId = await getDynamicTempleId();
   const id = data.id;
-  const exists = db_forms.some(f => f.id === id);
+  const current = gStore.db_forms || db_forms;
+  const exists = current.some((f: any) => f.id === id);
   if (exists) {
-    db_forms = gStore.db_forms = db_forms.map(f => f.id === id ? { ...f, ...data } : f);
+    gStore.db_forms = current.map((f: any) => f.id === id ? { ...f, ...data } : f);
   } else {
-    db_forms.push({ id: id || Date.now().toString(), ...data });
+    gStore.db_forms = [...current, { id: id || Date.now().toString(), templeId, ...data }];
   }
+  db_forms = gStore.db_forms;
   revalidatePath("/temple/services");
   return { success: true };
 }
@@ -561,7 +603,18 @@ export async function fetchPersonnel() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return [...db_personnel];
+      const myPersonnel = (gStore.db_personnel || db_personnel).filter((p: any) => p.templeId === templeId);
+      if (myPersonnel.length === 0 && templeId) {
+        // Seed default personnel for this new temple to ensure services have assigned staff
+        const defaults = (gStore.db_personnel || db_personnel).filter((p: any) => p.templeId === 'temple-1').map((p: any) => ({
+          ...p,
+          templeId
+        }));
+        gStore.db_personnel = [...(gStore.db_personnel || db_personnel), ...defaults];
+        db_personnel = gStore.db_personnel;
+        return defaults;
+      }
+      return myPersonnel;
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
@@ -707,7 +760,24 @@ let db_lamp_categories: any[] = initGlobal('db_lamp_categories', [
   { id: 'cat-2', name: '安太歲', price: 1000, durationDays: 365, totalSlots: 200, templeId: 'temple-1' },
   { id: 'cat-3', name: '文昌燈', price: 800, durationDays: 365, totalSlots: 300, templeId: 'temple-1' }
 ].map(x => ({...x, templeId: 'temple-1'})));
-export async function fetchLampCategories() { const templeId = await getDynamicTempleId(); return [...db_lamp_categories].filter(x => x.templeId === templeId); }
+export async function fetchLampCategories() {
+  const templeId = await getDynamicTempleId();
+  const currentCats = gStore.db_lamp_categories || db_lamp_categories;
+  const myCats = currentCats.filter((x: any) => x.templeId === templeId);
+  
+  if (myCats.length === 0 && templeId) {
+    const defaultCats = currentCats.filter((x: any) => x.templeId === 'temple-1').map((x: any) => ({
+      ...x,
+      id: `cat-${Date.now()}-${x.id}`,
+      templeId
+    }));
+    gStore.db_lamp_categories = [...currentCats, ...defaultCats];
+    db_lamp_categories = gStore.db_lamp_categories;
+    return defaultCats;
+  }
+  
+  return myCats;
+}
 let db_lamp_records: any[] = initGlobal("db_lamp_records", []);
 export async function createLightingOrder(fd: FormData) { 
   return createLampRecord(fd);
