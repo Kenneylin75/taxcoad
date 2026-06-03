@@ -1,0 +1,14 @@
+﻿無法擷取變數 '$LASTEXITCODE'，因為它尚未設定。
+位於 C:\Program Files\nodejs\npm.ps1:17 字元:5
++ if ($LASTEXITCODE -ne 0) {
++     ~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (LASTEXITCODE:String) []，RuntimeException
+    + FullyQualifiedErrorId : VariableIsUndefined
+ 
+無法擷取變數 '$LASTEXITCODE'，因為它尚未設定。
+位於 C:\Program Files\nodejs\npm.ps1:50 字元:6
++ exit $LASTEXITCODE
++      ~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (LASTEXITCODE:String) []，RuntimeException
+    + FullyQualifiedErrorId : VariableIsUndefined
+ 

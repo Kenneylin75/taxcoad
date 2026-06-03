@@ -1,0 +1,100 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100;300;400;600;800;900&family=Noto+Sans+TC:wght@300;500;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Outfit', 'Noto Sans TC', sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #FDFBF7; /* Soft Paper White */
+  --foreground: #2D2D2D;
+  --primary: #B91C1C;    /* Imperial Red */
+  --secondary: #D4AF37;  /* Classic Gold */
+  --accent: #065F46;     /* Jade Green */
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(185, 28, 28, 0.02) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(212, 175, 55, 0.02) 0px, transparent 50%);
+}
+
+/* --- Traditional Modern Typography --- */
+h1, h2, h3, h4 {
+  color: #1A1A1A;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+/* --- Serene Card Design --- */
+.premium-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  box-shadow: 
+    0 10px 30px -5px rgba(0, 0, 0, 0.03),
+    0 4px 6px -2px rgba(185, 28, 28, 0.01);
+  border-radius: 2.5rem;
+}
+
+.premium-card:hover {
+  border-color: rgba(185, 28, 28, 0.3);
+  box-shadow: 
+    0 20px 40px -10px rgba(185, 28, 28, 0.05),
+    0 10px 20px -5px rgba(212, 175, 55, 0.05);
+}
+
+/* --- Floating Effects --- */
+.float-shadow {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05);
+}
+
+.jade-glow {
+  box-shadow: 0 0 30px rgba(6, 95, 70, 0.05);
+}
+
+/* --- Traditional Gradients --- */
+.bg-imperial-gradient {
+  background: linear-gradient(135deg, #B91C1C 0%, #991B1B 100%);
+}
+
+.bg-paper-gradient {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FDFBF7 100%);
+}
+
+/* --- Animations --- */
+@keyframes soft-float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-soft-float {
+  animation: soft-float 6s ease-in-out infinite;
+}
+
+/* --- Modern Inputs --- */
+input, select, textarea {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #B91C1C;
+  box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.05);
+}
+
+/* --- Utilities --- */
+.text-imperial { color: #B91C1C; }
+.text-gold { color: #D4AF37; }
+.bg-jade { background-color: #065F46; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

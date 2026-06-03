@@ -1,0 +1,207 @@
+// =====================================================================
+// 全方位雲端宮廟管理系統 - Prisma 資料庫綱要 (Developer Handoff 版)
+// =====================================================================
+// 給接手工程師：
+// 1. 本檔案由系統目前的 In-Memory 架構自動逆向生成。
+// 2. 請安裝 Prisma: `npm i prisma -D` & `npm i @prisma/client`
+// 3. 執行 `npx prisma db push` 或 `npx prisma migrate dev` 即可產生資料庫。
+// 4. 將 `actions.ts` 內所有的陣列 (Array) 操作替換為 `prisma.model.create/findMany` 等。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // 建議商轉使用 postgresql，若使用 mysql 請自行更改 provider
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// 核心系統 (System Core)
+// ---------------------------------------------------------------------
+
+/// 宮廟主體 (多租戶 Multi-tenant 核心)
+model Temple {
+  id          String   @id @default(cuid())
+  name        String
+  region      String?
+  status      String   @default("Active") // 'Active', 'Pending', 'Suspended'
+  distributor String?  // 綁定之經銷商ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  guests      Guest[]
+  appointments Appointment[]
+  events      Event[]
+  lampCategories LampCategory[]
+  queueEvents QueueEvent[]
+}
+
+/// 系統人員 (宮廟管理員 / 經銷商 / 超級管理員)
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  password    String   // 請務必在商轉前加入 bcrypt 雜湊
+  name        String
+  role        String   // 'SuperAdmin', 'DistAdmin', 'TempleAdmin', 'Staff'
+  templeId    String?
+  permissions String[] // ['events', 'lamps', 'queue', 'appointments'] 等
+  createdAt   DateTime @default(now())
+
+  temple      Temple?  @relation(fields: [templeId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 信眾管理 (CRM)
+// ---------------------------------------------------------------------
+
+/// 信眾資料 (Guest)
+model Guest {
+  id            String   @id @default(cuid())
+  phone         String   // 手機號碼為主要識別 (建議加上 Unique 限制，但需考慮跨宮廟)
+  name          String
+  gender        String?  // 'M', 'F', 'O'
+  birthday      String?  // YYYY-MM-DD
+  birthHour     String?  // 出生時辰 (如: 子時)
+  address       String?
+  avatar        String?
+  lineId        String?  // 綁定之 LINE OA ID
+  email         String?
+  status        String   @default("Active")
+  templeId      String?
+  createdAt     DateTime @default(now())
+
+  temple        Temple?  @relation(fields: [templeId], references: [id])
+  appointments  Appointment[]
+  lampRecords   LampRecord[]
+  eventRegs     EventRegistration[]
+  queueTickets  QueueTicket[]
+}
+
+// ---------------------------------------------------------------------
+// 預約與服務 (Appointments)
+// ---------------------------------------------------------------------
+
+/// 預約紀錄 (Appointment)
+model Appointment {
+  id            String   @id @default(cuid())
+  templeId      String
+  guestId       String
+  service       String   // 服務項目名稱 (如: 安太歲、收驚)
+  date          String   // 預約日期 YYYY-MM-DD
+  time          String   // 預約時段 HH:mm
+  staff         String?  // 負責法師/專員
+  amount        Int      @default(0) // 結緣金/功德金
+  paymentMethod String?  // 'Cash', 'LinePayApi', 'ECPay'
+  paymentStatus String   @default("Pending") // 'Pending', 'Paid', 'Failed', 'Refunded'
+  paymentRef    String?  // 交易序號
+  status        String   @default("Pending") // 'Pending', 'Confirmed', 'Completed', 'Cancelled'
+  createdAt     DateTime @default(now())
+
+  temple        Temple   @relation(fields: [templeId], references: [id])
+  guest         Guest    @relation(fields: [guestId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 點燈系統 (Lamp Lighting)
+// ---------------------------------------------------------------------
+
+/// 點燈類別 (如: 光明燈、安太歲)
+model LampCategory {
+  id          String   @id @default(cuid())
+  templeId    String
+  name        String
+  description String?
+  price       Int      @default(0)
+  totalSlots  Int      @default(500)
+  createdAt   DateTime @default(now())
+
+  temple      Temple   @relation(fields: [templeId], references: [id])
+  records     LampRecord[]
+}
+
+/// 點燈紀錄 (燈位)
+model LampRecord {
+  id            String   @id @default(cuid())
+  templeId      String
+  categoryId    String
+  guestId       String
+  applicantName String   // 點燈者姓名 (可能與 guestName 不同，如幫家人點)
+  applicantBirth String? // 農曆/國曆生日
+  actualPrice   Int      @default(0)
+  paymentMethod String?
+  paymentStatus String   @default("Pending")
+  status        String   @default("Pending") // 'Pending', 'Active', 'Expired'
+  createdAt     DateTime @default(now())
+
+  temple        Temple       @relation(fields: [templeId], references: [id])
+  category      LampCategory @relation(fields: [categoryId], references: [id])
+  guest         Guest        @relation(fields: [guestId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 法會活動 (Events)
+// ---------------------------------------------------------------------
+
+/// 法會與活動主體
+model Event {
+  id          String   @id @default(cuid())
+  templeId    String
+  title       String
+  date        String   // YYYY-MM-DD
+  location    String?
+  imageUrl    String?  // 活動宣傳圖片
+  price       Int      @default(0) // 預設費用
+  capacity    Int      @default(0) // 0 表示無上限
+  status      String   @default("Draft") // 'Draft', 'Active', 'Completed'
+  createdAt   DateTime @default(now())
+
+  temple      Temple   @relation(fields: [templeId], references: [id])
+  registrations EventRegistration[]
+}
+
+/// 法會報名紀錄
+model EventRegistration {
+  id            String   @id @default(cuid())
+  eventId       String
+  guestId       String
+  actualPrice   Int      @default(0)
+  paymentMethod String?
+  paymentStatus String   @default("Pending")
+  createdAt     DateTime @default(now())
+
+  event         Event    @relation(fields: [eventId], references: [id])
+  guest         Guest    @relation(fields: [guestId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 現場排隊 (Queue System)
+// ---------------------------------------------------------------------
+
+/// 排隊/叫號活動 (如: 今日問事、點燈櫃台)
+model QueueEvent {
+  id          String   @id @default(cuid())
+  templeId    String
+  title       String
+  status      String   @default("Draft") // 'Draft', 'Active', 'Completed'
+  createdAt   DateTime @default(now())
+
+  temple      Temple   @relation(fields: [templeId], references: [id])
+  tickets     QueueTicket[]
+}
+
+/// 號碼牌 (Queue Ticket)
+model QueueTicket {
+  id          String   @id @default(cuid())
+  eventId     String
+  guestId     String
+  displayNum  String   // 顯示用號碼 (如: A001)
+  actualOrder Int      // 實際排序邏輯用
+  status      String   @default("Queuing") // 'Queuing', 'Calling', 'Completed', 'Cancelled'
+  createdAt   DateTime @default(now())
+
+  queueEvent  QueueEvent @relation(fields: [eventId], references: [id])
+  guest       Guest      @relation(fields: [guestId], references: [id])
+}

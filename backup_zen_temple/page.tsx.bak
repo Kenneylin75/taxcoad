@@ -1,0 +1,1197 @@
+"use client";
+import React, { useState, useEffect, useRef } from "react";
+import { Solar } from 'lunar-javascript';
+import { 
+  createAppointment, 
+  fetchAvailableSlots, 
+  fetchEvents, 
+  getGuestUser, 
+  guestLogin, 
+  fetchGuestSettings, 
+  GuestSettings, 
+  askAgiAssistant, 
+  fetchGuestAppointments, 
+  fetchServiceSettings, 
+  ServiceSettings, 
+  fetchQueueEvents, 
+  fetchGuestFiles, 
+  GuestFile,
+  createOrUpdateGuest,
+  createLightingOrder,
+  fetchServiceDefinitions,
+  fetchStaff,
+  joinQueue,
+  verifyQueueTicket,
+  registerForEvent,
+  fetchGuestRegistrations,
+  fetchGuestQueueTickets,
+  fetchGuestLampRecords,
+  fetchLampCategories
+} from "./actions";
+
+// --- Custom Icons (SVG) ---
+const IconHome = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+const IconCalendar = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>;
+const IconUser = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const IconSpace = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M12 2H2v10h10V2z"/><path d="M22 2h-10v10h10V2z"/><path d="M12 12H2v10h10V12z"/><path d="M22 12h-10v10h10V12z"/></svg>;
+const IconBell = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
+const IconCandle = () => <svg viewBox="0 0 24 24" fill="none" stroke="#E11D48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M9 22h6"/><path d="M12 22V10"/><path d="M12 10a2 2 0 0 1 2-2 2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2z"/><path d="M12 6V4"/><path d="M11 4c0-1.1.9-2 2-2s2 .9 2 2"/></svg>;
+const IconFestive = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M12 2v10"/><path d="m16 8-4 4-4-4"/><path d="M3 21h18"/><path d="M12 12v9"/></svg>;
+
+const TopNav = ({ title, onBack }: { title: string, onBack: () => void }) => (
+  <div className="sticky top-0 z-[100] bg-white/90 backdrop-blur-md border-b border-slate-100 p-5 flex items-center gap-4">
+    <button onClick={onBack} className="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-rose-50 rounded-2xl transition-all text-slate-400 hover:text-rose-600 active:scale-90 group">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+    </button>
+    <h2 className="text-lg font-black tracking-tight text-slate-800">{title}</h2>
+  </div>
+);
+
+type ViewState = 'home' | 'booking' | 'events' | 'queue' | 'space' | 'records' | 'profile' | 'lighting';
+
+export default function Home() {
+  const [activeView, setActiveView] = useState<ViewState>('home');
+  const [bookingStatus, setBookingStatus] = useState<"idle" | "booking" | "success">("idle");
+  
+  // AGI Chat States
+  const [isAgiModalOpen, setIsAgiModalOpen] = useState(false);
+  const [agiInput, setAgiInput] = useState("");
+  const [agiIsThinking, setAgiIsThinking] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'agi', text: string, action?: 'booking' | 'event'}[]>([
+    { role: 'agi', text: '您好！這裡是您的個人助理。有什麼我可以幫您的嗎？' }
+  ]);
+  const [successInfo, setSuccessInfo] = useState<{title: string, message: string} | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Data states
+  const [slots, setSlots] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [guestUser, setGuestUser] = useState<any | null>(null);
+  const [guestFiles, setGuestFiles] = useState<any[]>([]);
+  const [guestAppointments, setGuestAppointments] = useState<any[]>([]);
+  const [serviceDefinitions, setServiceDefinitions] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [queueEvents, setQueueEvents] = useState<any[]>([]);
+  const [fileSearch, setFileSearch] = useState("");
+  const [activeFileTab, setActiveFileTab] = useState<'photo' | 'video' | 'file'>('photo');
+
+  // Multi-step Booking States
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('2026-05-01');
+  const [bookingStep, setBookingStep] = useState<1 | 2 | 3>(1);
+  const [recordsTab, setRecordsTab] = useState('全部');
+  const [availableStaffList, setAvailableStaffList] = useState<any[]>([]);
+  const [lampCategories, setLampCategories] = useState<any[]>([]);
+  
+  // Dynamic Calendar States
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  // Event & Modal States
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailContent, setDetailContent] = useState<any>(null);
+
+  // Login States
+  const [showLoginWall, setShowLoginWall] = useState(true);
+  const [loginPhone, setLoginPhone] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Birthday States
+  const [gregorianDate, setGregorianDate] = useState("");
+  const [lunarResult, setLunarResult] = useState("");
+
+  useEffect(() => {
+    if (gregorianDate) {
+      try {
+        const parts = gregorianDate.split('-');
+        const solar = Solar.fromYmd(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+        const lunar = solar.getLunar();
+        setLunarResult(`農曆 ${lunar.getYearInChinese()}年 ${lunar.getMonthInChinese()}月 ${lunar.getDayInChinese()}日`);
+      } catch (e) { setLunarResult(""); }
+    }
+  }, [gregorianDate]);
+
+  useEffect(() => {
+    const init = async () => {
+      const user = await getGuestUser();
+      if (user) {
+        setGuestUser(user);
+        setShowLoginWall(false);
+        refreshAllData(user.phone);
+      }
+      const [slotsData, eventsData, servicesData, staffData, qEventsData, lampsData] = await Promise.all([
+        fetchAvailableSlots(), 
+        fetchEvents(),
+        fetchServiceDefinitions(),
+        fetchStaff(),
+        fetchQueueEvents(),
+        fetchLampCategories()
+      ]);
+      setSlots(slotsData);
+      setEvents(eventsData);
+      setServiceDefinitions(servicesData);
+      setStaff(staffData);
+      setQueueEvents(qEventsData);
+      setLampCategories(lampsData);
+      setSelectedDate(new Date().toISOString().split('T')[0]);
+    };
+    init();
+  }, []);
+
+  const [guestRegistrations, setGuestRegistrations] = useState<any[]>([]);
+  const [guestTickets, setGuestTickets] = useState<any[]>([]);
+  const [guestLamps, setGuestLamps] = useState<any[]>([]);
+
+  const refreshAllData = async (phone: string) => {
+    const [apps, files, regs, tix, lamps] = await Promise.all([
+      fetchGuestAppointments(phone), 
+      fetchGuestFiles(phone),
+      fetchGuestRegistrations(phone),
+      fetchGuestQueueTickets(phone),
+      fetchGuestLampRecords(phone)
+    ]);
+    setGuestAppointments(apps);
+    setGuestFiles(files);
+    setGuestRegistrations(regs);
+    setGuestTickets(tix);
+    setGuestLamps(lamps);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    const res = await guestLogin(loginPhone);
+    if (res.success) {
+      const user = { phone: loginPhone, name: res.guestName, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(res.guestName)}&background=B91C1C&color=fff` };
+      setGuestUser(user);
+      setShowLoginWall(false);
+      refreshAllData(user.phone);
+    }
+    setIsLoggingIn(false);
+  };
+
+  const handleAgiSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agiInput.trim() || agiIsThinking) return;
+    const query = agiInput;
+    setAgiInput("");
+    setChatHistory(prev => [...prev, { role: 'user', text: query }]);
+    setAgiIsThinking(true);
+    const res = await askAgiAssistant(query, chatHistory.length);
+    setChatHistory(prev => [...prev, { role: 'agi', text: res.reply, action: res.suggestedAction }]);
+    setAgiIsThinking(false);
+  };
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatHistory, agiIsThinking]);
+
+  const renderDetailModal = () => {
+    if (!isDetailModalOpen || !detailContent) return null;
+    return (
+      <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="w-full max-w-md bg-white rounded-t-[3.5rem] p-10 space-y-8 animate-in slide-in-from-bottom duration-500 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-slate-100 rounded-full mt-3"></div>
+          <div className="flex justify-between items-start pt-2">
+            <div className="space-y-2">
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight">{detailContent.title}</h3>
+              <div className="flex gap-2">
+                <span className="bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{detailContent.category}</span>
+                {detailContent.price && <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{detailContent.price}</span>}
+              </div>
+            </div>
+            <button onClick={() => setIsDetailModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 hover:text-slate-500 transition-colors">✕</button>
+          </div>
+          
+          {detailContent.description && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-rose-600 rounded-full"></span>
+                詳細資訊
+              </p>
+              <p className="text-slate-600 font-bold leading-relaxed">{detailContent.description}</p>
+            </div>
+          )}
+
+          {detailContent.precautions && (
+            <div className="space-y-3 bg-rose-50/50 p-6 rounded-3xl border border-rose-100/50">
+              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">注意事項</p>
+              <p className="text-rose-700 font-bold leading-relaxed text-sm">{detailContent.precautions}</p>
+            </div>
+          )}
+
+          {detailContent.onConfirm && (
+            <button 
+              onClick={() => {
+                detailContent.onConfirm();
+                setIsDetailModalOpen(false);
+              }}
+              className="w-full bg-rose-700 text-white py-6 rounded-[2rem] font-black text-lg shadow-xl shadow-rose-100 hover:bg-rose-800 transition-all active:scale-[0.98]"
+            >
+              確認辦理
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // --- Sub-Renders ---
+
+  const renderHome = () => (
+    <main className="relative z-10 max-w-md mx-auto p-8 space-y-10 animate-in fade-in duration-1000 pb-40">
+      <header className="flex items-center justify-between mt-6">
+        <div className="flex items-center gap-6">
+          <div className="relative group">
+            <div className="absolute inset-0 bg-rose-700 blur-2xl opacity-10 group-hover:opacity-30 transition-opacity"></div>
+            <div className="w-20 h-20 rounded-[2.25rem] overflow-hidden border-2 border-white shadow-2xl bg-white p-1 relative z-10">
+              <img src={guestUser?.avatar} alt="Avatar" className="w-full h-full object-cover rounded-[1.75rem]" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] text-rose-700 font-black uppercase tracking-[0.4em] leading-none mb-1">信眾平安</p>
+            <h2 className="text-4xl font-black text-slate-800 tracking-tighter leading-none">{guestUser?.name}</h2>
+          </div>
+        </div>
+        <button className="w-14 h-14 bg-white rounded-[1.75rem] flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-rose-700 hover:border-rose-100 transition-all relative group">
+          <IconBell />
+          <span className="absolute top-4 right-4 w-3 h-3 bg-rose-700 rounded-full border-2 border-white animate-pulse"></span>
+          <div className="absolute inset-0 bg-rose-50 rounded-[1.75rem] scale-0 group-hover:scale-100 transition-transform -z-10"></div>
+        </button>
+      </header>
+
+      {/* AI Assistant Banner - Premium Zen Guided Style */}
+      <div className="bg-white rounded-[4rem] p-12 shadow-2xl shadow-rose-900/5 border border-rose-50 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-rose-50 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 opacity-60"></div>
+        <div className="relative z-10 space-y-10">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-rose-700 rounded-[1.75rem] flex items-center justify-center text-4xl shadow-2xl shadow-rose-100 text-white animate-soft-float">✨</div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight">生活助理</h3>
+              <p className="text-[10px] text-rose-700/40 font-black uppercase tracking-[0.4em] mt-1">Divine AI Guidance</p>
+            </div>
+          </div>
+          <p className="text-2xl text-slate-700 leading-tight font-bold pr-4">傾聽您的心聲，<br/><span className="text-rose-700 font-black">指引生活的平靜與安詳。</span></p>
+          <button onClick={() => setIsAgiModalOpen(true)} className="w-full bg-slate-900 text-white font-black py-7 rounded-[2.5rem] shadow-2xl hover:bg-rose-700 transition-all flex items-center justify-center gap-4 group active:scale-[0.98]">
+            <span className="text-xs uppercase tracking-[0.4em] font-black">開啟諮詢對話</span>
+            <span className="text-2xl group-hover:translate-x-3 transition-transform">➔</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Primary Service Grid - Sacred Icons */}
+      <div className="grid grid-cols-2 gap-6">
+        {[
+          { id: 'booking', label: '聖事預約', sub: 'BOOKING', icon: '📅', color: 'bg-indigo-50/50', iconColor: 'text-indigo-700' },
+          { id: 'events', label: '法會活動', sub: 'EVENTS', icon: <IconFestive />, color: 'bg-rose-50/50', iconColor: 'text-rose-700', isSvg: true },
+          { id: 'queue', label: '現場排隊', sub: 'QUEUE', icon: '🎟️', color: 'bg-emerald-50/50', iconColor: 'text-emerald-700' },
+          { id: 'lighting', label: '點燈祈福', sub: 'LIGHTING', icon: <IconCandle />, color: 'bg-amber-50/50', iconColor: 'text-amber-700', isSvg: true }
+        ].map(item => (
+          <button key={item.id} onClick={() => setActiveView(item.id as any)} className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-slate-100 hover:border-rose-300 hover:shadow-xl transition-all duration-700 flex flex-col items-center justify-center gap-5 group">
+            <div className={`w-20 h-20 ${item.color} rounded-[2rem] flex items-center justify-center text-5xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 ${item.iconColor} shadow-inner`}>
+              {item.isSvg ? item.icon : item.icon}
+            </div>
+            <div className="text-center space-y-1">
+              <h4 className="font-black text-slate-800 text-lg tracking-tight leading-none">{item.label}</h4>
+              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">{item.sub}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* High Contrast List Actions */}
+      <div className="space-y-6">
+        <button onClick={() => setActiveView('space')} className="w-full bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:shadow-xl hover:border-rose-200 transition-all duration-700">
+          <div className="flex items-center gap-8">
+            <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-4xl group-hover:scale-110 transition-all duration-700 shadow-inner">📁</div>
+            <div className="text-left">
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-none">個人空間</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2 leading-none">Your Sacred Archives</p>
+            </div>
+          </div>
+          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:bg-rose-700 group-hover:text-white group-hover:translate-x-1 transition-all">➔</div>
+        </button>
+
+        <button onClick={() => setActiveView('records')} className="w-full bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:shadow-xl hover:border-rose-200 transition-all duration-700">
+          <div className="flex items-center gap-8">
+            <div className="w-20 h-20 bg-rose-50 rounded-[2rem] flex items-center justify-center text-4xl group-hover:scale-110 transition-all duration-700 shadow-inner">📜</div>
+            <div className="text-left">
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-none">所有紀錄</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2 leading-none">Spiritual History</p>
+            </div>
+          </div>
+          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:bg-rose-700 group-hover:text-white group-hover:translate-x-1 transition-all">➔</div>
+        </button>
+      </div>
+    </main>
+  );
+
+  const renderPersonalSpace = () => (
+    <div className="animate-in slide-in-from-right duration-700 min-h-screen">
+      <TopNav title="個人空間" onBack={() => setActiveView('home')} />
+      <div className="max-w-md mx-auto p-8 space-y-8 pb-40">
+        {/* Search Bar - Clean Minimalist */}
+        <div className="relative group">
+          <input 
+            type="text" 
+            placeholder="搜尋檔案名稱或日期..." 
+            value={fileSearch}
+            onChange={(e) => setFileSearch(e.target.value)}
+            className="w-full bg-white border border-slate-100 rounded-[2rem] p-6 pl-14 font-bold text-slate-800 shadow-sm focus:outline-none focus:border-rose-300 focus:shadow-xl transition-all"
+          />
+          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-rose-600 transition-colors">🔍</span>
+        </div>
+
+        {/* Category Tabs - Traditional Styled */}
+        <div className="flex bg-white p-2 rounded-[2.5rem] border border-slate-100 shadow-sm">
+          {(['photo', 'video', 'file'] as const).map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveFileTab(tab)}
+              className={`flex-1 py-4 rounded-[1.75rem] font-black text-[10px] uppercase tracking-[0.3em] transition-all duration-500 ${activeFileTab === tab ? 'bg-rose-700 text-white shadow-xl scale-105' : 'text-slate-400 hover:bg-rose-50'}`}
+            >
+              {tab === 'photo' ? '照片' : tab === 'video' ? '影音' : '檔案'}
+            </button>
+          ))}
+        </div>
+
+        {/* File List - Elegant Cards */}
+        <div className="grid grid-cols-1 gap-6">
+          {guestFiles.filter(f => f.type === activeFileTab && (f.name.includes(fileSearch) || f.folder.includes(fileSearch))).map(file => (
+            <div key={file.id} className="bg-white p-6 rounded-[3rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:border-rose-300 hover:shadow-xl transition-all duration-500">
+              <div className="w-24 h-24 bg-slate-50 rounded-[2rem] overflow-hidden border border-slate-100 flex-shrink-0 relative">
+                {file.type === 'photo' ? <img src={file.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" /> : <div className="w-full h-full flex items-center justify-center text-4xl">{file.type === 'video' ? '🎬' : '📄'}</div>}
+                <div className="absolute inset-0 bg-rose-900/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <h4 className="font-black text-slate-800 text-lg truncate tracking-tight">{file.name}</h4>
+                <div className="flex items-center gap-2">
+                   <div className="w-1.5 h-1.5 bg-slate-200 rounded-full"></div>
+                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{file.folder}</p>
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${file.uploadedBy === 'Temple' ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-600'}`}>
+                    {file.uploadedBy === 'Temple' ? '宮廟傳承' : '個人收藏'}
+                  </span>
+                  {!file.isPrivate && <span className="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600">公開分享</span>}
+                </div>
+              </div>
+              <button className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 hover:bg-rose-700 hover:text-white transition-all">⋮</button>
+            </div>
+          ))}
+          <button className="w-full py-10 border-2 border-dashed border-slate-100 rounded-[3rem] text-slate-300 font-black text-xs hover:border-rose-300 hover:text-rose-700 transition-all uppercase tracking-[0.4em] bg-white hover:bg-rose-50/30">
+            + 上傳新項目
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAllRecords = () => {
+    const allRecords = [
+      ...guestAppointments.map(a => ({ ...a, type: '預約', icon: '📅', color: 'bg-indigo-50', text: 'indigo' })),
+      ...guestRegistrations.map(r => ({ ...r, type: '活動', icon: '🏮', color: 'bg-rose-50', text: 'rose', service: r.title, time: r.timestamp, staff: '本宮法師' })),
+      ...guestTickets.map(t => ({ ...t, type: '排隊', icon: '🎟️', color: 'bg-emerald-50', text: 'emerald', service: t.eventTitle, time: t.scannedAt || '尚未核銷', staff: '現場候位' })),
+      ...guestLamps.map(l => {
+        const remaining = Math.ceil((new Date(l.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        return { 
+          ...l, 
+          type: '點燈', 
+          icon: '🕯️', 
+          color: 'bg-amber-50', 
+          text: 'amber', 
+          service: l.categoryName, 
+          time: `${l.startDate} ~ ${l.expiryDate}`, 
+          staff: '本宮法事',
+          remaining: remaining > 0 ? remaining : 0
+        };
+      })
+    ].sort((a, b) => b.time.localeCompare(a.time));
+
+    const filtered = recordsTab === '全部' ? allRecords : allRecords.filter(r => r.type === recordsTab);
+
+    return (
+      <div className="animate-in slide-in-from-right duration-700 min-h-screen">
+        <TopNav title="所有紀錄" onBack={() => setActiveView('home')} />
+        <div className="max-w-md mx-auto p-8 space-y-10 pb-40">
+          {/* Categories Tab - Elegant Pill Style */}
+          <div className="flex bg-white p-2 rounded-[3.5rem] border border-slate-100 shadow-sm overflow-x-auto no-scrollbar gap-2 px-3">
+            {['全部', '預約', '活動', '排隊', '點燈'].map(cat => (
+              <button 
+                key={cat} 
+                onClick={() => setRecordsTab(cat)}
+                className={`whitespace-nowrap px-8 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-500 ${
+                  recordsTab === cat ? 'bg-rose-700 text-white shadow-xl scale-105' : 'text-slate-400 hover:bg-rose-50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-6">
+            {filtered.length === 0 ? (
+              <div className="py-20 text-center space-y-6 bg-white rounded-[4rem] border-2 border-dashed border-slate-100">
+                <div className="text-7xl grayscale opacity-20">📜</div>
+                <p className="text-slate-300 font-black text-sm uppercase tracking-widest">目前尚無相關紀錄</p>
+              </div>
+            ) : filtered.map((record, idx) => (
+              <div key={idx} className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm space-y-8 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
+                <div className="flex justify-between items-start relative z-10">
+                  <div className="flex items-center gap-6">
+                    <div className={`w-14 h-14 ${record.color} rounded-[1.25rem] flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform`}>{record.icon}</div>
+                    <div>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mb-1 text-slate-300`}>{record.type}</p>
+                      <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">{record.service}</h3>
+                    </div>
+                  </div>
+                  <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest ${
+                    record.status === 'Pending' || record.status === 'Unpaid' ? 'bg-amber-50 text-amber-600' : 
+                    record.status === 'Queuing' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {record.status === 'Pending' ? '處理中' : 
+                     record.status === 'Unpaid' ? '待付款' :
+                     record.status === 'Completed' || record.status === 'Paid' ? '已完成' : 
+                     record.status === 'Queuing' ? '現場候位' : record.status}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-50 relative z-10">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">時間與日期</p>
+                    <div className="flex items-center gap-2 text-slate-600 font-bold text-xs truncate">
+                       <span className="opacity-50">📅</span> {record.time}
+                    </div>
+                  </div>
+                  {record.type === '點燈' ? (
+                    <div className="flex flex-col gap-2 text-right items-end">
+                       <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">點燈期限</p>
+                       <span className="text-[11px] font-black text-rose-700 animate-pulse bg-rose-50 px-3 py-1 rounded-full">剩餘 {record.remaining} 天</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 text-right items-end">
+                       <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">服務人員</p>
+                       <div className="flex items-center gap-2 text-slate-600 font-bold text-xs truncate">
+                          {record.staff} <span className="opacity-50">👤</span>
+                       </div>
+                    </div>
+                  )}
+                </div>
+                <div className={`absolute top-0 right-0 w-32 h-32 ${record.color} opacity-20 blur-[60px] -translate-y-1/2 translate-x-1/2`}></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderActionSuccess = () => (
+    <div className="fixed inset-0 z-[300] bg-white flex flex-col items-center justify-center p-12 animate-in fade-in zoom-in duration-700">
+      <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none overflow-hidden flex flex-wrap gap-10 p-10 rotate-12">
+         {Array.from({length: 40}).map((_, i) => <div key={i} className="text-4xl">⛩️</div>)}
+      </div>
+      
+      <div className="w-48 h-48 bg-rose-700 rounded-[4rem] flex items-center justify-center text-8xl text-white mb-12 shadow-2xl shadow-rose-100 animate-soft-float relative z-10">
+        ✓
+      </div>
+      
+      <div className="text-center space-y-6 relative z-10">
+        <h3 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{successInfo?.title || '辦理完成'}</h3>
+        <p className="text-slate-500 font-bold text-center text-xl leading-relaxed whitespace-pre-line max-w-xs mx-auto">
+          {successInfo?.message || '您的資料已同步至宮廟系統，\n祈願平安喜樂。'}
+        </p>
+      </div>
+
+      <button 
+        onClick={() => { setSuccessInfo(null); setBookingStatus('idle'); setBookingStep(1); setActiveView('home'); }} 
+        className="mt-16 w-full max-w-sm bg-slate-900 text-white py-8 rounded-[2.5rem] font-black text-xl shadow-2xl hover:bg-rose-700 transition-all active:scale-[0.98] relative z-10"
+      >
+        返回首頁 ➔
+      </button>
+    </div>
+  );
+
+  const renderProfile = () => (
+    <div className="animate-in slide-in-from-right duration-700">
+      <TopNav title="信眾基本資料" onBack={() => setActiveView('home')} />
+      <div className="max-w-md mx-auto p-8 space-y-10 pb-40">
+        <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-slate-100 space-y-12">
+          <div className="flex flex-col items-center gap-6">
+             <div className="relative group">
+                <div className="absolute inset-0 bg-rose-700 blur-2xl opacity-10 group-hover:opacity-30 transition-opacity"></div>
+                <div className="w-32 h-32 rounded-[3.5rem] border-4 border-white shadow-2xl overflow-hidden bg-white relative z-10">
+                  <img src={guestUser?.avatar} className="w-full h-full object-cover" />
+                </div>
+             </div>
+             <div className="text-center space-y-1">
+                <p className="text-[10px] text-rose-700 font-black tracking-[0.4em] uppercase">Sacred Identity</p>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight leading-none">GU-{guestUser?.phone?.slice(-4)}</h3>
+             </div>
+          </div>
+
+          <form className="space-y-10">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] ml-4">信眾姓名</label>
+              <input type="text" defaultValue={guestUser?.name} className="w-full py-6 px-10 rounded-[2.5rem] bg-slate-50 border-2 border-transparent font-black text-slate-800 text-xl focus:bg-white focus:border-rose-100 transition-all outline-none" />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] ml-4">聯絡電話</label>
+              <input type="text" value={guestUser?.phone} readOnly className="w-full py-6 px-10 rounded-[2.5rem] bg-slate-50/50 border-2 border-transparent font-black text-slate-400 text-xl cursor-not-allowed outline-none" />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] ml-4">出生日期 (國曆)</label>
+              <input 
+                type="date" 
+                value={gregorianDate} 
+                onChange={(e) => setGregorianDate(e.target.value)}
+                className="w-full py-6 px-10 rounded-[2.5rem] bg-slate-50 border-2 border-transparent font-black text-slate-800 text-xl focus:bg-white focus:border-rose-100 transition-all outline-none" 
+              />
+              {lunarResult && (
+                <div className="p-6 bg-rose-50/50 rounded-[2rem] text-rose-700 text-sm font-black text-center animate-in fade-in slide-in-from-top-2 border border-rose-100/30">
+                  {lunarResult}
+                </div>
+              )}
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] ml-4">居住地址</label>
+              <textarea className="w-full p-5 rounded-2xl bg-slate-50 border-none font-black text-slate-800 text-lg shadow-inner min-h-[120px]" placeholder="請輸入通訊地址" />
+            </div>
+            <button type="button" onClick={() => { alert("資料已更新"); setActiveView('home'); }} className="w-full bg-slate-900 text-white font-black py-6 rounded-[2.5rem] shadow-2xl hover:bg-slate-800 transition-all uppercase tracking-[0.2em] text-sm">
+              儲存更新資料
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderBooking = () => {
+    const handleNextStep = () => setBookingStep((prev) => (prev + 1) as any);
+    const handlePrevStep = () => setBookingStep((prev) => (prev - 1) as any);
+
+    const filteredSlots = slots.filter(s => s.date === selectedDate && (!selectedStaff || s.staff === selectedStaff.name));
+
+    return (
+      <div className="animate-in slide-in-from-right duration-700 min-h-screen pb-40">
+        <TopNav title="聖事預約" onBack={() => {
+          if (bookingStep > 1) handlePrevStep();
+          else setActiveView('home');
+        }} />
+        
+        <div className="max-w-md mx-auto p-8 space-y-12">
+          {/* Progress Indicator - Elegant Dots */}
+          <div className="flex items-center justify-center gap-12 relative px-4">
+            <div className="absolute top-1/2 left-0 w-full h-[1px] bg-slate-100 -translate-y-1/2 z-0"></div>
+            {[1, 2, 3].map(s => (
+              <div key={s} className="relative z-10 flex flex-col items-center gap-3">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-700 ${bookingStep >= s ? 'bg-rose-700 text-white shadow-lg shadow-rose-100 scale-110' : 'bg-white text-slate-300 border border-slate-100'}`}>
+                  <span className="text-xs font-black">{s}</span>
+                </div>
+                <span className={`text-[9px] font-black uppercase tracking-widest ${bookingStep === s ? 'text-rose-700' : 'text-slate-300'}`}>
+                  {s === 1 ? '項目' : s === 2 ? '人員' : '時段'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {bookingStep === 1 && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl font-black text-slate-800 tracking-tight">請選擇預約項目</h3>
+                <p className="text-[10px] text-rose-600/40 font-black uppercase tracking-[0.4em]">Sacred Service Selection</p>
+              </div>
+              <div className="grid gap-6">
+                {serviceDefinitions.map(svc => (
+                  <button 
+                    key={svc.id}
+                    onClick={() => {
+                      setSelectedService(svc);
+                      const assigned = staff.filter(s => svc.assignedStaff.includes(s.id));
+                      setAvailableStaffList(assigned);
+                      handleNextStep();
+                    }}
+                    className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm hover:border-rose-300 hover:shadow-xl transition-all duration-500 text-left group relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-6xl group-hover:scale-125 transition-transform duration-1000">⛩️</div>
+                    <div className="relative z-10 space-y-6">
+                      <div className="flex justify-between items-start">
+                        <h4 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">{svc.name}</h4>
+                        <span className="bg-rose-50 text-rose-700 px-4 py-2 rounded-2xl text-[10px] font-black tracking-widest uppercase">{svc.priceInfo}</span>
+                      </div>
+                      <p className="text-slate-500 text-sm font-bold leading-relaxed line-clamp-2">{svc.precautions}</p>
+                      <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">點擊以選擇</span>
+                        <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-rose-700 group-hover:text-white transition-all">➔</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {bookingStep === 2 && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl font-black text-slate-800 tracking-tight">請選擇服務人員</h3>
+                <p className="text-[10px] text-rose-600/40 font-black uppercase tracking-[0.4em]">Spiritual Guide Selection</p>
+              </div>
+              <div className="grid gap-6">
+                {availableStaffList.map(st => (
+                  <button 
+                    key={st.id}
+                    onClick={() => {
+                      setSelectedStaff(st);
+                      handleNextStep();
+                    }}
+                    className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:border-rose-300 hover:shadow-xl transition-all duration-500 flex items-center gap-8 group"
+                  >
+                    <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-all">👤</div>
+                    <div className="text-left flex-1">
+                      <h4 className="text-2xl font-black text-slate-800 tracking-tight">{st.name}</h4>
+                      <p className="text-rose-600 text-[10px] font-black uppercase tracking-[0.3em] mt-1">{st.title}</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-rose-700 group-hover:text-white transition-all">➔</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {bookingStep === 3 && (
+            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl font-black text-slate-800 tracking-tight">請挑選預約時段</h3>
+                <p className="text-[10px] text-rose-600/40 font-black uppercase tracking-[0.4em]">Sacred Time Selection</p>
+              </div>
+              
+              <div className="bg-white p-10 rounded-[4rem] border border-slate-100 shadow-xl space-y-10 relative overflow-hidden">
+                <div className="flex justify-between items-center px-4">
+                  <button onClick={() => {
+                    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(v => v - 1); }
+                    else setCurrentMonth(v => v - 1);
+                  }} className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 hover:text-rose-700 hover:bg-rose-50 transition-all shadow-sm active:scale-90">←</button>
+                  
+                  <div className="text-center">
+                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.4em] mb-1">Calendar</p>
+                    <span className="font-black text-slate-800 text-xl tracking-tight">{currentYear}年 {currentMonth + 1}月</span>
+                  </div>
+
+                  <button onClick={() => {
+                    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(v => v + 1); }
+                    else setCurrentMonth(v => v + 1);
+                  }} className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 hover:text-rose-700 hover:bg-rose-50 transition-all shadow-sm active:scale-90">→</button>
+                </div>
+                
+                <div className="grid grid-cols-7 gap-1">
+                  {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+                    <div key={d} className="text-center text-[10px] font-black text-slate-300 py-3 uppercase tracking-widest">{d}</div>
+                  ))}
+                  {Array.from({ length: new Date(currentYear, currentMonth, 1).getDay() }).map((_, i) => (
+                    <div key={`empty-${i}`} className="aspect-square"></div>
+                  ))}
+                  {Array.from({ length: new Date(currentYear, currentMonth + 1, 0).getDate() }).map((_, i) => {
+                    const day = i + 1;
+                    const dateStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                    const isSelected = selectedDate === dateStr;
+                    const hasSlots = slots.some(s => s.date === dateStr && (!selectedStaff || s.staff === selectedStaff.name));
+                    
+                    return (
+                      <button 
+                        key={i} 
+                        disabled={!hasSlots}
+                        onClick={() => setSelectedDate(dateStr)}
+                        className={`aspect-square rounded-2xl flex flex-col items-center justify-center font-black transition-all relative ${
+                          isSelected ? 'bg-rose-700 text-white shadow-xl scale-110 z-10' : 
+                          hasSlots ? 'hover:bg-rose-50 text-slate-700' : 'text-slate-100 cursor-not-allowed'
+                        }`}
+                      >
+                        <span className="text-sm">{day}</span>
+                        {hasSlots && !isSelected && <div className="absolute bottom-2 w-1 h-1 bg-amber-400 rounded-full"></div>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center justify-between px-4">
+                   <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">可預約時段 ({selectedDate})</h5>
+                   <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-full uppercase tracking-widest">Available</span>
+                </div>
+                
+                <div className="grid gap-4">
+                  {filteredSlots.length > 0 ? filteredSlots.map(slot => (
+                    <button 
+                      key={slot.id}
+                      onClick={() => {
+                        setDetailContent({
+                          title: selectedService?.name,
+                          category: selectedStaff?.name + ' ' + selectedStaff?.title,
+                          price: selectedService?.priceInfo,
+                          precautions: selectedService?.precautions,
+                          description: `時段：${selectedDate} ${slot.time}\n地點：本宮 二樓法事區`,
+                          onConfirm: async () => {
+                            const formData = new FormData();
+                            formData.append('guest_name', guestUser.name);
+                            formData.append('phone', guestUser.phone);
+                            formData.append('service', selectedService.name);
+                            formData.append('staff', selectedStaff.name);
+                            formData.append('date', selectedDate);
+                            formData.append('time', slot.time);
+                            await createAppointment(formData);
+                            setBookingStatus('success');
+                            refreshAllData(guestUser.phone);
+                          }
+                        });
+                        setIsDetailModalOpen(true);
+                      }}
+                      className="bg-white p-8 rounded-[3rem] border border-slate-100 flex items-center justify-between group hover:border-rose-300 hover:shadow-xl transition-all duration-500"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 bg-slate-50 rounded-[1.25rem] flex items-center justify-center text-xl font-black text-slate-900 group-hover:bg-rose-50 group-hover:text-rose-700 transition-colors">{slot.time}</div>
+                        <div className="text-left">
+                          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Guiding Staff</p>
+                          <h4 className="text-lg font-black text-slate-800 tracking-tight">{slot.staff}</h4>
+                        </div>
+                      </div>
+                      <div className="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center text-slate-200 group-hover:bg-rose-700 group-hover:text-white group-hover:border-rose-700 transition-all">✓</div>
+                    </button>
+                  )) : (
+                    <div className="py-20 text-center space-y-4 bg-white rounded-[4rem] border-2 border-dashed border-slate-100">
+                      <p className="text-slate-300 font-black text-sm uppercase tracking-widest">此日期暫無可預約時段</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {renderDetailModal()}
+        {successInfo && renderActionSuccess()}
+      </div>
+    );
+  };
+
+  const renderEvents = () => {
+    const eventsOnSelectedDate = events.filter(e => e.date === selectedDate);
+    
+    return (
+      <div className="animate-in slide-in-from-right duration-700 min-h-screen">
+        <TopNav title="法會活動" onBack={() => setActiveView('home')} />
+        <div className="max-w-md mx-auto p-8 space-y-10 pb-40">
+          <div className="text-center space-y-2">
+            <h3 className="text-3xl font-black text-slate-800 tracking-tight">活動日曆</h3>
+            <p className="text-[10px] text-rose-600/40 font-black uppercase tracking-[0.4em]">Sacred Events Calendar</p>
+          </div>
+
+          <div className="bg-white p-10 rounded-[4rem] border border-slate-100 shadow-xl space-y-10">
+            <div className="flex justify-between items-center px-4">
+              <button onClick={() => {
+                if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(v => v - 1); }
+                else setCurrentMonth(v => v - 1);
+              }} className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 hover:text-rose-700 hover:bg-rose-50 transition-all shadow-sm active:scale-90">←</button>
+              
+              <div className="text-center">
+                <p className="text-[10px] font-black text-rose-600 uppercase tracking-[0.4em] mb-1">Select Month</p>
+                <span className="font-black text-slate-800 text-xl tracking-tight">{currentYear}年 {currentMonth + 1}月</span>
+              </div>
+
+              <button onClick={() => {
+                if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(v => v + 1); }
+                else setCurrentMonth(v => v + 1);
+              }} className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 hover:text-rose-700 hover:bg-rose-50 transition-all shadow-sm active:scale-90">→</button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+                <div key={d} className="text-center text-[10px] font-black text-slate-300 py-3 uppercase tracking-widest">{d}</div>
+              ))}
+              {Array.from({ length: new Date(currentYear, currentMonth, 1).getDay() }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-square"></div>
+              ))}
+              {Array.from({ length: new Date(currentYear, currentMonth + 1, 0).getDate() }).map((_, i) => {
+                const day = i + 1;
+                const dateStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                const hasEvent = events.some(e => e.date === dateStr);
+                const isSelected = selectedDate === dateStr;
+                return (
+                  <button 
+                    key={i} 
+                    disabled={!hasEvent}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center font-black transition-all relative ${
+                      isSelected ? 'bg-rose-700 text-white shadow-xl scale-110 z-10' : 
+                      hasEvent ? 'hover:bg-rose-50 text-slate-700' : 'text-slate-100 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="text-sm">{day}</span>
+                    {hasEvent && !isSelected && <div className="absolute bottom-2 w-1 h-1 bg-rose-400 rounded-full"></div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">{selectedDate} 活動列表</h5>
+            <div className="grid gap-6">
+              {eventsOnSelectedDate.length > 0 ? eventsOnSelectedDate.map(evt => (
+                <div key={evt.id} className="bg-white rounded-[3.5rem] border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all group">
+                  <div className="h-56 overflow-hidden relative">
+                    <img src={evt.imageUrl} alt={evt.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                    <div className="absolute top-6 right-6 bg-white/90 backdrop-blur px-5 py-2 rounded-2xl text-[10px] font-black text-rose-700 shadow-lg">
+                      功德金 ${evt.price}
+                    </div>
+                  </div>
+                  <div className="p-10 space-y-6">
+                    <h4 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">{evt.title}</h4>
+                    <p className="text-slate-500 text-sm font-bold leading-relaxed line-clamp-2">{evt.description}</p>
+                    <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                      <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                        剩餘名額：<span className="text-rose-600">{evt.max_p - evt.current_p}</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setDetailContent({
+                            title: evt.title,
+                            category: '法會活動',
+                            price: `結緣價 $${evt.price}`,
+                            precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
+                            description: evt.description,
+                            onConfirm: async () => {
+                              await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price);
+                              setSuccessInfo({
+                                title: '報名成功！',
+                                message: '您已成功報名法會活動，\n詳細資訊可至紀錄中心查看。'
+                              });
+                              refreshAllData(guestUser.phone);
+                            }
+                          });
+                          setIsDetailModalOpen(true);
+                        }}
+                        className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-rose-700 shadow-xl transition-all"
+                      >
+                        立即報名
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="py-20 text-center space-y-4 bg-white rounded-[4rem] border-2 border-dashed border-slate-100">
+                  <p className="text-slate-300 font-black text-sm uppercase tracking-widest">此日期暫無法會活動</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {renderDetailModal()}
+        {successInfo && renderActionSuccess()}
+      </div>
+    );
+  };
+
+  const renderQueue = () => {
+    const activeQueueEvents = queueEvents.filter(e => e.status === 'Active');
+    
+    return (
+      <div className="animate-in slide-in-from-right duration-700 min-h-screen">
+        <TopNav title="現場排隊" onBack={() => setActiveView('home')} />
+        <div className="max-w-md mx-auto p-8 space-y-10 pb-40">
+          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-50 rounded-full blur-[60px] opacity-40"></div>
+            <div className="flex items-center gap-5 relative z-10">
+              <div className="w-14 h-14 bg-emerald-600 rounded-[1.5rem] flex items-center justify-center text-3xl text-white shadow-lg shadow-emerald-100">🎟️</div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight">在線領號</h3>
+            </div>
+            <p className="text-sm font-bold text-slate-500 leading-relaxed relative z-10">
+              請挑選開啟的排隊活動領取號碼牌。報到順序由到場**掃碼時間**決定。
+            </p>
+            <div className="space-y-4 relative z-10">
+              {activeQueueEvents.length > 0 ? activeQueueEvents.map(evt => (
+                <button 
+                  key={evt.id} 
+                  onClick={() => {
+                    setDetailContent({
+                      title: evt.title,
+                      category: '現場排隊',
+                      price: evt.priceInfo,
+                      precautions: evt.precautions,
+                      description: `活動時間：${evt.timeWindow}\n地點：${evt.location}`,
+                      onConfirm: async () => {
+                        await joinQueue(evt.id, guestUser.phone, guestUser.name);
+                        setSuccessInfo({
+                          title: '領取成功！',
+                          message: '您已領取號碼牌！\n請於活動時間內到場掃碼核銷。'
+                        });
+                        refreshAllData(guestUser.phone);
+                      }
+                    });
+                    setIsDetailModalOpen(true);
+                  }}
+                  className="w-full p-8 rounded-[3rem] bg-slate-50 border border-slate-100 font-black text-slate-800 flex justify-between items-center group hover:bg-emerald-50 hover:border-emerald-200 transition-all"
+                >
+                  <div className="text-left">
+                    <h4 className="text-lg tracking-tight">{evt.title}</h4>
+                    <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">{evt.timeWindow}</p>
+                  </div>
+                  <span className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg group-hover:bg-emerald-600 transition-colors">領號</span>
+                </button>
+              )) : (
+                <div className="py-12 text-center text-slate-300 font-black text-sm uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-[3rem]">
+                  目前無開啟活動
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button 
+            onClick={async () => {
+              await verifyQueueTicket('TICKET-AUTO-GEN');
+              setSuccessInfo({
+                title: '核銷成功！',
+                message: '您的正式順位已更新，\n請依照現場人員指示入座。'
+              });
+              refreshAllData(guestUser.phone);
+            }} 
+            className="w-full bg-slate-900 text-white p-12 rounded-[4rem] shadow-2xl flex items-center justify-center gap-8 group hover:bg-emerald-700 transition-all active:scale-[0.98]"
+          >
+            <div className="w-20 h-20 bg-white/10 rounded-[2rem] flex items-center justify-center text-5xl group-hover:rotate-12 transition-transform">📷</div>
+            <div className="text-left">
+              <h4 className="text-2xl font-black tracking-tight">到場掃碼核銷</h4>
+              <p className="text-[10px] font-black opacity-40 uppercase tracking-[0.3em] mt-2 tracking-tight">SCAN ON-SITE QR CODE</p>
+            </div>
+          </button>
+        </div>
+        {renderDetailModal()}
+      </div>
+    );
+  };
+
+  const renderLighting = () => (
+    <div className="animate-in slide-in-from-right duration-700 min-h-screen pb-40">
+      <TopNav title="線上點燈" onBack={() => setActiveView('home')} />
+      <div className="max-w-md mx-auto p-8 space-y-10">
+        <div className="bg-white rounded-[4rem] p-12 space-y-8 shadow-xl border border-amber-100 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-amber-50 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 opacity-60"></div>
+          
+          <div className="flex items-center gap-6 relative z-10">
+            <div className="w-20 h-20 bg-rose-700 rounded-[2rem] flex items-center justify-center text-4xl shadow-xl shadow-rose-100 text-white animate-soft-float"><IconCandle /></div>
+            <div className="space-y-2">
+              <h3 className="text-4xl font-black tracking-tight text-slate-900 leading-none">祈福光明燈</h3>
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-600/40">The Eternal Flame</p>
+            </div>
+          </div>
+          <p className="text-xl font-bold text-slate-600 leading-tight max-w-[280px] relative z-10">點亮平安紅燭，<br/><span className="text-rose-700 font-black">祈求諸神加持元辰光彩。</span></p>
+        </div>
+        
+        <div className="grid gap-6">
+          {lampCategories.map(item => (
+            <div key={item.id} className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm flex flex-col gap-8 group hover:border-rose-300 hover:shadow-xl transition-all duration-500">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <h4 className="text-2xl font-black text-slate-900 tracking-tight">{item.name}</h4>
+                  <p className="text-[10px] text-rose-600/60 font-black uppercase tracking-widest">Spiritual Protection</p>
+                </div>
+                <div className="text-right">
+                   <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">功德金</p>
+                   <p className="text-2xl text-slate-900 font-black tracking-tighter">$ {item.defaultPrice}</p>
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100/50">
+                <p className="text-slate-500 font-bold text-sm leading-relaxed">{item.precautions}</p>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setDetailContent({
+                    title: item.name,
+                    category: '祈福點燈',
+                    price: `功德金 $${item.defaultPrice}`,
+                    precautions: item.precautions,
+                    description: `點燈週期：${item.defaultDays} 日\n地點：本宮 祈福燈牆`,
+                    onConfirm: async () => {
+                      const fd = new FormData();
+                      fd.append('phone', guestUser.phone);
+                      fd.append('name', guestUser.name);
+                      fd.append('categoryId', item.id);
+                      fd.append('categoryName', item.name);
+                      fd.append('price', item.defaultPrice.toString());
+                      await createLightingOrder(fd);
+                      setSuccessInfo({
+                        title: '辦理成功！',
+                        message: '您的點燈申請已提交，\n本宮將為您安排上燈法事。'
+                      });
+                      refreshAllData(guestUser.phone);
+                    }
+                  });
+                  setIsDetailModalOpen(true);
+                }}
+                className="w-full bg-slate-900 text-white py-6 rounded-[2rem] font-black text-lg shadow-xl hover:bg-rose-700 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+              >
+                <span>立即辦理點燈</span>
+                <span className="text-xl">➔</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      {renderDetailModal()}
+      {successInfo && renderActionSuccess()}
+    </div>
+  );
+
+  if (showLoginWall) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-10 relative overflow-hidden font-sans">
+        <div className="absolute top-[-20%] right-[-20%] w-[100%] h-[60%] bg-rose-600/5 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[80%] h-[50%] bg-amber-500/5 blur-[120px] rounded-full"></div>
+        
+        <div className="w-full max-w-md space-y-16 animate-in fade-in zoom-in duration-1000 relative z-10">
+          <div className="text-center space-y-8">
+            <div className="relative inline-block group">
+              <div className="absolute inset-0 bg-rose-600/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="w-32 h-32 bg-white rounded-[3.5rem] mx-auto shadow-2xl flex items-center justify-center text-7xl border border-rose-50 relative z-10 animate-soft-float">⛩️</div>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-5xl font-black text-slate-800 tracking-tighter">PIVOT <span className="text-rose-700">Sanctuary</span></h1>
+              <p className="text-rose-600/40 font-black uppercase tracking-[0.6em] text-[10px]">Digital Sacred Portal</p>
+            </div>
+          </div>
+          
+          <div className="bg-white p-12 rounded-[4rem] shadow-xl border border-rose-50 space-y-10">
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-black text-slate-800">信眾登入</h3>
+              <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase">Enter the Path of Peace</p>
+            </div>
+            
+            <form onSubmit={handleLogin} className="space-y-8">
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">手機號碼</p>
+                <input 
+                  type="tel" 
+                  value={loginPhone} 
+                  onChange={(e) => setLoginPhone(e.target.value)} 
+                  className="w-full bg-slate-50 border border-slate-100 rounded-[2rem] py-6 px-10 font-black text-slate-800 text-xl placeholder:text-slate-200 outline-none focus:border-rose-300 focus:bg-white transition-all" 
+                  placeholder="0912345678" 
+                  required 
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={isLoggingIn}
+                className="w-full bg-slate-900 text-white font-black py-7 rounded-[2.5rem] text-sm uppercase tracking-[0.4em] shadow-2xl shadow-rose-900/10 hover:bg-rose-700 transition-all active:scale-[0.98] flex items-center justify-center gap-4 group"
+              >
+                {isLoggingIn ? '開啟中...' : '開啟平安之門'}
+                <span className="text-xl group-hover:translate-x-2 transition-transform">➔</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FDFBF7] text-slate-800 font-sans pb-40 overflow-x-hidden">
+      <div className="fixed top-0 left-0 w-full h-96 bg-gradient-to-b from-rose-600/[0.02] to-transparent pointer-events-none z-0"></div>
+      
+      {activeView === 'home' && renderHome()}
+      {activeView === 'space' && renderPersonalSpace()}
+      {activeView === 'records' && renderAllRecords()}
+      {activeView === 'profile' && renderProfile()}
+      {activeView === 'booking' && renderBooking()}
+      {activeView === 'events' && renderEvents()}
+      {activeView === 'queue' && renderQueue()}
+      {activeView === 'lighting' && renderLighting()}
+      
+      <nav className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 w-full max-w-[420px] px-6">
+        <div className="bg-white/90 backdrop-blur-xl border border-slate-100 rounded-[3.5rem] p-3 flex justify-between shadow-2xl shadow-rose-900/5 relative">
+          {[
+            { id: 'home', icon: <IconHome />, label: '首頁' },
+            { id: 'records', icon: <IconCalendar />, label: '紀錄' },
+            { id: 'profile', icon: <IconUser />, label: '個人' },
+            { id: 'space', icon: <IconSpace />, label: '空間' }
+          ].map(nav => (
+            <button 
+              key={nav.id} 
+              onClick={() => setActiveView(nav.id as any)}
+              className={`relative flex flex-col items-center justify-center w-20 h-18 rounded-[2.25rem] transition-all duration-500 ${
+                activeView === nav.id 
+                  ? 'bg-rose-700 text-white shadow-xl shadow-rose-100 scale-110 -translate-y-2' 
+                  : 'text-slate-400 hover:text-rose-700 hover:bg-rose-50'
+              }`}
+            >
+              <div className={`${activeView === nav.id ? 'scale-110' : 'scale-90'} mb-1 transition-transform`}>{nav.icon}</div>
+              <span className={`text-[9px] font-black uppercase tracking-tighter transition-all duration-300 ${
+                activeView === nav.id ? 'opacity-100' : 'opacity-40'
+              }`}>
+                {nav.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* AGI Chat Assistant Modal - Full Screen Premium */}
+      {isAgiModalOpen && (
+        <div className="fixed inset-0 z-[200] flex flex-col bg-white animate-in slide-in-from-bottom duration-700 overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-rose-600/[0.02] to-transparent pointer-events-none"></div>
+          <header className="bg-white/80 backdrop-blur-md p-10 flex items-center justify-between shadow-sm border-b border-slate-50 relative z-10">
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-rose-700 rounded-[1.75rem] flex items-center justify-center text-3xl text-white shadow-2xl animate-soft-float">✨</div>
+              <div className="space-y-1">
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">生活助理</h3>
+                <p className="text-[10px] text-rose-600/40 font-black uppercase tracking-[0.3em]">Sacred AI Guide</p>
+              </div>
+            </div>
+            <button onClick={() => setIsAgiModalOpen(false)} className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 text-xl hover:bg-slate-100 transition-colors">✕</button>
+          </header>
+          
+          <div className="flex-1 overflow-y-auto bg-slate-50/30 p-8 space-y-12 custom-scrollbar relative">
+            {chatHistory.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+                <div className={`p-8 rounded-[3rem] text-lg font-bold max-w-[85%] shadow-sm ${
+                  msg.role === 'user' 
+                    ? 'bg-slate-900 text-white rounded-tr-none shadow-xl' 
+                    : 'bg-white text-slate-800 rounded-tl-none border border-slate-100 shadow-xl shadow-rose-900/5'
+                }`}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {agiIsThinking && (
+              <div className="flex justify-start animate-in fade-in duration-300">
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 flex gap-2 items-center shadow-sm">
+                  <div className="w-2 h-2 bg-rose-700 rounded-full animate-bounce [animation-duration:1s]"></div>
+                  <div className="w-2 h-2 bg-rose-700 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.2s]"></div>
+                  <div className="w-2 h-2 bg-rose-700 rounded-full animate-bounce [animation-duration:1s] [animation-delay:0.4s]"></div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+          
+          <div className="p-10 bg-white border-t border-slate-50 relative z-10 shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
+            <form onSubmit={handleAgiSubmit} className="flex gap-4 max-w-2xl mx-auto">
+              <input 
+                value={agiInput} 
+                onChange={(e) => setAgiInput(e.target.value)} 
+                className="flex-1 py-7 px-10 bg-slate-50 rounded-[2.5rem] border-2 border-transparent focus:border-rose-700 focus:bg-white font-black text-lg outline-none transition-all placeholder:text-slate-300" 
+                placeholder="請輸入您的問題..." 
+              />
+              <button type="submit" className="w-20 h-20 bg-slate-900 text-white rounded-[2.5rem] flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all text-2xl">➔</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
