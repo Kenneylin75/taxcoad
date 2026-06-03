@@ -19,12 +19,6 @@ export default function TempleShell({ children, currentRole, currentUser, temple
       { name: '線上抽籤', href: `${basePath}/queue`, icon: '🎫', show: true },
       { name: '點燈管理', href: `${basePath}/lamps`, icon: '🏮', show: true },
       { name: '法會管理', href: `${basePath}/events`, icon: '🕉️', show: true },
-      { name: '服務進度', href: `${basePath}/tools`, icon: '🛠️', show: true },
-    ]},
-
-    { category: '財務與營收', show: ['TempleAdmin', 'SuperAdmin'].includes(currentRole), items: [
-      { name: '營收報表', href: `${basePath}/earnings`, icon: '💰', show: true },
-      { name: '經銷網路', href: `${basePath}/my-network`, icon: '🌐', show: true },
     ]},
 
     { category: '服務系統設定', show: ['TempleAdmin', 'SuperAdmin'].includes(currentRole), items: [

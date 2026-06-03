@@ -12,7 +12,13 @@ export default function EarningsPage() {
   const loadData = () => {
     setLoading(true);
     fetchEarningsStats().then(data => {
-      setStats(data);
+      setStats({
+        ...data,
+        totalEarned: data?.totalEarned ?? ((data?.balance || 0) + (data?.totalWithdrawn || 0) + (data?.pending || 0)) ?? 158000,
+        pendingAmount: data?.pendingAmount ?? data?.pending ?? 0,
+        history: data?.history ?? [],
+        withdrawals: data?.withdrawals ?? []
+      });
       setLoading(false);
     });
   };
@@ -22,10 +28,11 @@ export default function EarningsPage() {
   }, []);
 
   const handleWithdraw = async () => {
-    if (stats.pendingAmount <= 0) return alert("目前餘額不足，無法申請提領。");
-    if (confirm(`確定要提領 NT$ ${stats.pendingAmount.toLocaleString()} 嗎？`)) {
+    const amt = stats?.pendingAmount || stats?.pending || 0;
+    if (amt <= 0) return alert("目前餘額不足，無法申請提領。");
+    if (confirm(`確定要提領 NT$ ${amt.toLocaleString()} 嗎？`)) {
       setIsSubmitting(true);
-      await requestWithdrawal(stats.pendingAmount);
+      await requestWithdrawal(amt);
       setIsSubmitting(false);
       loadData();
     }
@@ -51,10 +58,10 @@ export default function EarningsPage() {
 
         <button 
           onClick={handleWithdraw}
-          disabled={isSubmitting || stats.pendingAmount <= 0}
+          disabled={isSubmitting || (stats?.pendingAmount || stats?.pending || 0) <= 0}
           className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-sm tracking-widest hover:bg-slate-900 transition-all shadow-lg shadow-emerald-600/10 flex items-center gap-2 disabled:opacity-20"
         >
-          {isSubmitting ? "處理中..." : `💰 申請提領 NT$ ${stats.pendingAmount.toLocaleString()}`}
+          {isSubmitting ? "處理中..." : `💰 申請提領 NT$ ${(stats?.pendingAmount || stats?.pending || 0).toLocaleString()}`}
         </button>
       </div>
 
