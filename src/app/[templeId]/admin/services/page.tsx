@@ -709,6 +709,15 @@ export default function ServicesManagement() {
    const [isLoading, setIsLoading] = useState(true);
    const [isMobile, setIsMobile] = useState(false);
 
+   const handleDeleteService = async (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!confirm('確定要刪除此服務項目嗎？此操作無法還原。')) return;
+      
+      const { deleteServiceDefinition } = await import('@/app/actions');
+      await deleteServiceDefinition(id);
+      loadData();
+   };
+
    const loadData = async () => {
       setIsLoading(true);
       try {
