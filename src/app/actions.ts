@@ -799,7 +799,34 @@ export async function createLightingOrder(fd: FormData) {
   return createLampRecord(fd);
 }
 export async function getGuestUser() {
-  return gStore.currentGuest || null;
+  const store = await cookies();
+  const phone = store.get('guestPhone')?.value;
+  if (!phone) return null;
+  const templeId = await getDynamicTempleId();
+  
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return (gStore.db_guests || db_guests).find((g: any) => g.phone === phone && g.templeId === templeId) || null;
+    }
+    const res = await client.query('SELECT * FROM guests WHERE phone = $1 AND temple_id = $2', [phone, templeId]);
+    if ((res.rowCount ?? 0) > 0) {
+      const r = res.rows[0];
+      return {
+        templeId: r.temple_id,
+        phone: r.phone,
+        name: r.name,
+        email: r.email,
+        password: r.password,
+        address: r.address,
+        birthday: r.birthday,
+        lunarBirthday: r.lunar_birthday,
+        birthHour: r.birth_hour,
+        lineId: r.line_id,
+        status: r.status
+      };
+    }
+    return null;
+  });
 }
 
 export async function guestLogin(phone: string, inputName?: string) {
@@ -870,14 +897,17 @@ export async function guestLogin(phone: string, inputName?: string) {
       }
     }
 
-    gStore.currentGuest = fullGuest;
+    const store = await cookies();
+    store.set('guestPhone', phone, { secure: true, httpOnly: true, path: '/' });
+    
     revalidatePath('/temple/customers');
     return { success: true, guestName: fullGuest.name, fullGuest };
   });
 }
 
 export async function guestLogout() {
-  gStore.currentGuest = null;
+  const store = await cookies();
+  store.delete('guestPhone');
   return { success: true };
 }
 
@@ -3089,11 +3119,6 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
         // 若未填帳號，預設使用手機
         if (!d.account) d.account = d.phone;
         db_guests.push(d);
-      }
-      
-      // Sync the currently logged-in guest session if they are updating their own profile
-      if (gStore.currentGuest && gStore.currentGuest.phone === d.phone) {
-        gStore.currentGuest = { ...gStore.currentGuest, ...d };
       }
     } else {
       await client.query(`
