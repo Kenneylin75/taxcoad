@@ -130,7 +130,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [loginPhone, setLoginPhone] = useState("");
   const [loginName, setLoginName] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [pendingConfirmGuest, setPendingConfirmGuest] = useState<any | null>(null);
+
   const [bindLineId, setBindLineId] = useState("");
 
   // Profile Form States
@@ -284,16 +284,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     e.preventDefault();
     setIsLoggingIn(true);
     
-    // 1. 先檢索後台是否已有宮廟方開立的檔案
-    const existingProfile = await checkGuestProfile(loginPhone);
-    if (existingProfile && !existingProfile.lineId) {
-      // 尋得檔案但尚未綁定 LINE ID：引導至確認及綁定畫面
-      setPendingConfirmGuest(existingProfile);
-      setIsLoggingIn(false);
-      return;
-    }
-    
-    // 2. 正常登入流程
+    // 正常登入流程
     const res = await guestLogin(loginPhone, loginName);
     if (res.success) {
       const user = res.fullGuest || { 
@@ -301,6 +292,13 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         name: res.guestName, 
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(res.guestName)}&background=B91C1C&color=fff` 
       };
+
+      // 背景自動綁定 LINE ID (如果有帶入 bindLineId 且尚未綁定或不同)
+      if (bindLineId && user.lineId !== bindLineId) {
+        user.lineId = bindLineId;
+        await createOrUpdateGuest(user, loginPhone);
+      }
+
       setGuestUser(user);
       setProfileName(user.name || "");
       setGregorianDate(user.birthday || "");
@@ -317,40 +315,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     setIsLoggingIn(false);
   };
 
-  const handleConfirmAndBindLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pendingConfirmGuest) return;
-    setIsLoggingIn(true);
-    
-    // 3. 綁定 LINE ID 並儲存/更新信眾基本檔案
-    const finalLineId = bindLineId.trim() || `@line_${pendingConfirmGuest.phone.slice(-4)}`;
-    const updatedPayload = {
-      ...pendingConfirmGuest,
-      lineId: finalLineId
-    };
-    
-    await createOrUpdateGuest(updatedPayload);
-    
-    // 4. 執行登入
-    const res = await guestLogin(loginPhone);
-    if (res.success) {
-      const user = res.fullGuest || updatedPayload;
-      setGuestUser(user);
-      setProfileName(user.name || "");
-      setGregorianDate(user.birthday || "");
-      setProfileEmail(user.email || "");
-      setProfilePassword(user.password || "");
-      setProfileAddress(user.address || "");
-      setProfileBirthHour(user.birthHour || "");
 
-      setShowLoginWall(false);
-      setPendingConfirmGuest(null);
-      setBindLineId("");
-      refreshAllData(user.phone);
-      alert(`✨ 成功確認檔案，且已完成 LINE ID (${finalLineId}) 綁定！`);
-    }
-    setIsLoggingIn(false);
-  };
 
   const handleAgiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1917,67 +1882,6 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           </div>
           
           <div className="app-card p-8 space-y-8 bg-white border-2 border-red-950/20 shadow-xl rounded-[35px] overflow-hidden">
-            {pendingConfirmGuest ? (
-              // 🔮 LINE ID Onboarding 綁定畫面
-              <div className="space-y-6 animate-in zoom-in-95 duration-300">
-                <div className="text-center space-y-2">
-                  <span className="text-3xl">🔍</span>
-                  <h3 className="text-lg font-black text-gray-900">系統已尋得宮廟服務檔案</h3>
-                  <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed">
-                     宮廟方已為您建檔，請確認並綁定 LINE ID
-                  </p>
-                </div>
-
-                <div className="p-5 bg-red-50 border border-red-100 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-center text-xs">
-                     <span className="font-bold text-gray-400">信眾姓名</span>
-                     <span className="font-black text-red-900 text-sm">{pendingConfirmGuest.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                     <span className="font-bold text-gray-400">聯絡電話</span>
-                     <span className="font-black text-gray-700">{pendingConfirmGuest.phone}</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleConfirmAndBindLogin} className="space-y-6">
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
-                       請輸入您的 LINE ID 以進行綁定
-                    </label>
-                    <input 
-                      type="text" 
-                      value={bindLineId} 
-                      onChange={(e) => setBindLineId(e.target.value)} 
-                      className="app-input border-2 focus:border-red-700" 
-                      placeholder="例如: @your_line_id" 
-                      required 
-                    />
-                    <p className="text-[9px] text-gray-400 font-bold mt-1 ml-1 leading-normal">
-                       * 綁定後，未來在信眾提醒中心可即時接收宮廟通知與排隊提醒。
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                     <button 
-                       type="submit" 
-                       disabled={isLoggingIn}
-                       className="btn-primary w-full py-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all"
-                     >
-                       {isLoggingIn ? '綁定登入中...' : '確認此檔案並登入 🚀'}
-                     </button>
-                     
-                     <button
-                       type="button"
-                       onClick={() => { setPendingConfirmGuest(null); setBindLineId(""); }}
-                       className="w-full text-center py-2 text-xs font-black text-gray-400 hover:text-gray-600 transition-colors"
-                     >
-                       返回重新輸入電話
-                     </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              // 📱 常規輸入手機登入畫面
               <div className="space-y-6">
                 <div className="text-center space-y-1">
                   <h3 className="text-xl font-black text-gray-900">信眾登入</h3>
@@ -2014,7 +1918,6 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                   </button>
                 </form>
               </div>
-            )}
           </div>
         </div>
       </div>
