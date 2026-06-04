@@ -16,7 +16,7 @@ export default function TempleShell({ children, currentRole, currentUser, temple
     { category: '服務核心業務', show: true, items: [
       { name: '信眾檔案', href: `${basePath}/customers`, icon: '📜', show: true },
       { name: '預約日曆', href: `${basePath}/calendar`, icon: '📅', show: true },
-      { name: '線上抽籤', href: `${basePath}/queue`, icon: '🎫', show: true },
+      { name: '現場排隊', href: `${basePath}/queue`, icon: '🎫', show: true },
       { name: '點燈管理', href: `${basePath}/lamps`, icon: '🏮', show: true },
       { name: '法會管理', href: `${basePath}/events`, icon: '🕉️', show: true },
     ]},

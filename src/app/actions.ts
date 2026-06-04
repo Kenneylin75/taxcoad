@@ -800,9 +800,9 @@ export async function createLightingOrder(fd: FormData) {
 }
 export async function getGuestUser() {
   const store = await cookies();
-  const phone = store.get('guestPhone')?.value;
-  if (!phone) return null;
   const templeId = await getDynamicTempleId();
+  const phone = store.get(`guestPhone_${templeId}`)?.value;
+  if (!phone) return null;
   
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
@@ -898,7 +898,7 @@ export async function guestLogin(phone: string, inputName?: string) {
     }
 
     const store = await cookies();
-    store.set('guestPhone', phone, { secure: true, httpOnly: true, path: '/' });
+    store.set(`guestPhone_${templeId}`, phone, { secure: true, httpOnly: true, path: '/' });
     
     revalidatePath('/temple/customers');
     return { success: true, guestName: fullGuest.name, fullGuest };
@@ -907,7 +907,8 @@ export async function guestLogin(phone: string, inputName?: string) {
 
 export async function guestLogout() {
   const store = await cookies();
-  store.delete('guestPhone');
+  const templeId = await getDynamicTempleId();
+  store.delete(`guestPhone_${templeId}`);
   return { success: true };
 }
 
