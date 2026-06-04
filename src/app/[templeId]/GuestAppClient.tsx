@@ -311,6 +311,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
 
       setShowLoginWall(false);
       refreshAllData(user.phone);
+    } else {
+      alert(res.error || "登入失敗，請確認資料後再試");
     }
     setIsLoggingIn(false);
   };
@@ -1984,14 +1986,13 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                 
                 <form onSubmit={handleLogin} className="space-y-6">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-2">真實姓名</label>
+                    <label className="block text-xs font-bold text-gray-500 mb-2">真實姓名 (舊信眾免填)</label>
                     <input 
                       type="text" 
                       value={loginName} 
                       onChange={(e) => setLoginName(e.target.value)} 
                       className="app-input mb-4" 
-                      placeholder="請輸入真實姓名" 
-                      required 
+                      placeholder="首次登入請輸入姓名" 
                     />
                     <label className="block text-xs font-bold text-gray-500 mb-2">手機號碼</label>
                     <input 

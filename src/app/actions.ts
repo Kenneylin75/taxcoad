@@ -874,7 +874,11 @@ export async function guestLogin(phone: string, inputName?: string) {
       }
     }
 
-    const guestName = existing ? existing.name : (inputName || "測試信眾");
+    if (!existing && !inputName) {
+      return { success: false, error: "首次登入請務必填寫您的真實姓名" };
+    }
+
+    const guestName = existing ? existing.name : inputName;
     const fullGuest = existing || {
       templeId,
       phone,
@@ -3102,23 +3106,24 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
     if (!client) {
       // 避免將手機號碼修改成其他已存在的號碼
       if (originalPhone && originalPhone !== d.phone) {
-        const conflict = db_guests.find((g: any) => g.phone === d.phone);
+        const conflict = db_guests.find((g: any) => g.phone === d.phone && g.templeId === templeId);
         if (conflict) {
           return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
         }
       }
 
-      const idx = db_guests.findIndex((g: any) => g.phone === lookupPhone);
+      const idx = db_guests.findIndex((g: any) => g.phone === lookupPhone && g.templeId === templeId);
       if (idx > -1) {
         db_guests[idx] = { ...db_guests[idx], ...d };
       } else {
         // 建立新信眾時，防範重複手機號碼
-        const exists = db_guests.find((g: any) => g.phone === d.phone);
+        const exists = db_guests.find((g: any) => g.phone === d.phone && g.templeId === templeId);
         if (exists) {
           return { success: false, error: "此手機號碼的信眾檔案已存在！" };
         }
         // 若未填帳號，預設使用手機
         if (!d.account) d.account = d.phone;
+        d.templeId = templeId;
         db_guests.push(d);
       }
     } else {
