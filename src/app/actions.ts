@@ -2461,18 +2461,26 @@ export async function fetchComplexAnalyticsData() {
   });
   const conversionRate = totalOrders === 0 ? 0 : Math.round((paidOrders / totalOrders) * 100);
 
-  // B. Gender Demographics
-  let male = 0;
-  let female = 0;
-  db_guests.forEach((g: any) => {
-    if (templeId && g.templeId && g.templeId !== templeId) return;
-    // Guess gender from name if gender field doesn't exist
-    if (g.name?.includes('先生') || g.gender === 'M') male++;
-    else if (g.name?.includes('小姐') || g.gender === 'F') female++;
+  // B. Guest Demographics (New vs Returning)
+  let newGuestCount = 0;
+  let returningGuestCount = 0;
+  
+  const guestApptCounts: Record<string, number> = {};
+  db_appointments.forEach((a: any) => {
+    if (templeId && a.templeId && a.templeId !== templeId) return;
+    if (a.phone) {
+      guestApptCounts[a.phone] = (guestApptCounts[a.phone] || 0) + 1;
+    }
   });
-  const totalGender = male + female;
-  const malePercentage = totalGender === 0 ? 50 : Math.round((male / totalGender) * 100);
-  const femalePercentage = totalGender === 0 ? 50 : 100 - malePercentage;
+  
+  Object.values(guestApptCounts).forEach((count) => {
+    if (count > 1) returningGuestCount++;
+    else newGuestCount++;
+  });
+  
+  const totalGuestTypes = newGuestCount + returningGuestCount;
+  const newPercentage = totalGuestTypes === 0 ? 40 : Math.round((newGuestCount / totalGuestTypes) * 100);
+  const returningPercentage = totalGuestTypes === 0 ? 60 : 100 - newPercentage;
 
   // C. Service Heat
   const serviceCounts: Record<string, number> = {};
@@ -2516,9 +2524,9 @@ export async function fetchComplexAnalyticsData() {
       avgProcessingTime: totalTickets > 0 ? 12 : 0
     },
     genderDemographics: {
-      male: malePercentage,
-      female: femalePercentage,
-      hasData: totalGender > 0
+      newGuest: newPercentage,
+      returning: returningPercentage,
+      hasData: totalGuestTypes > 0
     },
     serviceHeat: sortedServices
   }; 
@@ -4360,4 +4368,9 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
   }
 
   return { success: true };
+}
+
+export async function fetchAuditLogs() {
+  const templeId = await getDynamicTempleId();
+  return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
 }

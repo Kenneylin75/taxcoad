@@ -286,6 +286,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!loginPhone) return;
+    if (!/^09\d{8}$/.test(loginPhone)) {
+      alert('請輸入有效的手機號碼 (10位數，09開頭)');
+      return;
+    }
     setIsLoggingIn(true);
     
     // 正常登入流程
@@ -1238,6 +1243,16 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-gray-500 mb-2">LINE ID 綁定</label>
+            <input 
+              type="text" 
+              value={guestUser?.lineId || '無 (未來將開放點選自動綁定)'} 
+              readOnly 
+              className="app-input bg-gray-50 text-gray-400" 
+            />
+          </div>
+
+          <div>
             <label className="block text-xs font-bold text-gray-500 mb-2">電子郵件 (EMAIL)</label>
             <input 
               type="email" 
@@ -1265,6 +1280,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
               <input 
                 type="date" 
                 value={gregorianDate} 
+                max={new Date().toISOString().split('T')[0]}
+                min={`${new Date().getFullYear() - 100}-01-01`}
                 onChange={(e) => setGregorianDate(e.target.value)}
                 className="app-input" 
               />
@@ -1303,6 +1320,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           <button 
             type="button" 
             onClick={async () => { 
+              if (profileEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail)) {
+                return alert('請輸入正確的電子郵件格式！');
+              }
+              if (gregorianDate) {
+                const selectedYear = new Date(gregorianDate).getFullYear();
+                const currentYear = new Date().getFullYear();
+                if (new Date(gregorianDate) > new Date()) return alert('出生日期不可設定為未來時間！');
+                if (currentYear - selectedYear > 100) return alert('出生日期設定異常，超過一百歲請洽宮廟人員協助！');
+              }
               const updatedData = {
                 phone: guestUser.phone,
                 name: profileName,
@@ -1929,7 +1955,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     <input 
                       type="tel" 
                       value={loginPhone} 
-                      onChange={(e) => setLoginPhone(e.target.value)} 
+                      onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, ''))} 
                       className="app-input" 
                       placeholder="0912345678" 
                       required 

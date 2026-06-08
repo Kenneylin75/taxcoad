@@ -36,7 +36,7 @@ export default function SuperAdminClient({
 }: { 
   initialStats: any, initialAccounts: any[], initialPlans: any[], initialMedia: any[], initialTemples: any[]
 }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai_settings' | 'ai' | 'b2b_payment'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>('dashboard');
   const [analytics, setAnalytics] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
@@ -178,14 +178,14 @@ export default function SuperAdminClient({
              { id: 'accounts', label: '帳戶管理', icon: '👤' },
              { id: 'approvals', label: '審核中心', icon: '⚖️', count: pendingDistributors.length },
              { id: 'space', label: '雲端空間管理', icon: '☁️' },
-             { id: 'ai', label: 'AI 方案管理', icon: '🤖' },
+             { id: 'ai', label: 'AI 引擎與方案管理', icon: '🤖' },
              { id: 'tools', label: '資源同步', icon: '🔄' },
              { id: 'finance', label: '財務中心', icon: '💰' },
              { id: 'bridge', label: '數據橋接', icon: '🌐' },
              { id: 'logs', label: '系統日誌', icon: '📝' },
              { id: 'settings', label: '系統參數', icon: '⚙️' },
-             { id: 'b2b_payment', label: 'B2B收款設定', icon: '💳' },
-             { id: 'ai_settings', label: 'AI 引擎設定', icon: '🤖' }
+             { id: 'b2b_payment', label: 'B2B收款設定', icon: '💳' }
+
            ].map(item => (
              <button 
                 key={item.id} 
@@ -216,7 +216,7 @@ export default function SuperAdminClient({
                  {activeTab === 'logs' && 'System Audit Trail'}
                  {activeTab === 'settings' && 'Global Configurations'}
                   {activeTab === 'b2b_payment' && 'B2B Payment Gateway'}
-                 {activeTab === 'ai_settings' && 'AI Core Engines'}
+
               </h2>
            </div>
            
@@ -699,6 +699,56 @@ export default function SuperAdminClient({
            {/* --- 5. FINANCE HUB --- */}
                       {activeTab === 'ai' && (
              <div className="space-y-6">
+          <div className="p-16 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl">
+            <div className="mb-12">
+              <h3 className="text-3xl font-black text-slate-900 italic tracking-tighter">AI 核心介接設定</h3>
+              <p className="text-sm font-bold text-slate-400 mt-2 tracking-widest uppercase">Global AI Engine Endpoints</p>
+            </div>
+            
+            <div className="space-y-12">
+               {/* OCR */}
+               <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
+                 <h4 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3"><span className="text-2xl">👁️</span> 視知識別引擎 (OCR / 表單掃描)</h4>
+                 <div className="space-y-6">
+                    <div>
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API URL</label>
+                       <input value={config?.aiEndpoints?.ocrApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiUrl: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="https://api.openai.com/v1/chat/completions" />
+                    </div>
+                    <div>
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API Key</label>
+                       <input type="password" value={config?.aiEndpoints?.ocrApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiKey: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="sk-..." />
+                    </div>
+                 </div>
+               </div>
+
+               {/* Chat */}
+               <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
+                 <h4 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3"><span className="text-2xl">🧠</span> 對話大腦引擎 (信眾智能問答)</h4>
+                 <div className="space-y-6">
+                    <div>
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API URL</label>
+                       <input value={config?.aiEndpoints?.chatApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiUrl: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="https://api.openai.com/v1/chat/completions" />
+                    </div>
+                    <div>
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API Key</label>
+                       <input type="password" value={config?.aiEndpoints?.chatApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiKey: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="sk-..." />
+                    </div>
+                 </div>
+               </div>
+
+               <div className="flex justify-end">
+                  <button 
+                    onClick={async () => {
+                       await import('@/app/actions').then(m => m.updateSystemConfig({ aiEndpoints: config.aiEndpoints }));
+                       alert('AI 引擎設定已安全儲存生效！');
+                    }}
+                    className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl hover:-translate-y-1"
+                  >
+                     💾 儲存 AI 安全配置
+                  </button>
+               </div>
+            </div>
+          </div>
                 <div className="bg-white p-12 rounded-[2rem] border-2 border-slate-200 shadow-2xl relative overflow-hidden group">
                    <div className="absolute top-0 right-0 p-8 opacity-5 text-9xl group-hover:scale-110 transition-transform duration-700">🤖</div>
                    <div className="relative z-10 max-w-4xl">
@@ -1176,59 +1226,6 @@ export default function SuperAdminClient({
                  </div>
               </div>
            )}
-
-        {activeTab === 'ai_settings' && (
-          <div className="p-16 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl">
-            <div className="mb-12">
-              <h3 className="text-3xl font-black text-slate-900 italic tracking-tighter">AI 核心介接設定</h3>
-              <p className="text-sm font-bold text-slate-400 mt-2 tracking-widest uppercase">Global AI Engine Endpoints</p>
-            </div>
-            
-            <div className="space-y-12">
-               {/* OCR */}
-               <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
-                 <h4 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3"><span className="text-2xl">👁️</span> 視知識別引擎 (OCR / 表單掃描)</h4>
-                 <div className="space-y-6">
-                    <div>
-                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API URL</label>
-                       <input value={config?.aiEndpoints?.ocrApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiUrl: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="https://api.openai.com/v1/chat/completions" />
-                    </div>
-                    <div>
-                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API Key</label>
-                       <input type="password" value={config?.aiEndpoints?.ocrApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiKey: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="sk-..." />
-                    </div>
-                 </div>
-               </div>
-
-               {/* Chat */}
-               <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
-                 <h4 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3"><span className="text-2xl">🧠</span> 對話大腦引擎 (信眾智能問答)</h4>
-                 <div className="space-y-6">
-                    <div>
-                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API URL</label>
-                       <input value={config?.aiEndpoints?.chatApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiUrl: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="https://api.openai.com/v1/chat/completions" />
-                    </div>
-                    <div>
-                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2">API Key</label>
-                       <input type="password" value={config?.aiEndpoints?.chatApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiKey: e.target.value}})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600" placeholder="sk-..." />
-                    </div>
-                 </div>
-               </div>
-
-               <div className="flex justify-end">
-                  <button 
-                    onClick={async () => {
-                       await import('@/app/actions').then(m => m.updateSystemConfig({ aiEndpoints: config.aiEndpoints }));
-                       alert('AI 引擎設定已安全儲存生效！');
-                    }}
-                    className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl hover:-translate-y-1"
-                  >
-                     💾 儲存 AI 安全配置
-                  </button>
-               </div>
-            </div>
-          </div>
-        )}
 
       </main>
 

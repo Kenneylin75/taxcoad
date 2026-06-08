@@ -178,29 +178,29 @@ export default function AnalyticsClient({ initialSettings, data }: { initialSett
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                {/* Gender */}
                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">性別推算比例</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">信眾客群結構 (新客 vs 回客)</h4>
                   {!data.genderDemographics?.hasData ? (
                      <div className="flex flex-col items-center justify-center h-48 text-center bg-slate-50 rounded-2xl">
-                       <span className="text-2xl mb-2 grayscale opacity-50">🚻</span>
+                       <span className="text-2xl mb-2 grayscale opacity-50">👥</span>
                        <p className="text-xs font-bold text-slate-400">目前尚無足夠信眾資料</p>
                      </div>
                   ) : (
                      <div className="flex flex-col items-center justify-center gap-8 py-4">
                         <div className="w-32 h-32 rounded-full border-[20px] border-slate-900 relative flex items-center justify-center shadow-lg">
-                           <div className="absolute inset-[-20px] rounded-full border-[20px] border-amber-500" style={{ clipPath: `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% ${(data.genderDemographics.female / 100) * 100}%)` }}></div>
+                           <div className="absolute inset-[-20px] rounded-full border-[20px] border-amber-500" style={{ clipPath: `polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% ${(data.genderDemographics.returning / 100) * 100}%)` }}></div>
                            <div className="text-center">
-                              <p className="text-2xl font-black text-slate-800 font-serif leading-none">{data.genderDemographics.female}%</p>
-                              <p className="text-[8px] text-slate-400 font-black uppercase mt-1">女性能級</p>
+                              <p className="text-2xl font-black text-slate-800 font-serif leading-none">{data.genderDemographics.returning}%</p>
+                              <p className="text-[8px] text-slate-400 font-black uppercase mt-1">回訪客</p>
                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4 w-full mt-4">
                            <div className="bg-slate-50 p-3 rounded-xl text-center">
-                              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">男性</p>
-                              <p className="text-sm font-black text-slate-800">{data.genderDemographics.male}%</p>
+                              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">新客首次來訪</p>
+                              <p className="text-sm font-black text-slate-800">{data.genderDemographics.newGuest}%</p>
                            </div>
                            <div className="bg-slate-50 p-3 rounded-xl text-center">
-                              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">女性</p>
-                              <p className="text-sm font-black text-amber-600">{data.genderDemographics.female}%</p>
+                              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">回訪客</p>
+                              <p className="text-sm font-black text-amber-600">{data.genderDemographics.returning}%</p>
                            </div>
                         </div>
                      </div>
