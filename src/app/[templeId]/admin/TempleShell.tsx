@@ -120,7 +120,12 @@ export default function TempleShell({ children, currentRole, currentUser, temple
               </button>
             )}
 
-            {!isCollapsed && <button onClick={() => logoutAccount()} className="w-full mt-4 py-2 px-4 rounded-lg border border-slate-800 text-[10px] font-bold hover:bg-rose-500 hover:text-white transition-all text-slate-500">登出系統 LOGOUT</button>}
+            {!isCollapsed && <button onClick={async () => {
+              const res = await logoutAccount();
+              if (res.success) {
+                window.location.href = '/login';
+              }
+            }} className="w-full mt-4 py-2 px-4 rounded-lg border border-slate-800 text-[10px] font-bold hover:bg-rose-500 hover:text-white transition-all text-slate-500">登出系統 LOGOUT</button>}
           </div>
         </div>
       </aside>

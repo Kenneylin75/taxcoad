@@ -1410,7 +1410,7 @@ export default function SuperAdminClient({
                  </div>
                  <button onClick={() => { setViewingAccountDetail(null); setNewPassword(''); }} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all">✕</button>
               </div>
-              <div className="p-8 space-y-6">
+              <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                  <div className="space-y-4">
                     <div className="flex justify-between items-center pb-4 border-b border-slate-50">
                        <span className="text-xs font-bold text-slate-400">ID / 編號</span>
@@ -1428,6 +1428,43 @@ export default function SuperAdminClient({
                        <span className="text-xs font-bold text-slate-400">狀態 (Status)</span>
                        <span className="text-sm font-black text-emerald-500 uppercase italic">{viewingAccountDetail.status}</span>
                     </div>
+                    
+                    {viewingAccountDetail.role === 'Temple' && (
+                       <>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">所在縣市 (City)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.city || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">地址 (Address)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.address || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">聯絡電話 (Phone)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.templePhone || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">所屬代理商 (Distributor ID)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.distributorId || '無'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">負責業務 (Sales ID)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.salesId || '無'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">月租費 (Monthly Rent)</span>
+                            <span className="text-sm font-black text-slate-900">NT$ {viewingAccountDetail.monthlyRent || 0}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">建置費 (Setup Fee)</span>
+                            <span className="text-sm font-black text-slate-900">NT$ {viewingAccountDetail.setupFee || 0}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">建立時間 (Created At)</span>
+                            <span className="text-[10px] font-black text-slate-900">{viewingAccountDetail.timestamp ? new Date(viewingAccountDetail.timestamp).toLocaleString() : '未知'}</span>
+                         </div>
+                       </>
+                    )}
                  </div>
 
                  <div className="pt-4 space-y-3">

@@ -80,9 +80,12 @@ export default function AuditCenterPage() {
   };
 
   const filteredLogs = useMemo(() => {
-    return mockLogs.filter(log => {
-      const matchesSearch = log.operator.includes(searchQuery) || log.action.includes(searchQuery) || log.target.includes(searchQuery);
-      const matchesLevel = filterLevel === 'ALL' || log.level === filterLevel;
+    return systemLogs.filter(log => {
+      const operatorStr = log.operator || log.performedBy || '';
+      const actionStr = log.action || '';
+      const targetStr = log.target || log.details || '';
+      const matchesSearch = operatorStr.includes(searchQuery) || actionStr.includes(searchQuery) || targetStr.includes(searchQuery);
+      const matchesLevel = filterLevel === 'ALL' || (log.level || 'INFO') === filterLevel;
       return matchesSearch && matchesLevel;
     });
   }, [searchQuery, filterLevel]);

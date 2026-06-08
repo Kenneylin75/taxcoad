@@ -6,7 +6,8 @@ import {
   updateServiceSettings, 
   fetchStoragePlans, 
   fetchTempleStorages, 
-  upgradeTempleStorage, fetchTempleAiUsage, toggleTempleAiStatus, purchaseAiPlan, fetchAiPlans, fetchB2BPaymentConfig
+  upgradeTempleStorage, fetchTempleAiUsage, toggleTempleAiStatus, purchaseAiPlan, fetchAiPlans, fetchB2BPaymentConfig,
+  getTempleBasicInfo, updateTempleBasicInfo
 } from '@/app/actions';
 
 export default function AdvancedSettingsPage() {
@@ -57,6 +58,8 @@ export default function AdvancedSettingsPage() {
   const [selectedB2bMethod, setSelectedB2bMethod] = useState('creditCard');
   const [transferLast5, setTransferLast5] = useState('');
 
+  const [basicInfo, setBasicInfo] = useState<any>(null);
+
   useEffect(() => {
     // Load storage info and plans
     fetchStoragePlans().then(setStoragePlans);
@@ -65,13 +68,16 @@ export default function AdvancedSettingsPage() {
     
     // We assume templeId is accessible via window.location or we can just pass dynamic ID
     const currentTempleId = window.location.pathname.split('/')[1];
+    
+    getTempleBasicInfo(currentTempleId).then(setBasicInfo);
+    
     fetchB2BPaymentConfig(currentTempleId).then(setB2bConfig);
     fetchTempleStorages().then(list => {
-      const myStorage = list.find(s => s.templeId === 'temple-1') || {
-        templeId: 'temple-1',
-        templeName: '預設示範宮廟',
-        city: '台北市',
-        usedBytes: 2576980377, // 2.4 GB
+      const myStorage = list.find(s => s.templeId === currentTempleId) || {
+        templeId: currentTempleId,
+        templeName: basicInfo?.templeName || '未知宮廟',
+        city: basicInfo?.city || '台北市',
+        usedBytes: 0,
         quotaGb: 5,
         planName: '免費 5GB 空間'
       };
@@ -182,6 +188,48 @@ export default function AdvancedSettingsPage() {
            <span>{isPending ? '⏳' : '⚔️'}</span> 
            {isPending ? '同步中...' : '儲存系統設定'}
          </button>
+      </div>
+
+      {/* Basic Info */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 relative">
+         <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+               <div className="w-8 h-8 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-sm shadow-inner">🏛️</div>
+               <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">宮廟基本資料</h3>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Temple Basic Information</p>
+               </div>
+            </div>
+            <button 
+              onClick={() => {
+                startTransition(async () => {
+                  const res = await updateTempleBasicInfo(basicInfo, window.location.pathname.split('/')[1]);
+                  if (res.success) alert('宮廟基本資料已更新！');
+                });
+              }}
+              className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all"
+            >
+              更新資料
+            </button>
+         </div>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">宮廟名稱</label>
+              <input type="text" value={basicInfo?.templeName || ''} onChange={e => setBasicInfo({...basicInfo, templeName: e.target.value})} className="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">所在縣市</label>
+              <input type="text" value={basicInfo?.city || ''} onChange={e => setBasicInfo({...basicInfo, city: e.target.value})} className="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="space-y-1 lg:col-span-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">詳細地址</label>
+              <input type="text" value={basicInfo?.address || ''} onChange={e => setBasicInfo({...basicInfo, address: e.target.value})} className="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">聯絡電話</label>
+              <input type="text" value={basicInfo?.templePhone || ''} onChange={e => setBasicInfo({...basicInfo, templePhone: e.target.value})} className="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500" />
+            </div>
+         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

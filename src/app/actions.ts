@@ -107,6 +107,16 @@ export async function getCurrentUser() {
 }
 
 export async function logoutAccount() {
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    cookieStore.delete("admin_role");
+    cookieStore.delete("admin_account");
+    cookieStore.delete("templeId");
+    cookieStore.delete("impersonated_temple");
+  } catch (err) {
+    console.error("Logout error", err);
+  }
   return { success: true };
 }
 
@@ -1088,6 +1098,7 @@ let db_temples: any[] = initGlobal('db_temples', [
   {  id: 'temple-2', templeName: '第二測試宮廟', account: 'admin02', city: '台中市', address: '測試路2號', templePhone: '04-1234-5678', status: 'Active', timestamp: new Date().toISOString() , templeNo: 2 }
 ]);
 let db_sales_visits: any[] = initGlobal("db_sales_visits", []);
+let db_audit_logs: any[] = initGlobal("db_audit_logs", []);
 let db_tools: any[] = initGlobal('db_tools', [
   { id: 'tool-1', type: 'video', category: '系統教學', title: '快速上手指南', thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop' }
 ]);
@@ -1138,9 +1149,7 @@ let db_storage_plans: any[] = initGlobal('db_storage_plans', [
   { id: 'SP-1000', name: '1TB 至尊方案', sizeGb: 1000, priceMonthly: 3000 }
 ]);
 
-let db_temple_storages: any[] = initGlobal('db_temple_storages', [
-  { id: 'TS-1', templeId: 'temple-1', templeName: '預設示範宮廟', city: '台北市', usedBytes: 2576980377, quotaGb: 5, planName: '免費 5GB 空間' }
-]);
+let db_temple_storages: any[] = initGlobal('db_temple_storages', []);
 
 export interface TempleBill {
   id: string;
@@ -1828,6 +1837,7 @@ export async function fetchAllAccountsForAdmin() {
   db_temples.forEach(t => {
     const personnel = db_personnel.find(p => p.templeId === t.id);
     accounts.push({ 
+      ...t,
       id: t.id, 
       name: t.name || t.templeName || '未知宮廟', 
       role: 'Temple', 
@@ -4373,4 +4383,20 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
 export async function fetchAuditLogs() {
   const templeId = await getDynamicTempleId();
   return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
+}
+
+export async function getTempleBasicInfo(templeId?: string) {
+  const tId = templeId || await getDynamicTempleId();
+  return db_temples.find(t => t.id === tId) || null;
+}
+
+export async function updateTempleBasicInfo(data: any, templeId?: string) {
+  const tId = templeId || await getDynamicTempleId();
+  const idx = db_temples.findIndex(t => t.id === tId);
+  if (idx > -1) {
+    db_temples[idx] = { ...db_temples[idx], ...data };
+    gStore.db_temples = db_temples;
+    return { success: true };
+  }
+  return { success: false, message: 'Temple not found' };
 }
