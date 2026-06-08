@@ -11,10 +11,21 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
   const [activeWindow, setActiveWindow] = useState('01');
   const [isPending, startTransition] = useTransition();
   const [baseUrl, setBaseUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setBaseUrl(window.location.origin);
   }, []);
+
+  const today = new Date().toISOString().split('T')[0];
+  const activeEvents = initialEvents.filter(e => e.status !== 'Completed' && e.status !== 'Cancelled' && e.date >= today);
+  const historicalEvents = initialEvents.filter(e => e.status === 'Completed' || e.status === 'Cancelled' || e.date < today)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const filteredHistory = historicalEvents.filter(e => 
+    e.title.includes(searchQuery) || 
+    e.location.includes(searchQuery) || 
+    e.serviceType.includes(searchQuery)
+  );
 
   const activeEvent = initialEvents.find(e => e.status === 'Active');
 
@@ -66,12 +77,19 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
     });
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('確定要永久刪除此排隊活動嗎？')) return;
+  const handleDeleteEvent = (id: string) => {
+    if (!confirm('確定要取消/刪除此活動嗎？\n注意：若已有信眾報名，系統將變更狀態為「已取消」以保留紀錄；否則將會徹底刪除該活動。')) return;
     startTransition(async () => {
-      const res = await deleteQueueEvent(id); if(!res.success) { alert(res.error); }
+      const res = await deleteQueueEvent(id);
+      if (res.success) {
+        alert('✅ 操作成功！');
+      } else {
+        alert('操作失敗');
+      }
     });
   };
+
+
 
   const handleComplete = (ticketId: string) => {
     startTransition(async () => {
@@ -223,27 +241,29 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                </div>
 
                <div className="space-y-4">
-                  {initialEvents.sort((a, b) => a.status === 'Active' ? -1 : 1).map((e) => {
+                  {activeEvents.sort((a, b) => a.status === 'Active' ? -1 : 1).map((e) => {
                      const eventTickets = initialDashboard?.tickets?.filter((t: any) => t.eventId === e.id) || [];
                      const isFull = eventTickets.length >= e.maxCapacity;
                      return (
-                        <div key={e.id} className={`bg-white rounded-[35px] border-2 transition-all overflow-hidden ${e.status === 'Completed' ? 'opacity-50 grayscale border-slate-100' : 'border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-xl'}`}>
+                        <div key={e.id} className="bg-white rounded-[35px] border-2 border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-xl transition-all overflow-hidden relative group/card">
+                           <button onClick={() => handleDeleteEvent(e.id)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-500 rounded-full opacity-0 group-hover/card:opacity-100 hover:bg-rose-500 hover:text-white transition-all shadow-sm z-10" title="取消/刪除活動">
+                             ✕
+                           </button>
                            <div className="p-8">
                               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                  <div className="flex items-center gap-6">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg ${e.status === 'Completed' ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-amber-500'}`}>
-                                       {e.status === 'Completed' ? '📁' : '🏮'}
+                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg bg-slate-900 text-amber-500">
+                                       🏮
                                     </div>
                                     <div>
                                        <div className="flex items-center gap-3">
                                           <h4 className="text-xl font-black text-slate-900">{e.title}</h4>
                                           {isFull && <span className="bg-rose-500 text-white px-2 py-0.5 rounded text-[8px] font-black animate-pulse">額滿</span>}
-                                          {e.status === 'Completed' && <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[8px] font-black">歷史存檔</span>}
                                        </div>
                                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">📍 {e.location} | 📅 {e.date} ({e.startTime || '09:00'} - {e.endTime || '17:00'})</p>
                                     </div>
                                  </div>
-                                 <div className="text-right space-y-2">
+                                 <div className="text-right space-y-2 pr-8">
                                     <p className="text-[10px] font-black text-slate-400 uppercase">報名進度</p>
                                     <div className="flex items-center gap-3">
                                        <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -281,6 +301,60 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                         </div>
                      );
                   })}
+                  {activeEvents.length === 0 && (
+                     <div className="bg-white p-10 rounded-[35px] border-2 border-slate-100 text-center opacity-60">
+                        <div className="text-4xl mb-4 grayscale opacity-50">🏮</div>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">目前無進行中的活動</p>
+                     </div>
+                  )}
+               </div>
+
+               {/* 歷史活動清單區塊 */}
+               <div className="pt-8">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                     <div>
+                        <h3 className="text-lg font-black text-slate-900">歷史活動歸檔</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Historical Activity Archive</p>
+                     </div>
+                     <div className="relative">
+                        <input 
+                           type="text" 
+                           placeholder="搜尋歷史活動..." 
+                           value={searchQuery}
+                           onChange={e => setSearchQuery(e.target.value)}
+                           className="pl-10 pr-4 py-2 bg-white border-2 border-slate-200 rounded-xl text-xs font-bold focus:border-slate-900 outline-none w-full md:w-64 transition-all"
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                     </div>
+                  </div>
+
+                  <div className="space-y-3">
+                     {filteredHistory.map(e => {
+                        const eventTickets = initialDashboard?.tickets?.filter((t: any) => t.eventId === e.id) || [];
+                        const isCancelled = e.status === 'Cancelled';
+                        return (
+                           <div key={e.id} className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all">
+                              <div className="flex items-center gap-4 opacity-70">
+                                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-lg">📁</div>
+                                 <div>
+                                    <div className="flex items-center gap-2">
+                                       <h4 className="text-sm font-black text-slate-700">{e.title}</h4>
+                                       {isCancelled && <span className="bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded text-[8px] font-black">已取消</span>}
+                                       {!isCancelled && <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-black">已結束</span>}
+                                    </div>
+                                    <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">📍 {e.location} | 📅 {e.date}</p>
+                                 </div>
+                              </div>
+                              <div className="text-right">
+                                 <span className="text-xs font-black text-slate-500">{eventTickets.length} 人報名</span>
+                              </div>
+                           </div>
+                        );
+                     })}
+                     {filteredHistory.length === 0 && (
+                        <p className="text-center py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">無歷史活動紀錄</p>
+                     )}
+                  </div>
                </div>
             </div>
           </div>

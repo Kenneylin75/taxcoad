@@ -139,7 +139,14 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
             </div>
           </div>
 
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-end gap-4">
+            <button 
+              type="button"
+              onClick={() => setActiveTab('list')}
+              className="bg-white text-slate-500 border border-slate-200 px-8 py-3 rounded-xl font-black text-xs tracking-widest shadow-sm hover:bg-slate-50 transition-all uppercase"
+            >
+              取消設定
+            </button>
             <button 
               type="submit" 
               disabled={isPending}

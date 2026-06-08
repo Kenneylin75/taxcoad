@@ -29,6 +29,20 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
   const [apps, setApps] = useState<FreeAccountApplication[]>(freeApps);
   const [isPending, startTransition] = useTransition();
 
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const filteredRevenue = (initialData?.revenue || []).filter(rev => rev.timestamp.startsWith(selectedMonth));
+  const monthlyRevenue = filteredRevenue.reduce((sum, rev) => sum + rev.amount, 0);
+  const monthlyOrderCount = filteredRevenue.length;
+  const averageOrderValue = monthlyOrderCount > 0 ? Math.round(monthlyRevenue / monthlyOrderCount) : 0;
+
+  const filteredExpenses = (initialData?.expenses || []).filter(exp => (exp.billingDate && exp.billingDate.startsWith(selectedMonth)) || exp.status === 'Unpaid');
+  const nearestDueDate = (initialData?.expenses || []).filter(e => e.status === 'Unpaid').sort((a,b) => a.dueDate.localeCompare(b.dueDate))[0]?.dueDate || '無';
+
+
   const handleApprove = async (id: string) => {
     if (!confirm("確定核准此宮廟使用免費帳戶方案嗎？")) return;
     const res = await approveFreeAccount(id);
@@ -102,58 +116,83 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-8 rounded-2xl border-2 border-slate-200 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 text-5xl group-hover:scale-125 transition-transform duration-500">💰</div>
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">本月總收入 <span className="text-slate-900 underline decoration-amber-500 decoration-4 underline-offset-4">總計</span></p>
-            <div className="flex items-baseline gap-2">
-               <span className="text-sm font-black text-amber-600">NT$</span>
-               <h3 className="text-4xl font-black font-serif text-slate-900 tracking-tighter">{(initialData?.totalRevenue || 0).toLocaleString()}</h3>
-            </div>
-            <div className="mt-5">
-               <span className="bg-slate-900 text-amber-500 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg border border-slate-800">成長 {initialData?.lastMonthGrowth || '0%'} ↗</span>
-            </div>
-         </div>
+      {view === 'revenue' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           <div className="bg-white p-8 rounded-2xl border-2 border-slate-200 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 text-5xl group-hover:scale-125 transition-transform duration-500">💰</div>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">本月總收入 <span className="text-slate-900 underline decoration-amber-500 decoration-4 underline-offset-4">總計</span></p>
+              <div className="flex items-baseline gap-2">
+                 <span className="text-sm font-black text-amber-600">NT$</span>
+                 <h3 className="text-4xl font-black font-serif text-slate-900 tracking-tighter">{monthlyRevenue.toLocaleString()}</h3>
+              </div>
+           </div>
 
-         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-5 text-4xl group-hover:scale-125 transition-transform duration-500">🧾</div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">待支付帳單</p>
-            <div className="flex items-baseline gap-2">
-               <span className="text-sm font-bold text-slate-300">NT$</span>
-               <h3 className={`text-3xl font-black font-serif ${(initialData?.pendingExpense || 0) > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
-                 {(initialData?.pendingExpense || 0).toLocaleString()}
-               </h3>
-            </div>
-            <div className="mt-4">
-               <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${(initialData?.pendingExpense || 0) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                  {(initialData?.pendingExpense || 0) > 0 ? '待繳費' : '帳務結清'}
-               </span>
-            </div>
-         </div>
+           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 text-4xl group-hover:scale-125 transition-transform duration-500">🧾</div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">本月訂單數</p>
+              <div className="flex items-baseline gap-2">
+                 <h3 className="text-3xl font-black font-serif text-slate-800">{monthlyOrderCount}</h3>
+                 <span className="text-sm font-bold text-slate-300">筆</span>
+              </div>
+           </div>
 
-         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-5 text-4xl group-hover:scale-125 transition-transform duration-500">📊</div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">平均客單價</p>
-            <div className="flex items-baseline gap-2">
-               <span className="text-sm font-bold text-slate-300">NT$</span>
-               <h3 className="text-3xl font-black font-serif text-slate-800">1,250</h3>
-            </div>
-            <div className="mt-4">
-               <span className="bg-slate-50 text-slate-400 px-2 py-0.5 rounded text-[10px] font-black uppercase border border-slate-100">數據穩定</span>
-            </div>
-         </div>
-      </div>
+           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 text-4xl group-hover:scale-125 transition-transform duration-500">📊</div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">平均客單價</p>
+              <div className="flex items-baseline gap-2">
+                 <span className="text-sm font-bold text-slate-300">NT$</span>
+                 <h3 className="text-3xl font-black font-serif text-slate-800">{averageOrderValue.toLocaleString()}</h3>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {view === 'expenses' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           <div className="bg-white p-8 rounded-2xl border-2 border-slate-200 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-10 text-5xl group-hover:scale-125 transition-transform duration-500">💳</div>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">待支付帳單 <span className="text-rose-500 underline decoration-rose-500 decoration-4 underline-offset-4">總計</span></p>
+              <div className="flex items-baseline gap-2">
+                 <span className="text-sm font-black text-rose-600">NT$</span>
+                 <h3 className={`text-4xl font-black font-serif tracking-tighter ${(initialData?.pendingExpense || 0) > 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+                   {(initialData?.pendingExpense || 0).toLocaleString()}
+                 </h3>
+              </div>
+              <div className="mt-5">
+                 <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg border ${(initialData?.pendingExpense || 0) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                    {(initialData?.pendingExpense || 0) > 0 ? '待繳費' : '帳務結清'}
+                 </span>
+              </div>
+           </div>
+
+           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 text-4xl group-hover:scale-125 transition-transform duration-500">📅</div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">近期繳款期限</p>
+              <div className="flex items-baseline gap-2">
+                 <h3 className="text-2xl font-black font-serif text-slate-800">{nearestDueDate}</h3>
+              </div>
+           </div>
+        </div>
+      )}
 
       <main>
         {view === 'revenue' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+             <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-50/50">
                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                    <span className="text-amber-500">🏮</span> 信眾收入流水 Registry
                 </h3>
-                <button className="text-[10px] font-black text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-all shadow-sm">
-                   💾 匯出報表 EXPORT
-                </button>
+                <div className="flex items-center gap-3">
+                   <input 
+                     type="month" 
+                     value={selectedMonth}
+                     onChange={(e) => setSelectedMonth(e.target.value)}
+                     className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white focus:border-slate-900 outline-none"
+                   />
+                   <button className="text-[10px] font-black text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-all shadow-sm">
+                      💾 匯出報表 EXPORT
+                   </button>
+                </div>
              </div>
 
              <div className="overflow-x-auto">
@@ -168,7 +207,13 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
-                    {(initialData?.revenue || []).map((rev) => (
+                     {filteredRevenue.length === 0 ? (
+                       <tr>
+                         <td colSpan={5} className="px-6 py-12 text-center text-xs font-bold text-slate-400 bg-slate-50/20">
+                           本月份尚無收入紀錄
+                         </td>
+                       </tr>
+                     ) : filteredRevenue.map((rev) => (
                       <tr key={rev.id} className="hover:bg-slate-50/50 transition-all group">
                         <td className="px-6 py-4">
                            <div className="flex items-center gap-3">
@@ -222,12 +267,13 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">費用項目 / 週期</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">核定金額</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">截止期限</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">收款單位</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">清償狀態</th>
                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">管理操作</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {(initialData?.expenses || []).map((exp) => (
+                        {filteredExpenses.map((exp) => (
                           <tr key={exp.id} className="hover:bg-slate-50/50 transition-all">
                             <td className="px-6 py-4">
                                <div>

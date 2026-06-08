@@ -17,7 +17,7 @@ import {
 } from '@/app/actions';
 
 // --- 📱 手機版組件 (App Style Modern Professional) ---
-const AdminMobileView = ({ services, forms, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService }: any) => {
+const AdminMobileView = ({ services, forms, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm }: any) => {
    const [isMenuOpen, setIsMenuOpen] = useState(false);
    const [editingService, setEditingService] = useState<any>(null);
 
@@ -416,7 +416,15 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                            </div>
                            <h3 className="text-2xl font-bold text-slate-900 mb-2">{f.name}</h3>
                            <p className="text-xs font-bold text-indigo-600 mb-8">連結服務: {services.filter(s => s.linkedFormId === f.id).length} 個</p>
-                           <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">建模設定 ➔</div>
+                           <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">建模設定 ➔</span>
+                              <button 
+                                 onClick={(e) => handleDeleteForm(f.id, e)}
+                                 className="text-[11px] font-bold text-rose-300 uppercase tracking-widest hover:text-rose-600 transition-colors"
+                              >
+                                 刪除
+                              </button>
+                           </div>
                         </div>
                      ))}
                   </div>
@@ -718,6 +726,16 @@ export default function ServicesManagement() {
       loadData();
    };
 
+   
+   const handleDeleteForm = async (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!confirm('確定要刪除此表單嗎？此操作無法還原。')) return;
+      
+      const { deleteForm } = await import('@/app/actions');
+      await deleteForm(id);
+      loadData();
+   };
+
    const loadData = async () => {
       setIsLoading(true);
       try {
@@ -743,7 +761,7 @@ export default function ServicesManagement() {
 
    if (isLoading) return <div className="h-screen flex items-center justify-center font-bold text-slate-300 animate-pulse tracking-[0.5em] italic text-xl">系統資料加載中...</div>;
 
-   const commonProps = { services, forms, printTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService };
+   const commonProps = { services, forms, printTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm };
 
    return isMobile ? <AdminMobileView {...commonProps} /> : <AdminDesktopView {...commonProps} />;
 }

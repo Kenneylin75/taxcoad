@@ -23,6 +23,15 @@ export async function getDynamicTempleId() {
   }
 }
 
+export async function checkTempleSuspension(templeId?: string) {
+  const tId = templeId || await getDynamicTempleId();
+  const today = new Date().toISOString().split('T')[0];
+  const hasOverdue = db_temple_bills.some(
+    b => b.templeId === tId && b.status === 'Unpaid' && b.dueDate < today
+  );
+  return hasOverdue;
+}
+
 // -------------------------------------------------------------------------
 // 🛡️ 服務管理系統 - 核心資料持久化模擬 (Global Scope Persistence)
 // -------------------------------------------------------------------------
@@ -49,7 +58,7 @@ const DEFAULT_SERVICES = [
   { id: '5', name: '例行祈福', price: 0, duration: '30 min', description: '日常平安祈福', assignedStaff: [1], color: '#10b981' },
 ];
 
-let db_services: any[] = initGlobal('db_services', DEFAULT_SERVICES.map(s => ({...s, templeId: 'temple-1'})));
+let db_services: any[] = initGlobal('db_services', []);
 
 // Ensure core services are present and have correct colors, but DO NOT wipe other services
 DEFAULT_SERVICES.forEach(ds => {
@@ -62,13 +71,8 @@ DEFAULT_SERVICES.forEach(ds => {
 });
 gStore.db_services = db_services;
 
-let db_print_templates: any[] = initGlobal('db_print_templates', [
-  { id: '1', name: '預設標準版型', templeName: '大甲鎮瀾宮', watermarkUrl: '', watermarkOpacity: 0.1, borderStyle: 'border: 8px double #fcd34d; padding: 20px;', templeId: 'temple-1' }
-].map(x => ({...x, templeId: 'temple-1'})));
-
-let db_forms: any[] = initGlobal('db_forms', [
-  { id: '1', name: '預設預約表單', templeId: 'temple-1' }
-].map(x => ({...x, templeId: 'temple-1'})));
+let db_print_templates: any[] = initGlobal('db_print_templates', []);
+let db_forms: any[] = initGlobal('db_forms', []);
 
 let db_personnel: any[] = initGlobal('db_personnel', [
   { id: '1', name: "林廟祝", role: "Service", account: "lin.temple", status: "Active", phone: "0912-345-678", serviceCount: 15, avatar: "https://ui-avatars.com/api/?name=Lin&background=4F46E5&color=fff", permissions: ["calendar", "customers", "lamps"], templeId: 'temple-1' },
@@ -300,6 +304,7 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
 
 export async function bookAppointment(slotId: number, guestName: string, phone: string, paymentMethod?: string, paymentRef?: string, amount?: number) {
   const templeId = await getDynamicTempleId();
+  if (await checkTempleSuspension(templeId)) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
   return withTempleSession(templeId, false, async (client) => {
     let newId = Date.now();
     if (!client) {
@@ -771,11 +776,7 @@ export async function fetchLampRecords() {
   const templeId = await getDynamicTempleId();
   return [...db_lamp_records].filter(r => !r.templeId || r.templeId === templeId).reverse(); 
 }
-let db_lamp_categories: any[] = initGlobal('db_lamp_categories', [
-  { id: 'cat-1', name: '光明燈', price: 600, durationDays: 365, totalSlots: 500, templeId: 'temple-1' },
-  { id: 'cat-2', name: '安太歲', price: 1000, durationDays: 365, totalSlots: 200, templeId: 'temple-1' },
-  { id: 'cat-3', name: '文昌燈', price: 800, durationDays: 365, totalSlots: 300, templeId: 'temple-1' }
-].map(x => ({...x, templeId: 'temple-1'})));
+let db_lamp_categories: any[] = initGlobal('db_lamp_categories', []);
 export async function fetchLampCategories() {
   const templeId = await getDynamicTempleId();
   const currentCats = gStore.db_lamp_categories || db_lamp_categories;
@@ -1002,6 +1003,7 @@ export async function verifyQueueTicket(eventId: any, phone: string) {
 }
 
 export async function registerForEvent(id: any, phone: string, n: string, pr: number) { 
+  if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
   const ev = db_events.find(e => e.id === id);
   if (!ev) return { success: false };
   ev.enrolled += 1;
@@ -1164,6 +1166,33 @@ let db_storage_plans: any[] = initGlobal('db_storage_plans', [
 let db_temple_storages: any[] = initGlobal('db_temple_storages', [
   { id: 'TS-1', templeId: 'temple-1', templeName: '預設示範宮廟', city: '台北市', usedBytes: 2576980377, quotaGb: 5, planName: '免費 5GB 空間' }
 ]);
+
+export interface TempleBill {
+  id: string;
+  templeId: string;
+  type: string; // 'MonthlyFee', 'StorageUpgrade', 'AgiService'
+  amount: number;
+  billingDate: string; // e.g. '2026-06'
+  dueDate: string; // YYYY-MM-DD
+  status: 'Paid' | 'Unpaid';
+  payeeRole: 'SuperAdmin' | 'Distributor';
+  payeeId: string;
+  timestamp: string;
+}
+let db_temple_bills: TempleBill[] = initGlobal('db_temple_bills', []);
+
+export interface AiPlan {
+  id: string;
+  name: string;
+  monthlyFee: number;
+  chatLimit: number;
+}
+let db_ai_plans: AiPlan[] = initGlobal('db_ai_plans', [
+  { id: 'AI-500', name: '基礎智慧助理方案', monthlyFee: 500, chatLimit: 2000 },
+  { id: 'AI-1500', name: '進階智慧助理方案', monthlyFee: 1500, chatLimit: 10000 }
+]);
+
+let db_temple_ai_usage: any[] = initGlobal('db_temple_ai_usage', []);
 
 let db_wallets: any[] = initGlobal('db_wallets', [
   { role: 'SuperAdmin', id: 'system-hq', name: '系統中央總部', balance: 8540000 },
@@ -2026,6 +2055,31 @@ export async function createTempleAccount(data: any) {
     }
   }
 
+  // Generate initial bill
+  let payeeRole = 'SuperAdmin';
+  let payeeId = 'system-hq';
+  if (currentRole === 'Distributor' || currentRole === 'DistSales') {
+    payeeRole = 'Distributor';
+    const dist = db_distributors.find((d: any) => d.account === accountStr || d.name === creatorId);
+    payeeId = dist?.id || 'dist-1';
+  }
+
+  const billDueDate = new Date(new Date(newTemple.billingStartDate).getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  if (newTemple.freeType !== 'Permanent' && monthlyRent > 0) {
+    db_temple_bills.push({
+      id: `BILL-${Date.now()}`,
+      templeId: id,
+      type: 'MonthlyFee',
+      amount: monthlyRent,
+      billingDate: new Date(newTemple.billingStartDate).toISOString().substring(0, 7),
+      dueDate: billDueDate,
+      status: 'Unpaid',
+      payeeRole: payeeRole as any,
+      payeeId,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   revalidatePath('/super-admin');
   revalidatePath('/temple');
   return { success: true, id };
@@ -2447,7 +2501,81 @@ export async function fetchComplexAnalyticsData() {
     serviceHeat: sortedServices
   }; 
 }
-export async function fetchFinancialOverview() { return {}; }
+export async function fetchFinancialOverview() {
+  const templeId = await getDynamicTempleId();
+  
+  const revenue: RevenueEntry[] = [];
+  let totalRevenue = 0;
+
+  db_lamp_records.filter(r => r.templeId === templeId && r.price > 0).forEach(r => {
+    revenue.push({
+      id: r.id,
+      title: r.categoryName,
+      source: 'Lamp',
+      amount: r.price,
+      timestamp: r.createdAt || r.date,
+      guestName: r.guestName || r.phone,
+      paymentMethod: '現金/臨櫃',
+      status: 'Paid'
+    });
+    totalRevenue += r.price;
+  });
+
+  const myEvents = db_events.filter(e => e.templeId === templeId).map(e => e.id);
+  db_event_registrations.filter(r => myEvents.includes(r.eventId) && r.paymentStatus === 'Paid').forEach(r => {
+    revenue.push({
+      id: r.id,
+      title: r.title,
+      source: 'Event',
+      amount: r.actualPrice || r.price,
+      timestamp: r.timestamp || new Date().toISOString(),
+      guestName: r.guestName || r.phone,
+      paymentMethod: '現金/臨櫃',
+      status: 'Paid'
+    });
+    totalRevenue += (r.actualPrice || r.price);
+  });
+
+  const myServices = db_services.filter(s => s.templeId === templeId).map(s => s.id);
+  db_appointments.filter(a => myServices.includes(a.serviceId) && a.paymentStatus === 'Paid').forEach(a => {
+    revenue.push({
+      id: a.id,
+      title: a.service,
+      source: 'Appointment',
+      amount: a.amount || 0,
+      timestamp: a.date,
+      guestName: a.guestName || a.phone,
+      paymentMethod: a.paymentMethod || '現金/臨櫃',
+      status: 'Paid'
+    });
+    totalRevenue += (a.amount || 0);
+  });
+
+  revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const expenses: ExpenseEntry[] = db_temple_bills
+    .filter(b => b.templeId === templeId)
+    .map(b => ({
+      id: b.id,
+      type: b.type,
+      amount: b.amount,
+      dueDate: b.dueDate,
+      status: b.status,
+      billingDate: b.billingDate,
+      payeeRole: b.payeeRole,
+      payeeId: b.payeeId
+    }));
+  
+  const pendingExpense = expenses.filter(e => e.status === 'Unpaid').reduce((acc, e) => acc + e.amount, 0);
+
+  return {
+    revenue,
+    expenses,
+    totalRevenue,
+    pendingExpense,
+    lastMonthGrowth: '+12%'
+  };
+}
 export async function markAppointmentCompleted() { return { success: true }; }
 
 let db_bonuses: any[] = initGlobal('db_bonuses', []);
@@ -3444,9 +3572,16 @@ export async function activateQueueEvent(id: string) {
 
 export async function deleteQueueEvent(id: string) { 
   const hasTickets = db_queue_tickets.some(t => t.eventId === id);
-  if (hasTickets) return { success: false, error: '該排隊活動已有信眾取號，請先移除或處理相關號碼牌後再進行刪除。' }; 
-  db_queue_events = gStore.db_queue_events = db_queue_events.filter(e => e.id !== id);
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.filter(t => t.eventId !== id);
+  if (hasTickets) {
+    const idx = db_queue_events.findIndex(e => e.id === id);
+    if (idx > -1) {
+      db_queue_events[idx] = { ...db_queue_events[idx], status: 'Cancelled' };
+      gStore.db_queue_events = db_queue_events;
+    }
+  } else {
+    db_queue_events = gStore.db_queue_events = db_queue_events.filter(e => e.id !== id);
+    db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.filter(t => t.eventId !== id);
+  }
   revalidatePath('/temple/queue');
   revalidatePath('/live-queue');
   return { success: true }; 
@@ -4066,4 +4201,26 @@ export async function updateAppointmentPayment(appId: number, paymentMethod: str
     revalidatePath('/[templeId]/admin/calendar');
     return { success: true };
   });
+}
+
+export async function fetchAiPlans() {
+  return [...db_ai_plans];
+}
+
+export async function saveAiPlan(plan: any) {
+  const existing = db_ai_plans.find(p => p.id === plan.id);
+  if (existing) {
+    Object.assign(existing, plan);
+  } else {
+    db_ai_plans.push({ id: `AI-${Date.now()}`, ...plan });
+  }
+  return { success: true };
+}
+
+export async function deleteAiPlan(id: string) {
+  const index = db_ai_plans.findIndex(p => p.id === id);
+  if (index > -1) {
+    db_ai_plans.splice(index, 1);
+  }
+  return { success: true };
 }

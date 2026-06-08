@@ -1816,7 +1816,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       <h4 className="text-lg font-bold text-gray-900">{item.name}</h4>
                       <p className="text-xs text-gray-500 font-bold mt-1">{item.description}</p>
                    </div>
-                   <span className="font-bold text-red-700 bg-red-50 px-2 py-1 rounded text-sm">${item.defaultPrice}</span>
+                   <span className="font-bold text-red-700 bg-red-50 px-2 py-1 rounded text-sm">{(!item.price || item.price === 0) ? '隨喜功德' : `$${item.price}`}</span>
                 </div>
                 
                 {item.precautions && (
@@ -1834,16 +1834,16 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     setDetailContent({
                       title: item.name,
                       category: '點燈',
-                      price: `結緣價 $${item.defaultPrice ?? 0}`,
+                      price: (!item.price || item.price === 0) ? '結緣價：隨喜功德' : `結緣價 $${item.price}`,
                       precautions: item.precautions || '點燈後將於三日內為您上燈，並寄送電子通知。',
-                      description: `服務內容：${item.description}\n天數：${item.defaultDays}天`,
+                      description: `服務內容：${item.description || '祈福保平安'}\n天數：${item.durationDays || 365}天`,
                       onConfirm: async () => {
                         const fd = new FormData();
                         fd.append('phone', guestUser.phone);
                         fd.append('guestName', guestUser.name);
                         fd.append('categoryId', item.id);
                         fd.append('categoryName', item.name);
-                        fd.append('price', (item.defaultPrice ?? 0).toString());
+                        fd.append('price', (item.price ?? 0).toString());
                         await createLightingOrder(fd);
                         setSuccessInfo({
                           title: '辦理成功',
