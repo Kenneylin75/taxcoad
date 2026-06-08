@@ -36,6 +36,7 @@ import {
   fetchLatestNotificationForGuest,
   fetchActiveNotificationsForGuest,
   fetchActiveQueueCount,
+  fetchTempleAiUsage,
   type TempleNotification
 } from "@/app/actions";
 
@@ -142,6 +143,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [profileAddress, setProfileAddress] = useState("");
   const [profileBirthHour, setProfileBirthHour] = useState("");
   const [serviceSettings, setServiceSettings] = useState<ServiceSettings | null>(null);
+  const [templeAiUsage, setTempleAiUsage] = useState<any>(null);
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState("");
@@ -227,7 +229,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         setShowLoginWall(false);
         refreshAllData(user.phone);
       }
-      const [slotsData, eventsData, servicesData, staffData, qEventsData, lampsData, settingsData, latestNotif, activeNotifs, qCount] = await Promise.all([
+      const [slotsData, eventsData, servicesData, staffData, qEventsData, lampsData, settingsData, latestNotif, activeNotifs, qCount, aiUsageData] = await Promise.all([
         fetchAvailableSlots(), 
         fetchEvents(),
         fetchServiceDefinitions(),
@@ -237,7 +239,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         fetchServiceSettings(),
         fetchLatestNotificationForGuest(),
         fetchActiveNotificationsForGuest(),
-        fetchActiveQueueCount()
+        fetchActiveQueueCount(),
+        fetchTempleAiUsage()
       ]);
       setSlots(slotsData);
       setEvents(eventsData);
@@ -249,6 +252,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
       setLatestNotification(latestNotif);
       setActiveNotifications(activeNotifs);
       setActiveQueueCount(qCount);
+      setTempleAiUsage(aiUsageData);
       setSelectedDate(new Date().toISOString().split('T')[0]);
     };
     init();
@@ -741,12 +745,14 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         </div>
 
         {/* Floating AI Assistant (LINE Style) */}
-        <button 
-          onClick={() => setIsAgiModalOpen(true)}
-          className="fixed bottom-24 right-5 w-14 h-14 bg-red-700 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform z-40"
-        >
-          <span className="text-2xl">✨</span>
-        </button>
+        {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && (templeAiUsage.isVip || (new Date(templeAiUsage.expiryDate).getTime() > Date.now() && templeAiUsage.usedCount < templeAiUsage.chatLimit)) && (
+          <button 
+            onClick={() => setIsAgiModalOpen(true)}
+            className="fixed bottom-24 right-5 w-14 h-14 bg-red-700 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform z-40"
+          >
+            <span className="text-2xl">✨</span>
+          </button>
+        )}
       </main>
     );
   };
@@ -1091,15 +1097,36 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-             <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('ecpay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="col-span-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
-               💳 信用卡支付
-             </button>
-             <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('linepay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="py-4 bg-[#06C755] text-white rounded-2xl font-black text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
-               LINE Pay
-             </button>
-             <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('ecpay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="py-4 bg-slate-100 text-slate-600 hover:text-slate-900 rounded-2xl font-black text-xs shadow-sm border border-slate-200 active:scale-95 transition-transform">
-               轉帳匯款
-             </button>
+             {paymentConfig?.thirdParty?.enabled !== false && 
+               ((paymentIntent.module === 'Booking' && paymentConfig?.thirdParty?.allowBooking !== false) ||
+                (paymentIntent.module === 'Lamp' && paymentConfig?.thirdParty?.allowLamp !== false) ||
+                (paymentIntent.module === 'Event' && paymentConfig?.thirdParty?.allowEvent !== false) ||
+                (paymentIntent.module === 'Queue' && paymentConfig?.thirdParty?.allowQueue !== false)) && (
+               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('ecpay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="col-span-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
+                 💳 信用卡支付
+               </button>
+             )}
+             
+             {paymentConfig?.linePay?.enabled !== false && 
+               ((paymentIntent.module === 'Booking' && paymentConfig?.linePay?.allowBooking !== false) ||
+                (paymentIntent.module === 'Lamp' && paymentConfig?.linePay?.allowLamp !== false) ||
+                (paymentIntent.module === 'Event' && paymentConfig?.linePay?.allowEvent !== false) ||
+                (paymentIntent.module === 'Queue' && paymentConfig?.linePay?.allowQueue !== false)) && (
+               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('linepay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="py-4 bg-[#06C755] text-white rounded-2xl font-black text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                 LINE Pay
+               </button>
+             )}
+
+             {paymentConfig?.customTransfer?.enabled !== false && 
+               ((paymentIntent.module === 'Booking' && paymentConfig?.customTransfer?.allowBooking !== false) ||
+                (paymentIntent.module === 'Lamp' && paymentConfig?.customTransfer?.allowLamp !== false) ||
+                (paymentIntent.module === 'Event' && paymentConfig?.customTransfer?.allowEvent !== false) ||
+                (paymentIntent.module === 'Queue' && paymentConfig?.customTransfer?.allowQueue !== false)) && (
+               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('ecpay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="py-4 bg-slate-100 text-slate-600 hover:text-slate-900 rounded-2xl font-black text-xs shadow-sm border border-slate-200 active:scale-95 transition-transform">
+                 轉帳匯款
+               </button>
+             )}
+
              {paymentConfig?.cash?.enabled !== false && 
                ((paymentIntent.module === 'Booking' && paymentConfig?.cash?.allowBooking !== false) ||
                 (paymentIntent.module === 'Lamp' && paymentConfig?.cash?.allowLamp !== false) ||

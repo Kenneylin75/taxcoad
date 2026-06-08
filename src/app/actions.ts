@@ -214,6 +214,7 @@ export async function createSlot(data: any) {
   let time = '';
   let staff = '';
   let description = '';
+  let location = '';
   let bound_service_id = '';
   let price = 0;
 
@@ -222,6 +223,7 @@ export async function createSlot(data: any) {
     time = data.get("time") as string;
     staff = data.get("staff") as string;
     description = data.get("description") as string;
+    location = data.get("location") as string;
     bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
     price = Number(data.get("price")) || 0;
   } else {
@@ -229,6 +231,7 @@ export async function createSlot(data: any) {
     time = data.time;
     staff = data.staff;
     description = data.description || '';
+    location = data.location || '';
     bound_service_id = data.bound_service_id || data.serviceId;
     price = Number(data.price) || 0;
   }
@@ -249,6 +252,7 @@ export async function createSlot(data: any) {
           time,
           staff,
           description,
+          location,
           bound_service_id,
           price,
           status: "Available"
@@ -259,8 +263,8 @@ export async function createSlot(data: any) {
     } else {
       for (const date of dateList) {
         await client.query(
-          'INSERT INTO slots (temple_id, date, time, staff, description, status) VALUES ($1, $2, $3, $4, $5, $6)',
-          [templeId, date, time, staff, description, 'Available']
+          'INSERT INTO slots (temple_id, date, time, staff, description, location, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [templeId, date, time, staff, description, location, 'Available']
         );
       }
     }
@@ -692,10 +696,10 @@ let db_temple_payment_configs: any[] = initGlobal("db_temple_payment_configs", [
 
 export interface TemplePaymentConfig {
   templeId: string;
-  linePay: { enabled: boolean; channelId: string; channelSecret: string; };
-  thirdParty: { enabled: boolean; provider: string; merchantId: string; hashKey: string; hashIV: string; };
-  customTransfer: { enabled: boolean; bankCode: string; bankName: string; accountName: string; accountNo: string; };
-  customQR: { enabled: boolean; qrImageUrl: string; description: string; };
+  linePay: { enabled: boolean; channelId: string; channelSecret: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
+  thirdParty: { enabled: boolean; provider: string; merchantId: string; hashKey: string; hashIV: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
+  customTransfer: { enabled: boolean; bankCode: string; bankName: string; accountName: string; accountNo: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
+  customQR: { enabled: boolean; qrImageUrl: string; description: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
   cash?: { 
     enabled: boolean; 
     description: string; 
@@ -709,15 +713,18 @@ export interface TemplePaymentConfig {
 export async function fetchPaymentConfig() {
   const templeId = await getDynamicTempleId();
   const config = db_temple_payment_configs.find(c => c.templeId === templeId);
-  if (config && !config.cash) {
-    config.cash = { 
-      enabled: true, 
-      description: '現場現金付款',
-      allowBooking: true,
-      allowLamp: true,
-      allowEvent: true,
-      allowQueue: true
-    };
+  if (config) {
+    if (!config.cash) {
+      config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
+    }
+    ['linePay', 'thirdParty', 'customTransfer', 'customQR'].forEach(key => {
+      if (config[key] && config[key].allowBooking === undefined) {
+        config[key].allowBooking = true;
+        config[key].allowLamp = true;
+        config[key].allowEvent = true;
+        config[key].allowQueue = true;
+      }
+    });
   }
   return config || null;
 }
@@ -1061,6 +1068,12 @@ let db_distributors: any[] = initGlobal('db_distributors', [
       bankName: '國泰世華銀行 (013)',
       accountName: '北區雲端宮廟代理有限公司',
       accountNumber: '012-34-567890-1'
+    },
+    b2bPayment: {
+      enabledMethods: ['transfer', 'creditCard'],
+      ecpay: { merchantId: '', hashKey: '', hashIV: '' },
+      linePay: { channelId: '', channelSecret: '' },
+      transfer: { bankCode: '013', accountNumber: '012-34-567890-1', accountName: '北區雲端宮廟代理有限公司' }
     }
   }
 ]);
@@ -1099,6 +1112,12 @@ let db_config = initGlobal('db_config', {
     ocrApiKey: '',
     chatApiUrl: '',
     chatApiKey: ''
+  },
+  b2bPayment: {
+    enabledMethods: ['transfer', 'creditCard', 'linePay'],
+    ecpay: { merchantId: '', hashKey: '', hashIV: '' },
+    linePay: { channelId: '', channelSecret: '' },
+    transfer: { bankCode: '822', accountNumber: '1234567890', accountName: '系統科技股份有限公司' }
   }
 });
 
@@ -1148,7 +1167,23 @@ let db_ai_plans: AiPlan[] = initGlobal('db_ai_plans', [
   { id: 'AI-1500', name: '進階智慧助理方案', monthlyFee: 1500, chatLimit: 10000 }
 ]);
 
-let db_temple_ai_usage: any[] = initGlobal('db_temple_ai_usage', []);
+export interface AiApiModel {
+  id: string;
+  name: string;
+  apiKey: string;
+  isEnabled: boolean;
+}
+let db_ai_api_models: AiApiModel[] = initGlobal('db_ai_api_models', []);
+
+export interface TempleAiUsage {
+  templeId: string;
+  enabled: boolean;
+  planId: string;
+  usedCount: number;
+  expiryDate: string;
+  isVip: boolean;
+}
+let db_temple_ai_usage: TempleAiUsage[] = initGlobal('db_temple_ai_usage', []);
 
 let db_wallets: any[] = initGlobal('db_wallets', [
   { role: 'SuperAdmin', id: 'system-hq', name: '系統中央總部', balance: 8540000 },
@@ -1196,6 +1231,37 @@ export async function fetchFinanceData() {
       netProfit: incomes - expenses
     }
   };
+}
+
+// ==========================================
+// B2B 收款設定 (B2B Payment Configurations)
+// ==========================================
+export async function fetchB2BPaymentConfig(templeId: string) {
+  return withTempleSession(templeId, true, async (client) => {
+    let distributorId = null;
+    if (!client) {
+      const temple = db_temples.find(t => t.id === templeId);
+      distributorId = temple?.distributorId;
+    } else {
+      const res = await client.query('SELECT distributor_id FROM temples WHERE id = $1', [templeId]);
+      distributorId = res.rows[0]?.distributor_id;
+    }
+
+    if (distributorId) {
+      if (!client) {
+        const dist = db_distributors.find(d => d.id === distributorId);
+        return dist?.b2bPayment || null;
+      } else {
+        return null;
+      }
+    } else {
+      if (!client) {
+        return db_config.b2bPayment || null;
+      } else {
+        return null;
+      }
+    }
+  });
 }
 
 // --- STORAGE & BILLING APIS ---
@@ -3501,8 +3567,28 @@ export async function fetchActiveQueueCount(): Promise<number> { const templeId 
   return db_queue_tickets.filter(t => activeEventIds.includes(t.eventId) && t.status === 'Queuing').length;
 }
 
-export async function createQueueEvent(data: any) { const templeId = await getDynamicTempleId(); 
-  db_queue_events.push({ id: `qe-${Date.now()}`, ...data, status: 'Draft' });
+export async function createQueueEvent(data: any) { 
+  const templeId = await getDynamicTempleId(); 
+  
+  // Validation 1: Date must be > today
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (data.date <= todayStr) {
+    return { success: false, error: '只能部屬明日之後的活動。' };
+  }
+
+  // Validation 2: Time overlap
+  const overlapping = db_queue_events.find(e => 
+    e.templeId === templeId && 
+    e.date === data.date && 
+    e.status !== 'Cancelled' && 
+    (data.startTime < e.endTime && data.endTime > e.startTime)
+  );
+
+  if (overlapping) {
+    return { success: false, error: `同一日時段有重複（與 "${overlapping.title}" 衝突），無法部屬。` };
+  }
+
+  db_queue_events.push({ id: `qe-${Date.now()}`, ...data, templeId, status: 'Draft' });
   revalidatePath('/temple/queue');
   revalidatePath('/live-queue');
   return { success: true }; 
@@ -3510,16 +3596,6 @@ export async function createQueueEvent(data: any) { const templeId = await getDy
 
 export async function activateQueueEvent(id: string) { 
   db_queue_events = gStore.db_queue_events = db_queue_events.map(e => e.id === id ? { ...e, status: 'Active' } : { ...e, status: e.status === 'Active' ? 'Completed' : e.status });
-  
-  // Clear old simulated data for this event to avoid duplication
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.filter(t => t.eventId !== id);
-  
-  const now = Date.now();
-  db_queue_tickets.push(
-    { id: `t1-${now}`, eventId: id, status: 'Calling', assignedNumber: 'A001', guestName: '王大明', phone: '0912-345-678', actualOrder: 1, scannedAt: '15:10:00' },
-    { id: `t2-${now}`, eventId: id, status: 'Queuing', assignedNumber: 'A002', guestName: '林小美', phone: '0988-777-666', actualOrder: 2, scannedAt: '15:12:30' },
-    { id: `t3-${now}`, eventId: id, status: 'Queuing', assignedNumber: 'A003', guestName: '張志強', phone: '0933-111-222', actualOrder: 3, scannedAt: '15:15:45' }
-  );
   
   revalidatePath('/temple/queue');
   revalidatePath('/live-queue');
@@ -3543,10 +3619,15 @@ export async function deleteQueueEvent(id: string) {
   return { success: true }; 
 }
 
-export async function checkInWithQr(ticketId: string) { 
+export async function checkInWithQr(ticketId: string, eventId?: string) { 
+  const ticket = db_queue_tickets.find(t => t.id === ticketId);
+  if (!ticket) return { success: false, error: '找不到票券' };
+  if (ticket.status !== 'Registered') return { success: false, error: '票券狀態不正確' };
+  if (eventId && ticket.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
+
   db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => {
     if (t.id === ticketId) {
-      const qCount = db_queue_tickets.filter(x => x.eventId === t.eventId && x.status !== 'Pending').length + 1;
+      const qCount = db_queue_tickets.filter(x => x.eventId === t.eventId && (x.status === 'Queuing' || x.status === 'Calling' || x.status === 'Completed')).length + 1;
       return { ...t, status: 'Queuing', actualOrder: qCount, scannedAt: new Date().toLocaleTimeString() };
     }
     return t;
@@ -3580,22 +3661,28 @@ export async function updateQueueStatus(ticketId: string, status: string) {
   return { success: true }; 
 }
 
-export async function registerGuestForQueue(eventId: string, data: { guestName: string, phone: string }) {
+export async function registerGuestForQueue(eventId: string, data: { guestName: string, phone: string, isOnline?: boolean }) {
   const event = db_queue_events.find(e => e.id === eventId);
   if (!event) return { error: 'EVENT_NOT_FOUND' };
   
   const eventTickets = db_queue_tickets.filter(t => t.eventId === eventId);
+  
+  // Capacity check
+  if (event.maxCapacity && eventTickets.length >= event.maxCapacity) {
+    return { error: '活動預約已額滿！' };
+  }
+
   const nextNumber = `A${(eventTickets.length + 1).toString().padStart(3, '0')}`;
   
   const newTicket = {
     id: `t-${Date.now()}`,
     eventId,
-    status: 'Queuing', // Direct check-in for manual registration
+    status: data.isOnline ? 'Registered' : 'Queuing', 
     assignedNumber: nextNumber,
     guestName: data.guestName,
     phone: data.phone,
-    actualOrder: eventTickets.filter(t => t.status !== 'Pending').length + 1,
-    scannedAt: new Date().toLocaleTimeString()
+    actualOrder: data.isOnline ? null : eventTickets.filter(t => t.status === 'Queuing' || t.status === 'Calling' || t.status === 'Completed').length + 1,
+    scannedAt: data.isOnline ? null : new Date().toLocaleTimeString()
   };
   
   db_queue_tickets.push(newTicket);
@@ -4178,5 +4265,99 @@ export async function deleteAiPlan(id: string) {
   if (index > -1) {
     db_ai_plans.splice(index, 1);
   }
+  return { success: true };
+}
+
+
+// --- AI Plan & Usage Management ---
+export async function fetchAiApiModels() {
+  return [...db_ai_api_models];
+}
+
+export async function saveAiApiModels(models: any[]) {
+  db_ai_api_models = [...models];
+  gStore.db_ai_api_models = db_ai_api_models;
+  return { success: true };
+}
+
+export async function fetchAllTempleAiUsage() {
+  // Returns AI usage for all temples, joining with temple profiles and plans
+  return db_temple_ai_usage.map(usage => {
+    const temple = db_temple_profiles.find(t => t.id === usage.templeId) || { name: '未知宮廟' };
+    const plan = db_ai_plans.find(p => p.id === usage.planId) || { name: '無方案', chatLimit: 0 };
+    return { ...usage, templeName: temple.name, planName: plan.name, chatLimit: plan.chatLimit || 0 };
+  });
+}
+
+export async function grantTempleAiVip(templeId: string, isVip: boolean) {
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
+  if (!usage) {
+    usage = { templeId, enabled: true, planId: 'AI-500', usedCount: 0, expiryDate: new Date().toISOString(), isVip };
+    db_temple_ai_usage.push(usage);
+  } else {
+    usage.isVip = isVip;
+  }
+  gStore.db_temple_ai_usage = db_temple_ai_usage;
+  return { success: true };
+}
+
+export async function fetchTempleAiUsage() {
+  const templeId = await getDynamicTempleId();
+  if (!templeId) return null;
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
+  if (!usage) {
+    // Default 1-month trial
+    const thirtyDaysLater = new Date();
+    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+    usage = { templeId, enabled: false, planId: 'AI-500', usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
+    db_temple_ai_usage.push(usage);
+    gStore.db_temple_ai_usage = db_temple_ai_usage;
+  }
+  const plan = db_ai_plans.find(p => p.id === usage.planId) || { chatLimit: 0, name: '無方案', monthlyFee: 0 };
+  return { ...usage, chatLimit: plan.chatLimit, planName: plan.name, monthlyFee: plan.monthlyFee };
+}
+
+export async function toggleTempleAiStatus(enabled: boolean) {
+  const templeId = await getDynamicTempleId();
+  if (!templeId) return { success: false };
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
+  if (usage) {
+    usage.enabled = enabled;
+    gStore.db_temple_ai_usage = db_temple_ai_usage;
+  }
+  return { success: true };
+}
+
+export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
+  const templeId = await getDynamicTempleId();
+  if (!templeId) return { success: false };
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
+  const thirtyDaysLater = new Date();
+  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+  
+  if (usage) {
+    usage.planId = planId;
+    usage.expiryDate = thirtyDaysLater.toISOString();
+    usage.usedCount = 0; // Reset usage
+    usage.enabled = true;
+  } else {
+    usage = { templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
+    db_temple_ai_usage.push(usage);
+  }
+  gStore.db_temple_ai_usage = db_temple_ai_usage;
+
+  const plan = db_ai_plans.find(p => p.id === planId);
+  if (plan) {
+    const temple = db_temples.find(t => t.id === templeId);
+    db_finance_records.unshift({
+      id: `F-${Date.now()}`,
+      type: 'INCOME',
+      category: 'AI_UPGRADE',
+      amount: plan.monthlyFee,
+      source: `${temple?.templeName || '宮廟'}-AI方案續約 (${paymentMethod || '未知方式'})`,
+      date: new Date().toISOString().split('T')[0]
+    });
+  }
+
   return { success: true };
 }

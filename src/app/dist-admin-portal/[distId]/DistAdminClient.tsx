@@ -20,7 +20,7 @@ export default function DistAdminClient({
 }: { 
   distId: string, initialProfile: any, initialTeam: any[], initialApps: any[], initialCapacity: any, initialCommission: any 
 }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'approvals' | 'calendar' | 'financials' | 'tools' | 'profile' | 'logs' | 'temples'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'approvals' | 'calendar' | 'financials' | 'tools' | 'profile' | 'logs' | 'temples' | 'b2b_payment'>('overview');
   const [isPending, startTransition] = useTransition();
 
   // --- Financial Sub-Tab State ---
@@ -369,6 +369,7 @@ export default function DistAdminClient({
                 {activeTab === 'tools' && '官方工具 Tools'}
                 {activeTab === 'profile' && '資料中心 Profile'}
                 {activeTab === 'logs' && '系統日誌 Sys'}
+                 {activeTab === 'b2b_payment' && 'B2B收款 B2B'}
              </h1>
           </div>
           <div onClick={() => setActiveTab('logs')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-2xl transition-all duration-500 hover:rotate-12 ${activeTab === 'logs' ? 'bg-blue-600 text-white scale-110' : 'bg-white/80 backdrop-blur-md border border-white text-slate-300'}`}>🛰️</div>

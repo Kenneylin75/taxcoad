@@ -3,7 +3,7 @@
 import React, { useState, useTransition, useEffect } from 'react';
 import { 
   QueueEvent, createQueueEvent, completeQueueService, activateQueueEvent, deleteQueueEvent,
-  checkInWithQr, callNextInQueue, updateQueueStatus, registerGuestForQueue 
+  checkInWithQr, callNextInQueue, updateQueueStatus, registerGuestForQueue, fetchQueueDashboard
 } from '@/app/actions';
 
 export default function QueueManagerClient({ initialEvents, initialDashboard, services }: { initialEvents: QueueEvent[], initialDashboard: any, services: any[] }) {
@@ -43,6 +43,18 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
   
   // Walk-in Registration form state
   const [isRegistering, setIsRegistering] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [historyTickets, setHistoryTickets] = useState<any[]>([]);
+  
+  const loadHistoryTickets = async (eventId: string) => {
+    if (expandedHistoryId === eventId) {
+      setExpandedHistoryId(null);
+      return;
+    }
+    const res = await fetchQueueDashboard(eventId);
+    setHistoryTickets(res.tickets || []);
+    setExpandedHistoryId(eventId);
+  };
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
 
@@ -54,7 +66,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
     e.preventDefault();
     if (!title || !date) return alert('請填寫完整資訊。');
     startTransition(async () => {
-      await createQueueEvent({ 
+      const res = await createQueueEvent({ 
         title, 
         date, 
         location, 
@@ -64,6 +76,10 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
         startTime,
         endTime
       });
+      if (!res.success) {
+        alert('❌ 部署失敗：' + res.error);
+        return;
+      }
       alert('✅ 排隊活動已成功部署！');
       setTitle(''); setDate(''); setServiceType(''); setPrice('0');
     });
@@ -528,7 +544,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                     {/* QR Code Container */}
                     <div className="bg-white p-8 rounded-[50px] border border-slate-100 shadow-xl flex flex-col items-center gap-6">
                        <div className="p-4 bg-slate-50 rounded-[40px] shadow-inner">
-                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`SECURE_CHECKIN_${activeEvent.id}_${new Date().toISOString().split('T')[0]}`)}`} alt="Check-in QR" className="w-48 h-48 mix-blend-multiply opacity-80" />
+                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${baseUrl}/${activeEvent.templeId || 'temple-1'}/checkin?eventId=${activeEvent.id}`)}`} alt="Check-in QR" className="w-48 h-48 mix-blend-multiply opacity-80" />
                        </div>
                        <div className="text-center">
                           <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">信眾報到 QR Code</h4>

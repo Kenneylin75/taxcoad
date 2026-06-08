@@ -306,6 +306,11 @@ export default function AdminSlotsPage() {
                   <textarea name="description" rows={2} className="w-full bg-white border-2 border-slate-100 rounded-3xl px-6 py-5 text-sm font-black focus:border-indigo-600 outline-none resize-none transition-all shadow-sm" placeholder="請輸入本時段特定的注意事項（例如：請提早10分鐘報到）..." required></textarea>
                </div>
 
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">服務地點</label>
+                  <input type="text" name="location" className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-black focus:border-indigo-600 outline-none transition-all shadow-sm" placeholder="請輸入服務地點（例如：大殿左側、濟世辦事處）" required />
+               </div>
+
                <button 
                  type="submit" 
                  disabled={generatedDates.length === 0 || isSubmitting}

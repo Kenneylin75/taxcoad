@@ -41,6 +41,34 @@ export default function PaymentSetupPage() {
     }
   };
 
+    const renderModuleSelector = (paymentKey: keyof TemplePaymentConfig, colorClass: string, ringClass: string) => {
+    const section = config[paymentKey] as any;
+    if (!section) return null;
+    return (
+      <div className="mt-6 border-t border-slate-100 pt-6 animate-in fade-in">
+        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">適用的服務模組</label>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { id: 'allowBooking', label: '預約服務' },
+            { id: 'allowLamp', label: '點燈服務' },
+            { id: 'allowEvent', label: '法會活動' },
+            { id: 'allowQueue', label: '現場排隊' }
+          ].map(opt => (
+            <label key={opt.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-${colorClass}-200 cursor-pointer bg-white transition-colors`}>
+              <input
+                type="checkbox"
+                className={`w-4 h-4 text-${colorClass}-500 rounded border-gray-300 focus:ring-${ringClass}-500`}
+                checked={section[opt.id] !== false}
+                onChange={e => setConfig({...config, [paymentKey]: { ...section, [opt.id]: e.target.checked } as any})}
+              />
+              <span className="text-sm font-bold text-slate-700">{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (isLoading) return <div className="h-screen bg-slate-50 flex items-center justify-center animate-pulse text-slate-300 font-bold uppercase tracking-widest italic text-2xl">Loading Payment Config...</div>;
 
   return (
@@ -86,6 +114,7 @@ export default function PaymentSetupPage() {
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Channel Secret</label>
                  <input type="password" value={config.linePay.channelSecret} onChange={e => setConfig({...config, linePay: {...config.linePay, channelSecret: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-emerald-500 transition-colors" placeholder="••••••••••••••••" />
               </div>
+              {renderModuleSelector('linePay', 'emerald', 'emerald')}
            </div>
         </div>
 
@@ -129,6 +158,7 @@ export default function PaymentSetupPage() {
                     <input type="password" value={config.thirdParty.hashIV} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, hashIV: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••••••" />
                  </div>
               </div>
+              {renderModuleSelector('thirdParty', 'indigo', 'indigo')}
            </div>
         </div>
 
@@ -167,6 +197,7 @@ export default function PaymentSetupPage() {
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">收款帳號 Account Number</label>
                  <input type="text" value={config.customTransfer.accountNo} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, accountNo: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xl font-black font-serif tracking-[0.2em] focus:outline-none focus:border-amber-500 transition-colors" placeholder="1234-5678-9012" />
               </div>
+              {renderModuleSelector('customTransfer', 'amber', 'amber')}
            </div>
         </div>
 
@@ -198,25 +229,7 @@ export default function PaymentSetupPage() {
                      placeholder="例如：請於辦理當日至廟宇櫃檯繳納現金"
                    />
                    
-                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 mt-4">適用的服務模組</label>
-                   <div className="grid grid-cols-2 gap-3">
-                     {[
-                       { id: 'allowBooking', label: '預約服務' },
-                       { id: 'allowLamp', label: '點燈服務' },
-                       { id: 'allowEvent', label: '法會活動' },
-                       { id: 'allowQueue', label: '現場排隊' }
-                     ].map(opt => (
-                       <label key={opt.id} className="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-amber-200 cursor-pointer bg-white transition-colors">
-                         <input
-                           type="checkbox"
-                           className="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500"
-                           checked={(config.cash as any)?.[opt.id] !== false}
-                           onChange={e => setConfig({...config, cash: { ...config.cash, [opt.id]: e.target.checked } as any})}
-                         />
-                         <span className="text-sm font-bold text-slate-700">{opt.label}</span>
-                       </label>
-                     ))}
-                   </div>
+                   {renderModuleSelector('cash', 'amber', 'amber')}
                 </div>
              </div>
            )}
