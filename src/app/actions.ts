@@ -483,18 +483,6 @@ export async function fetchServiceDefinitions() {
   const templeId = await getDynamicTempleId();
   const currentServices = gStore.db_services || db_services;
   const myServices = currentServices.filter((x: any) => x.templeId === templeId);
-  
-  if (myServices.length === 0 && templeId) {
-     const defaultForTemple = DEFAULT_SERVICES.map(s => ({
-       ...s, 
-       templeId, 
-       id: `s-${Date.now()}-${s.id}`
-     }));
-     gStore.db_services = [...currentServices, ...defaultForTemple];
-     db_services = gStore.db_services;
-     return defaultForTemple;
-  }
-  
   return myServices;
 }
 
@@ -544,16 +532,6 @@ export async function fetchPrintTemplates() {
     if (!client) {
       const current = gStore.db_print_templates || db_print_templates;
       const mine = current.filter((t: any) => t.templeId === templeId);
-      if (mine.length === 0 && templeId) {
-        const defaults = current.filter((t: any) => t.templeId === 'temple-1').map((t: any) => ({
-          ...t,
-          id: `t-${Date.now()}-${t.id}`,
-          templeId
-        }));
-        gStore.db_print_templates = [...current, ...defaults];
-        db_print_templates = gStore.db_print_templates;
-        return defaults;
-      }
       return mine;
     }
     // DB impl omitted for now
@@ -591,16 +569,6 @@ export async function fetchForms() {
   const templeId = await getDynamicTempleId();
   const current = gStore.db_forms || db_forms;
   const mine = current.filter((f: any) => f.templeId === templeId);
-  if (mine.length === 0 && templeId) {
-    const defaults = current.filter((f: any) => f.templeId === 'temple-1').map((f: any) => ({
-      ...f,
-      id: `f-${Date.now()}-${f.id}`,
-      templeId
-    }));
-    gStore.db_forms = [...current, ...defaults];
-    db_forms = gStore.db_forms;
-    return defaults;
-  }
   return mine;
 }
 
@@ -781,18 +749,6 @@ export async function fetchLampCategories() {
   const templeId = await getDynamicTempleId();
   const currentCats = gStore.db_lamp_categories || db_lamp_categories;
   const myCats = currentCats.filter((x: any) => x.templeId === templeId);
-  
-  if (myCats.length === 0 && templeId) {
-    const defaultCats = currentCats.filter((x: any) => x.templeId === 'temple-1').map((x: any) => ({
-      ...x,
-      id: `cat-${Date.now()}-${x.id}`,
-      templeId
-    }));
-    gStore.db_lamp_categories = [...currentCats, ...defaultCats];
-    db_lamp_categories = gStore.db_lamp_categories;
-    return defaultCats;
-  }
-  
   return myCats;
 }
 let db_lamp_records: any[] = initGlobal("db_lamp_records", []);
