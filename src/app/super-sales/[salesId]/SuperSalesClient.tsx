@@ -29,17 +29,8 @@ export default function SuperSalesClient({
   }, []);
 
   // --- Financial Mock Data (Enhanced) ---
-  const [revenueHistory] = useState([
-    { id: 'RV-901', source: '北港朝天宮', type: '開辦費', total: 15000, net: 9000, date: '2026-05-03' },
-    { id: 'RV-902', source: '大甲鎮瀾宮', type: '月租(第一年)', total: 3600, net: 1080, date: '2026-05-02' },
-    { id: 'RV-903', source: '誠信經銷(台北)', type: '方案抽成', total: 1600000, net: 320000, date: '2026-04-28' }
-  ]);
-
-  const [withdrawHistory] = useState([
-    { id: 'WD-001', date: '2026-05-01', amount: 85000, status: 'Completed', method: '銀行轉帳' },
-    { id: 'WD-002', date: '2026-04-15', amount: 120000, status: 'Completed', method: '銀行轉帳' }
-  ]);
-
+  const [revenueHistory] = useState<any[]>([]);
+  const [withdrawHistory] = useState<any[]>([]);
   const [logs, setLogs] = useState([{ id: 1, action: "系統初始化", target: "超級業務權限", time: "15:34" }]);
 
   const addLog = (action: string, target: string) => {

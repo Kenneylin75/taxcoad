@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { addSalesMember, approveTempleByDistributor, rejectTempleByDistributor, fetchRoleWallets } from '../actions';
 import TempleApplicationForm from '../components/TempleApplicationForm';
 
@@ -21,8 +22,9 @@ export default function DistributorClient({
   initialFinance: any;
   initialTools?: any[];
 }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
-  const [team] = useState(initialTeam);
+  const [team, setTeam] = useState(initialTeam);
   const [temples] = useState(initialTemples);
   const [visits] = useState(initialVisits);
   const [tools] = useState(initialTools);
@@ -64,9 +66,15 @@ export default function DistributorClient({
 
   const handleAddSales = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addSalesMember(salesForm);
-    setIsAddSalesOpen(false);
-    window.location.reload();
+    const data = { ...salesForm, distributorId };
+    const res = await addSalesMember(data);
+    if (res.success) {
+      setTeam([...team, { id: res.id, ...data }]);
+      setIsAddSalesOpen(false);
+      setSalesForm({ name: '', account: '', setupFeePercent: 20, rentYear1Percent: 15, rentYear2Percent: 10, rentYear3PlusPercent: 5 });
+      router.refresh();
+      alert("業務菁英帳戶已成功開通！預設密碼為 12345678");
+    }
   };
 
   const handleApprove = async (id: string) => {
@@ -260,60 +268,44 @@ export default function DistributorClient({
     </div>
   );
 
-  const renderTools = () => (
-    <div className="space-y-10 animate-in fade-in slide-in-from-right-8 duration-500 pb-24 px-4">
-       <div className="space-y-2 border-l-4 border-blue-600 pl-6">
-          <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">中央資源與工具</h3>
-          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Synced with Super Admin HQ</p>
+    const renderTools = () => (
+    <div className="space-y-10 animate-in fade-in duration-500 pb-24">
+       <div className="px-2 space-y-1">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">資源與工具中心</h2>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Official Support & Assets</p>
        </div>
-       
-       <section className="space-y-6">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2 flex items-center justify-between">
-             影音教學與產品演示
-             <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-[8px] font-black uppercase">Live Sync</span>
-          </h4>
-          <div className="grid grid-cols-1 gap-6">
-             {tools.filter(t => t.type === 'video').map((tool, idx) => (
-                <div key={idx} className="bg-white rounded-[40px] overflow-hidden shadow-sm border border-slate-100 group cursor-pointer relative">
-                   <div className="h-56 bg-slate-100 relative overflow-hidden">
-                      <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700" alt={tool.title} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent flex items-end p-8">
-                         <div className="space-y-2">
-                            <span className="bg-blue-600 text-white px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">教學影片</span>
-                            <h5 className="text-xl font-black text-white leading-tight">{tool.title}</h5>
-                         </div>
-                      </div>
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center text-white text-3xl shadow-2xl border border-white/30 group-hover:scale-110 transition-all">▶</div>
-                   </div>
-                </div>
-             ))}
-          </div>
-       </section>
 
-       <section className="space-y-6">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2">合約與文件範本</h4>
-          <div className="grid grid-cols-1 gap-4">
-             {tools.filter(t => t.type === 'contract').map((tool, i) => (
-                <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex justify-between items-center group hover:border-blue-400 transition-all cursor-pointer">
-                   <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center text-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">📄</div>
-                      <p className="text-sm font-black text-slate-900">{tool.title}</p>
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tools.map((tool: any, idx: number) => (
+             <div key={idx} className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden group hover:shadow-xl transition-all cursor-pointer">
+                <div className="aspect-video relative bg-slate-100 overflow-hidden">
+                   <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000 opacity-80" />
+                   <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                      <span className="text-4xl">
+                         {tool.type === 'video' ? '▶️' : tool.type === 'photo' ? '🖼️' : tool.type === 'document' ? '📄' : '📝'}
+                      </span>
                    </div>
-                   <span className="text-[10px] font-black text-slate-300 uppercase group-hover:text-blue-600 transition-all">Download →</span>
-                </div>
-             ))}
-             {/* Fallback mock if no synced contracts */}
-             {tools.filter(t => t.type === 'contract').length === 0 && (
-                <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex justify-between items-center group hover:border-blue-400 transition-all cursor-pointer">
-                   <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center text-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">📄</div>
-                      <p className="text-sm font-black text-slate-900">標準經銷授權合約 V6</p>
+                   <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/90 backdrop-blur rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
+                      {tool.type === 'video' ? '影片' : tool.type === 'photo' ? '照片' : tool.type === 'document' ? '文件' : '電子合約'}
                    </div>
-                   <span className="text-[10px] font-black text-slate-300 uppercase group-hover:text-blue-600 transition-all">Download →</span>
                 </div>
-             )}
-          </div>
-       </section>
+                <div className="p-8 space-y-3">
+                   <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category} • {tool.uploadedAt || '2026/05/19'}</p>
+                   <h5 className="text-lg font-black text-slate-900 tracking-tight leading-tight">{tool.title}</h5>
+                   <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
+                      <span className="text-[9px] font-black text-slate-400 uppercase">HQ SYNCED</span>
+                      <button className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-all">開啟檢視</button>
+                   </div>
+                </div>
+             </div>
+          ))}
+          {tools.length === 0 && (
+             <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[40px]">
+                <span className="text-4xl mb-4 block opacity-50">📭</span>
+                <p className="text-sm font-black text-slate-400">總部目前尚未發布任何資源</p>
+             </div>
+          )}
+       </div>
     </div>
   );
 

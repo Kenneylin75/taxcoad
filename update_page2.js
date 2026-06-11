@@ -1,11 +1,24 @@
 const fs = require('fs');
 let c = fs.readFileSync('src/app/super-sales/[salesId]/page.tsx', 'utf8');
 
-const targetStr = '<div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center">';
-const [before, ...rest] = c.split(targetStr);
-const afterStr = rest.join(targetStr);
+const targetStr = `<div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center">
+                    {activeToolPreview.type === 'photo' ? (
+                       <img src={activeToolPreview.url} className="max-w-full max-h-full rounded-2xl shadow-sm" />
+                    ) : activeToolPreview.type === 'video' ? (
+                       <div className="w-full aspect-video bg-black rounded-2xl flex items-center justify-center">
+                          <span className="text-white opacity-50">影片播放器 (Demo)</span>
+                       </div>
+                    ) : (
+                       <div className="text-center space-y-4">
+                          <span className="text-6xl block">📄</span>
+                          <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，僅供預覽與授權下載</p>
+                          <button className="px-8 py-4 bg-indigo-600 text-white font-black text-sm rounded-2xl shadow-lg hover:bg-indigo-700 transition-all mt-4" onClick={() => alert('開始下載文件...')}>確認下載檔案</button>
+                       </div>
+                    )}
+                 </div>`;
 
-const replaced = before + `<div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
+const newStr = `<div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
                     {activeToolPreview.type === 'photo' ? (
                        <img src={activeToolPreview.url} className="max-w-full max-h-full rounded-2xl shadow-sm" />
                     ) : activeToolPreview.type === 'video' ? (
@@ -61,13 +74,7 @@ const replaced = before + `<div className="p-8 overflow-y-auto bg-slate-50 flex-
                          }}
                        >確認下載檔案 (Download)</button>
                     )}
-                 </div>
-              </div>
-           </div>
-        )}
-     </div>
-  );
-}
-`;
+                 </div>`;
 
-fs.writeFileSync('src/app/super-sales/[salesId]/page.tsx', replaced);
+c = c.replace(targetStr, newStr);
+fs.writeFileSync('src/app/super-sales/[salesId]/page.tsx', c);

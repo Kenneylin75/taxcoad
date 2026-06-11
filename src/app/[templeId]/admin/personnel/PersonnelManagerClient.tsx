@@ -84,8 +84,12 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
   const handleDelete = (id: string) => {
     if (!confirm('確定要刪除此帳號嗎？此操作不可還原。')) return;
     startTransition(async () => {
-      await deletePersonnel(id);
-      router.refresh();
+      const res = await deletePersonnel(id);
+      if (res && res.success === false) {
+        alert(res.message);
+      } else {
+        router.refresh();
+      }
     });
   };
 
@@ -241,7 +245,7 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-slate-600">聯絡電話</label>
-                          <input type="tel" name="phone" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:border-indigo-500 outline-none transition-colors" placeholder="例：0912345678" />
+                          <input type="tel" name="phone" required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:border-indigo-500 outline-none transition-colors" placeholder="例：0912345678" pattern="[0-9]*" onInput={(e) => { e.currentTarget.value = e.currentTarget.value.replace(/\D/g, ''); }} />
                        </div>
                        <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-slate-600">初始密碼</label>

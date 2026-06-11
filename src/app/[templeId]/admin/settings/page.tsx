@@ -7,7 +7,7 @@ import {
   fetchStoragePlans, 
   fetchTempleStorages, 
   upgradeTempleStorage, fetchTempleAiUsage, toggleTempleAiStatus, purchaseAiPlan, fetchAiPlans, fetchB2BPaymentConfig,
-  getTempleBasicInfo, updateTempleBasicInfo
+  getTempleBasicInfo, updateTempleBasicInfo, getTempleCreatorInfo
 } from '@/app/actions';
 
 export default function AdvancedSettingsPage() {
@@ -52,6 +52,8 @@ export default function AdvancedSettingsPage() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [selectedAiPlanId, setSelectedAiPlanId] = useState('');
   
+  const [creatorInfo, setCreatorInfo] = useState<any>(null);
+
   const [b2bConfig, setB2bConfig] = useState<any>(null);
   const [b2bModalOpen, setB2bModalOpen] = useState(false);
   const [b2bTarget, setB2bTarget] = useState<any>(null); // { type: 'storage' | 'ai' }
@@ -67,9 +69,10 @@ export default function AdvancedSettingsPage() {
     fetchTempleAiUsage().then(setAiInfo);
     
     // We assume templeId is accessible via window.location or we can just pass dynamic ID
-    const currentTempleId = window.location.pathname.split('/')[1];
+    const currentTempleId = decodeURIComponent(window.location.pathname.split('/')[1]);
     
     getTempleBasicInfo(currentTempleId).then(setBasicInfo);
+    getTempleCreatorInfo(currentTempleId).then(setCreatorInfo);
     
     fetchB2BPaymentConfig(currentTempleId).then(setB2bConfig);
     fetchTempleStorages().then(list => {
@@ -231,6 +234,47 @@ export default function AdvancedSettingsPage() {
             </div>
          </div>
       </div>
+
+      {/* Creator Info */}
+      {creatorInfo && (
+         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm p-6 space-y-4">
+            <div className="flex justify-between items-center pb-4 border-b border-blue-200/50">
+               <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-600 rounded-lg text-white flex items-center justify-center text-sm shadow-md">🤝</div>
+                  <div>
+                     <h3 className="text-sm font-black text-blue-900 uppercase tracking-widest">系統開通與服務窗口</h3>
+                     <p className="text-[8px] font-bold text-blue-600 uppercase tracking-widest mt-0.5">Account Provider & Service Contact</p>
+                  </div>
+               </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {(creatorInfo.type === 'dist_sales' || creatorInfo.type === 'super_sales') && (
+                  <div className="space-y-2 bg-white/60 p-4 rounded-xl border border-white">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">服務業務專員</p>
+                     <h4 className="text-base font-black text-slate-800">{creatorInfo.salesName}</h4>
+                     <p className="text-xs font-bold text-slate-500">聯絡方式: {creatorInfo.salesPhone}</p>
+                  </div>
+               )}
+               
+               {(creatorInfo.type === 'dist_sales' || creatorInfo.type === 'distributor') && (
+                  <div className="space-y-2 bg-white/60 p-4 rounded-xl border border-white">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">所屬授權經銷商</p>
+                     <h4 className="text-base font-black text-slate-800">{creatorInfo.distName}</h4>
+                     <p className="text-xs font-bold text-slate-500">聯絡方式: {creatorInfo.distPhone}</p>
+                  </div>
+               )}
+
+               {creatorInfo.type === 'super_admin' && (
+                  <div className="space-y-2 bg-white/60 p-4 rounded-xl border border-white md:col-span-2">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">系統總管理處</p>
+                     <h4 className="text-base font-black text-slate-800">{creatorInfo.adminName}</h4>
+                     <p className="text-xs font-bold text-slate-500">聯絡方式: {creatorInfo.adminContact}</p>
+                  </div>
+               )}
+            </div>
+         </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          {/* Configuration Columns */}

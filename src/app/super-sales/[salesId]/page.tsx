@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import ContractTemplate from '@/components/ContractTemplate';
 import TempleApplicationForm from '@/app/components/TempleApplicationForm';
 import DistributorApplicationForm from '@/app/components/DistributorApplicationForm';
 import { 
@@ -21,7 +22,6 @@ export default function SuperSalesPage() {
   const params = useParams();
   const salesId = params.salesId as string;
 
-  const [salesName] = useState("超級精英業務");
   const [activeTab, setActiveTab] = useState<'overview' | 'apply' | 'registry' | 'performance' | 'tools' | 'profile'>('overview');
   const [applyType, setApplyType] = useState<'temple' | 'distributor'>('temple');
   const [registryTab, setRegistryTab] = useState<'temples' | 'distributors'>('temples');
@@ -29,25 +29,31 @@ export default function SuperSalesPage() {
   const [submitted, setSubmitted] = useState(false);
   
   const [profile, setProfile] = useState<any>(null);
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [isEditingBank, setIsEditingBank] = useState(false);
+  const salesName = profile?.name || "超級精英業務";
   const [registry, setRegistry] = useState<any>({ temples: [], distributors: [] });
   const [tools, setTools] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [earnings, setEarnings] = useState({ balance: 0, pending: 0, totalWithdrawn: 0 });
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [activeToolPreview, setActiveToolPreview] = useState<any>(null);
+  const [showContractGenerator, setShowContractGenerator] = useState(false);
+  const [contractTarget, setContractTarget] = useState("");
 
   const [sysConfig, setSysConfig] = useState<any>(null);
   const [commissionHistory, setCommissionHistory] = useState<any>(null);
 
   useEffect(() => {
-    fetchSuperSalesProfile(salesName).then(setProfile);
-    fetchSuperSalesRegistry(salesName).then(setRegistry);
+    fetchSuperSalesProfile(salesId).then(setProfile);
+    fetchSuperSalesRegistry(salesId).then(setRegistry);
     fetchSalesTools().then(setTools);
     fetchNotifications("SuperSales").then(setNotifications);
-    fetchEarningsStats(salesName).then(setEarnings);
+    fetchEarningsStats(salesId).then(setEarnings);
     fetchSystemConfig().then(setSysConfig);
-    fetchCommissionHistory(salesName, "2026", "05").then(setCommissionHistory);
-  }, [salesName, activeTab]); 
+    fetchCommissionHistory(salesId, "2026", "05").then(setCommissionHistory);
+  }, [salesId, activeTab]); 
 
   if (submitted) {
     return (
@@ -297,18 +303,18 @@ export default function SuperSalesPage() {
                 <div className="grid grid-cols-2 gap-8 px-2">
                    <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">經銷商授權費提成</p>
-                      <p className="text-3xl font-black text-indigo-600 italic">{profile?.commissionRates?.distributor}%</p>
+                      <p className="text-3xl font-black text-indigo-600 italic">{profile?.commissionRates?.distributorAuthRate ?? profile?.commissionRates?.distributor ?? 0}%</p>
                    </div>
                    <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">宮廟開辦費分潤</p>
-                      <p className="text-3xl font-black text-emerald-600 italic">{profile?.commissionRates?.templeSetup}%</p>
+                      <p className="text-3xl font-black text-emerald-600 italic">{profile?.commissionRates?.templeSetupRate ?? profile?.commissionRates?.setupFeePercent ?? 0}%</p>
                    </div>
                    <div className="col-span-2 pt-4 space-y-4 border-t border-slate-100">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">宮廟月租維護提成 (階梯制)</p>
                       <div className="flex justify-between items-center bg-slate-50 p-4 rounded-3xl">
-                         <div className="text-center"><p className="text-[8px] font-black text-slate-400 uppercase">第一年</p><p className="text-xl font-black text-slate-900">{profile?.commissionRates?.templeMaintenance?.[0] ?? 0}%</p></div>
-                         <div className="text-center"><p className="text-[8px] font-black text-slate-400 uppercase">第二年</p><p className="text-xl font-black text-slate-900">{profile?.commissionRates?.templeMaintenance?.[1] ?? 0}%</p></div>
-                         <div className="text-center"><p className="text-[8px] font-black text-slate-400 uppercase">長期</p><p className="text-xl font-black text-slate-900">{profile?.commissionRates?.templeMaintenance?.[2] ?? 0}%</p></div>
+                         <div className="text-center"><p className="text-[8px] font-black text-slate-400 uppercase">第一年</p><p className="text-xl font-black text-slate-900">{profile?.commissionRates?.templeRentRates?.[0] ?? profile?.commissionRates?.rentYear1Percent ?? 0}%</p></div>
+                         <div className="text-center"><p className="text-[8px] font-black text-slate-400 uppercase">第二年</p><p className="text-xl font-black text-slate-900">{profile?.commissionRates?.templeRentRates?.[1] ?? profile?.commissionRates?.rentYear2Percent ?? 0}%</p></div>
+                         <div className="text-center"><p className="text-[8px] font-black text-slate-400 uppercase">長期</p><p className="text-xl font-black text-slate-900">{profile?.commissionRates?.templeRentRates?.[2] ?? profile?.commissionRates?.rentYear3PlusPercent ?? 0}%</p></div>
                       </div>
                    </div>
                 </div>
@@ -363,75 +369,87 @@ export default function SuperSalesPage() {
     </div>
   );
 
-  const renderTools = () => (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-24">
+  const renderTools = () => {
+    const mediaTools = tools.filter(t => t.type === 'video' || t.type === 'photo');
+    const docTools = tools.filter(t => t.type !== 'video' && t.type !== 'photo');
+
+    return (
+    <div className="space-y-12 animate-in fade-in duration-500 pb-24">
        <div className="px-2 space-y-1">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">業務資源中心</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">資源與工具中心</h2>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Official Support & Assets</p>
        </div>
 
-       {/* Video Resources - Distributor Style Clone */}
-       <section className="space-y-6">
-          <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] px-2 flex items-center gap-2">
-             <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></span>
-             影音教學與產品演示
-          </h4>
-          <div className="grid grid-cols-1 gap-6">
-             {tools.filter(t => t.type === 'Video' || t.type === 'video').map((tool, idx) => (
-                <div key={idx} className="bg-white rounded-[40px] overflow-hidden shadow-sm border border-slate-200 group cursor-pointer relative">
-                   <div className="h-56 bg-slate-100 relative overflow-hidden">
-                      <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700" alt={tool.title} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent flex items-end p-8">
-                         <div className="space-y-2">
-                            <span className="bg-indigo-600 text-white px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">教學影片</span>
-                            <h5 className="text-xl font-black text-white leading-tight">{tool.title}</h5>
-                         </div>
-                      </div>
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center text-white text-3xl shadow-2xl border border-white/30 group-hover:scale-110 transition-all">▶</div>
-                   </div>
-                </div>
-             ))}
-          </div>
-       </section>
+       {/* --- SYNCED HQ DOCUMENTS --- */}
+       {(docTools.length > 0 || tools.length === 0) && (
+           <div className="space-y-6 px-4">
+              <div className="flex items-center gap-3">
+                 <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                 <h3 className="font-black text-slate-800 text-sm tracking-widest">電子契約與規範手冊</h3>
+              </div>
+              
+              {docTools.length > 0 ? (
+                  <div className="space-y-4">
+                     {docTools.map((doc: any, idx: number) => (
+                        <button key={idx} onClick={() => setActiveToolPreview(doc)} className="w-full flex justify-between items-center bg-white border border-slate-100 p-6 rounded-[30px] hover:shadow-xl hover:border-indigo-100 transition-all group">
+                           <div className="flex items-center gap-6">
+                              <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
+                                 {doc.type === 'contract' ? '📑' : '📄'}
+                              </div>
+                              <span className="font-black text-slate-800 text-lg">{doc.title}</span>
+                           </div>
+                           <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest group-hover:text-indigo-600 transition-all">DOWNLOAD &rarr;</span>
+                        </button>
+                     ))}
+                  </div>
+              ) : (
+                  <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-[40px]">
+                     <span className="text-3xl mb-3 block opacity-30">📄</span>
+                     <p className="text-sm font-black text-slate-400">目前沒有文件或合約</p>
+                  </div>
+              )}
+           </div>
+       )}
 
-       {/* Documents & Contracts */}
-       <section className="space-y-6">
-          <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] px-2 flex items-center gap-2">
-             <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
-             電子契約與規範手冊
-          </h4>
-          <div className="grid grid-cols-1 gap-4">
-             {tools.filter(t => t.type === 'contract' || t.type === 'Contract').map((tool, i) => (
-                <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex justify-between items-center group hover:border-emerald-400 transition-all cursor-pointer">
-                   <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center text-xl group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">📄</div>
-                      <p className="text-sm font-black text-slate-900">{tool.title}</p>
-                   </div>
-                   <span className="text-[10px] font-black text-slate-300 uppercase group-hover:text-emerald-600 transition-all">Download →</span>
-                </div>
-             ))}
-             {tools.filter(t => t.type === 'contract' || t.type === 'Contract').length === 0 && ['標準經銷授權合約 V6', '宮廟節點服務條款', '業務開發戰略手冊'].map((doc, i) => (
-                <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex justify-between items-center group hover:border-emerald-400 transition-all cursor-pointer">
-                   <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center text-xl group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">📄</div>
-                      <p className="text-sm font-black text-slate-900">{doc}</p>
-                   </div>
-                   <span className="text-[10px] font-black text-slate-300 uppercase group-hover:text-emerald-600 transition-all">Download →</span>
-                </div>
-             ))}
-          </div>
-          
-          <div className="bg-indigo-950 p-10 rounded-[40px] text-white space-y-6 relative overflow-hidden mt-10">
-             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl"></div>
-             <div className="relative z-10 space-y-2 text-center">
-                <h5 className="text-xl font-black italic">官方數位簽署中心</h5>
-                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Digital Contract Authorization</p>
-             </div>
-             <button className="w-full py-5 bg-white text-indigo-950 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-50 transition-all">進入電子簽署系統 ✍️</button>
-          </div>
-       </section>
+       {/* --- SYNCED HQ MEDIA --- */}
+       {(mediaTools.length > 0) && (
+           <div className="space-y-6 px-4 pt-6 border-t border-slate-100">
+               <div className="flex items-center gap-3">
+                 <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                 <h3 className="font-black text-slate-800 text-sm tracking-widest">影音與視覺資源</h3>
+              </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {mediaTools.map((tool: any, idx: number) => (
+                     <div key={idx} onClick={() => setActiveToolPreview(tool)} className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden group hover:shadow-xl transition-all cursor-pointer">
+                        <div className="aspect-video relative bg-slate-100 overflow-hidden">
+                           <img src={tool.thumbnail || tool.url || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop'} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000 opacity-80" />
+                           <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                              <span className="text-4xl">
+                                 {tool.type === 'video' ? '▶️' : '🖼️'}
+                              </span>
+                           </div>
+                           <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/90 backdrop-blur rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
+                              {tool.type === 'video' ? '影片' : '照片'}
+                           </div>
+                        </div>
+                        <div className="p-8 space-y-3">
+                           <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category || '未分類'} • {tool.uploadedAt || '2026/05/19'}</p>
+                           <h5 className="text-lg font-black text-slate-900 tracking-tight leading-tight">{tool.title}</h5>
+                           <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
+                              <span className="text-[9px] font-black text-slate-400 uppercase">HQ SYNCED</span>
+                              <button onClick={() => setActiveToolPreview(tool)} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-all">開啟檢視</button>
+                           </div>
+                        </div>
+                     </div>
+                  ))}
+               </div>
+           </div>
+       )}
+
+       
     </div>
-  );
+    );
+  };
 
   const renderProfile = () => (
     <div className="space-y-8 animate-in fade-in duration-500 pb-24">
@@ -445,18 +463,50 @@ export default function SuperSalesPage() {
           </div>
 
           <div className="space-y-6">
+             <div className="flex justify-between items-center">
+                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">基本資料 (Contact Info)</h4>
+                 {isEditingContact ? (
+                     <div className="flex gap-2">
+                        <button onClick={() => setIsEditingContact(false)} className="text-[10px] font-black text-slate-500 bg-slate-100 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all">取消</button>
+                        <button onClick={async () => {
+                           const phone = (document.getElementById('editPhone') as HTMLInputElement).value;
+                           const email = (document.getElementById('editEmail') as HTMLInputElement).value;
+                           const { updateSuperSalesBasicInfo } = await import('@/app/actions');
+                           const res = await updateSuperSalesBasicInfo(salesId, { phone, email });
+                           if (res.success) {
+                              alert("基本資料已更新");
+                              setProfile({...profile, phone, email});
+                              setIsEditingContact(false);
+                           } else {
+                              alert("更新失敗：" + res.error);
+                           }
+                        }} className="text-[10px] font-black text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-sm">儲存變更</button>
+                     </div>
+                 ) : (
+                     <button onClick={() => setIsEditingContact(true)} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-all">編輯資料</button>
+                 )}
+             </div>
+             
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">行動電話 (Mobile)</p>
-                   <p className="text-sm font-black text-slate-900">0912-345-678</p>
+                   {isEditingContact ? (
+                      <input id="editPhone" defaultValue={profile?.phone || ''} className="w-full bg-white border-2 border-indigo-200 rounded-xl p-2 text-sm font-black text-slate-900 outline-none focus:border-indigo-500 mt-1 transition-all" />
+                   ) : (
+                      <p className="text-sm font-black text-slate-900">{profile?.phone || '未設定'}</p>
+                   )}
                 </div>
                 <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">登入帳號 (ID)</p>
-                   <p className="text-sm font-black text-slate-900">pivot_elite_001</p>
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">登入帳號 (ID) <span className="text-[8px] text-slate-300 ml-1">唯讀</span></p>
+                   <p className="text-sm font-black text-slate-900">{profile?.account || '未設定'}</p>
                 </div>
                 <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">電子郵件 (Email)</p>
-                   <p className="text-sm font-black text-slate-900">elite_001@system.tw</p>
+                   {isEditingContact ? (
+                      <input id="editEmail" defaultValue={profile?.email || ''} className="w-full bg-white border-2 border-indigo-200 rounded-xl p-2 text-sm font-black text-slate-900 outline-none focus:border-indigo-500 mt-1 transition-all" />
+                   ) : (
+                      <p className="text-sm font-black text-slate-900">{profile?.email || '未設定'}</p>
+                   )}
                 </div>
                 <div onClick={async () => {
                    if(confirm("確認要發起密碼重設申請嗎？申請後將由超級管理員核定並手動提供新密碼。")) {
@@ -464,7 +514,7 @@ export default function SuperSalesPage() {
                       await requestPasswordReset(salesName);
                       alert("重設申請已送達管理員，請靜候通知。");
                    }
-                }} className="p-6 bg-slate-50 rounded-[32px] space-y-1 flex justify-between items-center group cursor-pointer hover:bg-white border border-transparent hover:border-indigo-200 transition-all">
+                }} className="p-6 bg-slate-50 rounded-[32px] space-y-1 flex justify-between items-center group cursor-pointer hover:bg-white border-2 border-transparent hover:border-indigo-200 transition-all">
                    <div>
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">系統密碼 (Password)</p>
                       <p className="text-sm font-black text-slate-900">••••••••••••</p>
@@ -472,6 +522,72 @@ export default function SuperSalesPage() {
                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 shadow-sm">發起重設申請</span>
                 </div>
              </div>
+          </div>
+          
+          <div className="pt-6 border-t border-slate-100 space-y-6">
+             <div className="flex justify-between items-center">
+                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">收款帳戶資訊 (Bank Account)</h4>
+                 {isEditingBank ? (
+                     <div className="flex gap-2">
+                        <button onClick={() => setIsEditingBank(false)} className="text-[10px] font-black text-slate-500 bg-slate-100 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all">取消</button>
+                        <button onClick={async () => {
+                           const bankName = (document.getElementById('editBankName') as HTMLInputElement).value;
+                           const accountName = (document.getElementById('editAccountName') as HTMLInputElement).value;
+                           const accountNumber = (document.getElementById('editAccountNumber') as HTMLInputElement).value;
+                           if (bankName && accountName && accountNumber) {
+                              const { updateSuperSalesBankInfo } = await import('@/app/actions');
+                              const res = await updateSuperSalesBankInfo(salesId, { bankName, accountName, accountNumber });
+                              if (res.success) {
+                                  alert("收款帳戶已更新");
+                                  setProfile({...profile, bankInfo: { bankName, accountName, accountNumber }});
+                                  setIsEditingBank(false);
+                              } else {
+                                  alert("更新失敗：" + res.error);
+                              }
+                           } else {
+                               alert("所有欄位皆必填！");
+                           }
+                        }} className="text-[10px] font-black text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-sm">儲存變更</button>
+                     </div>
+                 ) : (
+                     <button onClick={() => setIsEditingBank(true)} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100 transition-all">修改帳戶</button>
+                 )}
+             </div>
+             {isEditingBank ? (
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">銀行名稱</p>
+                         <input id="editBankName" defaultValue={profile?.bankInfo?.bankName || ''} className="w-full bg-white border-2 border-indigo-200 rounded-xl p-2 text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all" placeholder="例如：中國信託" />
+                     </div>
+                     <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">戶名</p>
+                         <input id="editAccountName" defaultValue={profile?.bankInfo?.accountName || ''} className="w-full bg-white border-2 border-indigo-200 rounded-xl p-2 text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all" placeholder="例如：林精英" />
+                     </div>
+                     <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">帳號</p>
+                         <input id="editAccountNumber" defaultValue={profile?.bankInfo?.accountNumber || ''} className="w-full bg-white border-2 border-indigo-200 rounded-xl p-2 text-sm font-black text-slate-900 outline-none focus:border-indigo-500 transition-all" placeholder="例如：1234567890" />
+                     </div>
+                 </div>
+             ) : profile?.bankInfo ? (
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">銀行名稱</p>
+                         <p className="text-sm font-black text-slate-900">{profile.bankInfo.bankName}</p>
+                     </div>
+                     <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">戶名</p>
+                         <p className="text-sm font-black text-slate-900">{profile.bankInfo.accountName}</p>
+                     </div>
+                     <div className="p-6 bg-slate-50 rounded-[32px] space-y-1">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">帳號</p>
+                         <p className="text-sm font-black text-slate-900">{profile.bankInfo.accountNumber}</p>
+                     </div>
+                 </div>
+             ) : (
+                 <div className="p-8 border-2 border-dashed border-slate-200 rounded-[32px] text-center">
+                     <p className="text-sm font-bold text-slate-400">尚未設定收款帳戶</p>
+                 </div>
+             )}
           </div>
           
           <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex items-center gap-4">
@@ -542,6 +658,77 @@ export default function SuperSalesPage() {
            </button>
          ))}
       </nav>
-    </div>
+    {/* --- TOOL PREVIEW MODAL --- */}
+       {activeToolPreview && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
+             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                   <div>
+                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.type}</p>
+                   </div>
+                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
+                </div>
+                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
+                   {activeToolPreview.type === 'photo' ? (
+                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
+                   ) : activeToolPreview.type === 'video' ? (
+                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
+                   ) : (
+                      <div className="text-center space-y-4">
+                         <span className="text-6xl block">📄</span>
+                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
+                      </div>
+                   )}
+                   
+                   <button 
+                      className="px-8 py-4 bg-indigo-600 text-white font-black text-sm rounded-2xl shadow-lg hover:bg-indigo-700 transition-all mt-4" 
+                      onClick={() => {
+                        const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
+                        if (!fileUrl) {
+                          alert('檔案連結無效，無法下載。');
+                          return;
+                        }
+                        try {
+                          if (fileUrl.startsWith('data:')) {
+                            const arr = fileUrl.split(',');
+                            const mime = arr[0].match(/:(.*?);/)[1];
+                            const bstr = atob(arr[1]);
+                            let n = bstr.length;
+                            const u8arr = new Uint8Array(n);
+                            while (n--) {
+                              u8arr[n] = bstr.charCodeAt(n);
+                            }
+                            const blob = new Blob([u8arr], { type: mime });
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = activeToolPreview.title || 'download';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                          } else {
+                            const a = document.createElement('a');
+                            a.href = fileUrl;
+                            a.download = activeToolPreview.title || 'download';
+                            a.target = '_blank';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }
+                        } catch (err) {
+                          alert('下載失敗，檔案可能已損壞或過大。');
+                          console.error(err);
+                        }
+                      }}
+                   >確認下載檔案 (Download)</button>
+                </div>
+             </div>
+          </div>
+       )}
+</div>
   );
 }

@@ -46,6 +46,7 @@ export default function DistSalesPage() {
   const [performance, setPerformance] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
+  const [activeToolPreview, setActiveToolPreview] = useState<any>(null);
   const [tools, setTools] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [capacity, setCapacity] = useState<any>(null);
@@ -570,32 +571,32 @@ export default function DistSalesPage() {
     </div>
   );
 
-  const renderTools = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
-       <div className="px-2 space-y-1 border-l-4 border-emerald-500 pl-4">
-          <h3 className="text-2xl font-black text-slate-900">業務工具中心</h3>
-          <p className="text-[10px] text-emerald-600 font-black uppercase tracking-[0.2em]">Official Super Admin Assets</p>
-       </div>
+    const renderTools = () => (
+    <div className="space-y-8 animate-in slide-in-from-right-10 duration-700 pb-20">
+       <section className="px-2 space-y-1 border-l-4 border-blue-600 pl-5">
+          <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">官方工具中心</h3>
+          <p className="text-[10px] text-blue-600 font-black uppercase tracking-[0.3em]">Official Super Admin Assets</p>
+       </section>
 
        {/* Video Gallery */}
        <section className="space-y-6">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex justify-between items-center">
-             <span>影音介紹 (官方來源)</span>
-             <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span className="font-black">已同步最新</span>
+          <div className="flex justify-between items-center px-2">
+             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">影音介紹與培訓資源</h4>
+             <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full border border-blue-100">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                <span className="text-[8px] font-black uppercase tracking-widest">Live Sync</span>
              </div>
-          </h4>
-          <div className="grid grid-cols-1 gap-8 px-2">
-             {tools.filter(t => t.type === 'video').map(tool => (
-                <div key={tool.id} className="group relative bg-white rounded-[44px] shadow-xl border border-slate-100 overflow-hidden aspect-video">
-                   <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
-                   <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/95 via-emerald-950/20 to-transparent p-10 flex flex-col justify-end">
-                      <p className="text-[10px] font-black text-emerald-400 uppercase mb-3 tracking-widest">{tool.category}</p>
-                      <h5 className="text-2xl font-black text-white leading-tight">{tool.title}</h5>
-                      <div className="mt-6 flex items-center gap-3">
-                         <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xl shadow-lg shadow-emerald-500/20 group-hover:scale-110 transition-transform"><IconPlay /></div>
-                         <span className="text-xs font-bold text-white/60 tracking-widest">播放官方宣導影片</span>
+          </div>
+          <div className="grid grid-cols-1 gap-8">
+             {tools.filter(t => ['video', 'photo'].includes(t.type)).map(tool => (
+                <div key={tool.id} onClick={() => setActiveToolPreview(tool)} className="group relative bg-white rounded-[45px] shadow-2xl border border-white overflow-hidden aspect-[16/10] hover:shadow-blue-200 transition-all duration-700 cursor-pointer">
+                   <img src={tool.thumbnail || tool.url || 'https://images.unsplash.com/photo-1528642463367-12544dd1479d?q=80&w=800&auto=format&fit=crop'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s]" />
+                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent p-10 flex flex-col justify-end">
+                      <p className="text-[9px] font-black text-blue-400 uppercase mb-3 tracking-[0.3em] bg-blue-500/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">{tool.category}</p>
+                      <h5 className="text-2xl font-black text-white leading-tight italic tracking-tighter">{tool.title}</h5>
+                      <div className="mt-8 flex items-center gap-4">
+                         <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl shadow-2xl shadow-blue-500/40 group-hover:scale-110 group-hover:bg-blue-500 transition-all duration-500">▶️</div>
+                         <span className="text-[10px] font-black text-white/60 uppercase tracking-widest group-hover:text-white transition-colors">點擊檢閱資源</span>
                       </div>
                    </div>
                 </div>
@@ -603,44 +604,28 @@ export default function DistSalesPage() {
           </div>
        </section>
 
-       {/* Contracts */}
+       {/* Document & Assets Section */}
        <section className="space-y-6">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">電子合約系統 (官方規範)</h4>
-          <div className="space-y-4">
-             {tools.filter(t => t.type === 'contract').map((tool, i) => (
-                <div key={i} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 flex justify-between items-center group hover:border-emerald-400 transition-all cursor-pointer">
-                   <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">📄</div>
-                      <div>
-                         <p className="text-sm font-black text-slate-900">{tool.title}</p>
-                         <p className="text-[10px] text-emerald-600 font-bold tracking-widest uppercase">Official Synchronized</p>
-                      </div>
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">業務開發與法律文件 (官方規範)</h4>
+
+          <div className="grid grid-cols-2 gap-4">
+             {tools.filter(t => ['document', 'contract'].includes(t.type)).map(doc => (
+                <div key={doc.id} onClick={() => setActiveToolPreview(doc)} className="bg-white/60 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl flex flex-col items-center text-center space-y-4 hover:border-blue-500 transition-all duration-500 group cursor-pointer">
+                   <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-blue-600 group-hover:text-white transition-all">{doc.type === 'contract' ? '📑' : '📄'}</div>
+                   <div>
+                      <h6 className="text-xs font-black text-slate-900 tracking-tight">{doc.title}</h6>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">{doc.category}</p>
                    </div>
-                   <span className="text-[10px] font-black text-slate-300 uppercase group-hover:text-emerald-600 transition-all">Download →</span>
                 </div>
              ))}
-             {tools.filter(t => t.type === 'contract').length === 0 && (
-               <div className="bg-white rounded-[44px] p-10 shadow-sm border border-slate-100 space-y-8">
-                  <div className="flex items-center gap-8 p-8 bg-emerald-50 rounded-[32px] border border-emerald-100">
-                     <div className="w-20 h-20 rounded-3xl bg-white shadow-sm flex items-center justify-center text-4xl">📄</div>
-                     <div>
-                        <h5 className="text-lg font-black text-slate-900">標準服務契約 V4.0</h5>
-                        <p className="text-xs text-emerald-600 font-bold mt-2 tracking-widest uppercase">Verified by Super Admin</p>
-                     </div>
-                  </div>
-                  <button 
-                    onClick={() => setIsContractModalOpen(true)}
-                    className="w-full bg-slate-900 text-white py-6 rounded-[32px] font-black text-sm flex items-center justify-center gap-4 active:scale-95 hover:bg-emerald-600 transition-all shadow-2xl shadow-slate-200"
-                  >
-                     <IconSignature /> 簽署官方數位合約
-                  </button>
-               </div>
-             )}
           </div>
        </section>
+
+       
     </div>
   );
 
+  
   const renderProfile = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
        <div className="bg-white p-10 rounded-[48px] shadow-sm border border-slate-100 space-y-10">
@@ -863,6 +848,366 @@ export default function DistSalesPage() {
         }
         ::placeholder { color: #cbd5e1; }
       `}</style>
-    </div>
+    {/* --- TOOL PREVIEW MODAL --- */}
+       {activeToolPreview && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
+             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                   <div>
+                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.type}</p>
+                   </div>
+                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
+                </div>
+                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
+                   {activeToolPreview.type === 'photo' ? (
+                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
+                   ) : activeToolPreview.type === 'video' ? (
+                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
+                   ) : (
+                      <div className="text-center space-y-4">
+                         <span className="text-6xl block">📄</span>
+                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
+                      </div>
+                   )}
+                   
+                   <button 
+                      className="px-8 py-4 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-lg hover:bg-blue-700 transition-all mt-4" 
+                      onClick={() => {
+                        const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
+                        if (!fileUrl) {
+                          alert('檔案連結無效，無法下載。');
+                          return;
+                        }
+                        try {
+                          if (fileUrl.startsWith('data:')) {
+                            const arr = fileUrl.split(',');
+                            const mime = arr[0].match(/:(.*?);/)[1];
+                            const bstr = atob(arr[1]);
+                            let n = bstr.length;
+                            const u8arr = new Uint8Array(n);
+                            while (n--) {
+                              u8arr[n] = bstr.charCodeAt(n);
+                            }
+                            const blob = new Blob([u8arr], { type: mime });
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = activeToolPreview.title || 'download';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                          } else {
+                            const a = document.createElement('a');
+                            a.href = fileUrl;
+                            a.download = activeToolPreview.title || 'download';
+                            a.target = '_blank';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }
+                        } catch (err) {
+                          alert('下載失敗，檔案可能已損壞或過大。');
+                          console.error(err);
+                        }
+                      }}
+                   >確認下載檔案 (Download)</button>
+                </div>
+             </div>
+          </div>
+       )}
+
+
+
+       {/* --- MODALS --- */}
+       {isAddSalesModalOpen && (
+         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-end animate-in fade-in duration-300">
+            <form onSubmit={handleAddSales} className="bg-white w-full rounded-t-[60px] p-12 pb-20 shadow-2xl space-y-8 animate-in slide-in-from-bottom-20 duration-500 max-w-xl mx-auto max-h-[90vh] overflow-y-auto no-scrollbar relative">
+               <div className="sticky top-0 bg-white/80 backdrop-blur-md pt-2 pb-6 z-10 flex justify-between items-center border-b border-slate-50 mb-4">
+                  <div className="space-y-1">
+                     <h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">新增業務菁英</h3>
+                     <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">Authorized Sales Personnel</p>
+                  </div>
+                  <button type="button" onClick={() => setIsAddSalesModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
+               </div>
+               
+               <div className="space-y-10">
+                  {/* Basic Info Cards */}
+                  <div className="space-y-6">
+                     <div className="flex items-center gap-3 px-2">
+                        <div className="w-1.5 h-5 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
+                        <h4 className="text-lg font-black text-slate-900 tracking-tight">基本資料辨識 Basic Identity</h4>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">正式姓名 Full Name</p>
+                           <input type="text" placeholder="輸入業務姓名" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.name} onChange={e=>setNewSalesForm({...newSalesForm, name:e.target.value})} required />
+                        </div>
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">聯繫電話 Phone</p>
+                           <input type="tel" placeholder="輸入電話號碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.phone} onChange={e=>setNewSalesForm({...newSalesForm, phone:e.target.value})} required />
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">系統帳號 ID</p>
+                           <input type="text" placeholder="自定義登入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.account} onChange={e=>setNewSalesForm({...newSalesForm, account:e.target.value})} required />
+                        </div>
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">安全密碼 Password</p>
+                           <input type="password" placeholder="輸入初始密碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.password} onChange={e=>setNewSalesForm({...newSalesForm, password:e.target.value})} required />
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Commission Section */}
+                  <div className="space-y-6">
+                     <div className="flex items-center gap-3 px-2">
+                        <div className="w-1.5 h-5 bg-indigo-600 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.6)]"></div>
+                        <h4 className="text-lg font-black text-slate-900 tracking-tight">分潤合約協議 Commission Rules</h4>
+                     </div>
+                     <div className="grid grid-cols-4 gap-3 px-2">
+                        {[
+                           { key: 'setupRate', label: '開辦費', sub: '分潤' },
+                           { key: 'rentYear1Rate', label: '第一年', sub: '月租' },
+                           { key: 'rentYear2Rate', label: '第二年', sub: '月租' },
+                           { key: 'rentYear3PlusRate', label: '第三年後', sub: '月租' }
+                        ].map(item => (
+                           <div key={item.key} className="bg-slate-50 p-5 rounded-[30px] border border-slate-100 flex flex-col items-center justify-center space-y-4 hover:bg-slate-950 hover:text-white transition-all duration-500">
+                              <p className="text-[9px] font-black opacity-50 uppercase text-center leading-tight">{item.label}<br/>{item.sub}</p>
+                              <div className="relative">
+                                 <input type="number" className="bg-transparent w-12 text-2xl font-black text-center outline-none" value={(newSalesForm as any)[item.key]} onChange={e=>setNewSalesForm({...newSalesForm, [item.key]:parseInt(e.target.value)})} />
+                                 <span className="absolute -right-3 bottom-0.5 text-[10px] font-bold">%</span>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+
+                  <button type="submit" className="w-full py-8 bg-slate-950 text-white rounded-[45px] font-black text-sm uppercase tracking-[0.4em] italic shadow-2xl hover:bg-blue-600 hover:shadow-blue-200 transition-all active:scale-95">
+                     簽署並正式簽發權限 🚀
+                  </button>
+               </div>
+            </form>
+         </div>
+       )}
+       {isEditBankModalOpen && (
+         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-end animate-in fade-in duration-300">
+            <form onSubmit={handleSaveBankInfo} className="bg-white w-full rounded-t-[60px] p-12 pb-20 shadow-2xl space-y-8 animate-in slide-in-from-bottom-20 duration-500 max-w-xl mx-auto relative">
+               <div className="flex justify-between items-center border-b border-slate-50 pb-6 mb-4">
+                  <div className="space-y-1">
+                     <h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">編輯銀行帳戶資訊</h3>
+                     <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">Bank Account Information</p>
+                  </div>
+                  <button type="button" onClick={() => setIsEditBankModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
+               </div>
+               
+               <div className="space-y-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">解付銀行</label>
+                     <input required type="text" value={editBankForm.bankName} onChange={e => setEditBankForm({...editBankForm, bankName: e.target.value})} className="w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="例：國泰世華銀行 (013)" />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">帳戶名稱</label>
+                     <input required type="text" value={editBankForm.accountName} onChange={e => setEditBankForm({...editBankForm, accountName: e.target.value})} className="w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">銀行帳號</label>
+                     <input required type="text" value={editBankForm.accountNumber} onChange={e => setEditBankForm({...editBankForm, accountNumber: e.target.value})} className="w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                  </div>
+               </div>
+               
+               <button type="submit" className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black text-sm shadow-[0_15px_30px_rgba(37,99,235,0.3)] hover:bg-blue-500 transition-all">儲存變更</button>
+            </form>
+         </div>
+       )}
+       {isEditRateModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-center justify-center p-6 animate-in fade-in duration-300">
+             <div className="bg-white w-full max-w-xl rounded-[60px] p-12 shadow-2xl text-center animate-in zoom-in-95 duration-500 space-y-10">
+                <div className="space-y-2">
+                   <h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">調整分潤協議</h3>
+                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{selectedSales?.name} • Elite Personnel</p>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[
+                     { key: 'setupRate', label: '開辦費', sub: '分潤' },
+                     { key: 'rentYear1Rate', label: '第一年', sub: '月租' },
+                     { key: 'rentYear2Rate', label: '第二年', sub: '月租' },
+                     { key: 'rentYear3PlusRate', label: '第三年後', sub: '月租' }
+                  ].map(k => (
+                    <div key={k.key} className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex flex-col items-center justify-center space-y-3 hover:bg-blue-600 hover:text-white transition-all">
+                       <p className="text-[9px] font-black opacity-50 uppercase leading-tight">{k.label}<br/>{k.sub}</p>
+                       <div className="relative">
+                          <input type="number" className="bg-transparent w-full text-center font-black text-2xl outline-none" value={(editingRates as any)[k.key]} onChange={e=>setEditingRates({...editingRates, [k.key]:parseInt(e.target.value)})} />
+                       </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-4 pt-4">
+                   <button onClick={() => setIsEditRateModalOpen(false)} className="flex-1 py-6 bg-slate-50 text-slate-400 rounded-3xl font-black uppercase text-[10px] tracking-widest">取消變更</button>
+                   <button onClick={() => {
+                      addLog("分潤協議變更", selectedSales.name); 
+                      setIsEditRateModalOpen(false); 
+                      alert("✅ 協議已更新並即刻生效");
+                   }} className="flex-[1.5] py-6 bg-slate-950 text-white rounded-3xl font-black uppercase text-[10px] tracking-[0.2em] italic hover:bg-blue-600 shadow-2xl transition-all">確認簽署新協議</button>
+                </div>
+             </div>
+          </div>
+       )}
+       {isRejectModalOpen && (
+         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[500] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+            <div className="bg-white w-full max-sm rounded-[55px] p-12 shadow-2xl space-y-8 text-center border border-white">
+               <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">駁回開戶申請</h3>
+               <textarea placeholder="敘明駁回理由..." className="w-full bg-slate-50 rounded-[35px] p-8 h-40 text-sm font-bold outline-none border-2 border-transparent focus:border-blue-200 transition-all shadow-inner" value={rejectReason} onChange={e=>setRejectReason(e.target.value)} />
+               <div className="flex gap-3"><button onClick={()=>setIsRejectModalOpen(false)} className="flex-1 py-5 bg-slate-50 text-slate-400 rounded-3xl font-black text-[10px] uppercase">返回</button><button onClick={handleReject} className="flex-1 py-5 bg-rose-500 text-white rounded-3xl font-black text-[10px] uppercase shadow-xl shadow-rose-100">確認駁回</button></div>
+            </div>
+         </div>
+       )}
+       {isDirectCreateModalOpen && (
+         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-2xl z-[400] flex items-end animate-in fade-in duration-300">
+            <div className="bg-white w-full rounded-t-[75px] p-12 pb-24 shadow-2xl space-y-10 animate-in slide-in-from-bottom-40 duration-700 max-w-xl mx-auto max-h-[95vh] overflow-y-auto no-scrollbar relative">
+               <div className="flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md pt-2 pb-6 z-10"><h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">部署新宮廟節點</h3><button onClick={() => setIsDirectCreateModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 text-xl font-bold hover:bg-rose-50 transition-all">✕</button></div>
+               <TempleApplicationForm role="distributor" submittedBy={initialProfile.name} distributorId={initialProfile.id} onSuccess={() => window.location.reload()} onCancel={() => setIsDirectCreateModalOpen(false)} />
+            </div>
+         </div>
+       )}
+       {isTempleListModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-center justify-center p-6 animate-in fade-in duration-300">
+             <div className="bg-white w-full max-w-xl rounded-[60px] p-12 shadow-2xl animate-in zoom-in-95 duration-500 max-h-[85vh] overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center mb-8 px-4">
+                   <div className="space-y-1"><h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">營運節點清單</h3><p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Global Managed Nodes Registry</p></div>
+                   <button onClick={() => setIsTempleListModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
+                </div>
+                <div className="flex-1 overflow-y-auto no-scrollbar px-2 space-y-4">
+                   {managedTemples.map(temple => (
+                      <div key={temple.id} className="bg-slate-50 p-6 rounded-[35px] border border-slate-100 flex justify-between items-center group hover:bg-white hover:shadow-xl transition-all duration-500">
+                         <div className="flex gap-4 items-center">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-lg transition-all ${temple.status === 'Active' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>🏛️</div>
+                            <div><h4 className="text-sm font-black text-slate-900">{temple.name}</h4><p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">負責業務：{temple.sales} • {temple.plan}</p></div>
+                         </div>
+                         <div className="text-right"><p className="text-[8px] font-black text-slate-300 uppercase leading-none mb-1">開通日期</p><p className="text-[10px] font-black text-slate-900 tracking-tight">{temple.joinedAt}</p></div>
+                      </div>
+                   ))}
+                </div>
+             </div>
+          </div>
+       )}
+       {/* Official Contract Signing Modal (Ported from DistSales) */}
+       {isContractModalOpen && (
+         <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[500] flex items-center justify-center p-6 animate-in zoom-in duration-500">
+            <div className="bg-white w-full max-w-md rounded-[60px] p-12 space-y-12 shadow-2xl relative overflow-hidden border border-white">
+               <div className="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
+               <div className="text-center space-y-4">
+                  <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic">官方數位合約</h2>
+                  <p className="text-[10px] text-blue-600 font-black uppercase tracking-[0.3em]">HQ Admin Verified Protocol</p>
+               </div>
+               <div className="space-y-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">受約對象宮廟名稱</p>
+                  <input type="text" placeholder="輸入宮廟全銜" value={contractTemple} onChange={e => setContractTemple(e.target.value)} className="w-full py-6 rounded-[30px] bg-blue-50/50 border-2 border-blue-100 text-center text-xl font-black outline-none focus:border-blue-400 transition-all" />
+               </div>
+               <div className="h-48 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] flex items-center justify-center text-slate-300 font-black italic shadow-inner">
+                  在此區域進行法定電子簽署
+               </div>
+               <div className="grid grid-cols-2 gap-5">
+                  <button onClick={() => setIsContractModalOpen(false)} className="py-6 rounded-[32px] font-black text-slate-400 bg-slate-50 uppercase text-[10px] tracking-widest">取消</button>
+                  <button onClick={() => {
+                     addLog("簽署官方合約", contractTemple);
+                     setIsContractModalOpen(false);
+                     alert("✅ 電子合約已完成簽署並加密存檔");
+                  }} className="py-6 rounded-[32px] font-black text-white bg-slate-950 shadow-2xl uppercase text-[10px] tracking-[0.2em] italic hover:bg-blue-600">啟動契約</button>
+               </div>
+            </div>
+         </div>
+       )}
+       {/* --- TOOL PREVIEW MODAL --- */}
+       {activeToolPreview && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
+             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                   <div>
+                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.type}</p>
+                   </div>
+                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
+                </div>
+                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
+                   {activeToolPreview.type === 'photo' ? (
+                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
+                   ) : activeToolPreview.type === 'video' ? (
+                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
+                   ) : (
+                      <div className="text-center space-y-4">
+                         <span className="text-6xl block">📄</span>
+                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
+                      </div>
+                   )}
+                </div>
+                <div className="p-6 border-t border-slate-100 bg-white flex justify-end">
+                   <button 
+                     onClick={() => {
+                        if (['video', 'photo'].includes(activeToolPreview.type)) {
+                           const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
+                           if (fileUrl.startsWith('data:')) {
+                             const a = document.createElement('a');
+                             a.href = fileUrl;
+                             a.download = activeToolPreview.title || 'download';
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                           } else {
+                             const a = document.createElement('a');
+                             a.href = fileUrl;
+                             a.download = activeToolPreview.title || 'download';
+                             a.target = '_blank';
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                           }
+                        } else {
+                           const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
+                           if (fileUrl.startsWith('data:')) {
+                             const arr = fileUrl.split(',');
+                             const bstr = atob(arr[1]);
+                             let n = bstr.length;
+                             const u8arr = new Uint8Array(n);
+                             while(n--){
+                                 u8arr[n] = bstr.charCodeAt(n);
+                             }
+                             const blob = new Blob([u8arr], {type: arr[0].match(/:(.*?);/)[1]});
+                             const url = URL.createObjectURL(blob);
+                             const a = document.createElement('a');
+                             a.href = url;
+                             a.download = activeToolPreview.title || 'download';
+                             a.target = '_blank';
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                             URL.revokeObjectURL(url);
+                           } else {
+                             const a = document.createElement('a');
+                             a.href = fileUrl;
+                             a.download = activeToolPreview.title || 'download';
+                             a.target = '_blank';
+                             document.body.appendChild(a);
+                             a.click();
+                             document.body.removeChild(a);
+                           }
+                        }
+                     }} 
+                     className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 transition-all active:scale-95"
+                   >
+                     確認下載檔案
+                   </button>
+                </div>
+             </div>
+          </div>
+       )}
+    
+</div>
   );
 }

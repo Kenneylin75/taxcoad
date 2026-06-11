@@ -121,8 +121,12 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">宣傳圖片網址 (Image URL) - 選填</label>
-              <input name="imageUrl" type="url" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：https://example.com/img.jpg" />
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">宣傳圖片 (IMAGE) - 網址或上傳皆可</label>
+              <div className="flex gap-2 items-center">
+                 <input name="imageUrl" type="url" className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：https://example.com/img.jpg" />
+                 <span className="text-xs font-bold text-slate-400 uppercase">或</span>
+                 <input name="imageFile" type="file" accept="image/*" className="flex-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer" />
+              </div>
             </div>
 
             <div className="space-y-2">

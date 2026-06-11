@@ -5,6 +5,7 @@ import TempleApplicationForm from '../components/TempleApplicationForm';
 import DistributorApplicationForm from '../components/DistributorApplicationForm';
 import { 
   uploadTool, 
+  deleteTool,
   approveTempleBySuperAdmin, 
   rejectTempleBySuperAdmin, 
   fetchSystemConfig, 
@@ -28,6 +29,7 @@ transferDistributorOwnership,
   updateAccountPassword,
   fetchTempleStorages,
   fetchRoleWallets,
+  fetchSuperAdminFinancials,
   logoutAccount
 } from '../actions';
 
@@ -68,10 +70,15 @@ export default function SuperAdminClient({
   const [newSalesId, setNewSalesId] = useState('');
   const [newDistributorId, setNewDistributorId] = useState('');
    const [accountSubTab, setAccountSubTab] = useState<'Temple' | 'Distributor' | 'SuperSales'>('Temple');
+  const [transferModalData, setTransferModalData] = useState<{id: string, role: string, name: string} | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState<string>('HQ');
+  const [transferTargetType, setTransferTargetType] = useState<'HQ' | 'Distributor' | 'SuperSales'>('HQ');
+  const [selectedTransferTemples, setSelectedTransferTemples] = useState<string[]>([]);
    const [accountType, setAccountType] = useState<'SuperSales' | 'Distributor' | 'Temple' | 'Admin'>('SuperSales');
    const [isFree, setIsFree] = useState(false);
    const [freeType, setFreeType] = useState<'Normal' | 'Trial' | 'Permanent'>('Normal');
-   const [uploadMode, setUploadMode] = useState<'video' | 'contract'>('video');
+   const [uploadMode, setUploadMode] = useState<'video' | 'photo' | 'document' | 'contract'>('video');
+   const [selectedFile, setSelectedFile] = useState<File | null>(null);
    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
    const [paymentCycle, setPaymentCycle] = useState<'Monthly' | 'Yearly'>('Monthly');
    const [viewingAccountDetail, setViewingAccountDetail] = useState<any>(null);
@@ -82,7 +89,10 @@ export default function SuperAdminClient({
     fetchAggregatedAnalytics().then(setAnalytics);
     fetchSystemConfig().then(setConfig);
     fetchAdminLogs().then(setLogs);
-    fetchFinanceData().then(setFinance);
+    fetchSuperAdminFinancials().then(data => {
+      setFinance({ records: data.records, summary: data.summary });
+      setWallets(data.wallets);
+    });
     fetchSyncQueue().then(setSyncQueue);
     fetchPendingDistributors().then(setPendingDistributors);
     fetchStoragePlans().then(setStoragePlans);
@@ -90,7 +100,6 @@ export default function SuperAdminClient({
     fetchAiApiModels().then(setAiModels);
     fetchAllTempleAiUsage().then(setAllTempleAiUsage);
     fetchTempleStorages().then(setTempleStorages);
-    fetchRoleWallets().then(setWallets);
   }, []);
 
   // --- Handlers ---
@@ -132,19 +141,40 @@ export default function SuperAdminClient({
   const handleUploadTool = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const data = {
-        type: uploadMode,
-        title: fd.get('title') as string,
-        category: fd.get('category') as string,
-        thumbnail: uploadMode === 'video' ? 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000' : 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=1000'
-    };
+    
+    let defaultThumb = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000';
+    if (uploadMode === 'photo') defaultThumb = 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=1000';
+    if (uploadMode === 'document') defaultThumb = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000';
+    if (uploadMode === 'contract') defaultThumb = 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=1000';
 
-    startTransition(async () => {
-        await uploadTool(data);
-        setMediaList([ {id: Date.now().toString(), ...data}, ...mediaList ]);
-        setIsUploadModalOpen(false);
-        alert("資材已即時同步至全球網域節點，所有業務端、經銷商、高級業務員介面均已更新 ⚡");
-    });
+    const formData = new FormData();
+        formData.append('type', uploadMode);
+        formData.append('title', fd.get('title') as string);
+        formData.append('category', fd.get('category') as string);
+        formData.append('thumbnail', defaultThumb);
+        if (selectedFile) {
+            formData.append('file', selectedFile);
+        }
+
+        startTransition(async () => {
+            const res = await uploadTool(formData);
+            if (res && res.success) {
+                setMediaList([{
+                    id: Date.now().toString(), 
+                    type: uploadMode,
+                    title: fd.get('title') as string,
+                    category: fd.get('category') as string,
+                    thumbnail: res.thumbnail,
+                    url: res.toolUrl,
+                    uploadedAt: new Date().toISOString().split('T')[0]
+                }, ...mediaList]);
+                setIsUploadModalOpen(false);
+                setSelectedFile(null);
+                alert("資材已即時同步至全球網域節點，所有業務端、經銷商、高級業務員介面均已更新 ⚡");
+            } else {
+                alert("上傳失敗！");
+            }
+        });
   };
 
   const handleDownloadLogs = async () => {
@@ -339,6 +369,7 @@ export default function SuperAdminClient({
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">職級 (Role)</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">業務名稱</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
@@ -349,8 +380,22 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-indigo-50 text-indigo-600">{acc.role}</span></td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-12 py-8"><div className="flex items-center gap-3"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[11px] font-black text-emerald-500 uppercase italic">Active</span></div></td>
+                               <td className="px-12 py-8">
+                                  <button 
+                                     onClick={async () => {
+                                        if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
+                                           const { updateAccountStatus } = await import('../actions');
+                                           await updateAccountStatus(acc.id, 'SuperSales', (!acc.status || acc.status==='Active') ? 'Inactive' : 'Active');
+                                           window.location.reload();
+                                        }
+                                     }}
+                                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic transition-all ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
+                                  >
+                                     {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
+                                  </button>
+                               </td>
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
+                                  <button onClick={() => setTransferModalData({id: acc.id, role: 'SuperSales', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
                                      window.location.href = `/super-sales/${acc.id}`;
                                   }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
@@ -388,8 +433,22 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-emerald-50 text-emerald-600">{acc.role}</span></td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-12 py-8"><div className="flex items-center gap-3"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[11px] font-black text-emerald-500 uppercase italic">Active</span></div></td>
+                               <td className="px-12 py-8">
+                                  <button 
+                                     onClick={async () => {
+                                        if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
+                                           const { updateAccountStatus } = await import('../actions');
+                                           await updateAccountStatus(acc.id, 'Distributor', (!acc.status || acc.status==='Active') ? 'Inactive' : 'Active');
+                                           window.location.reload();
+                                        }
+                                     }}
+                                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic transition-all ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
+                                  >
+                                     {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
+                                  </button>
+                               </td>
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
+                                  <button onClick={() => setTransferModalData({id: acc.id, role: 'Distributor', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
                                      window.location.href = `/${acc.id}`;
                                   }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
@@ -417,6 +476,7 @@ export default function SuperAdminClient({
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">編號</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">宮廟名稱</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
@@ -427,7 +487,21 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8 text-lg font-black text-slate-400 tracking-tight italic">No.{String(idx+1).padStart(4, '0')}</td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-12 py-8"><div className="flex items-center gap-3"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[11px] font-black text-emerald-500 uppercase italic">Active</span></div></td>
+                               <td className="px-12 py-8 text-[12px] font-bold text-slate-600">{acc.distributorId ? initialAccounts.find(a => a.id === acc.distributorId)?.name : (acc.salesId ? initialAccounts.find(a => a.id === acc.salesId)?.name : '系統總部 HQ')}</td>
+                               <td className="px-12 py-8">
+                                  <button 
+                                     onClick={async () => {
+                                        if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
+                                           const { updateAccountStatus } = await import('../actions');
+                                           await updateAccountStatus(acc.id, 'Temple', (!acc.status || acc.status==='Active') ? 'Inactive' : 'Active');
+                                           window.location.reload();
+                                        }
+                                     }}
+                                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic transition-all ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
+                                  >
+                                     {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
+                                  </button>
+                               </td>
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
                                   <button onClick={() => {
                                      import('@/app/actions').then(async m => { const res = await m.impersonateTemple((acc.templeId || acc.id) as string, 'SuperAdmin'); if(res.success && res.redirectPath) window.location.href = res.redirectPath; })
@@ -676,18 +750,27 @@ export default function SuperAdminClient({
                           <div className="aspect-video relative bg-slate-100 overflow-hidden">
                              <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000 opacity-80" />
                              <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                                <span className="text-4xl">{tool.type === 'video' ? '▶️' : '📄'}</span>
+                                <span className="text-4xl">
+                                   {tool.type === 'video' ? '▶️' : tool.type === 'photo' ? '🖼️' : tool.type === 'document' ? '📄' : '📝'}
+                                </span>
                              </div>
                              <div className="absolute top-6 left-6 px-4 py-2 bg-white/90 backdrop-blur rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm">
-                                {tool.type === 'video' ? '業務演示影片' : '合約 規範文檔'}
+                                {tool.type === 'video' ? '影片' : tool.type === 'photo' ? '照片' : tool.type === 'document' ? '文件' : '電子合約'}
                              </div>
                           </div>
                           <div className="p-10 space-y-4">
-                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category}</p>
+                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category} • {tool.uploadedAt || '2026/05/19'}</p>
                              <h5 className="text-xl font-black text-slate-900 tracking-tight italic">{tool.title}</h5>
                              <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                 <span className="text-[10px] font-black text-emerald-500 uppercase italic">Synced All Nodes</span>
-                                <button className="text-xs font-black text-slate-300 hover:text-rose-500 transition-all">移除</button>
+                                <button onClick={async () => {
+                                   if(confirm('確定要移除此資源嗎？移除後全球網域皆會同步刪除。')) {
+                                      const res = await deleteTool(tool.id);
+                                      if (res.success) {
+                                         setMediaList(mediaList.filter(t => t.id !== tool.id));
+                                      }
+                                   }
+                                }} className="text-xs font-black text-slate-300 hover:text-rose-500 transition-all">移除</button>
                              </div>
                           </div>
                        </div>
@@ -1332,6 +1415,9 @@ export default function SuperAdminClient({
                           <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">聯繫電話</label><input name="phone" type="text" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="0900-000-000" /></div>
                           <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">登入 ID (Account)</label><input name="account" type="text" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="elite_manager_01" required /></div>
                           <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">安全密碼 (Password)</label><input name="password" type="password" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="••••••••" required /></div>
+                          {accountType === 'SuperSales' && (
+                             <div className="space-y-4 col-span-2"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">電子郵件 (Email)</label><input name="email" type="email" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="elite@system.tw" /></div>
+                          )}
                        </div>
                     </section>
 
@@ -1355,6 +1441,21 @@ export default function SuperAdminClient({
                                    <div className="space-y-2 text-center"><p className="text-[9px] font-black text-slate-400">第二年</p><input name="rentY2" type="number" defaultValue={config?.defaultSuperSalesRates?.templeRentRates?.[1] ?? 12} className="w-full bg-white rounded-2xl p-4 text-center font-black" /></div>
                                    <div className="space-y-2 text-center"><p className="text-[9px] font-black text-slate-400">後續 (三年起)</p><input name="rentY3" type="number" defaultValue={config?.defaultSuperSalesRates?.templeRentRates?.[2] ?? 10} className="w-full bg-white rounded-2xl p-4 text-center font-black" /></div>
                                 </div>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-4 pt-4"><div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest italic">03. 收款帳戶設定 (Bank Account Information)</h4></div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-8 rounded-[40px] border border-slate-100">
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 italic">銀行名稱</label>
+                                <input name="bankName" type="text" className="w-full bg-white rounded-2xl p-4 font-black outline-none border border-slate-100 focus:border-emerald-500 transition-all" placeholder="例如：中國信託" />
+                             </div>
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 italic">戶名</label>
+                                <input name="accountName" type="text" className="w-full bg-white rounded-2xl p-4 font-black outline-none border border-slate-100 focus:border-emerald-500 transition-all" placeholder="例如：林精英" />
+                             </div>
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 italic">帳號</label>
+                                <input name="accountNumber" type="text" className="w-full bg-white rounded-2xl p-4 font-black outline-none border border-slate-100 focus:border-emerald-500 transition-all" placeholder="例如：1234567890" />
                              </div>
                           </div>
                        </section>
@@ -1381,16 +1482,38 @@ export default function SuperAdminClient({
                 <div className="space-y-4"><p className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.4em] italic">System Resource Sync</p><h3 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">上傳並同步資源至全網</h3></div>
                 <form onSubmit={handleUploadTool} className="space-y-8">
                     <div className="flex gap-4">
-                        <button type="button" onClick={()=>setUploadMode('video')} className={`flex-1 py-5 rounded-[25px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'video' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>業務演示影片</button>
-                        <button type="button" onClick={()=>setUploadMode('contract')} className={`flex-1 py-5 rounded-[25px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'contract' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>合約 規範文件</button>
+                        <button type="button" onClick={()=>setUploadMode('video')} className={`flex-1 py-5 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'video' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>影片</button>
+                        <button type="button" onClick={()=>setUploadMode('photo')} className={`flex-1 py-5 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'photo' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>照片</button>
+                        <button type="button" onClick={()=>setUploadMode('document')} className={`flex-1 py-5 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'document' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>文件</button>
+                        <button type="button" onClick={()=>setUploadMode('contract')} className={`flex-1 py-5 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'contract' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>電子合約</button>
                     </div>
                     <div className="space-y-6">
                         <input name="title" type="text" placeholder="資源標題 (例如：2026合約演示)" className="w-full bg-slate-50 rounded-[30px] p-7 text-sm font-black outline-none border border-slate-100" required />
                         <input name="category" type="text" placeholder="類別 (例如：系統說明)" className="w-full bg-slate-50 rounded-[30px] p-7 text-sm font-black outline-none border border-slate-100" required />
-                        <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] h-40 flex flex-col items-center justify-center space-y-2 group cursor-pointer hover:bg-white hover:border-indigo-400 transition-all">
-                            <span className="text-3xl group-hover:scale-110 transition-transform">📁</span>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">點擊或拖曳檔案至此 (MAX 500MB)</p>
-                        </div>
+                        <label 
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                    setSelectedFile(e.dataTransfer.files[0]);
+                                    e.dataTransfer.clearData();
+                                }
+                            }}
+                            className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] h-40 flex flex-col items-center justify-center space-y-2 group cursor-pointer hover:bg-white hover:border-indigo-400 transition-all">
+                            {selectedFile ? (
+                               <>
+                                 <span className="text-3xl text-emerald-500">✅</span>
+                                 <p className="text-xs font-black text-slate-800 tracking-widest">{selectedFile.name}</p>
+                                 <p className="text-[9px] font-bold text-slate-400">點擊或拖曳可重新選擇檔案</p>
+                               </>
+                            ) : (
+                               <>
+                                 <span className="text-3xl group-hover:scale-110 transition-transform">📁</span>
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">點擊或拖曳檔案至此 (MAX 500MB)</p>
+                               </>
+                            )}
+                            <input type="file" name="file" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+                        </label>
                     </div>
                     <button type="submit" disabled={isPending} className="w-full py-8 bg-indigo-600 text-white rounded-[35px] font-black text-xs uppercase tracking-[0.4em] shadow-xl hover:bg-indigo-500 transition-all">確認上傳並廣播雲端指令 ☁️</button>
                 </form>
@@ -1444,12 +1567,16 @@ export default function SuperAdminClient({
                             <span className="text-sm font-black text-slate-900">{viewingAccountDetail.templePhone || '未設定'}</span>
                          </div>
                          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
-                            <span className="text-xs font-bold text-slate-400">所屬代理商 (Distributor ID)</span>
-                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.distributorId || '無'}</span>
+                            <span className="text-xs font-bold text-slate-400">所屬代理商 (Distributor)</span>
+                            <span className="text-sm font-black text-slate-900">
+                               {viewingAccountDetail.creatorInfo?.type === 'super_admin' ? '超級管理員 (總部)' : (viewingAccountDetail.creatorInfo?.distName || '無')}
+                            </span>
                          </div>
                          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
-                            <span className="text-xs font-bold text-slate-400">負責業務 (Sales ID)</span>
-                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.salesId || '無'}</span>
+                            <span className="text-xs font-bold text-slate-400">負責業務 (Sales)</span>
+                            <span className="text-sm font-black text-slate-900">
+                               {viewingAccountDetail.creatorInfo?.type === 'super_admin' ? '超級管理員 (總部)' : (viewingAccountDetail.creatorInfo?.salesName || '無')}
+                            </span>
                          </div>
                          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
                             <span className="text-xs font-bold text-slate-400">月租費 (Monthly Rent)</span>
@@ -1463,6 +1590,114 @@ export default function SuperAdminClient({
                             <span className="text-xs font-bold text-slate-400">建立時間 (Created At)</span>
                             <span className="text-[10px] font-black text-slate-900">{viewingAccountDetail.timestamp ? new Date(viewingAccountDetail.timestamp).toLocaleString() : '未知'}</span>
                          </div>
+                       </>
+                    )}
+                    
+                    {viewingAccountDetail.role === 'Distributor' && (
+                       <>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">聯絡電話 (Phone)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.phone || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">電子信箱 (Email)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.email || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">通訊地址 (Address)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.address || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">抽成比例 (Commission)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.commissionRate ? `${(viewingAccountDetail.commissionRate * 100).toFixed(0)}%` : '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">合約狀態 (Contract)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.contractStatus || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">加入時間 (Joined At)</span>
+                            <span className="text-[10px] font-black text-slate-900">{viewingAccountDetail.joinedAt || '未知'}</span>
+                         </div>
+                         {viewingAccountDetail.bankInfo && (
+                           <div className="pb-4 border-b border-slate-50 space-y-2">
+                              <span className="text-xs font-bold text-slate-400 block">匯款帳戶 (Bank Info)</span>
+                              <div className="text-[10px] font-black text-slate-900 bg-slate-100 p-3 rounded-xl leading-relaxed">
+                                 銀行：{viewingAccountDetail.bankInfo.bankName}<br/>
+                                 戶名：{viewingAccountDetail.bankInfo.accountName}<br/>
+                                 帳號：{viewingAccountDetail.bankInfo.accountNumber}
+                              </div>
+                           </div>
+                         )}
+                       </>
+                    )}
+
+                    {viewingAccountDetail.role === 'SuperSales' && (
+                       <>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">聯絡電話 (Phone)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.phone || '未設定'}</span>
+                         </div>
+                         <div className="flex justify-between items-center pb-4 border-b border-slate-50">
+                            <span className="text-xs font-bold text-slate-400">所屬代理商 (Distributor ID)</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.distributorId || '總部直屬'}</span>
+                         </div>
+                         {viewingAccountDetail.bankInfo && (
+                            <div className="flex justify-between items-start pb-4 border-b border-slate-50 bg-slate-50/50 p-4 rounded-xl">
+                               <span className="text-xs font-bold text-slate-400">收款帳戶 (Bank Account)</span>
+                               <span className="text-xs font-black text-slate-900 text-right leading-relaxed">
+                                  銀行：{viewingAccountDetail.bankInfo.bankName}<br/>
+                                  戶名：{viewingAccountDetail.bankInfo.accountName}<br/>
+                                  帳號：{viewingAccountDetail.bankInfo.accountNumber}
+                               </span>
+                            </div>
+                         )}
+                         {viewingAccountDetail.commissionRules && (
+                           <form onSubmit={async (e) => {
+                              e.preventDefault();
+                              if(confirm('確定要更新此業務的抽成設定嗎？')) {
+                                 const formData = new FormData(e.currentTarget);
+                                 const newRates = {
+                                    ...viewingAccountDetail.commissionRules,
+                                    templeSetupRate: Number(formData.get('setup')),
+                                    templeRentRates: [
+                                       Number(formData.get('y1')),
+                                       Number(formData.get('y2')),
+                                       Number(formData.get('y3'))
+                                    ]
+                                 };
+                                 const { updateSuperSalesCommission } = await import('../actions');
+                                 await updateSuperSalesCommission(viewingAccountDetail.name, newRates);
+                                 alert('抽成設定已更新！');
+                                 window.location.reload();
+                              }
+                           }} className="pb-4 border-b border-slate-50 space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <span className="text-xs font-bold text-slate-400 block">抽成規則 (Commission Rules)</span>
+                                 <button type="submit" className="text-[10px] bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-black hover:bg-indigo-600 hover:text-white transition-all shadow-sm">更新設定</button>
+                              </div>
+                              <div className="text-[10px] font-black text-slate-900 bg-slate-100 p-4 rounded-xl leading-relaxed mt-2 border border-slate-200 shadow-sm">
+                                 <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-slate-500">建置費抽成 (%):</span>
+                                       <input name="setup" type="number" defaultValue={viewingAccountDetail.commissionRules.templeSetupRate || viewingAccountDetail.commissionRules.setupFeePercent || 0} className="w-16 bg-white border border-slate-200 rounded-lg text-center py-1.5 outline-none focus:border-indigo-500 text-indigo-600 font-black" />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-slate-500">首年租金 (%):</span>
+                                       <input name="y1" type="number" defaultValue={viewingAccountDetail.commissionRules.templeRentRates?.[0] || viewingAccountDetail.commissionRules.rentYear1Percent || 0} className="w-16 bg-white border border-slate-200 rounded-lg text-center py-1.5 outline-none focus:border-emerald-500 text-emerald-600 font-black" />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-slate-500">次年租金 (%):</span>
+                                       <input name="y2" type="number" defaultValue={viewingAccountDetail.commissionRules.templeRentRates?.[1] || viewingAccountDetail.commissionRules.rentYear2Percent || 0} className="w-16 bg-white border border-slate-200 rounded-lg text-center py-1.5 outline-none focus:border-emerald-500 text-emerald-600 font-black" />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-slate-500">後續租金 (%):</span>
+                                       <input name="y3" type="number" defaultValue={viewingAccountDetail.commissionRules.templeRentRates?.[2] || viewingAccountDetail.commissionRules.rentYear3PlusPercent || 0} className="w-16 bg-white border border-slate-200 rounded-lg text-center py-1.5 outline-none focus:border-emerald-500 text-emerald-600 font-black" />
+                                    </div>
+                                 </div>
+                              </div>
+                           </form>
+                         )}
                        </>
                     )}
                  </div>
@@ -1496,6 +1731,119 @@ export default function SuperAdminClient({
            </div>
         </div>
       )}
-    </div>
+    
+      {/* 轉移資產 Modal */}
+      {transferModalData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/50 backdrop-blur-sm">
+           <div className="w-full max-w-3xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-10 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                 <div>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">資產轉移配置 (Asset Transfer)</h3>
+                    <p className="text-sm font-bold text-slate-400 mt-2">來源：<span className="text-indigo-600">{transferModalData.name} ({transferModalData.role})</span></p>
+                 </div>
+              </div>
+              <div className="p-10 overflow-y-auto bg-white flex-1">
+                 <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">名下資產 (宮廟列表)</h4>
+                 <div className="border border-slate-100 rounded-2xl overflow-hidden mb-8">
+                    <table className="w-full text-left text-sm">
+                       <thead className="bg-slate-50 border-b border-slate-100 text-[10px] uppercase font-black text-slate-400">
+                          <tr>
+                             <th className="p-4 w-12"><input type="checkbox" onChange={(e) => {
+                                const relatedTemples = initialAccounts.filter(a => a.role === 'Temple' && (transferModalData.role === 'Distributor' ? a.distributorId === transferModalData.id : a.salesId === transferModalData.id));
+                                setSelectedTransferTemples(e.target.checked ? relatedTemples.map(t => t.id) : []);
+                             }} /></th>
+                             <th className="p-4">宮廟名稱</th>
+                             <th className="p-4">現有租金設定</th>
+                          </tr>
+                       </thead>
+                       <tbody>
+                          {initialAccounts.filter(a => a.role === 'Temple' && (transferModalData.role === 'Distributor' ? a.distributorId === transferModalData.id : a.salesId === transferModalData.id)).map(t => (
+                             <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50">
+                                <td className="p-4"><input type="checkbox" checked={selectedTransferTemples.includes(t.id)} onChange={(e) => {
+                                   if(e.target.checked) setSelectedTransferTemples([...selectedTransferTemples, t.id]);
+                                   else setSelectedTransferTemples(selectedTransferTemples.filter(id => id !== t.id));
+                                }} /></td>
+                                <td className="p-4 font-bold text-slate-800">{t.name || t.templeName}</td>
+                                <td className="p-4 text-slate-500">{t.monthlyRent || 0} / 月</td>
+                             </tr>
+                          ))}
+                          {initialAccounts.filter(a => a.role === 'Temple' && (transferModalData.role === 'Distributor' ? a.distributorId === transferModalData.id : a.salesId === transferModalData.id)).length === 0 && (
+                             <tr><td colSpan={3} className="p-8 text-center text-slate-400 font-bold">該帳戶名下無宮廟資產</td></tr>
+                          )}
+                       </tbody>
+                    </table>
+                 </div>
+
+                 <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">轉移目標 (Target Allocation)</h4>
+                 
+                 <div className="space-y-4">
+                    <select 
+                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-indigo-500" 
+                       value={transferTargetType} 
+                       onChange={e => {
+                          const val = e.target.value as 'HQ' | 'Distributor' | 'SuperSales';
+                          setTransferTargetType(val);
+                          setTransferTargetId(val === 'HQ' ? 'HQ' : '');
+                       }}
+                    >
+                       <option value="HQ">👑 系統總部 (收回直營)</option>
+                       <option value="Distributor">🏢 經銷代理商</option>
+                       <option value="SuperSales">🚀 超級業務</option>
+                    </select>
+
+                    {transferTargetType === 'Distributor' && (
+                       <select 
+                          className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-indigo-500 shadow-sm" 
+                          value={transferTargetId} 
+                          onChange={e => setTransferTargetId(e.target.value)}
+                       >
+                          <option value="" disabled>請選擇要轉移的經銷商...</option>
+                          {initialAccounts.filter(a => a.role === 'Distributor' && a.id !== transferModalData.id && (!a.status || a.status === 'Active')).map(d => (
+                             <option key={d.id} value={`Distributor|${d.id}`}>{d.name} ({d.id})</option>
+                          ))}
+                       </select>
+                    )}
+
+                    {transferTargetType === 'SuperSales' && (
+                       <select 
+                          className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold focus:outline-none focus:border-indigo-500 shadow-sm" 
+                          value={transferTargetId} 
+                          onChange={e => setTransferTargetId(e.target.value)}
+                       >
+                          <option value="" disabled>請選擇要轉移的超級業務...</option>
+                          {initialAccounts.filter(a => a.role === 'SuperSales' && a.id !== transferModalData.id && (!a.status || a.status === 'Active')).map(s => (
+                             <option key={s.id} value={`SuperSales|${s.id}`}>{s.name} ({s.id})</option>
+                          ))}
+                       </select>
+                    )}
+                 </div>
+
+                 <p className="mt-4 text-[11px] text-rose-500 font-bold bg-rose-50 p-4 rounded-xl border border-rose-100">⚠️ 轉移後，選定宮廟的後續月租費分潤將自動歸屬於新的目標帳戶，此動作無法撤銷，請審慎操作。</p>
+              </div>
+              <div className="p-6 bg-slate-50 flex gap-4">
+                 <button onClick={async () => {
+                    if (selectedTransferTemples.length === 0) { alert('請先選擇要轉移的宮廟！'); return; }
+                    if (confirm(`確定要將 ${selectedTransferTemples.length} 間宮廟轉移給該目標嗎？`)) {
+                       const { transferTemples } = await import('../actions');
+                       let tRole: 'HQ' | 'Distributor' | 'SuperSales' = 'HQ';
+                       let tId: string | null = null;
+                       if (transferTargetId !== 'HQ') {
+                          const parts = transferTargetId.split('|');
+                          tRole = parts[0] as any;
+                          tId = parts[1];
+                       }
+                       await transferTemples(selectedTransferTemples, tId, tRole);
+                       alert('資產轉移成功！');
+                       setTransferModalData(null);
+                       setSelectedTransferTemples([]);
+                       window.location.reload();
+                    }
+                 }} className="flex-1 bg-purple-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-purple-700 shadow-xl">確認轉移 (Confirm Transfer)</button>
+                 <button onClick={() => { setTransferModalData(null); setSelectedTransferTemples([]); }} className="px-8 py-4 font-black text-xs text-slate-400">取消 (Cancel)</button>
+              </div>
+           </div>
+        </div>
+      )}
+</div>
   );
 }

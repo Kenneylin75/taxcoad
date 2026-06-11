@@ -75,9 +75,6 @@ let db_print_templates: any[] = initGlobal('db_print_templates', []);
 let db_forms: any[] = initGlobal('db_forms', []);
 
 let db_personnel: any[] = initGlobal('db_personnel', [
-  { id: '1', name: "林廟祝", role: "Service", account: "lin.temple", status: "Active", phone: "0912-345-678", serviceCount: 15, avatar: "https://ui-avatars.com/api/?name=Lin&background=4F46E5&color=fff", permissions: ["calendar", "customers", "lamps"], templeId: 'temple-1' },
-  { id: '2', name: "陳道長", role: "Service", account: "chen.temple", status: "Active", phone: "0923-456-789", serviceCount: 22, avatar: "https://ui-avatars.com/api/?name=Chen&background=10B981&color=fff", permissions: ["calendar", "customers", "lamps"], templeId: 'temple-1' },
-  { id: '3', name: "王師傅", role: "Service", account: "wang.temple", status: "Active", phone: "0934-567-890", serviceCount: 8, avatar: "https://ui-avatars.com/api/?name=Wang&background=F59E0B&color=fff", permissions: ["calendar", "customers"], templeId: 'temple-1' },
   { id: '4', name: "測試宮廟管理員", role: "TempleAdmin", account: "admin02", password: "admin02", status: "Active", phone: "0900-000-002", templeId: "temple-2" }
 ].map(x => x.templeId ? x : ({...x, templeId: 'temple-1'})));
 
@@ -130,6 +127,7 @@ export async function loginAccount(formData: FormData) {
   let success = false;
   let loggedInName = account;
   let assignedRole = "TempleAdmin";
+  let loginStatus = "Active";
 
   const searchAccount = account.toLowerCase();
   const pData = (gStore.db_personnel || db_personnel);
@@ -146,24 +144,39 @@ export async function loginAccount(formData: FormData) {
   } else {
     const distributor = db_distributors.find(d => (d.account || "").toLowerCase() === searchAccount && (d.password === password || !d.password));
     if (distributor) {
-      success = true;
-      redirectPath = `/${distributor.id}`;
-      assignedRole = "Distributor";
+      if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
+      else {
+        success = true;
+        redirectPath = `/${distributor.id}`;
+        assignedRole = "Distributor";
+      }
     } else {
       const salesPerson = db_dist_sales.find(s => (s.account || "").toLowerCase() === searchAccount && (s.password === password || !s.password));
       if (salesPerson) {
-        success = true;
-        redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
-        assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
+        if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
+        else {
+          success = true;
+          redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
+          assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
+        }
       } else {
         const person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password);
         if (person) { 
-          success = true; 
-          redirectPath = `/${person.templeId}/admin/services`; 
-          assignedRole = "TempleAdmin"; 
+          const temple = db_temples.find(t => t.id === person.templeId);
+          if (temple && temple.status === "Inactive") {
+             loginStatus = "Inactive";
+          } else {
+             success = true; 
+             redirectPath = `/${person.templeId}/admin/services`; 
+             assignedRole = "TempleAdmin"; 
+          }
         }
       }
     }
+  }
+
+  if (loginStatus === "Inactive") {
+     return { success: false, error: "該帳戶已被停權或關閉，無法登入" };
   }
 
   if (success) {
@@ -344,10 +357,10 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
         phone,
         service: serviceName,
         serviceId: svcId || null,
-        status: paymentMethod === 'Cash' || paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Confirmed' : 'Pending',
+        status: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Confirmed' : 'Pending',
         paymentMethod,
         paymentRef,
-        paymentStatus: paymentMethod === 'Cash' || paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
+        paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
         amount
       };
       db_appointments.push(newAppointment);
@@ -359,10 +372,10 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
         db_guests.push({
           phone,
           name: guestName,
-          status: paymentMethod === 'Cash' || paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Active' : 'Pending',
+          status: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Active' : 'Pending',
     paymentMethod,
     paymentRef,
-    paymentStatus: paymentMethod === 'Cash' || paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
+    paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName)}&background=B91C1C&color=fff`
         });
         gStore.db_guests = db_guests;
@@ -735,8 +748,18 @@ export async function fetchPaymentConfig() {
         config[key].allowQueue = true;
       }
     });
+    return config;
   }
-  return config || null;
+
+  // 強制預設僅開啟現場現金付款
+  return {
+    templeId: templeId,
+    cash: { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+    linePay: { enabled: false },
+    thirdParty: { enabled: false },
+    customTransfer: { enabled: false },
+    customQR: { enabled: false }
+  } as TemplePaymentConfig;
 }
 
 export async function savePaymentConfig(data: TemplePaymentConfig) {
@@ -987,7 +1010,7 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
     phone,
     guestName: n,
     price: pr,
-    paymentStatus: pr > 0 ? 'Paid' : 'Unpaid',
+    paymentStatus: pr > 0 ? 'Pending' : 'Unpaid',
     actualPrice: pr > 0 ? pr : 0,
     timestamp: new Date().toISOString().replace('T', ' ').split('.')[0]
   });
@@ -1038,16 +1061,32 @@ export async function saveEvent(fd: FormData) {
   const price = Number(fd.get('price')) || 0;
   const capacity = Number(fd.get('capacity')) || 0;
   const status = (fd.get('status') as any) || 'Draft';
+  let imageUrl = fd.get('imageUrl') as string;
+  const imageFile = fd.get('imageFile') as File | null;
+  
+  if (imageFile && imageFile.size > 0) {
+    const fs = require('fs');
+    const path = require('path');
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    
+    const ext = imageFile.name.split('.').pop() || 'jpg';
+    const filename = `evt-${Date.now()}.${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+    const arrayBuffer = await imageFile.arrayBuffer();
+    fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+    imageUrl = `/uploads/${filename}`;
+  }
   
   const templeId = await getDynamicTempleId();
 
   if (id) {
     const idx = db_events.findIndex(e => e.id === id);
     if (idx > -1) {
-      db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId };
+      db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId, imageUrl };
     }
   } else {
-    db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId });
+    db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl });
   }
   revalidatePath('/temple/events');
   revalidatePath('/');
@@ -1063,45 +1102,14 @@ export async function deleteEvent(id: string) {
 }
 
 // --- B2B SaaS 多租戶與經銷架構全域變數 ---
-let db_distributors: any[] = initGlobal('db_distributors', [
-  { 
-    id: 'dist-1', 
-    name: '北區總代理', 
-    code: 'HQ-DIST-001', 
-    phone: '02-2789-1234',
-    email: 'service@dist-north.tw',
-    address: '台北市內湖區瑞光路 500 號 12 樓',
-    commissionRate: 0.2,
-    contractStatus: 'Active',
-    joinedAt: '2024-01-10',
-    bankInfo: {
-      bankName: '國泰世華銀行 (013)',
-      accountName: '北區雲端宮廟代理有限公司',
-      accountNumber: '012-34-567890-1'
-    },
-    b2bPayment: {
-      enabledMethods: ['transfer', 'creditCard'],
-      ecpay: { merchantId: '', hashKey: '', hashIV: '' },
-      linePay: { channelId: '', channelSecret: '' },
-      transfer: { bankCode: '013', accountNumber: '012-34-567890-1', accountName: '北區雲端宮廟代理有限公司' }
-    }
-  }
-]);
-let db_dist_sales: any[] = initGlobal('db_dist_sales', [
-  { 
-    id: 'sales-1', name: '王業務', distributorId: 'dist-1', account: 'wang_sales', 
-    commissionRules: { setupFeePercent: 20, rentYear1Percent: 15, rentYear2Percent: 10, rentYear3PlusPercent: 5 }
-  }
-]);
+let db_distributors: any[] = initGlobal('db_distributors', []);
+let db_dist_sales: any[] = initGlobal('db_dist_sales', []);
 let db_temples: any[] = initGlobal('db_temples', [
-  {  id: 'temple-1', templeName: '預設示範宮廟', city: '台北市', address: '信義路五段7號', templePhone: '02-8101-8800', status: 'Active', salesId: 'sales-1', distributorId: 'dist-1', monthlyRent: 3600, setupFee: 12000, timestamp: new Date().toISOString() , templeNo: 1 },
   {  id: 'temple-2', templeName: '第二測試宮廟', account: 'admin02', city: '台中市', address: '測試路2號', templePhone: '04-1234-5678', status: 'Active', timestamp: new Date().toISOString() , templeNo: 2 }
 ]);
 let db_sales_visits: any[] = initGlobal("db_sales_visits", []);
 let db_audit_logs: any[] = initGlobal("db_audit_logs", []);
-let db_tools: any[] = initGlobal('db_tools', [
-  { id: 'tool-1', type: 'video', category: '系統教學', title: '快速上手指南', thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop' }
-]);
+let db_tools: any[] = initGlobal('db_tools', []);
 let db_commissions: any[] = initGlobal('db_commissions', []);
 
 let db_config = initGlobal('db_config', {
@@ -1823,28 +1831,37 @@ export async function fetchAllAccountsForAdmin() {
   accounts.push({ id: 'ADMIN', name: '總部最高系統管理員', role: 'SuperAdmin', account: 'PIVOTADMIN01', status: 'Active' });
   
   db_personnel.forEach(p => {
-    if (p.role === 'Admin') accounts.push({ id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
+    if (p.role === 'Admin') accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
   });
 
   db_distributors.forEach(d => {
-    accounts.push({ id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
+    accounts.push({ ...d, id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
   });
 
   db_dist_sales.forEach(s => {
-    if (s.role === 'SuperSales') accounts.push({ id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: 'Active' });
+    if (s.role === 'SuperSales') {
+      const overrides = db_super_sales_overrides[s.name];
+      const mergedRules = overrides || s.commissionRules || db_config.defaultSuperSalesRates;
+      accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active', commissionRules: mergedRules });
+    }
   });
   
-  db_temples.forEach(t => {
+  const templePromises = db_temples.map(async t => {
     const personnel = db_personnel.find(p => p.templeId === t.id);
-    accounts.push({ 
+    const creatorInfo = await getTempleCreatorInfo(t.id);
+    return { 
       ...t,
       id: t.id, 
       name: t.name || t.templeName || '未知宮廟', 
       role: 'Temple', 
       account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
-      status: t.status || 'Active' 
-    });
+      status: t.status || 'Active',
+      creatorInfo: creatorInfo
+    };
   });
+  
+  const resolvedTemples = await Promise.all(templePromises);
+  accounts.push(...resolvedTemples);
 
   return accounts.reverse();
 }
@@ -1867,12 +1884,71 @@ export async function addVisitationRecord(data: any) {
 }
 
 export async function fetchSalesTools() { return [...db_tools]; }
-export async function uploadTool(data: any) {
-  db_tools.push({ id: `tool-${Date.now()}`, ...data });
+export async function uploadTool(formData: FormData) {
+  const type = formData.get('type') as string;
+  const title = formData.get('title') as string;
+  const category = formData.get('category') as string;
+  let thumbnail = formData.get('thumbnail') as string;
+  const file = formData.get('file') as File | null;
+  let url = thumbnail;
+
+  if (file && file.size > 0) {
+    const fs = require('fs');
+    const path = require('path');
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const ext = path.extname(file.name) || '';
+    const safeName = 'tool-' + Date.now() + ext;
+    const filePath = path.join(uploadsDir, safeName);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    fs.writeFileSync(filePath, buffer);
+    url = '/api/uploads/' + safeName;
+    if (type === 'photo') {
+      thumbnail = url;
+    }
+  }
+
+  const uploadedAt = new Date().toISOString().split('T')[0];
+  db_tools.push({ id: 'tool-' + Date.now(), uploadedAt, type, title, category, thumbnail, url });
+  
+  const { revalidatePath } = require('next/cache');
   revalidatePath('/super-admin');
   revalidatePath('/distributor');
   revalidatePath('/dist-sales');
-  return { success: true };
+  revalidatePath('/super-sales/[salesId]', 'page');
+  return { success: true, toolUrl: url, thumbnail };
+}
+
+export async function createDistributorSales(distId: string, data: any) {
+  const { name, phone, account, password, setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate } = data;
+  const newSales = {
+    id: 'dist-sales-' + Date.now(),
+    name,
+    phone,
+    account,
+    password,
+    distributorId: distId,
+    commissionRates: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate },
+    joinedAt: new Date().toISOString().split('T')[0],
+    status: 'Active'
+  };
+  
+  db_dist_sales.push(newSales);
+  return { success: true, data: newSales };
+}
+export async function deleteTool(toolId: string) {
+  const idx = db_tools.findIndex((t: any) => t.id === toolId);
+  if (idx > -1) {
+    db_tools.splice(idx, 1);
+    revalidatePath('/super-admin');
+    revalidatePath('/distributor');
+    revalidatePath('/dist-sales');
+    revalidatePath('/super-sales/[salesId]', 'page');
+    return { success: true };
+  }
+  return { success: false, error: 'Tool not found' };
 }
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
@@ -1925,28 +2001,65 @@ export async function submitDistributorApplication(data: any) {
 export async function fetchSuperSalesProfile(salesId: string) {
   const salesPerson = db_dist_sales.find(s => s.id === salesId) || db_dist_sales[0];
   const name = salesPerson.name || '超級精英業務';
-  const commissionRates = db_super_sales_overrides[name] || db_config.defaultSuperSalesRates;
+  const commissionRates = salesPerson.commissionRules || db_super_sales_overrides[name] || db_config.defaultSuperSalesRates;
   return {
     name: name,
     rank: '超級精英業務',
     id: salesPerson.id || 'pivot_elite_001',
     organization: '中央管理總部',
-    commissionRates
+    commissionRates,
+    phone: salesPerson.phone || '未設定',
+    account: salesPerson.account || '未設定',
+    email: salesPerson.email || '未設定',
+    bankInfo: salesPerson.bankInfo || null
   };
 }
 
-export async function fetchSuperSalesRegistry(name: string) {
-  return {
-    temples: [
-      { id: 'T1', name: '艋舺龍山寺', status: 'Active', plan: '企業旗艦方案', date: '2026-05-12', revenue: 3600 },
-      { id: 'T2', name: '台北天后宮', status: 'Pending', plan: '進階營運方案', date: '2026-05-10', revenue: 0 },
-      { id: 'T3', name: '大甲鎮瀾宮', status: 'Active', plan: '企業旗艦方案', date: '2026-05-08', revenue: 3600 }
-    ],
-    distributors: [
-      { id: 'D1', name: '誠信經銷台北分公司', status: 'Active', plan: '160萬/2年/100帳戶', date: '2026-04-15', nodesUsed: 42 },
-      { id: 'D2', name: '中台灣聯合開發中心', status: 'Pending', plan: '320萬/4年/250帳戶', date: '2026-05-01', nodesUsed: 0 }
-    ]
-  };
+export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bankName: string, accountName: string, accountNumber: string }) {
+  const salesPerson = db_dist_sales.find(s => s.id === salesId);
+  if (salesPerson) {
+    salesPerson.bankInfo = bankInfo;
+    revalidatePath('/super-sales/[salesId]', 'page');
+    revalidatePath('/super-admin');
+    return { success: true };
+  }
+  return { success: false, error: 'Account not found' };
+}
+
+export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: string, email: string }) {
+  const salesPerson = db_dist_sales.find(s => s.id === salesId);
+  if (salesPerson) {
+    salesPerson.phone = data.phone;
+    salesPerson.email = data.email;
+    revalidatePath('/super-sales/[salesId]', 'page');
+    revalidatePath('/super-admin');
+    return { success: true };
+  }
+  return { success: false, error: 'Account not found' };
+}
+
+export async function fetchSuperSalesRegistry(salesId: string) {
+  const sales = db_dist_sales.find(s => s.id === salesId);
+  const name = sales?.name;
+  
+  const temples = [];
+  for (const t of db_temples) {
+    const creatorInfo = await getTempleCreatorInfo(t.id);
+    if ((creatorInfo && creatorInfo.salesName === name) || t.salesId === salesId) {
+       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0 });
+    }
+  }
+
+  const distributors = db_distributors.filter(d => d.creatorSalesId === salesId || d.salesId === salesId).map(d => ({
+    id: d.id,
+    name: d.name,
+    status: d.contractStatus || 'Active',
+    plan: '經銷專案',
+    date: d.joinedAt || '未知',
+    nodesUsed: db_temples.filter(t => t.distributorId === d.id).length
+  }));
+
+  return { temples, distributors };
 }
 
 // --- Super Admin Account Creation API ---
@@ -1977,6 +2090,14 @@ export async function createSuperSalesAccount(data: any) {
     id,
     name: data.name,
     account: data.account,
+    password: data.password,
+    phone: data.phone,
+    email: data.email,
+    bankInfo: {
+      bankName: data.bankName,
+      accountName: data.accountName,
+      accountNumber: data.accountNumber
+    },
     role: 'SuperSales',
     commissionRules: commissionRates
   });
@@ -2151,13 +2272,29 @@ export async function fetchAggregatedAnalytics() {
 }
 
 
-export async function fetchCommissionHistory(salesName: string, year: string, month: string) { 
-  const sales = db_dist_sales.find(s => s.name === salesName);
-  const myTemples = db_temples.filter(t => t.salesId === sales?.id && t.status === 'Active');
+export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
+  const sales = db_dist_sales.find(s => s.id === salesId);
+  const salesName = sales?.name;
+  
+  const myTemples = [];
+  for (const t of db_temples) {
+    const creatorInfo = await getTempleCreatorInfo(t.id);
+    if ((creatorInfo && creatorInfo.salesName === salesName) || t.salesId === salesId) {
+      if (t.status === 'Active') {
+        myTemples.push(t);
+      }
+    }
+  }
   
   let totalEarned = 0;
   const records: any[] = [];
-  const rules = sales?.commissionRules || { setupFeePercent: 20, rentYear1Percent: 15, rentYear2Percent: 10, rentYear3PlusPercent: 5 };
+  
+  const overrides = salesName ? db_super_sales_overrides[salesName] : null;
+  const rules = sales?.commissionRules || overrides || db_config.defaultSuperSalesRates;
+  const setupRate = rules.templeSetupRate ?? rules.setupFeePercent ?? 20;
+  const rentY1 = rules.templeRentRates?.[0] ?? rules.rentYear1Percent ?? 15;
+  const rentY2 = rules.templeRentRates?.[1] ?? rules.rentYear2Percent ?? 12;
+  const rentY3 = rules.templeRentRates?.[2] ?? rules.rentYear3PlusPercent ?? 10;
 
   const now = new Date();
   
@@ -2167,7 +2304,7 @@ export async function fetchCommissionHistory(salesName: string, year: string, mo
     
     // 1. 開辦費分潤 (只有第一個月才算)
     if (monthsDiff === 0) {
-      const setupFeeCom = (t.setupFee || 12000) * (rules.setupFeePercent / 100);
+      const setupFeeCom = (t.setupFee || 12000) * (setupRate / 100);
       totalEarned += setupFeeCom;
       records.push({
         id: `${t.id}-setup`, 
@@ -2176,19 +2313,19 @@ export async function fetchCommissionHistory(salesName: string, year: string, mo
         type: '開辦費分潤', 
         amount: setupFeeCom, 
         phase: 'Setup',
-        calculation: `開辦費 $${(t.setupFee || 12000).toLocaleString()} * ${rules.setupFeePercent}%`
+        calculation: `開辦費 $${(t.setupFee || 12000).toLocaleString()} * ${setupRate}%`
       });
     }
 
     // 2. 月租費分潤 (判斷年份/階梯)
-    let rentPercent = rules.rentYear1Percent;
+    let rentPercent = rentY1;
     let yearLabel = '第一年';
     
     if (monthsDiff >= 12 && monthsDiff < 24) {
-      rentPercent = rules.rentYear2Percent;
+      rentPercent = rentY2;
       yearLabel = '第二年';
     } else if (monthsDiff >= 24) {
-      rentPercent = rules.rentYear3PlusPercent;
+      rentPercent = rentY3;
       yearLabel = '第三年及以上';
     }
     
@@ -2254,6 +2391,10 @@ export async function addSalesMember(data: any) {
     id: id, 
     distributorId: data.distributorId || 'dist-1', 
     account: data.account || `sales_${id}`, 
+    password: data.password || '12345678',
+    role: 'DistributorSales',
+    status: 'Active',
+    joinedAt: new Date().toISOString().split('T')[0],
     commissionRules: {
       setupFeePercent: data.setupFeePercent || 20,
       rentYear1Percent: data.rentYear1Percent || 15,
@@ -2263,7 +2404,7 @@ export async function addSalesMember(data: any) {
     ...data 
   });
   revalidatePath('/distributor');
-  return { success: true }; 
+  return { success: true, id }; 
 }
 export async function fetchDistributorTeam(distributorId: string) {
   return db_dist_sales.filter(s => s.distributorId === distributorId);
@@ -2697,14 +2838,17 @@ export async function rejectWithdrawal(id: string) {
 
 export async function updateServiceSettings() { return { success: true }; }
 
-export async function fetchEarningsStats(salesName: string = '超級精英業務') { 
+export async function fetchEarningsStats(salesId: string = '超級精英業務') { 
+  const sales = db_dist_sales.find(s => s.id === salesId);
+  const salesName = sales?.name || salesId;
   return withTempleSession(null, true, async (client) => {
     if (!client) {
+      const history = await fetchCommissionHistory(salesId, "2026", "05");
       const wallet = db_wallets.find(w => w.name === salesName);
       return { 
-        balance: wallet ? wallet.balance : 124500, 
-        pending: 45000, 
-        totalWithdrawn: 300000 
+        balance: wallet ? wallet.balance : history.totalEarned, 
+        pending: 0, 
+        totalWithdrawn: 0 
       };
     } else {
       const wRes = await client.query('SELECT balance FROM wallets WHERE name = $1', [salesName]);
@@ -2932,6 +3076,15 @@ export async function createPersonnel(formData: FormData) {
 export async function deletePersonnel(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
+    const personnel = db_personnel.find((p: any) => p.id.toString() === id.toString() && p.templeId === templeId);
+    if (personnel) {
+      const hasAppointments = db_appointments.some((a: any) => a.staff === personnel.name && a.status !== 'Completed' && a.templeId === templeId);
+      const hasSlots = db_slots.some((s: any) => s.staff === personnel.name && s.status !== 'Completed' && s.templeId === templeId);
+      if (hasAppointments || hasSlots) {
+        return { success: false, message: '此人員目前尚有預約服務或已排班時段，請先清空後再進行刪除！' };
+      }
+    }
+
     if (!client) {
       db_personnel = gStore.db_personnel = db_personnel.filter((p: any) => p.id.toString() !== id.toString());
     } else {
@@ -3497,6 +3650,9 @@ export async function createLampRecord(data: any) {
     startDate: today.toISOString().split('T')[0],
     expiryDate: exp.toISOString().split('T')[0],
     status: 'Active',
+    paymentMethod,
+    paymentRef,
+    paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
     createdAt: new Date().toISOString()
   };
 
@@ -3546,7 +3702,22 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
       db_appointments[idx].paymentStatus = 'Paid';
     }
   }
-  revalidatePath('/temple/lamps');
+  if (recordType === 'Event') {
+    const idx = db_event_registrations.findIndex(r => r.id === recordId);
+    if (idx > -1) {
+      db_event_registrations[idx].paymentStatus = 'Paid';
+    }
+  }
+  if (recordType === 'Queue') {
+    if (typeof db_queue_tickets !== 'undefined') {
+      const idx = db_queue_tickets.findIndex(r => r.id === recordId);
+      if (idx > -1) {
+        db_queue_tickets[idx].paymentStatus = 'Paid';
+      }
+    }
+  }
+  revalidatePath('/');
+  revalidatePath('/[templeId]/admin/customers');
   return { success: true };
 }
 
@@ -4250,7 +4421,7 @@ export async function updateAppointmentPayment(appId: number, paymentMethod: str
     db_appointments[idx].paymentMethod = paymentMethod;
     if (paymentRef) db_appointments[idx].paymentRef = paymentRef;
     
-    if (paymentMethod === 'Cash' || paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
+    if (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
       db_appointments[idx].paymentStatus = 'Paid';
       db_appointments[idx].status = 'Confirmed';
     } else {
@@ -4301,7 +4472,7 @@ export async function saveAiApiModels(models: any[]) {
 export async function fetchAllTempleAiUsage() {
   // Returns AI usage for all temples, joining with temple profiles and plans
   return db_temple_ai_usage.map(usage => {
-    const temple = db_temple_profiles.find(t => t.id === usage.templeId) || { name: '未知宮廟' };
+    const temple = db_temples.find(t => t.id === usage.templeId) || { name: '未知宮廟' };
     const plan = db_ai_plans.find(p => p.id === usage.planId) || { name: '無方案', chatLimit: 0 };
     return { ...usage, templeName: temple.name, planName: plan.name, chatLimit: plan.chatLimit || 0 };
   });
@@ -4399,4 +4570,195 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
     return { success: true };
   }
   return { success: false, message: 'Temple not found' };
+}
+
+export async function fetchDistributorFinancials(distId: string) {
+  const temples = db_temples.filter(t => t.distributorId === distId);
+  const templeIds = temples.map(t => t.id);
+
+  const bills = db_temple_bills.filter(b => templeIds.includes(b.templeId));
+
+  const paymentRecords = temples.map(t => {
+    const tBills = bills.filter(b => b.templeId === t.id);
+    const lastBill = tBills.sort((a,b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())[0];
+    
+    return {
+      id: t.id,
+      temple: t.templeName || '未知宮廟',
+      region: t.city || '未知區域',
+      amount: lastBill ? lastBill.amount : (t.monthlyRent || 0),
+      date: lastBill ? (lastBill.timestamp ? lastBill.timestamp.split('T')[0] : '未知') : (t.timestamp ? t.timestamp.split('T')[0] : '未知'),
+      status: lastBill ? (lastBill.status === 'Paid' ? 'Paid' : 'Overdue') : 'Paid',
+      type: lastBill ? lastBill.type : 'Monthly',
+      history: tBills.map(b => ({
+        month: b.billingDate || (b.timestamp ? b.timestamp.substring(0, 7) : '未知'),
+        amount: b.amount,
+        type: b.type === 'SetupFee' ? 'Setup' : 'Monthly',
+        status: b.status === 'Paid' ? 'Paid' : 'Overdue'
+      })).sort((a,b) => b.month.localeCompare(a.month))
+    };
+  }).filter(p => p.history.length > 0 || p.amount > 0);
+
+  const sales = db_dist_sales.filter(s => s.distributorId === distId);
+  const salesNames = sales.map(s => s.name);
+  const bonusRequests = db_bonuses.filter(b => salesNames.includes(b.salesName));
+
+  return { paymentRecords, bonusRequests };
+}
+
+export async function fetchDistributorSalesPerformance(distId: string) {
+  const sales = db_dist_sales.filter(s => s.distributorId === distId);
+  return sales.map(s => {
+    const temples = db_temples.filter(t => t.salesId === s.id);
+    const templeIds = temples.map(t => t.id);
+    const bills = db_temple_bills.filter(b => templeIds.includes(b.templeId) && b.status === 'Paid');
+    
+    const totalSales = bills.reduce((sum, b) => sum + b.amount, 0);
+
+    const commission = bills.reduce((sum, b) => {
+      const isSetup = b.type === 'SetupFee' || b.type === 'Setup';
+      const rate = isSetup ? (s.commissionRules?.setupFeePercent || 20) : (s.commissionRules?.rentYear1Percent || 15);
+      return sum + (b.amount * rate / 100);
+    }, 0);
+
+    return {
+      id: s.id,
+      name: s.name,
+      account: s.account,
+      totalSales,
+      commission,
+      commissionRules: s.commissionRules
+    };
+  });
+}
+
+export async function fetchSuperAdminFinancials() {
+  const records = db_finance_records;
+  
+  const totalRevenue = records.filter(r => r.type === 'INCOME').reduce((s, r) => s + r.amount, 0);
+  const totalCommission = db_bonuses.reduce((s, b) => s + b.amount, 0);
+  const netProfit = totalRevenue - totalCommission;
+
+  return {
+    records: records.slice().reverse(),
+    summary: {
+      totalRevenue,
+      totalCommission,
+      netProfit
+    },
+    wallets: db_wallets
+  };
+}
+
+export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
+  const distIndex = db_distributors.findIndex(d => d.id === distId);
+  if (distIndex > -1) {
+    db_distributors[distIndex].bankInfo = bankInfo;
+    if (typeof gStore !== 'undefined') {
+      gStore.db_distributors = db_distributors;
+    }
+    return true;
+  }
+  return false;
+}
+
+export async function getTempleCreatorInfo(templeId: string) {
+  const temple = db_temples.find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
+  if (!temple) {
+    return {
+      type: 'super_admin',
+      adminName: '系統總管理員 (總部)',
+      adminContact: 'admin_root (官方聯絡管道)'
+    };
+  }
+
+  if (temple.salesId) {
+    const sales = db_dist_sales.find(s => s.id === temple.salesId);
+    if (sales) {
+      if (sales.distributorId) {
+        // Distributor Sales
+        const dist = db_distributors.find(d => d.id === sales.distributorId);
+        const ret = {
+          type: 'dist_sales',
+          salesName: sales.name,
+          salesPhone: sales.phone || sales.account || '未提供',
+          distName: dist?.name || '未知經銷商',
+          distPhone: dist?.phone || dist?.account || '未提供'
+        };
+        console.log('getTempleCreatorInfo returning:', ret);
+        return ret;
+      } else {
+        // Super Sales
+        const ret = {
+          type: 'super_sales',
+          salesName: sales.name,
+          salesPhone: sales.phone || sales.account || '未提供'
+        };
+        console.log('getTempleCreatorInfo returning:', ret);
+        return ret;
+      }
+    }
+  }
+
+  if (temple.distributorId) {
+     const dist = db_distributors.find(d => d.id === temple.distributorId);
+     if (dist) {
+        const ret = {
+           type: 'distributor',
+           distName: dist.name,
+           distPhone: dist.phone || dist.account || '未提供'
+        };
+        console.log('getTempleCreatorInfo returning:', ret);
+        return ret;
+     }
+  }
+
+  const ret = {
+    type: 'super_admin',
+    adminName: '系統總管理員 (總部)',
+    adminContact: 'admin_root (官方聯絡管道)'
+  };
+  console.log('getTempleCreatorInfo returning:', ret);
+  return ret;
+}
+
+export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
+  if (role === 'TempleAdmin' || role === 'Temple') {
+    const temple = db_temples.find(t => t.id === id);
+    if (temple) temple.status = status;
+    gStore.db_temples = db_temples;
+  } else if (role === 'Distributor') {
+    const dist = db_distributors.find(d => d.id === id);
+    if (dist) dist.status = status;
+    gStore.db_distributors = db_distributors;
+  } else if (role === 'SuperSales' || role === 'DistSales') {
+    const sales = db_dist_sales.find(s => s.id === id);
+    if (sales) sales.status = status;
+    gStore.db_dist_sales = db_dist_sales;
+  }
+  return { success: true };
+}
+
+export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
+  templeIds.forEach(tId => {
+    const temple = db_temples.find(t => t.id === tId);
+    if (temple) {
+      if (targetRole === 'HQ') {
+        temple.distributorId = null;
+        temple.salesId = null;
+      } else if (targetRole === 'Distributor') {
+        temple.distributorId = targetId;
+        temple.salesId = null;
+      } else if (targetRole === 'SuperSales') {
+        temple.distributorId = null;
+        temple.salesId = targetId;
+      }
+    }
+  });
+  gStore.db_temples = db_temples;
+  
+  const targetName = targetRole === 'HQ' ? '系統總部 HQ' : targetId;
+  db_admin_logs.unshift({ id: `L-${Date.now()}`, user: 'System Admin', action: 'BATCH_TRANSFER', target: `${templeIds.length} temples to ${targetName}`, timestamp: new Date().toLocaleString() });
+
+  return { success: true };
 }

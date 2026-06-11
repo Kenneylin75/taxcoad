@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10gb',
+    },
+  },
   async rewrites() {
     return [
       {
@@ -12,6 +17,10 @@ const nextConfig: NextConfig = {
         // 經銷商: /dist-xxx
         source: '/:distId(dist-[^/]+)',
         destination: '/dist-admin-portal/:distId',
+      },
+      {
+        source: '/uploads/:path*',
+        destination: '/api/uploads/:path*',
       },
     ];
   },

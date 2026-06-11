@@ -6,6 +6,8 @@ import {
 } from '../actions';
 import SuperAdminClient from './SuperAdminClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SuperAdminPage() {
   const stats = {
     temples: 42501,
