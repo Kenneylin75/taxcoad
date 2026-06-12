@@ -518,8 +518,6 @@ export async function cancelServiceRecord(recordId: string, type: string) {
     }
   });
 }
-  });
-}
 
 export async function modifyAppointment(appId: number, newSlotId: number) {
   const templeId = await getDynamicTempleId();
@@ -4193,17 +4191,21 @@ export async function createQueueEvent(data: any) {
 export async function updateQueueEvent(id: string, data: any) { 
   const templeId = await getDynamicTempleId(); 
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const idx = db_queue_events.findIndex(e => e.id === id);
-      if (idx !== -1) {
-        db_queue_events[idx] = { ...db_queue_events[idx], ...data };
+    try {
+      if (!client) {
+        const idx = db_queue_events.findIndex(e => e.id === id);
+        if (idx !== -1) {
+          db_queue_events[idx] = { ...db_queue_events[idx], ...data };
+        }
+      } else {
+        await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
+          [data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, id, templeId]);
       }
-    } else {
-      await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
-        [data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, id, templeId]);
+      await revalidateTemple();
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
     }
-    await revalidateTemple();
-    return { success: true };
   });
 }
 export async function activateQueueEvent(id: string) {
