@@ -35,47 +35,37 @@ export class PivotConnector {
 
   static async handleGuestBooking(bookingData: any) {
     // Sync to Temple Module Calendar
-    revalidatePath('/temple/calendar');
-    revalidatePath('/temple/customers');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 
   static async handleGuestLighting(lightingData: any) {
     // Sync to Temple Module Lighting List
-    revalidatePath('/temple/lighting');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 
   static async syncGuestProfileToTemple(profileData: any) {
     // Update the Temple's Master Guest List
-    revalidatePath('/temple/customers');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 
   static async handleGuestFileUpload(fileData: any) {
     // If public, notify Temple
-    if (!fileData.isPrivate) {
-      revalidatePath('/temple/customers');
-    }
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 
   static async handleEventSync(eventData: any) {
     // Sync to Temple Module Event Management
-    revalidatePath('/temple/events');
-    revalidatePath('/temple/customers');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 
   static async handleQueueUpdate(queueData: any) {
     // Sync to Temple Module Queue Management
-    revalidatePath('/temple/queue');
-    revalidatePath('/temple/customers');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 
@@ -94,10 +84,7 @@ export class PivotConnector {
   static async broadcastUpdate(type: string, payload: any) {
     console.log(`[Connector] Broadcasting ${type} to all modules`, payload);
     // In a real system, this would push to a message queue or WS
-    revalidatePath('/');
-    revalidatePath('/temple');
-    revalidatePath('/distributor');
-    revalidatePath('/super-admin');
+    revalidatePath('/', 'layout');
     return { success: true };
   }
 

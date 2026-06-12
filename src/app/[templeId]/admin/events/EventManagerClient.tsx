@@ -8,6 +8,7 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'manage'>('list');
   const [managingEvent, setManagingEvent] = useState<EventItem | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [registrations, setRegistrations] = useState<any[]>([]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -17,21 +18,39 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
     startTransition(async () => {
       const res = await saveEvent(fd);
       if (res.success) {
-        alert('✅ 活動已成功建立！');
-        // Optimistic update for demo purposes
-        setEvents([...events, {
-          id: Date.now().toString(),
-          title: fd.get('title') as string,
-          date: fd.get('date') as string,
-          location: fd.get('location') as string,
-          price: Number(fd.get('price')),
-          capacity: Number(fd.get('capacity')),
-          enrolled: 0,
-          status: 'Draft'
-        }]);
+        alert(editingEvent ? '✅ 活動已成功更新！' : '✅ 活動已成功建立！');
+        // Let revalidatePath do its job but we also reload page or optimistic update
+        if (editingEvent) {
+           setEvents(events.map(e => e.id === editingEvent.id ? {
+              ...e,
+              title: fd.get('title') as string,
+              date: fd.get('date') as string,
+              location: fd.get('location') as string,
+              price: Number(fd.get('price')),
+              capacity: Number(fd.get('capacity')),
+              status: fd.get('status') as 'Active' | 'Draft' | 'Completed' || 'Draft'
+           } : e));
+        } else {
+           setEvents([...events, {
+             id: Date.now().toString(),
+             title: fd.get('title') as string,
+             date: fd.get('date') as string,
+             location: fd.get('location') as string,
+             price: Number(fd.get('price')),
+             capacity: Number(fd.get('capacity')),
+             enrolled: 0,
+             status: 'Draft'
+           }]);
+        }
         setActiveTab('list');
+        setEditingEvent(null);
       }
     });
+  };
+
+  const handleEdit = (event: EventItem) => {
+    setEditingEvent(event);
+    setActiveTab('create');
   };
 
   const handleDelete = (id: string) => {
@@ -90,8 +109,8 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
               活動總覽清冊
             </button>
             <button 
-              onClick={() => setActiveTab('create')}
-              className={`px-6 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all ${activeTab === 'create' ? 'bg-slate-900 text-amber-500 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+              onClick={() => { setEditingEvent(null); setActiveTab('create'); }}
+              className={`px-6 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all ${activeTab === 'create' && !editingEvent ? 'bg-slate-900 text-amber-500 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
             >
               部署新活動
             </button>
@@ -100,30 +119,31 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
 
       {activeTab === 'create' && (
         <form onSubmit={handleSubmit} className="bg-white p-8 rounded-2xl border-2 border-slate-200 shadow-xl relative overflow-hidden group">
+          {editingEvent && <input type="hidden" name="id" value={editingEvent.id} />}
           <div className="absolute top-0 right-0 p-4 opacity-5 text-8xl group-hover:scale-110 transition-transform duration-700 pointer-events-none">🎪</div>
           
-          <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-4 mb-6">活動參數設定</h3>
+          <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-4 mb-6">{editingEvent ? '編輯活動' : '活動參數設定'}</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">活動名稱 (Event Title)</label>
-              <input required name="title" type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：中元普渡祈安大法會" />
+              <input required name="title" defaultValue={editingEvent?.title} type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：中元普渡祈安大法會" />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">舉辦日期 (Event Date)</label>
-              <input required name="date" type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
+              <input required name="date" defaultValue={editingEvent?.date} type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">舉辦地點 (Location)</label>
-              <input required name="location" type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：本宮大殿 / 戶外廣場" />
+              <input required name="location" defaultValue={editingEvent?.location} type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：本宮大殿 / 戶外廣場" />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">宣傳圖片 (IMAGE) - 網址或上傳皆可</label>
               <div className="flex gap-2 items-center">
-                 <input name="imageUrl" type="url" className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：https://example.com/img.jpg" />
+                 <input name="imageUrl" defaultValue={editingEvent?.imageUrl} type="url" className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：https://example.com/img.jpg" />
                  <span className="text-xs font-bold text-slate-400 uppercase">或</span>
                  <input name="imageFile" type="file" accept="image/*" className="flex-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer" />
               </div>
@@ -133,20 +153,30 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">功德金 (Price - 填 0 為免費/隨喜)</label>
               <div className="relative">
                 <span className="absolute left-4 top-3 text-slate-400 font-bold">$</span>
-                <input required name="price" type="number" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="1200" />
+                <input required name="price" defaultValue={editingEvent?.price} type="number" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="1200" />
               </div>
             </div>
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">人數限制 (Max Capacity)</label>
-              <input required name="capacity" type="number" min="1" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：500" />
+              <input required name="capacity" defaultValue={editingEvent?.capacity} type="number" min="1" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：500" />
             </div>
+
+            {editingEvent && (
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">狀態 (Status)</label>
+                <select name="status" defaultValue={editingEvent.status} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all">
+                   <option value="Draft">草稿/籌備中</option>
+                   <option value="Active">開放報名中</option>
+                   <option value="Completed">已結束</option>
+                </select>
+              </div>
+            )}
           </div>
 
-          <div className="mt-8 flex justify-end gap-4">
             <button 
               type="button"
-              onClick={() => setActiveTab('list')}
+              onClick={() => { setActiveTab('list'); setEditingEvent(null); }}
               className="bg-white text-slate-500 border border-slate-200 px-8 py-3 rounded-xl font-black text-xs tracking-widest shadow-sm hover:bg-slate-50 transition-all uppercase"
             >
               取消設定
@@ -156,7 +186,7 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
               disabled={isPending}
               className="bg-slate-900 text-amber-500 px-8 py-3 rounded-xl font-black text-xs tracking-widest shadow-xl shadow-slate-900/20 hover:bg-slate-800 hover:scale-105 transition-all flex items-center gap-2 uppercase disabled:opacity-50"
             >
-              {isPending ? '部署中...' : '確認部署活動 🚀'}
+              {isPending ? (editingEvent ? '更新中...' : '部署中...') : (editingEvent ? '確認更新活動 🚀' : '確認部署活動 🚀')}
             </button>
           </div>
         </form>
@@ -183,7 +213,10 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
                     </div>
                     <h3 className="text-lg font-black text-slate-800 tracking-tight group-hover:text-amber-600 transition-colors">{event.title}</h3>
                   </div>
-                  <button onClick={() => handleDelete(event.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="刪除活動">🗑️</button>
+                  <div className="flex gap-1">
+                    <button onClick={() => handleEdit(event)} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all" title="編輯活動">✏️</button>
+                    <button onClick={() => handleDelete(event.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="刪除活動">🗑️</button>
+                  </div>
                 </div>
                 
                 <div className="p-5 space-y-4 flex-1">

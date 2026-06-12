@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  fetchServiceDefinitions, fetchAvailableSlots, createAppointment, 
+  fetchServiceDefinitions, fetchAvailableSlots, bookAppointment, 
   fetchQueueEvents, fetchEvents, fetchGuestByPhone, createOrUpdateGuest,
   searchGuestsByNameOrPhone
 } from '@/app/actions';
@@ -50,6 +50,10 @@ export default function AppointmentManager({ initialAppointments }: { initialApp
     birthday: "",
     address: ""
   });
+
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
   const handleNameSearchChange = async (nameVal: string) => {
     setSearchName(nameVal);
@@ -422,6 +426,64 @@ export default function AppointmentManager({ initialAppointments }: { initialApp
                         </div>
                      )}
 
+                     {/* Step 2: 服務與時段選擇 */}
+                     {foundGuest && (
+                        <div className="space-y-6 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                           <div className="flex items-center gap-4 border-b-2 border-slate-50 pb-4">
+                              <span className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-lg">02</span>
+                              <div>
+                                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">服務項目與時段設定</h4>
+                                 <p className="text-[10px] font-bold text-slate-400">Service & Scheduling Allocation</p>
+                              </div>
+                           </div>
+
+                           <div className="space-y-4">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">選擇服務項目</label>
+                              <div className="grid grid-cols-2 gap-3">
+                                 {services.map(svc => (
+                                    <button 
+                                       key={svc.id}
+                                       onClick={() => { setSelectedServiceId(svc.id); setSelectedSlotId(null); }}
+                                       className={`p-4 rounded-2xl text-left border-2 transition-all ${selectedServiceId === svc.id ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-100 hover:border-indigo-200 bg-white'}`}
+                                    >
+                                       <h5 className="font-bold text-slate-900 text-sm">{svc.name}</h5>
+                                       <p className="text-[10px] text-slate-500 mt-1">{svc.price ? `結緣金 $${svc.price}` : '隨喜功德'}</p>
+                                    </button>
+                                 ))}
+                              </div>
+                           </div>
+
+                           {selectedServiceId && (
+                              <div className="space-y-4 pt-2">
+                                 <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                                       選擇 {selectedDate.toISOString().split('T')[0]} 之可用時段
+                                    </label>
+                                 </div>
+                                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                                    {availableSlots
+                                       .filter(slot => slot.date === selectedDate.toISOString().split('T')[0] && slot.status === 'Available' && (String(slot.bound_service_id) === String(selectedServiceId) || String(slot.serviceId) === String(selectedServiceId)))
+                                       .map(slot => (
+                                          <button 
+                                             key={slot.id}
+                                             onClick={() => setSelectedSlotId(slot.id)}
+                                             className={`py-3 px-2 rounded-2xl border-2 text-center transition-all ${selectedSlotId === slot.id ? 'border-amber-500 bg-amber-50 shadow-md text-amber-700' : 'border-slate-100 hover:border-amber-200 bg-white text-slate-700'}`}
+                                          >
+                                             <div className="font-black text-sm">{slot.time}</div>
+                                             <div className="text-[9px] text-slate-400 mt-0.5 truncate">{slot.staff}</div>
+                                          </button>
+                                    ))}
+                                    {availableSlots.filter(slot => slot.date === selectedDate.toISOString().split('T')[0] && slot.status === 'Available' && (String(slot.bound_service_id) === String(selectedServiceId) || String(slot.serviceId) === String(selectedServiceId))).length === 0 && (
+                                       <div className="col-span-full py-6 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                                          <p className="text-xs font-bold text-slate-400">此日期暫無此服務的可用時段，請嘗試選擇其他日期</p>
+                                       </div>
+                                    )}
+                                 </div>
+                              </div>
+                           )}
+                        </div>
+                     )}
+
                      {/* 新增信眾子表單 */}
                      {isAddingNewGuest && (
                         <div className="bg-slate-900 text-white border-4 border-slate-950 p-8 rounded-[35px] space-y-6 animate-in zoom-in-95 duration-200">
@@ -527,17 +589,28 @@ export default function AppointmentManager({ initialAppointments }: { initialApp
 
                   <div className="pt-6">
                      <button 
-                        onClick={() => {
-                           alert(`🏮 預約成功！已為 ${foundGuest ? foundGuest.name : ''} 排定時程。`);
-                            setShowAddModal(false);
-                            setFoundGuest(null);
-                            setSearchName("");
-                            setSearchPhone("");
-                            setSearchResults([]);
+                        disabled={!foundGuest || !selectedServiceId || !selectedSlotId || isSubmittingBooking}
+                        onClick={async () => {
+                           setIsSubmittingBooking(true);
+                           const res = await bookAppointment(selectedSlotId!, foundGuest.name, foundGuest.phone, 'Cash');
+                           setIsSubmittingBooking(false);
+                           if (res.success) {
+                              alert(`🏮 預約成功！已為 ${foundGuest.name} 排定時程，由於採取現金對帳，此筆狀態預設為「待付款」。`);
+                              setShowAddModal(false);
+                              setFoundGuest(null);
+                              setSearchName("");
+                              setSearchPhone("");
+                              setSearchResults([]);
+                              setSelectedServiceId("");
+                              setSelectedSlotId(null);
+                              window.location.reload();
+                           } else {
+                              alert(`❌ 預約失敗: ${res.message}`);
+                           }
                         }}
-                        className="w-full py-8 bg-slate-950 text-amber-500 rounded-[40px] font-black text-sm uppercase tracking-[0.5em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all"
+                        className="w-full py-8 bg-slate-950 text-amber-500 rounded-[40px] font-black text-sm uppercase tracking-[0.5em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
                      >
-                        確認核准預約 🚀
+                        {isSubmittingBooking ? '處理中...' : '確認核准預約 🚀'}
                      </button>
                   </div>
                </div>

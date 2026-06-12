@@ -30,6 +30,7 @@ export default function TempleShell({ children, currentRole, currentUser, temple
       { name: '帳務管理', href: `${basePath}/billing`, icon: '💳', show: true },
       { name: '金流收款', href: `${basePath}/payment-setup`, icon: '💰', show: true },
       { name: '數據分析', href: `${basePath}/analytics`, icon: '📈', show: true },
+      { name: 'AI 監控', href: `${basePath}/ai-chat`, icon: '🤖', show: true },
       { name: '進階設定', href: `${basePath}/settings`, icon: '⚙️', show: true },
       { name: '系統日誌', href: `${basePath}/audit`, icon: '📜', show: true },
     ]},

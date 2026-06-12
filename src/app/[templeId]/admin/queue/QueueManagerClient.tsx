@@ -2,11 +2,14 @@
 
 import React, { useState, useTransition, useEffect } from 'react';
 import { 
-  QueueEvent, createQueueEvent, completeQueueService, activateQueueEvent, deleteQueueEvent,
+  QueueEvent, createQueueEvent, updateQueueEvent, completeQueueService, activateQueueEvent, deleteQueueEvent,
   checkInWithQr, callNextInQueue, updateQueueStatus, registerGuestForQueue, fetchQueueDashboard
 } from '@/app/actions';
+import { useRouter, usePathname } from 'next/navigation';
 
-export default function QueueManagerClient({ initialEvents, initialDashboard, services }: { initialEvents: QueueEvent[], initialDashboard: any, services: any[] }) {
+export default function QueueManagerClient({ initialEvents, initialDashboard, services, activeEventId }: { initialEvents: QueueEvent[], initialDashboard: any, services: any[], activeEventId?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'setup'>('dashboard');
   const [activeWindow, setActiveWindow] = useState('01');
   const [isPending, startTransition] = useTransition();
@@ -27,7 +30,8 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
     e.serviceType.includes(searchQuery)
   );
 
-  const activeEvent = initialEvents.find(e => e.status === 'Active');
+  const activeEvent = initialEvents.find(e => e.id === activeEventId) || activeEvents.find(e => e.status === 'Active') || activeEvents[0];
+  const allActiveEvents = activeEvents;
 
   // Form state
   const [title, setTitle] = useState('');
@@ -40,6 +44,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
   const [customService, setCustomService] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
+  const [editingEvent, setEditingEvent] = useState<QueueEvent | null>(null);
   
   // Walk-in Registration form state
   const [isRegistering, setIsRegistering] = useState(false);
@@ -66,7 +71,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
     e.preventDefault();
     if (!title || !date) return alert('請填寫完整資訊。');
     startTransition(async () => {
-      const res = await createQueueEvent({ 
+      const payload = {
         title, 
         date, 
         location, 
@@ -75,18 +80,44 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
         price: parseInt(price),
         startTime,
         endTime
-      });
-      if (!res.success) {
-        alert('❌ 部署失敗：' + res.error);
-        return;
+      };
+      
+      if (editingEvent) {
+         const res = await updateQueueEvent(editingEvent.id, payload);
+         if (!res.success) {
+           alert('❌ 更新失敗：' + res.error);
+           return;
+         }
+         alert('✅ 排隊活動已成功更新！');
+         setEditingEvent(null);
+      } else {
+         const res = await createQueueEvent(payload);
+         if (!res.success) {
+           alert('❌ 部署失敗：' + res.error);
+           return;
+         }
+         alert('✅ 排隊活動已成功部署！');
       }
-      alert('✅ 排隊活動已成功部署！');
+      
       setTitle(''); setDate(''); setServiceType(''); setPrice('0');
     });
   };
 
-  const handleActivate = (id: string) => {
-    if (!confirm('確定要將此活動設為今日活動嗎？系統將啟動報到功能。')) return;
+  const handleEditEvent = (evt: QueueEvent) => {
+    setEditingEvent(evt);
+    setTitle(evt.title);
+    setDate(evt.date);
+    setLocation(evt.location);
+    setMaxCapacity(String(evt.maxCapacity));
+    setServiceType(evt.serviceType || '');
+    setPrice(String(evt.price || 0));
+    setStartTime(evt.timeWindow?.split('-')[0] || '09:00');
+    setEndTime(evt.timeWindow?.split('-')[1] || '17:00');
+    setActiveTab('setup');
+  };
+
+  const handleActivate = (id: string, isCurrentlyActive: boolean) => {
+    if (!confirm(isCurrentlyActive ? '確定要暫停此排隊活動嗎？' : '確定要將此活動設為今日活動嗎？系統將啟動報到功能。')) return;
     startTransition(async () => {
       await activateQueueEvent(id);
       setActiveTab('dashboard');
@@ -167,8 +198,8 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
               即時監控
             </button>
             <button 
-              onClick={() => setActiveTab('setup')}
-              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'setup' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-900 font-bold hover:bg-slate-100'}`}
+              onClick={() => { setActiveTab('setup'); setEditingEvent(null); }}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'setup' && !editingEvent ? 'bg-slate-900 text-white shadow-md' : 'text-slate-900 font-bold hover:bg-slate-100'}`}
             >
               活動部署
             </button>
@@ -180,6 +211,14 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-5">
                <div className="bg-white p-8 rounded-2xl border-2 border-slate-200 shadow-2xl">
+                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                     <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest">{editingEvent ? '編輯活動' : '部署新活動'}</h2>
+                     {editingEvent && (
+                        <button onClick={() => setEditingEvent(null)} className="text-xs text-slate-400 hover:text-slate-600 font-bold uppercase tracking-widest">
+                           取消編輯
+                        </button>
+                     )}
+                  </div>
                   <form onSubmit={handleCreateEvent} className="space-y-6">
                      <div className="space-y-2">
                         <label className="text-xs font-black text-slate-900 uppercase tracking-widest">活動主題 (ACTIVITY TITLE)</label>
@@ -236,7 +275,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                         </div>
                      </div>
                      <button type="submit" disabled={isPending} className="w-full bg-slate-900 text-amber-500 font-black py-4 rounded-xl text-sm tracking-widest shadow-xl hover:bg-amber-500 hover:text-slate-900 transition-all uppercase">
-                        {isPending ? '正在執行活動發佈...' : '活動發佈'}
+                        {isPending ? (editingEvent ? '正在更新活動...' : '正在發佈活動...') : (editingEvent ? '確認更新活動' : '活動發佈')}
                      </button>
                   </form>
                </div>
@@ -262,9 +301,14 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                      const isFull = eventTickets.length >= e.maxCapacity;
                      return (
                         <div key={e.id} className="bg-white rounded-[35px] border-2 border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-xl transition-all overflow-hidden relative group/card">
-                           <button onClick={() => handleDeleteEvent(e.id)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-500 rounded-full opacity-0 group-hover/card:opacity-100 hover:bg-rose-500 hover:text-white transition-all shadow-sm z-10" title="取消/刪除活動">
-                             ✕
-                           </button>
+                           <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover/card:opacity-100 transition-all z-10">
+                             <button onClick={() => handleEditEvent(e)} className="w-8 h-8 flex items-center justify-center bg-amber-50 text-amber-500 rounded-full hover:bg-amber-500 hover:text-white shadow-sm" title="編輯活動">
+                               ✏️
+                             </button>
+                             <button onClick={() => handleDeleteEvent(e.id)} className="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-500 rounded-full hover:bg-rose-500 hover:text-white shadow-sm" title="取消/刪除活動">
+                               ✕
+                             </button>
+                           </div>
                            <div className="p-8">
                               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                  <div className="flex items-center gap-6">
@@ -287,6 +331,12 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                                        </div>
                                        <span className="text-sm font-black text-slate-900">{eventTickets.length}/{e.maxCapacity}</span>
                                     </div>
+                                    {e.status === 'Draft' && (
+                                       <button onClick={() => handleActivate(e.id, false)} className="bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase mt-2 w-full hover:bg-emerald-600 shadow-sm transition-all">啟動排隊</button>
+                                    )}
+                                    {e.status === 'Active' && (
+                                       <button onClick={() => handleActivate(e.id, true)} className="text-[10px] font-black text-emerald-500 uppercase mt-2 block border border-emerald-500 rounded-xl px-2 py-1 text-center bg-emerald-50 w-full hover:bg-rose-50 hover:text-rose-500 hover:border-rose-500 transition-all">暫停排隊</button>
+                                    )}
                                  </div>
                               </div>
 
@@ -386,13 +436,35 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
                 {/* Dashboard Active Event Header */}
                 <div className="bg-white px-10 py-6 rounded-[35px] border border-slate-100 shadow-sm flex items-center justify-between">
-                   <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-6">
                       <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-emerald-100">🏮</div>
                       <div>
-                         <h2 className="text-xl font-black text-slate-900">{activeEvent.title} <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded uppercase tracking-widest font-black">Active</span></h2>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            📍 {activeEvent.location} | 📅 {activeEvent.date} ({activeEvent.startTime || '09:00'} - {activeEvent.endTime || '17:00'})
-                         </p>
+                         <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                           {allActiveEvents.length > 0 ? (
+                             <select 
+                               className="bg-transparent border-none font-black text-xl text-slate-900 focus:outline-none cursor-pointer hover:bg-slate-50 rounded px-1"
+                               value={activeEvent.id}
+                               onChange={(e) => router.push(`?eventId=${e.target.value}`)}
+                             >
+                               {allActiveEvents.map(e => (
+                                 <option key={e.id} value={e.id}>{e.title}</option>
+                               ))}
+                             </select>
+                           ) : (
+                             activeEvent.title
+                           )}
+                           <span className={`text-[10px] px-2 py-0.5 rounded uppercase tracking-widest font-black ${activeEvent.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                             {activeEvent.status === 'Active' ? 'ACTIVE' : 'DRAFT'}
+                           </span>
+                         </h2>
+                         <div className="flex items-center gap-3 mt-1">
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                              📍 {activeEvent.location} | 📅 {activeEvent.date} ({activeEvent.startTime || '09:00'} - {activeEvent.endTime || '17:00'})
+                           </p>
+                           {activeEvent.status !== 'Active' && (
+                             <button onClick={() => handleActivate(activeEvent.id, false)} className="bg-emerald-500 text-white text-[9px] px-2 py-0.5 rounded shadow hover:bg-emerald-600 ml-2">立刻啟動 🚀</button>
+                           )}
+                         </div>
                       </div>
                    </div>
                    <div className="flex gap-4">

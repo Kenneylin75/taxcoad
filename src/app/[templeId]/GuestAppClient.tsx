@@ -8,6 +8,8 @@ import {
 } from "@/app/shared-types";
 import { 
   bookAppointment, 
+  cancelAppointment,
+  modifyAppointment,
   updateAppointmentPayment,
   fetchAvailableSlots, 
   fetchEvents, 
@@ -55,6 +57,58 @@ const IconLotus = ({ className }: { className?: string }) => (
     <path d="M50 30 C70 45 80 70 50 85 C20 70 30 45 50 30" opacity="0.2"/>
   </svg>
 );
+
+function QRScannerComponent({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) {
+  useEffect(() => {
+    let html5QrcodeScanner: any;
+    let isUnmounted = false;
+
+    import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
+      if (isUnmounted) return;
+      html5QrcodeScanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        /* verbose= */ false
+      );
+      
+      html5QrcodeScanner.render(
+        (decodedText: string) => {
+          if (isUnmounted) return;
+          html5QrcodeScanner.clear().catch(console.error);
+          onScan(decodedText);
+        },
+        (error: any) => {
+          // ignore scan errors
+        }
+      );
+    });
+
+    return () => {
+      isUnmounted = true;
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(console.error);
+      }
+    };
+  }, [onScan]);
+
+  return (
+    <div className="relative w-full max-w-[280px] mx-auto overflow-hidden rounded-[30px] bg-black">
+      <div id="qr-reader" className="w-full h-full text-white [&>div]:border-none [&_button]:bg-white/20 [&_button]:text-white [&_button]:rounded-xl [&_button]:py-2 [&_button]:px-4 [&_select]:text-black [&_select]:mb-2"></div>
+      
+      {/* Fallback mock input (for debugging on PC) */}
+      <input 
+        type="text" 
+        placeholder="[開發用: 手動輸入QR內容]" 
+        className="absolute bottom-2 left-2 right-2 bg-black/50 border border-white/20 rounded-xl px-3 py-2 text-[10px] text-white outline-none focus:border-red-500 z-[999]"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            onScan((e.target as HTMLInputElement).value);
+          }
+        }}
+      />
+    </div>
+  );
+}
 
 const TopNav = ({ title, onBack }: { title: string, onBack: () => void }) => (
   <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200">
@@ -148,6 +202,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState("");
 
+  const [modifyModalOpen, setModifyModalOpen] = useState(false);
+  const [selectedModifyAppId, setSelectedModifyAppId] = useState<number | null>(null);
+  const [availableModifySlots, setAvailableModifySlots] = useState<any[]>([]);
+  const [isModifying, setIsModifying] = useState(false);
+
   const handleSecureCheckIn = async (qrData: string) => {
     // 驗證格式: SECURE_CHECKIN_EVENTID_YYYY-MM-DD
     if (!qrData.startsWith('SECURE_CHECKIN_')) {
@@ -194,6 +253,45 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
       } catch (e) { setLunarResult(""); }
     }
   }, [gregorianDate]);
+
+  const handleCancelAppointment = async (appId: number) => {
+    if (!confirm("確定要取消此預約嗎？")) return;
+    const res = await cancelAppointment(appId);
+    if (res.success) {
+      alert("預約已取消");
+      refreshAllData(guestUser?.phone || "");
+    } else {
+      alert(res.message || "取消失敗");
+    }
+  };
+
+  const handleModifyClick = async (appId: number) => {
+    setSelectedModifyAppId(appId);
+    const slots = await fetchAvailableSlots();
+    // Filter out past slots and already booked slots, maybe only show same service
+    const app = guestAppointments.find(a => a.id === appId);
+    if (app) {
+      const filtered = slots.filter((s: any) => s.status === 'Available');
+      setAvailableModifySlots(filtered);
+    } else {
+      setAvailableModifySlots(slots.filter((s: any) => s.status === 'Available'));
+    }
+    setModifyModalOpen(true);
+  };
+
+  const handleConfirmModify = async (newSlotId: number) => {
+    if (!selectedModifyAppId) return;
+    setIsModifying(true);
+    const res = await modifyAppointment(selectedModifyAppId, newSlotId);
+    setIsModifying(false);
+    if (res.success) {
+      alert("預約已成功更改");
+      setModifyModalOpen(false);
+      refreshAllData(guestUser?.phone || "");
+    } else {
+      alert(res.message || "更改失敗");
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -256,6 +354,24 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
       setSelectedDate(new Date().toISOString().split('T')[0]);
     };
     init();
+
+    // 背景輪詢機制：每 10 秒更新一次推播通知與排隊人數，達成即時化 (Phase 2.2)
+    const pollInterval = setInterval(async () => {
+      try {
+        const [latestNotif, activeNotifs, qCount] = await Promise.all([
+          fetchLatestNotificationForGuest(),
+          fetchActiveNotificationsForGuest(),
+          fetchActiveQueueCount()
+        ]);
+        setLatestNotification(latestNotif);
+        setActiveNotifications(activeNotifs);
+        setActiveQueueCount(qCount);
+      } catch (e) {
+        console.error("Polling error:", e);
+      }
+    }, 10000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const [guestRegistrations, setGuestRegistrations] = useState<any[]>([]);
@@ -302,8 +418,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(res.guestName)}&background=B91C1C&color=fff` 
       };
 
-      // 背景自動綁定 LINE ID (如果有帶入 bindLineId 且尚未綁定或不同)
-      if (bindLineId && user.lineId !== bindLineId) {
+      // 背景自動綁定 LINE ID (僅限尚未綁定任何 LINE ID 的信眾)
+      if (bindLineId && !user.lineId) {
         user.lineId = bindLineId;
         await createOrUpdateGuest(user, loginPhone);
       }
@@ -627,30 +743,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       {activeAppointment.paymentStatus === 'Pending' && (
                         <button
                           onClick={() => {
-                            setPaymentIntent({
-                              module: 'Booking',
-                              amount: activeAppointment.amount || 0,
-                              onPaid: async (gateway, ref) => {
-                                const res = await updateAppointmentPayment(activeAppointment.id, gateway, ref);
-                                if (res.success) {
-                                  alert('付款狀態已更新，等待宮廟對帳。');
-                                  if (guestUser) await refreshAllData(guestUser.phone);
-                                } else {
-                                  alert(res.message);
-                                }
-                              }
-                            });
-                            setDetailContent({
-                              title: activeAppointment.service,
-                              category: '預約對帳',
-                              price: activeAppointment.amount ? '應付 NT$ ' + activeAppointment.amount : '隨喜功德',
-                              description: '請選擇您偏好的付款方式，以完成預約。'
-                            });
-                            setIsDetailModalOpen(true);
+                            alert('本宮目前採取現金對帳，請於現場出示此預約紀錄並完成繳費。');
                           }}
-                          className="mt-2 w-full py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1"
+                          className="mt-2 w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1"
                         >
-                          💳 重新付款 / 更改付款方式
+                          💸 請至現場繳費核銷
                         </button>
                       )}
                     </>
@@ -1060,12 +1157,14 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       </div>
                       <div className="flex gap-2">
                         <button 
+                          onClick={() => handleModifyClick(record.id)}
                           disabled={!canModify}
                           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canModify ? 'bg-white border border-gray-200 text-gray-700 active:bg-gray-50' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
                         >
                           更改預約
                         </button>
                         <button 
+                          onClick={() => handleCancelAppointment(record.id)}
                           disabled={!canCancel}
                           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canCancel ? 'bg-red-50 border border-red-100 text-red-600 active:bg-red-100' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
                         >
@@ -1183,21 +1282,13 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
              <p className="text-sm font-bold text-red-400 uppercase tracking-widest">Secure Check-in Scanner</p>
           </div>
 
-          <div className="relative aspect-square w-full max-w-[280px] mx-auto">
-             <div className="absolute inset-0 border-4 border-red-600/50 rounded-[40px] animate-pulse"></div>
-             <div className="absolute inset-4 border border-white/10 rounded-[30px] flex items-center justify-center text-white/20 text-[10px] font-black uppercase tracking-[0.5em] text-center">
-                請將相機對準<br/>現場 QR CODE
-             </div>
-             {/* 模擬輸入框用於測試 */}
-             <input 
-               type="text" 
-               placeholder="[ 測試用：請輸入掃描內容 ]" 
-               className="absolute -bottom-20 left-0 w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-red-500"
-               onKeyDown={(e) => {
-                 if (e.key === 'Enter') handleSecureCheckIn((e.target as HTMLInputElement).value);
-               }}
-             />
-          </div>
+          <QRScannerComponent 
+             onScan={(data) => {
+               setIsScanning(false);
+               handleSecureCheckIn(data);
+             }} 
+             onClose={() => setIsScanning(false)} 
+          />
 
           <button onClick={() => setIsScanning(false)} className="w-full py-4 text-white font-black text-xs uppercase tracking-widest opacity-50 hover:opacity-100">
              取消掃描
@@ -1514,31 +1605,13 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                             price: !slot.price && !selectedService?.price ? '隨喜功德' : `結緣金 ${slot.price || selectedService?.price}`,
                             description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：\n${slot.description || selectedService?.precautions || '無'}`,
                             onConfirm: async () => {
-                              const handleAppointmentPayment = async () => {
-                                const slotPrice = slot.price || selectedService?.price || 0;
-                                const finalPrice = slotPrice === 0 ? Number(prompt('請輸入隨喜功德金額：', '100')) || 100 : slotPrice;
-                                
-                                setPaymentIntent({
-                                  module: 'Booking',
-                                  amount: finalPrice,
-                                  onPaid: async (gateway, ref) => {
-                                    const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, gateway, ref, finalPrice);
-                                    if (res.success) {
-                                      setSuccessInfo({ title: '預約成功', message: gateway === 'Transfer' || gateway === 'QR' ? '您的預約已提交，等待宮廟確認對帳。' : '預約已完成，請準時到場辦理聖事。' });
-                                      setIsDetailModalOpen(false);
-                                      loadData();
-                                    } else { alert(res.message); }
-                                  }
-                                });
-                              };
-
                               const finalizeBooking = async () => {
-                                const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone);
+                                const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, 'Cash');
                                 
                                 if (res.success) {
                                   setSuccessInfo({
                                     title: '預約成功',
-                                    message: '您的預約已完成，請準時到場辦理聖事。'
+                                    message: '您的預約已提交。由於採現金對帳，請依循現場人員指示完成繳費與報到手續。'
                                   });
                                   await refreshAllData(guestUser.phone);
                                   const updatedSlots = await fetchAvailableSlots();
@@ -1547,28 +1620,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                                   alert(`❌ 預約失敗: ${res.message}`);
                                 }
                               };
-
-                              if (selectedService?.price && selectedService.price > 0) {
-                                setPaymentIntent({
-                                  amount: selectedService.price,
-                                  onPaid: async (gateway: 'ecpay' | 'linepay') => {
-                                    const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone);
-                                    if (res.success && res.id) {
-                                      const orderId = `AP-${Date.now()}-${res.id}`;
-                                      const returnUrl = encodeURIComponent(window.location.origin + `/temple/calendar?success=paid`);
-                                      let gatewayUrl = `/api/payment-mock-gateway?orderId=${orderId}&amount=${selectedService.price}&gateway=${gateway}`;
-                                      if (gateway === 'linepay') {
-                                        gatewayUrl += `&confirmUrl=${returnUrl}`;
-                                      }
-                                      window.location.href = gatewayUrl;
-                                    } else {
-                                      alert(`❌ 預約失敗: ${res.message || '請重新嘗試'}`);
-                                    }
-                                  }
-                                });
-                              } else {
-                                await finalizeBooking();
-                              }
+                              await finalizeBooking();
                             }
                           });
                           setIsDetailModalOpen(true);
@@ -2070,6 +2122,47 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         </div>
       )}
       {isScanning && renderScanModal()}
+      
+      {modifyModalOpen && (
+        <div className="fixed inset-0 z-[500] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-900">請選擇新時段</h3>
+              <button onClick={() => setModifyModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1 space-y-3">
+              {availableModifySlots.length === 0 ? (
+                 <div className="py-8 text-center text-gray-400 text-sm font-bold">目前沒有可更換的時段</div>
+              ) : (
+                 availableModifySlots.map(slot => (
+                   <div 
+                     key={slot.id} 
+                     onClick={() => handleConfirmModify(slot.id)}
+                     className="p-4 border border-gray-200 rounded-xl hover:border-red-500 hover:bg-red-50 cursor-pointer transition-colors"
+                   >
+                     <div className="flex justify-between items-center">
+                       <div>
+                         <div className="text-xs text-gray-500 font-bold mb-1">{slot.date}</div>
+                         <div className="text-lg font-black text-gray-900">{slot.time}</div>
+                       </div>
+                       <div className="text-right">
+                         <div className="text-xs text-gray-400 font-bold mb-1">服務人員</div>
+                         <div className="text-sm font-bold text-gray-700">{slot.staff}</div>
+                       </div>
+                     </div>
+                   </div>
+                 ))
+              )}
+            </div>
+            {isModifying && (
+               <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                 <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                 <p className="mt-4 text-xs font-bold text-gray-600">正在為您更改預約...</p>
+               </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

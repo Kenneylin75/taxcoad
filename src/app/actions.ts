@@ -5,6 +5,16 @@ import { cookies } from "next/headers";
 import { withTempleSession, dbQuery } from "../db/db";
 
 // Helper to dynamically get templeId from cookies or fallback
+
+export async function revalidateTemple(templeId?: string) {
+  try {
+    const tId = templeId || await getDynamicTempleId();
+    revalidatePath(`/${tId}`, 'layout');
+    revalidatePath('/super-admin', 'layout');
+    revalidatePath('/', 'layout');
+  } catch(e) {}
+}
+
 export async function setGuestTempleContext(templeId: string) {
   try {
     const store = await cookies();
@@ -218,13 +228,31 @@ export async function fetchAvailableSlots() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) return [...(gStore.db_slots || db_slots)].filter(x => x.templeId === templeId);
-    const res = await client.query('SELECT * FROM slots ORDER BY date, time');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS slots (
+        id SERIAL PRIMARY KEY,
+        temple_id VARCHAR(50) NOT NULL,
+        date VARCHAR(50),
+        time VARCHAR(50),
+        staff VARCHAR(255),
+        description TEXT,
+        location VARCHAR(255),
+        bound_service_id VARCHAR(50),
+        price INTEGER DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'Available',
+        guest_name VARCHAR(255)
+      )
+    `);
+    const res = await client.query('SELECT * FROM slots WHERE temple_id = $1 ORDER BY date, time', [templeId]);
     return res.rows.map(r => ({
       id: r.id,
       date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
       time: r.time,
       staff: r.staff,
       description: r.description,
+      location: r.location,
+      bound_service_id: r.bound_service_id,
+      price: r.price,
       status: r.status,
       guestName: r.guest_name
     }));
@@ -233,14 +261,7 @@ export async function fetchAvailableSlots() {
 
 // 2. 批量建立排班
 export async function createSlot(data: any) {
-  let datesStr = '';
-  let time = '';
-  let staff = '';
-  let description = '';
-  let location = '';
-  let bound_service_id = '';
-  let price = 0;
-
+  let datesStr = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
   if (data instanceof FormData) {
     datesStr = data.get("dates") as string || data.get("date") as string;
     time = data.get("time") as string;
@@ -250,52 +271,66 @@ export async function createSlot(data: any) {
     bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
     price = Number(data.get("price")) || 0;
   } else {
-    datesStr = data.dates || data.date;
-    time = data.time;
-    staff = data.staff;
-    description = data.description || '';
-    location = data.location || '';
-    bound_service_id = data.bound_service_id || data.serviceId;
-    price = Number(data.price) || 0;
+    datesStr = data.dates || data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
   }
-
   if (!datesStr) return { success: false, message: "無效的日期" };
-
   const dateList = datesStr.includes(',') ? datesStr.split(",") : [datesStr];
-
   const templeId = await getDynamicTempleId();
+
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       const currentSlots = gStore.db_slots || db_slots;
       const now = Date.now();
       dateList.forEach((date, idx) => {
-        currentSlots.push({
-          id: now + idx + Math.floor(Math.random() * 1000),
-          date,
-          time,
-          staff,
-          description,
-          location,
-          bound_service_id,
-          price,
-          status: "Available"
-        , templeId});
+        currentSlots.push({ id: now + idx + Math.floor(Math.random() * 1000), date, time, staff, description, location, bound_service_id, price, status: "Available", templeId });
       });
       gStore.db_slots = [...currentSlots];
       db_slots = gStore.db_slots;
     } else {
       for (const date of dateList) {
         await client.query(
-          'INSERT INTO slots (temple_id, date, time, staff, description, location, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [templeId, date, time, staff, description, location, 'Available']
+          'INSERT INTO slots (temple_id, date, time, staff, description, location, bound_service_id, price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+          [templeId, date, time, staff, description, location, bound_service_id, price, 'Available']
         );
       }
     }
-
-    revalidatePath("/temple/slots");
-    revalidatePath("/temple/calendar");
-    revalidatePath("/");
+    await revalidateTemple();
     return { success: true, count: dateList.length };
+  });
+}
+
+export async function updateSlot(id: number, data: any) {
+  let date = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
+  if (data instanceof FormData) {
+    date = data.get("date") as string;
+    time = data.get("time") as string;
+    staff = data.get("staff") as string;
+    description = data.get("description") as string;
+    location = data.get("location") as string;
+    bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
+    price = Number(data.get("price")) || 0;
+  } else {
+    date = data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
+  }
+
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const currentSlots = gStore.db_slots || db_slots;
+      const idx = currentSlots.findIndex((s: any) => s.id === id);
+      if (idx !== -1) {
+        currentSlots[idx] = { ...currentSlots[idx], date, time, staff, description, location, bound_service_id, price };
+      }
+      gStore.db_slots = [...currentSlots];
+      db_slots = gStore.db_slots;
+    } else {
+      await client.query(
+        'UPDATE slots SET date = $1, time = $2, staff = $3, description = $4, location = $5, bound_service_id = $6, price = $7 WHERE id = $8 AND temple_id = $9',
+        [date, time, staff, description, location, bound_service_id, price, id, templeId]
+      );
+    }
+    await revalidateTemple();
+    return { success: true };
   });
 }
 
@@ -389,8 +424,8 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', guestName, slotId]);
 
       const insRes = await client.query(
-        'INSERT INTO appointments (temple_id, date, time, staff, guest_name, service, status, phone) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-        [templeId, slot.date, slot.time, slot.staff, guestName, slot.description || '日常預約', 'Confirmed', phone]
+        'INSERT INTO appointments (temple_id, date, time, staff, guest_name, service, service_id, status, phone, payment_method, payment_ref, payment_status, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id',
+        [templeId, slot.date, slot.time, slot.staff, guestName, slot.description || '日常預約', slot.bound_service_id || null, 'Confirmed', phone, paymentMethod || null, paymentRef || null, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', amount || 0]
       );
       newId = insRes.rows[0].id;
 
@@ -424,10 +459,112 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
       }
     }
 
-    revalidatePath("/");
-    revalidatePath("/temple/calendar");
-    revalidatePath("/temple/customers");
+    await revalidateTemple();
     return { success: true, id: newId };
+  });
+}
+
+export async function cancelAppointment(appId: number) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const appIdx = db_appointments.findIndex(a => a.id === appId);
+      if (appIdx === -1) return { success: false, message: '找不到該預約' };
+      const app = db_appointments[appIdx];
+      db_appointments[appIdx].status = 'Cancelled';
+      
+      const slot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+      if (slot) { slot.status = 'Available'; slot.guestName = ''; }
+    } else {
+      const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
+      if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
+      const app = appRes.rows[0];
+      
+      await client.query('UPDATE appointments SET status = $1 WHERE id = $2', ['Cancelled', appId]);
+      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
+        ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+
+export async function cancelServiceRecord(recordId: string, type: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return { success: false, message: "記憶體模式暫不支援取消此服務" };
+
+    try {
+      if (type === '點燈') {
+        await client.query('UPDATE lamp_records SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
+      } else if (type === '活動') {
+        await client.query('UPDATE event_registrations SET payment_status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
+      } else if (type === '排隊') {
+        await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
+      } else if (type === '預約') {
+        await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
+        
+        // Also free up the slot
+        const appRes = await client.query('SELECT * FROM appointments WHERE id = $1', [recordId]);
+        if ((appRes.rowCount ?? 0) > 0) {
+          const app = appRes.rows[0];
+          await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6', ['Available', null, app.date, app.time, app.staff, templeId]);
+        }
+      }
+      await revalidateTemple();
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  });
+}
+  });
+}
+
+export async function modifyAppointment(appId: number, newSlotId: number) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const appIdx = db_appointments.findIndex(a => a.id === appId);
+      if (appIdx === -1) return { success: false, message: '找不到該預約' };
+      const app = db_appointments[appIdx];
+      
+      const newSlotIdx = db_slots.findIndex(s => s.id === newSlotId);
+      if (newSlotIdx === -1) return { success: false, message: '找不到新時段' };
+      const newSlot = db_slots[newSlotIdx];
+      if (newSlot.status === 'Booked') return { success: false, message: '該時段已被預約' };
+
+      const oldSlot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+      if (oldSlot) { oldSlot.status = 'Available'; oldSlot.guestName = ''; }
+
+      newSlot.status = 'Booked';
+      newSlot.guestName = app.guestName;
+      
+      db_appointments[appIdx].date = newSlot.date;
+      db_appointments[appIdx].time = newSlot.time;
+      db_appointments[appIdx].staff = newSlot.staff;
+    } else {
+      const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
+      if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
+      const app = appRes.rows[0];
+
+      const slotRes = await client.query('SELECT * FROM slots WHERE id = $1 AND temple_id = $2', [newSlotId, templeId]);
+      if (slotRes.rowCount === 0) return { success: false, message: '找不到新時段' };
+      const newSlot = slotRes.rows[0];
+      if (newSlot.status === 'Booked') return { success: false, message: '新時段已被預約' };
+
+      // Free old slot
+      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6', 
+        ['Available', null, app.date, app.time, app.staff, templeId]);
+
+      // Book new slot
+      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', app.guest_name, newSlotId]);
+
+      // Update appointment
+      await client.query('UPDATE appointments SET date = $1, time = $2, staff = $3 WHERE id = $4', [newSlot.date, newSlot.time, newSlot.staff, appId]);
+    }
+    await revalidateTemple();
+    return { success: true };
   });
 }
 
@@ -436,15 +573,13 @@ export async function markAppointmentAsArrived(appointmentId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = db_appointments.findIndex((a: any) => a.id.toString() === appointmentId.toString());
+      const appIdx = db_appointments.findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
       if (appIdx === -1) return { success: false, message: "找不到該筆預約" };
       db_appointments[appIdx].status = "Arrived";
     } else {
-      await client.query('UPDATE appointments SET status = $1 WHERE id = $2', ['Arrived', appointmentId]);
+      await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Arrived', appointmentId, templeId]);
     }
-    revalidatePath("/");
-    revalidatePath("/temple/calendar");
-    revalidatePath("/temple/customers");
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -454,15 +589,13 @@ export async function markAppointmentAsPaid(appointmentId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = db_appointments.findIndex((a: any) => a.id.toString() === appointmentId.toString());
+      const appIdx = db_appointments.findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
       if (appIdx === -1) return { success: false, message: "找不到該筆預約" };
       db_appointments[appIdx].status = "Paid";
     } else {
-      await client.query("UPDATE appointments SET status = 'Paid' WHERE id = $1", [appointmentId]);
+      await client.query("UPDATE appointments SET status = 'Paid' WHERE id = $1 AND temple_id = $2", [appointmentId, templeId]);
     }
-    revalidatePath("/");
-    revalidatePath("/temple/calendar");
-    revalidatePath("/temple/customers");
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -473,24 +606,38 @@ export async function fetchAppointments() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      db_appointments.forEach((app: any) => {
+      const filtered = db_appointments.filter((a: any) => !a.templeId || a.templeId === templeId);
+      filtered.forEach((app: any) => {
         if (!app.serviceId) {
-          const slot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff);
-          if (slot && (slot.bound_service_id || slot.serviceId)) {
-            app.serviceId = slot.bound_service_id || slot.serviceId;
-          }
+          const slot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+          if (slot && (slot.bound_service_id || slot.serviceId)) { app.serviceId = slot.bound_service_id || slot.serviceId; }
         }
         if (app.serviceId) {
-          const svc = db_services.find((s: any) => s.id === app.serviceId);
-          if (svc) {
-            app.service = svc.name;
-            if (app.amount === undefined) app.amount = svc.price;
-          }
+          const svc = db_services.find((s: any) => s.id === app.serviceId && s.templeId === templeId);
+          if (svc) { app.service = svc.name; if (app.amount === undefined) app.amount = svc.price; }
         }
       });
-      return [...db_appointments];
+      return [...filtered];
     } else {
-      const res = await client.query('SELECT * FROM appointments ORDER BY date, time');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS appointments (
+          id SERIAL PRIMARY KEY,
+          temple_id VARCHAR(50) NOT NULL,
+          date VARCHAR(50),
+          time VARCHAR(50),
+          staff VARCHAR(255),
+          guest_name VARCHAR(255),
+          service VARCHAR(255),
+          service_id VARCHAR(50),
+          status VARCHAR(50) DEFAULT 'Pending',
+          phone VARCHAR(255),
+          payment_method VARCHAR(50),
+          payment_ref VARCHAR(255),
+          payment_status VARCHAR(50) DEFAULT 'Pending',
+          amount INTEGER DEFAULT 0
+        )
+      `);
+      const res = await client.query('SELECT * FROM appointments WHERE temple_id = $1 ORDER BY date, time', [templeId]);
       return res.rows.map(r => ({
         id: r.id,
         date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
@@ -498,8 +645,13 @@ export async function fetchAppointments() {
         staff: r.staff,
         guestName: r.guest_name,
         service: r.service,
+        serviceId: r.service_id,
         status: r.status,
-        phone: r.phone
+        phone: r.phone,
+        paymentMethod: r.payment_method,
+        paymentRef: r.payment_ref,
+        paymentStatus: r.payment_status,
+        amount: r.amount
       }));
     }
   });
@@ -508,32 +660,82 @@ export async function fetchAppointments() {
 // 5. 抓取與儲存服務項目
 export async function fetchServiceDefinitions() {
   const templeId = await getDynamicTempleId();
-  const currentServices = gStore.db_services || db_services;
-  const myServices = currentServices.filter((x: any) => x.templeId === templeId);
-  return myServices;
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const currentServices = gStore.db_services || db_services;
+      return currentServices.filter((x: any) => x.templeId === templeId);
+    } else {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS services (
+          id VARCHAR(50) NOT NULL,
+          temple_id VARCHAR(50) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          price INTEGER DEFAULT 0,
+          duration VARCHAR(50),
+          description TEXT,
+          color VARCHAR(50),
+          status VARCHAR(50) DEFAULT 'Active',
+          assigned_staff TEXT[],
+          PRIMARY KEY (id, temple_id)
+        )
+      `);
+      const res = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
+      if (res.rowCount === 0) {
+        // Seed default services
+        const DEFAULT_SERVICES = [
+          { id: '1', name: '光明燈祈福', price: 600, duration: '30 min', description: '消災解厄，前途光明', assignedStaff: ['1', '2'], color: '#f59e0b' },
+          { id: '2', name: '文昌開運', price: 800, duration: '45 min', description: '金榜題名，智慧大開', assignedStaff: ['3'], color: '#3b82f6' },
+          { id: '3', name: '太歲安奉', price: 1000, duration: '20 min', description: '歲歲平安，諸事順遂', assignedStaff: ['1'], color: '#ef4444' },
+          { id: '4', name: '問事服務', price: 0, duration: '20 min', description: '指點迷津，解惑人生', assignedStaff: ['1', '2'], color: '#8b5cf6' },
+          { id: '5', name: '例行祈福', price: 0, duration: '30 min', description: '日常平安祈福', assignedStaff: ['1'], color: '#10b981' }
+        ];
+        for (const s of DEFAULT_SERVICES) {
+          await client.query(
+            'INSERT INTO services (id, temple_id, name, price, duration, description, color, assigned_staff) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+            [s.id, templeId, s.name, s.price, s.duration, s.description, s.color, s.assignedStaff]
+          );
+        }
+        const retryRes = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
+        return retryRes.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
+      }
+      return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
+    }
+  });
 }
 
 export async function saveServiceDefinition(data: any) {
   const templeId = await getDynamicTempleId();
-  const id = data.id;
-  let currentServices = gStore.db_services || db_services;
-  
-  const idx = currentServices.findIndex((s: any) => s.id === id);
-  if (idx > -1) {
-    currentServices[idx] = { ...currentServices[idx], ...data };
-  } else {
-    // Assign a default vibrant indigo if no color is specified
-    const newColor = data.color || '#6366f1'; 
-    currentServices.push({ id: id || `s-${Date.now()}`, status: 'Active', color: newColor, ...data , templeId});
-  }
-  
-  gStore.db_services = [...currentServices];
-  db_services = gStore.db_services;
-  
-  revalidatePath("/temple/services");
-  revalidatePath("/temple/slots");
-  revalidatePath("/temple/calendar");
-  return { success: true };
+  return withTempleSession(templeId, false, async (client) => {
+    const id = data.id || `s-${Date.now()}`;
+    const newColor = data.color || '#6366f1';
+    
+    if (!client) {
+      let currentServices = gStore.db_services || db_services;
+      const idx = currentServices.findIndex((s: any) => s.id === id);
+      if (idx > -1) {
+        currentServices[idx] = { ...currentServices[idx], ...data };
+      } else {
+        currentServices.push({ id, status: 'Active', color: newColor, ...data , templeId});
+      }
+      gStore.db_services = [...currentServices];
+      db_services = gStore.db_services;
+    } else {
+      const res = await client.query('SELECT 1 FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      if (res.rowCount > 0) {
+        await client.query(
+          'UPDATE services SET name = $1, price = $2, duration = $3, description = $4, color = $5, assigned_staff = $6, status = $7 WHERE id = $8 AND temple_id = $9',
+          [data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active', id, templeId]
+        );
+      } else {
+        await client.query(
+          'INSERT INTO services (id, temple_id, name, price, duration, description, color, assigned_staff, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+          [id, templeId, data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active']
+        );
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
 }
 
 export async function deleteServiceDefinition(id: string) {
@@ -543,11 +745,10 @@ export async function deleteServiceDefinition(id: string) {
       let currentServices = gStore.db_services || db_services;
       gStore.db_services = currentServices.filter((s: any) => !(s.id === id && s.templeId === templeId));
       db_services = gStore.db_services;
-      revalidatePath("/temple/services");
-      revalidatePath("/temple/slots");
-      return { success: true };
+    } else {
+      await client.query('DELETE FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
     }
-    // DB implementation omitted
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -610,8 +811,8 @@ export async function saveForm(data: any) {
     gStore.db_forms = [...current, { id: id || Date.now().toString(), templeId, ...data }];
   }
   db_forms = gStore.db_forms;
-  revalidatePath("/temple/services");
-  return { success: true };
+  await revalidateTemple();
+    return { success: true };
 }
 
 // 7. 抓取與管理人員 (修復 Build Error 關鍵)
@@ -690,15 +891,19 @@ export async function fetchStaff() {
 
 // 8. 刪除單個時段
 export async function removeSingleSlot(id: any) {
-  let currentSlots = gStore.db_slots || db_slots;
-  const filtered = currentSlots.filter((s: any) => String(s.id) !== String(id));
-  
-  gStore.db_slots = [...filtered];
-  db_slots = gStore.db_slots;
-  
-  revalidatePath("/temple/slots");
-  revalidatePath("/temple/calendar");
-  return { success: true };
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      let currentSlots = gStore.db_slots || db_slots;
+      const filtered = currentSlots.filter((s: any) => String(s.id) !== String(id));
+      gStore.db_slots = [...filtered];
+      db_slots = gStore.db_slots;
+    } else {
+      await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
 }
 
 // 9. 智能分析受影響預約
@@ -770,26 +975,34 @@ export async function savePaymentConfig(data: TemplePaymentConfig) {
   } else {
     db_temple_payment_configs.push({ ...data, templeId });
   }
-  revalidatePath('/temple/payment-setup');
-  return { success: true };
+  await revalidateTemple();
+    return { success: true };
 }
 
 export async function executeEmergencyReschedule(formData: FormData) {
-  revalidatePath("/temple/slots");
-  return { success: true };
+  await revalidateTemple();
+    return { success: true };
 }
 
 // --- 其餘輔助函式 ---
-export async function fetchLampRecords() { 
+export async function fetchLampRecords() {
   const templeId = await getDynamicTempleId();
-  return [...db_lamp_records].filter(r => !r.templeId || r.templeId === templeId).reverse(); 
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return [...db_lamp_records].filter(r => !r.templeId || r.templeId === templeId).reverse();
+    await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
+    const res = await client.query('SELECT * FROM lamp_records WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, guestName: r.guest_name, phone: r.phone, lampType: r.lamp_type, amount: r.amount, status: r.status, createdAt: r.created_at, paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status }));
+  });
 }
 let db_lamp_categories: any[] = initGlobal('db_lamp_categories', []);
 export async function fetchLampCategories() {
   const templeId = await getDynamicTempleId();
-  const currentCats = gStore.db_lamp_categories || db_lamp_categories;
-  const myCats = currentCats.filter((x: any) => x.templeId === templeId);
-  return myCats;
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return (gStore.db_lamp_categories || db_lamp_categories).filter((x: any) => !x.templeId || x.templeId === templeId);
+    await client.query(`CREATE TABLE IF NOT EXISTS lamp_categories (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), name VARCHAR(255), price INTEGER, description TEXT, color VARCHAR(50), is_active BOOLEAN DEFAULT true, type VARCHAR(50))`);
+    const res = await client.query('SELECT * FROM lamp_categories WHERE temple_id = $1', [templeId]);
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, description: r.description, color: r.color, isActive: r.is_active, type: r.type }));
+  });
 }
 let db_lamp_records: any[] = initGlobal("db_lamp_records", []);
 export async function createLightingOrder(fd: FormData) { 
@@ -901,7 +1114,7 @@ export async function guestLogin(phone: string, inputName?: string) {
     const store = await cookies();
     store.set(`guestPhone_${templeId}`, phone, { secure: true, httpOnly: true, path: '/' });
     
-    revalidatePath('/temple/customers');
+    await revalidateTemple();
     return { success: true, guestName: fullGuest.name, fullGuest };
   });
 }
@@ -914,17 +1127,111 @@ export async function guestLogout() {
 }
 
 export async function fetchGuestSettings() { return {}; }
-export async function askAgiAssistant(q: string, h: number) { return { reply: "好的", suggestedAction: "none" }; }
+export async function askAgiAssistant(q: string, h: number) {
+  const store = await cookies();
+  const templeId = await getDynamicTempleId();
+  const phone = store.get(`guestPhone_${templeId}`)?.value || 'unknown';
+
+  // 簡單的 AI 回應邏輯 (此處可未來串接真實 LLM API)
+  let reply = "好的，我已經收到您的訊息。如果有更詳細的問題，歡迎隨時告訴我！";
+  if (q.includes('預約') || q.includes('掛號')) reply = "您想了解預約相關的服務嗎？您可以點擊下方的「立刻線上預約」來查看目前可用的時段喔！";
+  if (q.includes('點燈')) reply = "我們提供多種點燈服務（如太歲燈、光明燈），歡迎前往「線上點燈」了解詳情與價格！";
+
+  return withTempleSession(templeId, false, async (client) => {
+    if (client) {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ai_chat_logs (
+          id SERIAL PRIMARY KEY,
+          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          phone VARCHAR(50) NOT NULL,
+          user_query TEXT NOT NULL,
+          ai_reply TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await client.query(
+        'INSERT INTO ai_chat_logs (temple_id, phone, user_query, ai_reply) VALUES ($1, $2, $3, $4)',
+        [templeId, phone, q, reply]
+      );
+    }
+    return { reply, suggestedAction: "none" };
+  });
+}
+
+export async function fetchAiChatLogs() {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return [];
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_chat_logs (
+        id SERIAL PRIMARY KEY,
+        temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+        phone VARCHAR(50) NOT NULL,
+        user_query TEXT NOT NULL,
+        ai_reply TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    const res = await client.query('SELECT * FROM ai_chat_logs WHERE temple_id = $1 ORDER BY created_at DESC LIMIT 100', [templeId]);
+    return res.rows.map(r => ({
+      id: r.id,
+      phone: r.phone,
+      userQuery: r.user_query,
+      aiReply: r.ai_reply,
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
+    }));
+  });
+}
 
 const normCompare = (p1: string, p2: string) => {
   if (!p1 || !p2) return false;
   return normalizePhone(p1) === normalizePhone(p2);
 };
 
-export async function fetchGuestAppointments(p: any) { 
-  return db_appointments.filter((a: any) => normCompare(a.phone, p)); 
+export async function fetchGuestAppointments(p: any) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return db_appointments.filter((a: any) => normCompare(a.phone, p) && (!a.templeId || a.templeId === templeId));
+    }
+    const normPhone = normalizePhone(p);
+    const res = await client.query(`
+      SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount
+      FROM appointments 
+      WHERE REPLACE(phone, '-', '') = $1 AND temple_id = $2
+      ORDER BY date DESC, time DESC
+    `, [normPhone, templeId]);
+    return res.rows;
+  });
 }
-export async function fetchServiceSettings() { return { cancelHoursBefore: 24, modifyHoursBefore: 24 }; }
+let db_service_settings_mock: any[] = initGlobal('db_service_settings_mock', []);
+export async function fetchServiceSettings() { 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const s = db_service_settings_mock.find(x => x.templeId === templeId);
+      return s || { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [] };
+    }
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS temple_settings (
+        temple_id VARCHAR(50) PRIMARY KEY REFERENCES temples(id) ON DELETE CASCADE,
+        settings JSONB NOT NULL DEFAULT '{}'::jsonb
+      )
+    `);
+    const res = await client.query('SELECT settings FROM temple_settings WHERE temple_id = $1', [templeId]);
+    if (res.rowCount > 0) {
+      const s = res.rows[0].settings;
+      return {
+        cancelHoursBefore: s.cancelHoursBefore ?? 24,
+        modifyHoursBefore: s.modifyHoursBefore ?? 24,
+        allowCancel: s.allowCancel ?? true,
+        allowModify: s.allowModify ?? true,
+        pushConfigs: s.pushConfigs || []
+      };
+    }
+    return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [] };
+  });
+}
 
 let db_guest_files: any[] = initGlobal("db_guest_files", []);
 export async function fetchGuestFiles(phone: string) {
@@ -952,7 +1259,7 @@ export async function fetchGuestFiles(phone: string) {
       const guestRes = await client.query("SELECT phone FROM guests WHERE REPLACE(phone, '-', '') = $1", [normPhone]);
       const dbPhone = guestRes.rows[0]?.phone || phone;
       
-      const res = await client.query('SELECT * FROM guest_files WHERE temple_id = $1 AND phone = $2 AND temple_id = $2 ORDER BY uploaded_at DESC', [dbPhone, templeId]);
+      const res = await client.query('SELECT * FROM guest_files WHERE temple_id = $1 AND phone = $2 ORDER BY uploaded_at DESC', [templeId, dbPhone]);
       return res.rows.map(r => ({
         id: r.id,
         phone: r.phone,
@@ -970,89 +1277,133 @@ export async function fetchGuestFiles(phone: string) {
 let db_event_registrations: any[] = initGlobal("db_event_registrations", []);
 
 export async function fetchEventRegistrationsByEventId(eventId: string) {
-  return db_event_registrations.filter(r => r.eventId === eventId);
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return db_event_registrations.filter(r => r.eventId === eventId && (!r.templeId || r.templeId === templeId));
+    await client.query(`CREATE TABLE IF NOT EXISTS event_registrations (id VARCHAR(50) PRIMARY KEY, event_id VARCHAR(50), temple_id VARCHAR(50), title VARCHAR(255), phone VARCHAR(50), guest_name VARCHAR(255), price INTEGER, payment_status VARCHAR(50), actual_price INTEGER, timestamp VARCHAR(50))`);
+    const res = await client.query('SELECT * FROM event_registrations WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
+    return res.rows.map(r => ({ id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone, guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status, actualPrice: r.actual_price, timestamp: r.timestamp }));
+  });
 }
-
 export async function markRegistrationAsPaid(registrationId: string, actualPrice: number) {
-  const reg = db_event_registrations.find(r => r.id === registrationId);
-  if (!reg) return { success: false, message: '找不到報名紀錄' };
-  reg.paymentStatus = 'Paid';
-  reg.actualPrice = actualPrice;
-  revalidatePath('/temple/events');
-  return { success: true };
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const reg = db_event_registrations.find(r => r.id === registrationId && (!r.templeId || r.templeId === templeId));
+      if (!reg) return { success: false, message: '找不到報名紀錄' };
+      reg.paymentStatus = 'Paid';
+      reg.actualPrice = actualPrice;
+    } else {
+      await client.query('UPDATE event_registrations SET payment_status = $1, actual_price = $2 WHERE id = $3 AND temple_id = $4', ['Paid', actualPrice, registrationId, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
 }
 let db_activities: any[] = initGlobal('db_activities', []);
 let db_deep_records: any[] = initGlobal('db_deep_records', []);
 
 // (Removed duplicate createOrUpdateGuest)
-export async function verifyQueueTicket(eventId: any, phone: string) { 
-  const t = db_queue_tickets.find(t => t.eventId === eventId && normCompare(t.phone, phone));
-  if (!t) return { success: false, error: 'No ticket found' };
-  if (t.status === 'Pending') {
-    t.status = 'Queuing';
-    t.scannedAt = new Date().toLocaleTimeString();
-    t.actualOrder = db_queue_tickets.filter((x: any) => x.eventId === eventId && x.status !== 'Pending').length + 1;
-  }
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
-}
-
-export async function registerForEvent(id: any, phone: string, n: string, pr: number) { 
-  if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
-  const ev = db_events.find(e => e.id === id);
-  if (!ev) return { success: false };
-  ev.enrolled += 1;
-  db_event_registrations.push({
-    id: `REG-${Date.now()}`,
-    eventId: id,
-    title: ev.title,
-    phone,
-    guestName: n,
-    price: pr,
-    paymentStatus: pr > 0 ? 'Pending' : 'Unpaid',
-    actualPrice: pr > 0 ? pr : 0,
-    timestamp: new Date().toISOString().replace('T', ' ').split('.')[0]
+export async function verifyQueueTicket(eventId: any, phone: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const t = db_queue_tickets.find(t => t.eventId === eventId && normCompare(t.phone, phone) && (!t.templeId || t.templeId === templeId));
+      if (!t) return { success: false, error: 'No ticket found' };
+      if (t.status === 'Pending') { t.status = 'Queuing'; t.scannedAt = new Date().toLocaleTimeString(); t.actualOrder = db_queue_tickets.filter((x: any) => x.eventId === eventId && x.status !== 'Pending').length + 1; }
+    } else {
+      const tRes = await client.query('SELECT id, status FROM queue_tickets WHERE event_id = $1 AND REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [eventId, phone.replace(/-/g, ''), templeId]);
+      if (tRes.rowCount === 0) return { success: false, error: 'No ticket found' };
+      const t = tRes.rows[0];
+      if (t.status === 'Pending') {
+        const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status != \'Pending\' AND temple_id = $2', [eventId, templeId]);
+        const actualOrder = parseInt(orderRes.rows[0].count) + 1;
+        await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, t.id]);
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
   });
-  db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '活動報名', content: `報名 ${ev.title}` });
-  revalidatePath('/temple/events');
-  return { success: true }; 
+}
+export async function registerForEvent(id: any, phone: string, n: string, pr: number, paymentMethod?: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
+    
+    const pStatus = paymentMethod === 'Cash' || !paymentMethod ? (pr > 0 ? 'Pending' : 'Unpaid') : 'Paid';
+
+    if (!client) {
+      const ev = db_events.find(e => e.id === id && (!e.templeId || e.templeId === templeId));
+      if (!ev) return { success: false };
+      ev.enrolled += 1;
+      db_event_registrations.push({ id: `REG-${Date.now()}`, eventId: id, templeId, title: ev.title, phone, guestName: n, price: pr, paymentStatus: pStatus, actualPrice: pr > 0 ? pr : 0, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] });
+    } else {
+      const evRes = await client.query('SELECT title, enrolled, capacity FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      if (evRes.rowCount === 0) return { success: false };
+      const ev = evRes.rows[0];
+      if (ev.capacity > 0 && ev.enrolled >= ev.capacity) return { success: false, message: '名額已滿' };
+      
+      await client.query('UPDATE events SET enrolled = enrolled + 1 WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      await client.query('INSERT INTO event_registrations (id, event_id, temple_id, title, phone, guest_name, price, payment_status, actual_price, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+        [`REG-${Date.now()}`, id, templeId, ev.title, phone, n, pr, pStatus, pr > 0 ? pr : 0, new Date().toISOString().replace('T', ' ').split('.')[0]]
+      );
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+export async function fetchGuestRegistrations(p: any) {
+  const templeId = await getDynamicTempleId();
+  return db_event_registrations.filter(r => normCompare(r.phone, p) && (!r.templeId || r.templeId === templeId));
+}
+export async function fetchGuestQueueTickets(p: any) {
+  const templeId = await getDynamicTempleId();
+  return db_queue_tickets.filter((t: any) => normCompare(t.phone, p) && (!t.templeId || t.templeId === templeId));
+}
+export async function fetchGuestLampRecords(p: any) {
+  const templeId = await getDynamicTempleId();
+  return db_lamp_records.filter(l => normCompare(l.phone, p) && (!l.templeId || l.templeId === templeId));
 }
 
-export async function fetchGuestRegistrations(p: any) { 
-  return db_event_registrations.filter(r => normCompare(r.phone, p)); 
-}
-export async function fetchGuestQueueTickets(p: any) { 
-  return db_queue_tickets.filter((t: any) => normCompare(t.phone, p)); 
-}
-export async function fetchGuestLampRecords(p: any) { 
-  return db_lamp_records.filter(l => normCompare(l.phone, p)); 
-}
-
-export async function joinQueue(eventId: any, phone: string, guestName: string) { 
-  const ev = db_queue_events.find((e: any) => e.id === eventId);
-  if (!ev) return { success: false };
-  const assignedNumber = `A${(db_queue_tickets.filter((t: any) => t.eventId === eventId).length + 1).toString().padStart(3, '0')}`;
-  const tix = {
-    id: `TIX-${Date.now()}`,
-    eventId,
-    eventTitle: ev.title,
-    phone,
-    guestName,
-    status: 'Pending',
-    assignedNumber,
-    createdAt: new Date().toISOString().replace('T', ' ').split('.')[0]
-  };
-  db_queue_tickets.push(tix);
-  db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '現場取號', content: `抽取 ${ev.title} 號碼牌: ${assignedNumber}` });
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true, ticket: tix }; 
+export async function joinQueue(eventId: any, phone: string, guestName: string, paymentMethod?: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    const pStatus = paymentMethod === 'Cash' || !paymentMethod ? 'Pending' : 'Paid';
+    if (!client) {
+      const ev = db_queue_events.find((e: any) => e.id === eventId && (!e.templeId || e.templeId === templeId));
+      if (!ev) return { success: false };
+      const assignedNumber = `A${(db_queue_tickets.filter((t: any) => t.eventId === eventId).length + 1).toString().padStart(3, '0')}`;
+      const tix = { id: `TIX-${Date.now()}`, eventId, templeId, eventTitle: ev.title, phone, guestName, status: 'Pending', assignedNumber, paymentStatus: pStatus, createdAt: new Date().toISOString().replace('T', ' ').split('.')[0] };
+      db_queue_tickets.push(tix);
+      return { success: true, ticket: tix };
+    } else {
+      const evRes = await client.query('SELECT title FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
+      if (evRes.rowCount === 0) return { success: false };
+      const countRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
+      const assignedNumber = `A${(parseInt(countRes.rows[0].count) + 1).toString().padStart(3, '0')}`;
+      const newId = `TIX-${Date.now()}`;
+      const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
+      
+      await client.query(`ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Pending'`);
+      
+      await client.query('INSERT INTO queue_tickets (id, event_id, temple_id, event_title, phone, guest_name, status, assigned_number, payment_status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+        [newId, eventId, templeId, evRes.rows[0].title, phone, guestName, 'Pending', assignedNumber, pStatus, nowStr]);
+      return { success: true, ticket: { id: newId, eventId, templeId, eventTitle: evRes.rows[0].title, phone, guestName, status: 'Pending', assignedNumber, paymentStatus: pStatus, createdAt: nowStr } };
+    }
+  });
 }
 export type EventItem = { id: string; title: string; date: string; location: string; price: number; status: 'Active' | 'Draft' | 'Completed'; capacity: number; enrolled: number; imageUrl?: string };
 let db_events: any[] = initGlobal("db_events", []);
 
-export async function fetchEvents() { const templeId = await getDynamicTempleId(); return [...db_events].filter(x => x.templeId === templeId); }
+export async function fetchEvents() {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return [...db_events].filter(x => x.templeId === templeId);
+    await client.query(`CREATE TABLE IF NOT EXISTS events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), location VARCHAR(255), price INTEGER, status VARCHAR(50), capacity INTEGER, enrolled INTEGER DEFAULT 0, image_url TEXT)`);
+    const res = await client.query('SELECT * FROM events WHERE temple_id = $1', [templeId]);
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, location: r.location, price: r.price, status: r.status, capacity: r.capacity, enrolled: r.enrolled, imageUrl: r.image_url }));
+  });
+}
 export async function saveEvent(fd: FormData) { 
   const id = fd.get('id') as string;
   const title = fd.get('title') as string;
@@ -1080,25 +1431,42 @@ export async function saveEvent(fd: FormData) {
   
   const templeId = await getDynamicTempleId();
 
-  if (id) {
-    const idx = db_events.findIndex(e => e.id === id);
-    if (idx > -1) {
-      db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId, imageUrl };
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      if (id) {
+        const idx = db_events.findIndex(e => e.id === id && (!e.templeId || e.templeId === templeId));
+        if (idx > -1) {
+          db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId, imageUrl };
+        }
+      } else {
+        db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl });
+      }
+    } else {
+      if (id) {
+        await client.query('UPDATE events SET title = $1, date = $2, location = $3, price = $4, capacity = $5, status = $6, image_url = $7 WHERE id = $8 AND temple_id = $9', [title, date, location, price, capacity, status, imageUrl, id, templeId]);
+      } else {
+        await client.query('INSERT INTO events (id, temple_id, title, date, location, price, capacity, status, enrolled, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9)', [`ev-${Date.now()}`, templeId, title, date, location, price, capacity, status, imageUrl]);
+      }
     }
-  } else {
-    db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl });
-  }
-  revalidatePath('/temple/events');
-  revalidatePath('/');
-  return { success: true }; 
+    await revalidateTemple();
+    return { success: true };
+  });
 }
-export async function deleteEvent(id: string) { 
-  const hasRegistrations = db_event_registrations.some(r => r.eventId === id);
-  if (hasRegistrations) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' }; 
-  db_events = gStore.db_events = db_events.filter(e => e.id !== id);
-  revalidatePath('/temple/events');
-  revalidatePath('/');
-  return { success: true }; 
+export async function deleteEvent(id: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const hasRegistrations = db_event_registrations.some(r => r.eventId === id && (!r.templeId || r.templeId === templeId));
+      if (hasRegistrations) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' }; 
+      db_events = gStore.db_events = db_events.filter(e => !(e.id === id && (!e.templeId || e.templeId === templeId)));
+    } else {
+      const regCheck = await client.query('SELECT 1 FROM event_registrations WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
+      if (regCheck.rowCount && regCheck.rowCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
+      await client.query('DELETE FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 
 // --- B2B SaaS 多租戶與經銷架構全域變數 ---
@@ -1435,7 +1803,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
     }
 
     revalidatePath('/super-admin');
-    revalidatePath('/temple/settings');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -2234,7 +2602,7 @@ export async function createTempleAccount(data: any) {
   }
 
   revalidatePath('/super-admin');
-  revalidatePath('/temple');
+  await revalidateTemple(id);
   return { success: true, id };
 }
 
@@ -2836,7 +3204,33 @@ export async function rejectWithdrawal(id: string) {
   });
 }
 
-export async function updateServiceSettings() { return { success: true }; }
+export async function updateServiceSettings(settings: any) { 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const idx = db_service_settings_mock.findIndex(x => x.templeId === templeId);
+      if (idx !== -1) db_service_settings_mock[idx] = { templeId, ...settings };
+      else db_service_settings_mock.push({ templeId, ...settings });
+      return { success: true };
+    }
+    
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS temple_settings (
+        temple_id VARCHAR(50) PRIMARY KEY REFERENCES temples(id) ON DELETE CASCADE,
+        settings JSONB NOT NULL DEFAULT '{}'::jsonb
+      )
+    `);
+    
+    const res = await client.query('SELECT 1 FROM temple_settings WHERE temple_id = $1', [templeId]);
+    if (res.rowCount > 0) {
+      await client.query('UPDATE temple_settings SET settings = $1 WHERE temple_id = $2', [JSON.stringify(settings), templeId]);
+    } else {
+      await client.query('INSERT INTO temple_settings (temple_id, settings) VALUES ($1, $2)', [templeId, JSON.stringify(settings)]);
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
 
 export async function fetchEarningsStats(salesId: string = '超級精英業務') { 
   const sales = db_dist_sales.find(s => s.id === salesId);
@@ -3013,8 +3407,7 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
       `, [newId, templeId, dbPhone, url, type, newFile.name, newFile.folder, newFile.uploadedBy]);
     }
 
-    revalidatePath('/temple/customers');
-    revalidatePath('/temple/calendar');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -3068,7 +3461,7 @@ export async function createPersonnel(formData: FormData) {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [newId, templeId, name, role, account, phone, password, 'Active', avatar, defaultPerms]);
     }
-    revalidatePath('/temple/personnel');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -3090,7 +3483,7 @@ export async function deletePersonnel(id: string) {
     } else {
       await client.query('DELETE FROM personnel WHERE id = $1 AND temple_id = $2', [id, templeId]);
     }
-    revalidatePath('/temple/personnel');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -3107,7 +3500,7 @@ export async function updateAccountPermissions(id: string, permissions: string[]
     } else {
       await client.query('UPDATE personnel SET permissions = $1 WHERE id = $2 AND temple_id = $3', [permissions, id, templeId]);
     }
-    revalidatePath('/temple/personnel');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -3161,97 +3554,83 @@ export async function fetchDistributorCommissionSummary(distId: string, year: st
 export async function fetchGlobalTempleData() {
   const templeId = await getDynamicTempleId();
   const now = new Date();
-  
-  // Format today's date YYYY-MM-DD in local timezone roughly
   const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
-  // 1. Today's Appointments
-  let todayAppointments = 0;
-  let completedAppointments = 0;
-  let totalServices = 0;
-  const serviceCounts: Record<string, number> = {};
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      // In-Memory Fallback
+      let todayAppointments = 0; let completedAppointments = 0; let totalServices = 0;
+      const serviceCounts: Record<string, number> = {};
+      const apps = db_appointments.filter((a: any) => !a.templeId || a.templeId === templeId);
+      apps.forEach((a: any) => {
+        if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
+        if (a.date === todayStr) {
+          todayAppointments++;
+          if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') completedAppointments++;
+        }
+      });
+      const sortedServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label, count], index) => {
+        const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
+        return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
+      });
+      if (sortedServices.length === 0) sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
+      const validEventIds = db_queue_events.filter((e: any) => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
+      const qActive = validEventIds.map((evt: any) => {
+        const tix = db_queue_tickets.filter((t: any) => t.eventId === evt.id);
+        const waiting = tix.filter((t: any) => t.status === 'Queuing').length;
+        const completed = tix.filter((t: any) => t.status === 'Completed').length;
+        return { title: evt.title, waiting, completed };
+      });
+      const guests = db_guests.filter((g: any) => !g.templeId || g.templeId === templeId);
+      const totalGuests = guests.length;
+      let totalLamps = 0; let activeLamps = 0;
+      db_lamp_records.forEach((l: any) => {
+        if (templeId && l.templeId && l.templeId !== templeId) return;
+        totalLamps++;
+        if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
+      });
+      return { analyticsSettings: {}, analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, raw: { apps, agiStats: {}, guests, storageInfo: { used: 12.5, total: 100 }, qActive } };
+    } else {
+      // PostgreSQL Realization
+      const guestsRes = await client.query('SELECT phone, name FROM guests WHERE temple_id = $1', [templeId]);
+      const totalGuests = guestsRes.rowCount || 0;
+      
+      const appsRes = await client.query('SELECT id, guest_id as "guestId", service, date, time, status, payment_status as "paymentStatus" FROM appointments WHERE temple_id = $1', [templeId]);
+      const apps = appsRes.rows;
+      let todayAppointments = 0; let completedAppointments = 0; let totalServices = 0;
+      const serviceCounts: Record<string, number> = {};
+      apps.forEach((a: any) => {
+        if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
+        if (a.date === todayStr) {
+          todayAppointments++;
+          if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') completedAppointments++;
+        }
+      });
+      const sortedServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label, count], index) => {
+        const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
+        return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
+      });
+      if (sortedServices.length === 0) sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
 
-  db_appointments.forEach((a: any) => {
-    if (templeId && a.templeId && a.templeId !== templeId) return;
-    
-    // Service Heat Calculation
-    if (a.service) {
-      serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1;
-      totalServices++;
+      const lampsRes = await client.query('SELECT status, payment_status FROM lamp_records WHERE temple_id = $1', [templeId]);
+      let totalLamps = lampsRes.rowCount || 0;
+      let activeLamps = lampsRes.rows.filter(l => l.status === 'Active' || l.payment_status === 'Paid').length;
+
+      const qEventsRes = await client.query('SELECT id, title FROM queue_events WHERE status = \'Active\' AND temple_id = $1', [templeId]);
+      const qActive = await Promise.all(qEventsRes.rows.map(async (evt) => {
+        const tRes = await client.query('SELECT status FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [evt.id, templeId]);
+        const waiting = tRes.rows.filter(t => t.status === 'Queuing').length;
+        const completed = tRes.rows.filter(t => t.status === 'Completed').length;
+        return { title: evt.title, waiting, completed };
+      }));
+
+      return { 
+        analyticsSettings: {}, 
+        analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, 
+        raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used: 12.5, total: 100 }, qActive } 
+      };
     }
-
-    // Today's appointments Calculation
-    if (a.date === todayStr) {
-      todayAppointments++;
-      if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') {
-        // Just as an example, count completed/paid as completed for today
-        completedAppointments++;
-      }
-    }
   });
-
-  // Top 3 Services
-  const sortedServices = Object.entries(serviceCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([label, count], index) => {
-       const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
-       return {
-         label,
-         val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100),
-         color: colors[index % colors.length]
-       };
-    });
-
-  if (sortedServices.length === 0) {
-     sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
-  }
-
-  // 2. Queue Summary (Live Queue)
-  const validEventIds = db_queue_events.filter((e: any) => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
-  const qActive = validEventIds.map((evt: any) => {
-    const tix = db_queue_tickets.filter((t: any) => t.eventId === evt.id);
-    const waiting = tix.filter((t: any) => t.status === 'Queuing').length;
-    const completed = tix.filter((t: any) => t.status === 'Completed').length;
-    return { title: evt.title, waiting, completed };
-  });
-
-  // 3. Total Guests
-  let totalGuests = 0;
-  db_guests.forEach((g: any) => {
-    if (templeId && g.templeId && g.templeId !== templeId) return;
-    totalGuests++;
-  });
-
-  // 4. Lamp Stats
-  let totalLamps = 0;
-  let activeLamps = 0;
-  db_lamp_records.forEach((l: any) => {
-    if (templeId && l.templeId && l.templeId !== templeId) return;
-    totalLamps++;
-    if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
-  });
-
-  // Storage info (mocked/static for now)
-  const storageInfo = { used: 12.5, total: 100 };
-
-  return {
-    analyticsSettings: {},
-    analyticsData: { 
-      todayAppointments,
-      completedAppointments,
-      totalGuests,
-      lampStats: { totalLamps, activeLamps },
-      serviceHeat: sortedServices
-    },
-    raw: {
-      apps: [],
-      agiStats: {},
-      guests: [],
-      storageInfo,
-      qActive
-    }
-  };
 }
 
 // --- 信眾檔案 (Customers) 相關 mock 函式與型別 ---
@@ -3264,55 +3643,22 @@ export type LampCategory = any;
 
 let db_guests: any[] = initGlobal("db_guests", []);
 
-export async function fetchGuests() { 
+export async function fetchGuests() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const seen = new Set();
-      db_guests = db_guests.filter((g: any) => {
-        const p = normalizePhone(g.phone);
-        if (seen.has(p)) return false;
-        seen.add(p);
-        return true;
-      });
-      gStore.db_guests = db_guests; // 同步至全域快取
-      return [...db_guests].reverse(); 
+      return db_guests.filter((g: any) => !g.templeId || g.templeId === templeId);
     } else {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          PRIMARY KEY (temple_id, phone),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          password VARCHAR(255),
-          address TEXT,
-          birthday VARCHAR(50),
-          lunar_birthday VARCHAR(255),
-          birth_hour VARCHAR(50),
-          line_id VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'Active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      const res = await client.query('SELECT * FROM guests ORDER BY created_at DESC');
+      const res = await client.query('SELECT * FROM guests WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
       return res.rows.map(r => ({
-        phone: r.phone,
-        name: r.name,
-        email: r.email || '',
-        password: r.password || '',
-        address: r.address || '',
-        birthday: r.birthday || '',
-        lunarBirthday: r.lunar_birthday || '',
-        birthHour: r.birth_hour || '',
-        lineId: r.line_id || '',
-        status: r.status || 'Active',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
+        id: r.id, templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email,
+        address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday,
+        birthHour: r.birth_hour, lineId: r.line_id, status: r.status,
+        createdAt: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : r.created_at
       }));
     }
   });
 }
-
 export async function searchGuestsByNameOrPhone(query: string) {
   if (!query) return [];
   const normalizedQuery = query.trim().toLowerCase();
@@ -3467,36 +3813,46 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
       `);
       
       if (originalPhone && originalPhone !== d.phone) {
-        const conflictRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [d.phone]);
-        if (conflic(tRes.rowCount ?? 0) > 0) {
+        const conflictRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, d.phone]);
+        if ((conflictRes.rowCount ?? 0) > 0) {
           return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
         }
       }
       
-      const checkRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [lookupPhone]);
+      const checkRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, lookupPhone]);
       if ((checkRes.rowCount ?? 0) > 0) {
-        // Update!
+        // Update! COALESCE($9, line_id) ensures that if the frontend doesn't provide a lineId, the existing one in the DB is not overwritten by null.
         await client.query(`
           UPDATE guests 
-          SET phone = $1, name = $2, email = $3, password = $4, address = $5, birthday = $6, lunar_birthday = $7, birth_hour = $8, line_id = $9, status = $10
-          WHERE temple_id = $1 AND phone = $21
+          SET phone = $1, name = $2, email = $3, password = $4, address = $5, birthday = $6, lunar_birthday = $7, birth_hour = $8, line_id = COALESCE($9, line_id), status = $10
+          WHERE temple_id = $11 AND phone = $12
         `, [
           d.phone, d.name, d.email || null, d.password || null, d.address || null,
           d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active',
-          lookupPhone
+          templeId, lookupPhone
         ]);
+        
+        if (lookupPhone !== d.phone) {
+           await client.query('UPDATE appointments SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+           await client.query('UPDATE lamp_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+           await client.query('UPDATE event_registrations SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+           await client.query('UPDATE queue_tickets SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+           await client.query('UPDATE deep_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+           await client.query('UPDATE activities SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+           await client.query('UPDATE guest_files SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+        }
       } else {
         // Insert!
         await client.query(`
           INSERT INTO guests (temple_id, phone, name, email, password, address, birthday, lunar_birthday, birth_hour, line_id, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, [
-          d.phone, d.name, d.email || null, d.password || null, d.address || null,
+          templeId, d.phone, d.name, d.email || null, d.password || null, d.address || null,
           d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active'
         ]);
       }
     }
-    revalidatePath('/temple/customers');
+    await revalidateTemple();
     return { success: true }; 
   });
 }
@@ -3520,7 +3876,7 @@ export async function fetchGuestHistory(p: string) {
         )
       `);
       
-      const normPhone = normalizePhone(phone);
+      const normPhone = normalizePhone(p);
       const guestRes = await client.query("SELECT phone FROM guests WHERE REPLACE(phone, '-', '') = $1", [normPhone]);
       const dbPhone = guestRes.rows[0]?.phone || p;
       
@@ -3537,6 +3893,20 @@ export async function fetchGuestHistory(p: string) {
           uploadedAt: r.uploaded_at instanceof Date ? r.uploaded_at.toISOString().replace('T', ' ').slice(0, 19) : r.uploaded_at
         }));
       }
+      const appsRes = await client.query('SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount FROM appointments WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const lampsRes = await client.query('SELECT id, temple_id as "templeId", guest_name as "guestName", phone, lamp_type as "lampType", amount, status, created_at as "createdAt", payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus" FROM lamp_records WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const queueRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", event_title as "eventTitle", phone, guest_name as "guestName", status, assigned_number as "assignedNumber", actual_order as "actualOrder", payment_status as "paymentStatus", created_at as "createdAt" FROM queue_tickets WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const eventsRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", title, phone, guest_name as "guestName", price, payment_status as "paymentStatus", actual_price as "actualPrice", timestamp as "createdAt" FROM event_registrations WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+
+      return {
+        appointments: appsRes.rows,
+        records: db_deep_records.filter((r: any) => normCompare(r.phone, p)),
+        files: files,
+        lampRecords: lampsRes.rows,
+        activities: db_activities.filter((a: any) => normCompare(a.phone, p)),
+        queueTickets: queueRes.rows,
+        eventRegistrations: eventsRes.rows
+      };
     }
 
     const apps = db_appointments.filter((a: any) => normCompare(a.phone, p));
@@ -3554,7 +3924,9 @@ export async function fetchGuestHistory(p: string) {
       records: db_deep_records.filter((r: any) => normCompare(r.phone, p)), 
       files: files, 
       lampRecords: db_lamp_records.filter((l: any) => normCompare(l.phone, p)), 
-      activities: db_activities.filter((a: any) => normCompare(a.phone, p)) 
+      activities: db_activities.filter((a: any) => normCompare(a.phone, p)),
+      queueTickets: db_queue_tickets.filter((t: any) => normCompare(t.phone, p)),
+      eventRegistrations: db_event_registrations.filter((e: any) => normCompare(e.phone, p))
     }; 
   });
 }
@@ -3591,8 +3963,8 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
   });
   gStore.db_activities = db_activities;
 
-  revalidatePath('/temple/customers');
-  return { success: true, record: newRecord };
+  await revalidateTemple();
+    return { success: true, record: newRecord };
 }
 export async function fetchAllFilesByDate() { return []; }
 export async function setFilePrivacy() { return { success: true }; }
@@ -3604,129 +3976,135 @@ export type LampRecord = any;
 export async function fetchGuestByPhone(p: string) { 
   return db_guests.find((g: any) => g.phone === p) || null; 
 }
+export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      if (recordType === 'Lamp') {
+        const idx = db_lamp_records.findIndex(r => r.id === recordId);
+        if (idx > -1) {
+          db_lamp_records[idx].status = 'Active';
+          db_lamp_records[idx].paymentStatus = 'Paid';
+        }
+      }
+      if (recordType === 'Appointment') {
+        const idx = db_appointments.findIndex(r => r.id.toString() === recordId.toString());
+        if (idx > -1) {
+          db_appointments[idx].status = 'Confirmed';
+          db_appointments[idx].paymentStatus = 'Paid';
+        }
+      }
+      if (recordType === 'Event') {
+        const idx = db_event_registrations.findIndex(r => r.id === recordId);
+        if (idx > -1) {
+          db_event_registrations[idx].paymentStatus = 'Paid';
+        }
+      }
+      if (recordType === 'Queue') {
+        if (typeof db_queue_tickets !== 'undefined') {
+          const idx = db_queue_tickets.findIndex(r => r.id === recordId);
+          if (idx > -1) {
+            db_queue_tickets[idx].paymentStatus = 'Paid';
+          }
+        }
+      }
+    } else {
+      if (recordType === 'Appointment') {
+        await client.query('UPDATE appointments SET status = \'Confirmed\', payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+      if (recordType === 'Lamp') {
+        await client.query('UPDATE lamp_records SET status = \'Active\', payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+      if (recordType === 'Event') {
+        await client.query('UPDATE event_registrations SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+      if (recordType === 'Queue') {
+        await client.query('UPDATE queue_tickets SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
 export async function createLampRecord(data: any) { 
-  // Handle both FormData (from direct forms) and plain objects
-  let phone = '';
-  let categoryId = '';
-  let guestName = '';
-  let notice = '';
-  let paymentMethod = '';
-  let paymentRef = '';
-
+  let phone = ''; let categoryId = ''; let guestName = ''; let notice = ''; let paymentMethod = ''; let paymentRef = '';
   if (data instanceof FormData) {
-    phone = data.get('phone') as string;
-    categoryId = data.get('categoryId') as string;
-    guestName = data.get('guestName') as string;
-    notice = data.get('notice') as string;
-    paymentMethod = data.get('paymentMethod') as string || 'Cash';
-    paymentRef = data.get('paymentRef') as string || '';
+    phone = data.get('phone') as string; categoryId = data.get('categoryId') as string; guestName = data.get('guestName') as string; notice = data.get('notice') as string; paymentMethod = data.get('paymentMethod') as string || 'Cash'; paymentRef = data.get('paymentRef') as string || '';
   } else {
-    phone = data.phone;
-    categoryId = data.categoryId;
-    guestName = data.guestName;
-    notice = data.notice;
-    paymentMethod = data.paymentMethod || 'Cash';
-    paymentRef = data.paymentRef || '';
+    phone = data.phone; categoryId = data.categoryId; guestName = data.guestName; notice = data.notice; paymentMethod = data.paymentMethod || 'Cash'; paymentRef = data.paymentRef || '';
   }
 
-  const cat = db_lamp_categories.find(c => c.id === categoryId);
-  if(!cat) return { success: false, error: '未找到燈種類別' };
-  
-  const today = new Date();
-  const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
-  
   const templeId = await getDynamicTempleId();
 
-  const newRecord = {
-    id: `LMP-${Date.now()}`,
-    templeId,
-    phone,
-    guestName,
-    categoryId: cat.id,
-    categoryName: cat.name,
-    price: cat.price,
-    durationDays: cat.durationDays || 365,
-    notice: notice || '',
-    startDate: today.toISOString().split('T')[0],
-    expiryDate: exp.toISOString().split('T')[0],
-    status: 'Active',
-    paymentMethod,
-    paymentRef,
-    paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
-    createdAt: new Date().toISOString()
-  };
-
-  db_lamp_records.push(newRecord);
-  
-  // Also log to activities if possible
-  if (typeof db_activities !== 'undefined') {
-    db_activities.push({ 
-      phone, 
-      timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], 
-      type: '點燈', 
-      content: `成功安奉 ${cat.name}` 
-    });
-  }
-  
-  revalidatePath('/temple/lamps');
-  revalidatePath('/temple/customers');
-  revalidatePath('/');
-  return { success: true, record: newRecord }; 
+  return withTempleSession(templeId, false, async (client) => {
+    let cat: any = null;
+    if (!client) {
+      cat = db_lamp_categories.find((c: any) => c.id === categoryId && (!c.templeId || c.templeId === templeId));
+      if(!cat) return { success: false, error: '未找到燈種類別' };
+      const today = new Date();
+      const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
+      const newRecord = { id: `LMP-${Date.now()}`, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Active', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', createdAt: new Date().toISOString() };
+      db_lamp_records.push(newRecord);
+      if (typeof db_activities !== 'undefined') db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
+    } else {
+      const catRes = await client.query('SELECT name, price FROM lamp_categories WHERE id = $1 AND temple_id = $2', [categoryId, templeId]);
+      if (catRes.rowCount === 0) return { success: false, error: '未找到燈種類別' };
+      cat = catRes.rows[0];
+      const today = new Date();
+      const newId = `LMP-${Date.now()}`;
+      await client.query('INSERT INTO lamp_records (id, temple_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [newId, templeId, guestName, phone, cat.name, cat.price, 'Active', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending']
+      );
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
 }
 export async function checkLampNotifications() { return { hasNotification: false }; }
 export async function saveLampCategory(data: any) { 
   const id = data.id;
   const templeId = await getDynamicTempleId();
-  if (id) {
-    const idx = db_lamp_categories.findIndex(c => c.id === id);
-    if (idx > -1) db_lamp_categories[idx] = { ...db_lamp_categories[idx], ...data, templeId };
-  } else {
-    db_lamp_categories.push({ id: `cat-${Date.now()}`, ...data, totalSlots: data.totalSlots || 500, templeId });
-  }
-  revalidatePath('/temple/lamps');
-  return { success: true }; 
-}
-
-export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
-  if (recordType === 'Lamp') {
-    const idx = db_lamp_records.findIndex(r => r.id === recordId);
-    if (idx > -1) {
-      db_lamp_records[idx].status = 'Active';
-      db_lamp_records[idx].paymentStatus = 'Paid';
-    }
-  }
-  if (recordType === 'Appointment') {
-    const idx = db_appointments.findIndex(r => r.id.toString() === recordId.toString());
-    if (idx > -1) {
-      db_appointments[idx].status = 'Confirmed';
-      db_appointments[idx].paymentStatus = 'Paid';
-    }
-  }
-  if (recordType === 'Event') {
-    const idx = db_event_registrations.findIndex(r => r.id === recordId);
-    if (idx > -1) {
-      db_event_registrations[idx].paymentStatus = 'Paid';
-    }
-  }
-  if (recordType === 'Queue') {
-    if (typeof db_queue_tickets !== 'undefined') {
-      const idx = db_queue_tickets.findIndex(r => r.id === recordId);
-      if (idx > -1) {
-        db_queue_tickets[idx].paymentStatus = 'Paid';
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      if (id) {
+        const idx = db_lamp_categories.findIndex(c => c.id === id);
+        if (idx > -1) db_lamp_categories[idx] = { ...db_lamp_categories[idx], ...data, templeId };
+      } else {
+        db_lamp_categories.push({ id: `cat-${Date.now()}`, ...data, totalSlots: data.totalSlots || 500, templeId });
+      }
+    } else {
+      if (id) {
+        await client.query(
+          'UPDATE lamp_categories SET name = $1, description = $2, duration_days = $3, total_slots = $4, price = $5 WHERE id = $6 AND temple_id = $7',
+          [data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, id, templeId]
+        );
+      } else {
+        await client.query(
+          'INSERT INTO lamp_categories (id, temple_id, name, description, duration_days, total_slots, price) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [`cat-${Date.now()}`, templeId, data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0]
+        );
       }
     }
-  }
-  revalidatePath('/');
-  revalidatePath('/[templeId]/admin/customers');
-  return { success: true };
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 
 export async function deleteLampCategory(id: string) { 
-  const hasRecords = db_lamp_records.some(r => r.categoryId === id);
-  if (hasRecords) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
-  db_lamp_categories = gStore.db_lamp_categories = db_lamp_categories.filter(c => c.id !== id);
-  revalidatePath('/temple/lamps');
-  return { success: true }; 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const hasRecords = db_lamp_records.some(r => r.categoryId === id);
+      if (hasRecords) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
+      db_lamp_categories = gStore.db_lamp_categories = db_lamp_categories.filter(c => c.id !== id);
+    } else {
+      const hasRecords = await client.query('SELECT 1 FROM lamp_records WHERE category_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
+      if (hasRecords.rowCount && hasRecords.rowCount > 0) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
+      await client.query('DELETE FROM lamp_categories WHERE id = $1 AND temple_id = $2', [id, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 export async function renewLampRecord(id: string) { return { success: true }; }
 
@@ -3737,148 +4115,266 @@ export type QueueEvent = any;
 
 // Removed redundant initialization block
 
-export async function fetchQueueEvents() { const templeId = await getDynamicTempleId(); 
-  return db_queue_events.filter(e => !e.templeId || e.templeId === templeId).map(evt => {
-    const participantCount = db_queue_tickets.filter(t => t.eventId === evt.id && t.status === 'Queuing').length;
-    return { ...evt, participantCount };
+export async function fetchQueueEvents() {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return db_queue_events.filter(e => !e.templeId || e.templeId === templeId).map(evt => {
+        const participantCount = db_queue_tickets.filter(t => t.eventId === evt.id && t.status === 'Queuing').length;
+        return { ...evt, participantCount };
+      });
+    } else {
+      await client.query(`CREATE TABLE IF NOT EXISTS queue_events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), start_time VARCHAR(50), end_time VARCHAR(50), location VARCHAR(255), service_type VARCHAR(255), price INTEGER, max_capacity INTEGER, status VARCHAR(50))`);
+      const res = await client.query('SELECT * FROM queue_events WHERE temple_id = $1 ORDER BY date DESC, start_time DESC', [templeId]);
+      
+      const counts = await client.query('SELECT event_id, COUNT(*) as count FROM queue_tickets WHERE temple_id = $1 AND status = \'Queuing\' GROUP BY event_id', [templeId]);
+      const countMap = counts.rows.reduce((acc, r) => ({...acc, [r.event_id]: parseInt(r.count)}), {});
+      
+      return res.rows.map(r => ({
+        id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time,
+        location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status,
+        participantCount: countMap[r.id] || 0
+      }));
+    }
   });
 }
-export async function fetchActiveQueues() { const templeId = await getDynamicTempleId(); return db_queue_events.filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)); }
-export async function fetchQueueDashboard(eventId?: string) { 
-  if (!eventId) return { tickets: [] };
-  return { tickets: db_queue_tickets.filter(t => t.eventId === eventId) }; 
+export async function fetchActiveQueues() {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return db_queue_events.filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
+    const res = await client.query('SELECT * FROM queue_events WHERE status = \'Active\' AND temple_id = $1', [templeId]);
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time, location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status }));
+  });
 }
-
+export async function fetchQueueDashboard(eventId?: string) {
+  if (!eventId) return { tickets: [] };
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) return { tickets: db_queue_tickets.filter(t => t.eventId === eventId) };
+    const res = await client.query('SELECT * FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
+    return { tickets: res.rows.map(r => ({
+      id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title, phone: r.phone, guestName: r.guest_name,
+      status: r.status, assignedNumber: r.assigned_number, createdAt: r.created_at, scannedAt: r.scanned_at, actualOrder: r.actual_order
+    })) };
+  });
+}
 // 獲取當前活動以掃碼正在排隊的人數
-export async function fetchActiveQueueCount(): Promise<number> { const templeId = await getDynamicTempleId();
-  const activeEventIds = db_queue_events.filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)).map(e => e.id);
-  if (activeEventIds.length === 0) return 0;
-  return db_queue_tickets.filter(t => activeEventIds.includes(t.eventId) && t.status === 'Queuing').length;
+export async function fetchActiveQueueCount(): Promise<number> {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const activeEventIds = db_queue_events.filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)).map(e => e.id);
+      if (activeEventIds.length === 0) return 0;
+      return db_queue_tickets.filter(t => activeEventIds.includes(t.eventId) && t.status === 'Queuing').length;
+    } else {
+      const res = await client.query('SELECT COUNT(qt.id) as count FROM queue_tickets qt JOIN queue_events qe ON qt.event_id = qe.id WHERE qe.status = \'Active\' AND qt.status = \'Queuing\' AND qt.temple_id = $1', [templeId]);
+      return parseInt(res.rows[0].count) || 0;
+    }
+  });
 }
 
 export async function createQueueEvent(data: any) { 
   const templeId = await getDynamicTempleId(); 
-  
-  // Validation 1: Date must be > today
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (data.date <= todayStr) {
-    return { success: false, error: '只能部屬明日之後的活動。' };
-  }
+  return withTempleSession(templeId, false, async (client) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
 
-  // Validation 2: Time overlap
-  const overlapping = db_queue_events.find(e => 
-    e.templeId === templeId && 
-    e.date === data.date && 
-    e.status !== 'Cancelled' && 
-    (data.startTime < e.endTime && data.endTime > e.startTime)
-  );
-
-  if (overlapping) {
-    return { success: false, error: `同一日時段有重複（與 "${overlapping.title}" 衝突），無法部屬。` };
-  }
-
-  db_queue_events.push({ id: `qe-${Date.now()}`, ...data, templeId, status: 'Draft' });
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
-}
-
-export async function activateQueueEvent(id: string) { 
-  db_queue_events = gStore.db_queue_events = db_queue_events.map(e => e.id === id ? { ...e, status: 'Active' } : { ...e, status: e.status === 'Active' ? 'Completed' : e.status });
-  
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
-}
-
-export async function deleteQueueEvent(id: string) { 
-  const hasTickets = db_queue_tickets.some(t => t.eventId === id);
-  if (hasTickets) {
-    const idx = db_queue_events.findIndex(e => e.id === id);
-    if (idx > -1) {
-      db_queue_events[idx] = { ...db_queue_events[idx], status: 'Cancelled' };
-      gStore.db_queue_events = db_queue_events;
+    if (!client) {
+      db_queue_events.push({ id: `qe-${Date.now()}`, ...data, templeId, status: 'Draft' });
+    } else {
+      await client.query('INSERT INTO queue_events (id, temple_id, title, date, start_time, end_time, location, service_type, price, max_capacity, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Draft']);
     }
-  } else {
-    db_queue_events = gStore.db_queue_events = db_queue_events.filter(e => e.id !== id);
-    db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.filter(t => t.eventId !== id);
-  }
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
-}
-
-export async function checkInWithQr(ticketId: string, eventId?: string) { 
-  const ticket = db_queue_tickets.find(t => t.id === ticketId);
-  if (!ticket) return { success: false, error: '找不到票券' };
-  if (ticket.status !== 'Registered') return { success: false, error: '票券狀態不正確' };
-  if (eventId && ticket.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
-
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => {
-    if (t.id === ticketId) {
-      const qCount = db_queue_tickets.filter(x => x.eventId === t.eventId && (x.status === 'Queuing' || x.status === 'Calling' || x.status === 'Completed')).length + 1;
-      return { ...t, status: 'Queuing', actualOrder: qCount, scannedAt: new Date().toLocaleTimeString() };
-    }
-    return t;
+    await revalidateTemple();
+    return { success: true };
   });
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
+}
+
+export async function updateQueueEvent(id: string, data: any) { 
+  const templeId = await getDynamicTempleId(); 
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const idx = db_queue_events.findIndex(e => e.id === id);
+      if (idx !== -1) {
+        db_queue_events[idx] = { ...db_queue_events[idx], ...data };
+      }
+    } else {
+      await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
+        [data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, id, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+export async function activateQueueEvent(id: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      db_queue_events = gStore.db_queue_events = db_queue_events.map((e: any) => {
+        if (e.id === id) {
+          return { ...e, status: e.status === 'Active' ? 'Draft' : 'Active' };
+        }
+        return e;
+      });
+    } else {
+      // Toggle status between Active and Draft
+      const res = await client.query('SELECT status FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      if (res.rows.length > 0) {
+        const newStatus = res.rows[0].status === 'Active' ? 'Draft' : 'Active';
+        await client.query('UPDATE queue_events SET status = $1 WHERE id = $2 AND temple_id = $3', [newStatus, id, templeId]);
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+export async function deleteQueueEvent(id: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const hasTickets = db_queue_tickets.some((t: any) => t.eventId === id && (!t.templeId || t.templeId === templeId));
+      if (hasTickets) {
+        db_queue_events = gStore.db_queue_events = db_queue_events.map((e: any) => e.id === id ? { ...e, status: 'Cancelled' } : e);
+      } else {
+        db_queue_events = gStore.db_queue_events = db_queue_events.filter((e: any) => !(e.id === id && (!e.templeId || e.templeId === templeId)));
+      }
+    } else {
+      const tRes = await client.query('SELECT 1 FROM queue_tickets WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
+      if (tRes.rowCount > 0) {
+        await client.query('UPDATE queue_events SET status = \'Cancelled\' WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      } else {
+        await client.query('DELETE FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+export async function checkInWithQr(ticketId: string, eventId?: string) { 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const ticket = db_queue_tickets.find(t => t.id === ticketId);
+      if (!ticket) return { success: false, error: '找不到票券' };
+      if (ticket.status !== 'Registered' && ticket.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
+      if (eventId && ticket.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
+
+      const qCount = db_queue_tickets.filter(x => x.eventId === ticket.eventId && (x.status === 'Queuing' || x.status === 'Calling' || x.status === 'Completed')).length + 1;
+      ticket.status = 'Queuing';
+      ticket.actualOrder = qCount;
+      ticket.scannedAt = new Date().toLocaleTimeString();
+    } else {
+      const tRes = await client.query('SELECT * FROM queue_tickets WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
+      if (tRes.rowCount === 0) return { success: false, error: '找不到票券' };
+      const t = tRes.rows[0];
+      if (t.status !== 'Registered' && t.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
+      if (eventId && t.event_id !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
+
+      const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [t.event_id, templeId]);
+      const actualOrder = parseInt(orderRes.rows[0].count) + 1;
+      await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, ticketId]);
+    }
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 
 export async function callNextInQueue(eventId: string) { 
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.eventId === eventId && t.status === 'Calling' ? { ...t, status: 'Completed' } : t);
-  const nextTicket = db_queue_tickets.slice().sort((a,b) => a.actualOrder - b.actualOrder).find(t => t.eventId === eventId && t.status === 'Queuing');
-  if (!nextTicket) return { error: 'NO_ONE_IN_QUEUE' };
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === nextTicket.id ? { ...t, status: 'Calling' } : t);
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.eventId === eventId && t.status === 'Calling' ? { ...t, status: 'Completed' } : t);
+      const nextTicket = db_queue_tickets.slice().sort((a,b) => (a.actualOrder||999) - (b.actualOrder||999)).find(t => t.eventId === eventId && t.status === 'Queuing');
+      if (!nextTicket) return { error: 'NO_ONE_IN_QUEUE' };
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === nextTicket.id ? { ...t, status: 'Calling' } : t);
+    } else {
+      await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE event_id = $1 AND status = \'Calling\' AND temple_id = $2', [eventId, templeId]);
+      const nextRes = await client.query('SELECT id FROM queue_tickets WHERE event_id = $1 AND status = \'Queuing\' AND temple_id = $2 ORDER BY actual_order ASC LIMIT 1', [eventId, templeId]);
+      if (nextRes.rowCount === 0) return { error: 'NO_ONE_IN_QUEUE' };
+      await client.query('UPDATE queue_tickets SET status = \'Calling\' WHERE id = $1', [nextRes.rows[0].id]);
+    }
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 
 export async function completeQueueService(ticketId: string) { 
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === ticketId ? { ...t, status: 'Completed' } : t);
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === ticketId ? { ...t, status: 'Completed' } : t);
+    } else {
+      await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 
 export async function updateQueueStatus(ticketId: string, status: string) { 
-  db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === ticketId ? { ...t, status } : t);
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true }; 
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === ticketId ? { ...t, status } : t);
+    } else {
+      await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', [status, ticketId, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true }; 
+  });
 }
 
 export async function registerGuestForQueue(eventId: string, data: { guestName: string, phone: string, isOnline?: boolean }) {
-  const event = db_queue_events.find(e => e.id === eventId);
-  if (!event) return { error: 'EVENT_NOT_FOUND' };
-  
-  const eventTickets = db_queue_tickets.filter(t => t.eventId === eventId);
-  
-  // Capacity check
-  if (event.maxCapacity && eventTickets.length >= event.maxCapacity) {
-    return { error: '活動預約已額滿！' };
-  }
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    let newTicket: any;
+    if (!client) {
+      const event = db_queue_events.find(e => e.id === eventId);
+      if (!event) return { error: 'EVENT_NOT_FOUND' };
+      const eventTickets = db_queue_tickets.filter(t => t.eventId === eventId);
+      if (event.maxCapacity && eventTickets.length >= event.maxCapacity) return { error: '活動預約已額滿！' };
 
-  const nextNumber = `A${(eventTickets.length + 1).toString().padStart(3, '0')}`;
-  
-  const newTicket = {
-    id: `t-${Date.now()}`,
-    eventId,
-    status: data.isOnline ? 'Registered' : 'Queuing', 
-    assignedNumber: nextNumber,
-    guestName: data.guestName,
-    phone: data.phone,
-    actualOrder: data.isOnline ? null : eventTickets.filter(t => t.status === 'Queuing' || t.status === 'Calling' || t.status === 'Completed').length + 1,
-    scannedAt: data.isOnline ? null : new Date().toLocaleTimeString()
-  };
-  
-  db_queue_tickets.push(newTicket);
-  gStore.db_queue_tickets = db_queue_tickets;
-  revalidatePath('/temple/queue');
-  revalidatePath('/live-queue');
-  return { success: true, ticket: newTicket };
+      const nextNumber = `A${(eventTickets.length + 1).toString().padStart(3, '0')}`;
+      newTicket = {
+        id: `t-${Date.now()}`,
+        eventId,
+        status: data.isOnline ? 'Registered' : 'Queuing', 
+        assignedNumber: nextNumber,
+        guestName: data.guestName,
+        phone: data.phone,
+        actualOrder: data.isOnline ? null : eventTickets.filter(t => t.status === 'Queuing' || t.status === 'Calling' || t.status === 'Completed').length + 1,
+        scannedAt: data.isOnline ? null : new Date().toLocaleTimeString()
+      };
+      db_queue_tickets.push(newTicket);
+      gStore.db_queue_tickets = db_queue_tickets;
+    } else {
+      const evRes = await client.query('SELECT title, capacity FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
+      if (evRes.rowCount === 0) return { error: 'EVENT_NOT_FOUND' };
+      const ev = evRes.rows[0];
+      
+      const ticketsRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
+      const totalTickets = parseInt(ticketsRes.rows[0].count);
+      if (ev.capacity && ev.capacity > 0 && totalTickets >= ev.capacity) return { error: '活動預約已額滿！' };
+
+      const nextNumber = `A${(totalTickets + 1).toString().padStart(3, '0')}`;
+      const newId = `t-${Date.now()}`;
+      
+      let actualOrder = null;
+      let scannedAt = null;
+      if (!data.isOnline) {
+        const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [eventId, templeId]);
+        actualOrder = parseInt(orderRes.rows[0].count) + 1;
+        scannedAt = new Date().toLocaleTimeString();
+      }
+
+      await client.query('INSERT INTO queue_tickets (id, event_id, temple_id, event_title, phone, guest_name, status, assigned_number, actual_order, scanned_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [newId, eventId, templeId, ev.title, data.phone, data.guestName, data.isOnline ? 'Registered' : 'Queuing', nextNumber, actualOrder, scannedAt, new Date().toISOString()]
+      );
+      newTicket = { id: newId };
+    }
+    await revalidateTemple();
+    return { success: true, ticket: newTicket };
+  });
 }
 
 // --- 財務與結算 (Billing) 相關 mock 函式與型別 ---
@@ -3893,8 +4389,8 @@ export async function rejectFreeAccount(id: string) { return { success: true }; 
 export async function completeMeritPayment(phone: string, recordId: string, amount: number, service: string) {
   // Mock implementation: just log it and return success
   console.log(`[MERIT PAYMENT] Phone: ${phone}, ID: ${recordId}, Amount: ${amount}, Service: ${service}`);
-  revalidatePath('/temple/customers');
-  return { success: true };
+  await revalidateTemple();
+    return { success: true };
 }
 
 // -------------------------------------------------------------------------
@@ -4037,7 +4533,7 @@ export async function createPricePlan(plan: any) {
         VALUES ($1, $2, $3, $4, $5, $6, $7)
       `, [newId, 'dist-1', plan.name, Number(plan.setupFee || 0), Number(plan.monthlyFee || 0), Boolean(plan.isFree), Number(plan.freeMonths || 0)]);
     }
-    revalidatePath('/temple/my-network');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -4114,7 +4610,7 @@ export async function submitTempleApplication(data: any) {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [newId, data.templeName, data.contactPerson || '聯絡人', data.contactPhone || '', data.planId, setupFee, monthlyFee, 'Pending', 'sales-1']);
     }
-    revalidatePath('/temple/my-network');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -4168,7 +4664,7 @@ export async function approveTempleApplication(appId: string) {
         VALUES ($1, $2, $3, $4, $5)
       `, [newTempleId, 0, 5368709120, '標準免費空間', '台北市']);
     }
-    revalidatePath('/temple/my-network');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -4222,8 +4718,7 @@ export async function createNotification(title: string, content: string, sendTim
       `, [newId, templeId, title, content, newNotif.sendTime, newNotif.createdAt]);
     }
 
-    revalidatePath('/');
-    revalidatePath('/temple/notifications');
+    await revalidateTemple();
     return { success: true };
   });
 }
@@ -4429,8 +4924,7 @@ export async function updateAppointmentPayment(appId: number, paymentMethod: str
       db_appointments[idx].status = 'Pending';
     }
     
-    revalidatePath('/');
-    revalidatePath('/[templeId]/admin/calendar');
+    await revalidateTemple();
     return { success: true };
   });
 }

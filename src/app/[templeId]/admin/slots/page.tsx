@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchAvailableSlots, createSlot, removeSingleSlot, analyzeAffectedAppointments, executeEmergencyReschedule, fetchPersonnel, getCurrentRole, AppRole, fetchServiceDefinitions } from '@/app/actions';
+import { fetchAvailableSlots, createSlot, updateSlot, removeSingleSlot, analyzeAffectedAppointments, executeEmergencyReschedule, fetchPersonnel, getCurrentRole, AppRole, fetchServiceDefinitions } from '@/app/actions';
 
 export default function AdminSlotsPage() {
   const [slots, setSlots] = useState<any[]>([]);
@@ -16,6 +16,10 @@ export default function AdminSlotsPage() {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState("");
+
+  // 單筆編輯狀態
+  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
 
   // 突發請假智能調度狀態
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
@@ -151,6 +155,41 @@ export default function AdminSlotsPage() {
     if(confirm("確定要取消此日時段嗎？")) {
       await removeSingleSlot(id);
       loadSlots();
+    }
+  };
+
+  const handleEditSlotClick = (slotId: number) => {
+    const slot = slots.find(s => s.id === slotId);
+    if (slot) {
+      setEditFormData({
+        date: slot.date,
+        time: slot.time,
+        staff: slot.staff,
+        location: slot.location,
+        description: slot.description,
+        price: slot.price,
+        serviceId: slot.bound_service_id || slot.serviceId
+      });
+      setEditingSlotId(slotId);
+    }
+  };
+
+  const handleEditSlotSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingSlotId) return;
+    setIsSubmitting(true);
+    const fd = new FormData(e.currentTarget);
+    try {
+      const res = await updateSlot(editingSlotId, fd);
+      if (res.success) {
+        setEditingSlotId(null);
+        await loadSlots();
+        alert('✅ 時段已成功更新！');
+      }
+    } catch(err) {
+      alert("❌ 更新失敗，請稍後再試。");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -390,7 +429,10 @@ export default function AdminSlotsPage() {
                                            <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full group-hover/date:animate-ping"></span>
                                            <span className="tracking-widest font-mono">{dObj.date}</span>
                                         </div>
-                                        <button onClick={() => handleRemoveSlot(dObj.id)} className="w-10 h-10 rounded-2xl text-slate-200 hover:bg-rose-500 hover:text-white transition-all shadow-inner flex items-center justify-center font-bold text-lg">✕</button>
+                                        <div className="flex gap-2">
+                                           <button onClick={() => handleEditSlotClick(dObj.id)} className="w-10 h-10 rounded-2xl text-slate-400 hover:bg-amber-500 hover:text-white transition-all shadow-inner flex items-center justify-center font-bold text-lg" title="編輯時段">✏️</button>
+                                           <button onClick={() => handleRemoveSlot(dObj.id)} className="w-10 h-10 rounded-2xl text-slate-200 hover:bg-rose-500 hover:text-white transition-all shadow-inner flex items-center justify-center font-bold text-lg" title="刪除時段">✕</button>
+                                        </div>
                                      </div>
                                   ))}
                                </div>
@@ -403,6 +445,63 @@ export default function AdminSlotsPage() {
             </div>
          </div>
       </div>
+
+      {/* Edit Slot Modal */}
+      {editingSlotId !== null && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <h3 className="font-bold text-slate-900 uppercase tracking-widest text-lg">編輯單一時段</h3>
+                 <button onClick={() => setEditingSlotId(null)} className="text-slate-400 hover:text-slate-600 text-2xl font-bold">×</button>
+              </div>
+              <form onSubmit={handleEditSlotSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                       <label className="text-xs font-black text-slate-500 uppercase tracking-widest">日期</label>
+                       <input type="date" name="date" defaultValue={editFormData.date} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-xs font-black text-slate-500 uppercase tracking-widest">時間</label>
+                       <input type="time" name="time" defaultValue={editFormData.time} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none" />
+                    </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                       <label className="text-xs font-black text-slate-500 uppercase tracking-widest">服務老師</label>
+                       <select name="staff" defaultValue={editFormData.staff} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none">
+                          {serviceStaffs.map(staff => <option key={staff.id} value={staff.name}>{staff.name} 老師</option>)}
+                          <option value="未指定">未指定</option>
+                       </select>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-xs font-black text-slate-500 uppercase tracking-widest">功德金</label>
+                       <input type="number" name="price" defaultValue={editFormData.price} min="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none" />
+                    </div>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">地點</label>
+                    <input type="text" name="location" defaultValue={editFormData.location} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">服務項目</label>
+                    <select name="serviceId" defaultValue={editFormData.serviceId} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none">
+                       {availableServices.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">說明 / 注意事項</label>
+                    <textarea name="description" defaultValue={editFormData.description} rows={3} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:border-indigo-600 outline-none resize-none"></textarea>
+                 </div>
+                 <div className="pt-4 border-t border-slate-100 flex gap-4">
+                    <button type="button" onClick={() => setEditingSlotId(null)} className="flex-1 py-3 bg-white text-slate-600 font-black rounded-xl border border-slate-200 hover:bg-slate-50">取消</button>
+                    <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 disabled:opacity-50 tracking-widest uppercase">
+                       {isSubmitting ? "更新中..." : "儲存更新"}
+                    </button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
 
       {/* Emergency Modal */}
       {showEmergencyModal && (
