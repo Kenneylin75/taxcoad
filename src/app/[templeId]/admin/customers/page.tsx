@@ -375,15 +375,28 @@ function DeepFileCenterContent() {
                  <button onClick={() => setShowAddModal(true)} className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">編輯資料</button>
               </div>
               <nav className="flex gap-8 overflow-x-auto scrollbar-hide w-full">
-{[{ id: 'appointments', label: '預約' }, { id: 'lamps', label: '點燈' }, { id: 'media', label: '媒體' }, { id: 'history', label: '紀錄' }, { id: 'merit', label: '功德' }, { id: 'account', label: '帳號' }].map((tab) => (<button key={tab.id} onClick={() => setGuestSubTab(tab.id as any)} className={`pb-4 text-sm font-medium transition-colors border-b-2 ${guestSubTab === tab.id ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>{tab.label}</button>))}</nav>
+{[{ id: 'appointments', label: '預約' }, { id: 'lamps', label: '點燈' }, { id: 'events', label: '活動' }, { id: 'queue', label: '排隊' }, { id: 'media', label: '媒體' }, { id: 'history', label: '紀錄' }, { id: 'merit', label: '功德' }, { id: 'account', label: '帳號' }].map((tab) => (<button key={tab.id} onClick={() => setGuestSubTab(tab.id as any)} className={`pb-4 text-sm font-medium transition-colors border-b-2 ${guestSubTab === tab.id ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>{tab.label}</button>))}</nav>
             </div>
 
             <div className="p-12 space-y-12 max-w-5xl">
                {/* Quick Info */}
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 py-8 border-b border-slate-100">
-                  <div className="space-y-2"><p className="text-xs font-medium text-slate-400">聯絡電話</p><p className="text-base text-slate-900">{selectedGuest.phone}</p></div>
-                  <div className="space-y-2"><p className="text-xs font-medium text-slate-400">生辰案卷</p><div className="flex items-center gap-3"><span className="text-base text-slate-900">{selectedGuest.birthday || '未提供'}</span><span className="text-sm text-slate-500">{selectedGuest.lunarBirthday || ''}</span></div></div>
-                  <div className="space-y-2"><p className="text-xs font-medium text-slate-400">通訊地址</p><p className="text-base text-slate-900">{selectedGuest.address || '未提供'}</p></div>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 py-8 border-b border-slate-100 relative group">
+                  <div onClick={() => setShowAddModal(true)} className="absolute right-0 top-0 flex items-center justify-center gap-2 cursor-pointer bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all opacity-0 group-hover:opacity-100">
+                     <span className="text-sm">✏️</span>
+                     <span className="text-xs font-bold uppercase tracking-widest">快速修改資料</span>
+                  </div>
+                  <div className="space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                     <p className="text-xs font-medium text-slate-400 flex items-center gap-2">聯絡電話 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                     <p className="text-base text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.phone}</p>
+                  </div>
+                  <div className="space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                     <p className="text-xs font-medium text-slate-400 flex items-center gap-2">生辰案卷 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                     <div className="flex items-center gap-3"><span className="text-base text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.birthday || '未提供'}</span><span className="text-sm text-slate-500">{selectedGuest.lunarBirthday || ''}</span></div>
+                  </div>
+                  <div className="space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                     <p className="text-xs font-medium text-slate-400 flex items-center gap-2">通訊地址 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                     <p className="text-base text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.address || '未提供'}</p>
+                  </div>
                </div>
 
                {/* TAB: 點燈 (關鍵連動與視覺同步) */}
@@ -416,7 +429,7 @@ function DeepFileCenterContent() {
                                   <div className="flex justify-between items-end">
                                      <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p><p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p></div>
                                      <div className="flex gap-2">
-                                     {lamp.paymentStatus === 'Pending' && (
+                                     {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid') && (
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定已收取現金並標記為已付款？')) {
@@ -524,7 +537,7 @@ function DeepFileCenterContent() {
                                         </button>
                                       )}
                                       
-                                      {event.paymentStatus === 'Pending' && event.paymentMethod === 'Cash' && (
+                                      {(event.paymentStatus === 'Pending' || event.paymentStatus === 'Unpaid') && (
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定已收取現金並標記為已付款？')) {
@@ -546,6 +559,78 @@ function DeepFileCenterContent() {
                              </div>
                            );
                         })}
+                     </div>
+                  </div>
+               )}
+
+               {guestSubTab === 'events' && (
+                  <div className="space-y-6 animate-in fade-in duration-500">
+                     <h3 className="text-lg font-bold text-slate-900">法會活動報名紀錄</h3>
+                     <div className="space-y-4">
+                        {history.eventRegistrations?.length > 0 ? history.eventRegistrations.map((evt: any) => (
+                           <div key={evt.id} className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                              <div>
+                                 <h4 className="text-base font-bold text-slate-900">{evt.title}</h4>
+                                 <p className="text-sm text-slate-500 mt-1">結緣金：{evt.price > 0 ? `$${evt.price}` : '隨喜'}</p>
+                              </div>
+                              <div className="flex gap-4 items-center">
+                                 {(evt.paymentStatus === 'Pending' || evt.paymentStatus === 'Unpaid') && (
+                                    <button 
+                                      onClick={async () => {
+                                        if (confirm('確定已收取現金並標記為已付款？')) {
+                                          await import('@/app/actions').then(m => m.confirmPayment(evt.id, 'Event'));
+                                          if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                        }
+                                      }}
+                                      className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
+                                    >
+                                      💵 標記為已付款
+                                    </button>
+                                 )}
+                                 {evt.paymentStatus === 'Paid' && (
+                                    <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>
+                                 )}
+                              </div>
+                           </div>
+                        )) : (
+                          <div className="p-10 text-center opacity-40 font-bold text-sm">無活動紀錄</div>
+                        )}
+                     </div>
+                  </div>
+               )}
+
+               {guestSubTab === 'queue' && (
+                  <div className="space-y-6 animate-in fade-in duration-500">
+                     <h3 className="text-lg font-bold text-slate-900">排隊號碼牌紀錄</h3>
+                     <div className="space-y-4">
+                        {history.queueTickets?.length > 0 ? history.queueTickets.map((tix: any) => (
+                           <div key={tix.id} className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center justify-between shadow-sm">
+                              <div>
+                                 <h4 className="text-base font-bold text-slate-900">{tix.eventTitle}</h4>
+                                 <p className="text-sm text-slate-500 mt-1">號碼牌：<span className="font-mono font-bold text-indigo-600 text-lg">{tix.assignedNumber}</span></p>
+                              </div>
+                              <div className="flex gap-4 items-center">
+                                 {(tix.paymentStatus === 'Pending' || tix.paymentStatus === 'Unpaid') && (
+                                    <button 
+                                      onClick={async () => {
+                                        if (confirm('確定已收取現金並標記為已付款？')) {
+                                          await import('@/app/actions').then(m => m.confirmPayment(tix.id, 'Queue'));
+                                          if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                        }
+                                      }}
+                                      className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
+                                    >
+                                      💵 標記為已付款
+                                    </button>
+                                 )}
+                                 {tix.paymentStatus === 'Paid' && (
+                                    <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>
+                                 )}
+                              </div>
+                           </div>
+                        )) : (
+                          <div className="p-10 text-center opacity-40 font-bold text-sm">無排隊紀錄</div>
+                        )}
                      </div>
                   </div>
                )}

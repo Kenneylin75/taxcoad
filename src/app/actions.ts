@@ -216,6 +216,8 @@ export async function loginAccount(formData: FormData) {
          } catch(e) { console.error("Log error", e); }
       }
     });
+    
+    await logSystemEvent('INFO', '帳號登入', logMsg, loggedInName, redirectPath.split('/')[1] || 'hq');
 
     return { success: true, redirectPath, role: assignedRole };
   }
@@ -677,6 +679,7 @@ export async function fetchServiceDefinitions() {
           PRIMARY KEY (id, temple_id)
         )
       `);
+      await client.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0');
       const res = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
       if (res.rowCount === 0) {
         // Seed default services
@@ -694,9 +697,9 @@ export async function fetchServiceDefinitions() {
           );
         }
         const retryRes = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
-        return retryRes.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
+        return retryRes.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
       }
-      return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
+      return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
     }
   });
 }
@@ -732,6 +735,7 @@ export async function saveServiceDefinition(data: any) {
       }
     }
     await revalidateTemple();
+    await logSystemEvent('SUCCESS', '設定服務項目', `服務名稱：${data.name}`, '管理員', templeId);
     return { success: true };
   });
 }
@@ -1208,7 +1212,14 @@ export async function fetchServiceSettings() {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       const s = db_service_settings_mock.find(x => x.templeId === templeId);
-      return s || { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [] };
+      return s || { 
+        cancelHoursBefore: 24, 
+        modifyHoursBefore: 24, 
+        allowCancel: true, 
+        allowModify: true, 
+        pushConfigs: [],
+        modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true }
+      };
     }
     await client.query(`
       CREATE TABLE IF NOT EXISTS temple_settings (
@@ -1220,6 +1231,7 @@ export async function fetchServiceSettings() {
     if (res.rowCount > 0) {
       const s = res.rows[0].settings;
       return {
+        ...s,
         cancelHoursBefore: s.cancelHoursBefore ?? 24,
         modifyHoursBefore: s.modifyHoursBefore ?? 24,
         allowCancel: s.allowCancel ?? true,
@@ -1227,7 +1239,7 @@ export async function fetchServiceSettings() {
         pushConfigs: s.pushConfigs || []
       };
     }
-    return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [] };
+    return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
   });
 }
 
@@ -1352,15 +1364,103 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
 }
 export async function fetchGuestRegistrations(p: any) {
   const templeId = await getDynamicTempleId();
-  return db_event_registrations.filter(r => normCompare(r.phone, p) && (!r.templeId || r.templeId === templeId));
+  const normPhone = (p || '').replace(/[- ]/g, '');
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return db_event_registrations.filter(r => normCompare(r.phone, p) && (!r.templeId || r.templeId === templeId));
+    } else {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS event_registrations (
+          id VARCHAR(50) PRIMARY KEY,
+          event_id VARCHAR(50),
+          temple_id VARCHAR(50),
+          title VARCHAR(255),
+          phone VARCHAR(50),
+          guest_name VARCHAR(255),
+          price INTEGER,
+          payment_status VARCHAR(50),
+          actual_price INTEGER,
+          timestamp VARCHAR(50)
+        )
+      `);
+      const res = await client.query(`
+        SELECT * FROM event_registrations 
+        WHERE REPLACE(REPLACE(phone, '-', ''), ' ', '') = REPLACE(REPLACE($1, '-', ''), ' ', '')
+        AND temple_id = $2
+        ORDER BY timestamp DESC
+      `, [normPhone, templeId]);
+      
+      return res.rows.map(r => ({
+        id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone,
+        guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status,
+        actualPrice: r.actual_price, timestamp: r.timestamp
+      }));
+    }
+  });
 }
 export async function fetchGuestQueueTickets(p: any) {
   const templeId = await getDynamicTempleId();
-  return db_queue_tickets.filter((t: any) => normCompare(t.phone, p) && (!t.templeId || t.templeId === templeId));
+  const normPhone = (p || '').replace(/[- ]/g, '');
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return db_queue_tickets.filter((t: any) => normCompare(t.phone, p) && (!t.templeId || t.templeId === templeId));
+    } else {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS queue_tickets (
+          id VARCHAR(50) PRIMARY KEY,
+          event_id VARCHAR(50),
+          temple_id VARCHAR(50),
+          event_title VARCHAR(255),
+          phone VARCHAR(50),
+          guest_name VARCHAR(255),
+          status VARCHAR(50),
+          assigned_number VARCHAR(50),
+          payment_status VARCHAR(50),
+          created_at VARCHAR(50)
+        )
+      `);
+      const res = await client.query(`
+        SELECT * FROM queue_tickets 
+        WHERE REPLACE(REPLACE(phone, '-', ''), ' ', '') = REPLACE(REPLACE($1, '-', ''), ' ', '')
+        AND temple_id = $2
+        ORDER BY created_at DESC
+      `, [normPhone, templeId]);
+      
+      return res.rows.map(r => ({
+        id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title,
+        phone: r.phone, guestName: r.guest_name, status: r.status, assignedNumber: r.assigned_number,
+        paymentStatus: r.payment_status, createdAt: r.created_at
+      }));
+    }
+  });
 }
 export async function fetchGuestLampRecords(p: any) {
   const templeId = await getDynamicTempleId();
-  return db_lamp_records.filter(l => normCompare(l.phone, p) && (!l.templeId || l.templeId === templeId));
+  const normPhone = (p || '').replace(/[- ]/g, '');
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return db_lamp_records.filter(l => normCompare(l.phone, p) && (!l.templeId || l.templeId === templeId));
+    } else {
+      await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
+      const res = await client.query(`
+        SELECT * FROM lamp_records 
+        WHERE REPLACE(REPLACE(phone, '-', ''), ' ', '') = REPLACE(REPLACE($1, '-', ''), ' ', '')
+        AND temple_id = $2
+        ORDER BY created_at DESC
+      `, [normPhone, templeId]);
+      
+      return res.rows.map(r => {
+        const start = new Date(r.created_at);
+        const exp = new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000));
+        return {
+          id: r.id, templeId: r.temple_id, guestName: r.guest_name, phone: r.phone,
+          categoryName: r.lamp_type, price: r.amount, status: r.status,
+          startDate: start.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0],
+          paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status, createdAt: r.created_at
+        };
+      });
+    }
+  });
 }
 
 export async function joinQueue(eventId: any, phone: string, guestName: string, paymentMethod?: string) {
@@ -3460,6 +3560,7 @@ export async function createPersonnel(formData: FormData) {
       `, [newId, templeId, name, role, account, phone, password, 'Active', avatar, defaultPerms]);
     }
     await revalidateTemple();
+    await logSystemEvent('SUCCESS', '新增人員', `人員名稱：${name}`, '管理員', templeId);
     return { success: true };
   });
 }
@@ -4041,7 +4142,7 @@ export async function createLampRecord(data: any) {
       if(!cat) return { success: false, error: '未找到燈種類別' };
       const today = new Date();
       const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
-      const newRecord = { id: `LMP-${Date.now()}`, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Active', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', createdAt: new Date().toISOString() };
+      const newRecord = { id: `LMP-${Date.now()}`, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Active', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Unpaid', createdAt: new Date().toISOString() };
       db_lamp_records.push(newRecord);
       if (typeof db_activities !== 'undefined') db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
     } else {
@@ -4051,7 +4152,7 @@ export async function createLampRecord(data: any) {
       const today = new Date();
       const newId = `LMP-${Date.now()}`;
       await client.query('INSERT INTO lamp_records (id, temple_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [newId, templeId, guestName, phone, cat.name, cat.price, 'Active', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending']
+        [newId, templeId, guestName, phone, cat.name, cat.price, 'Active', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Unpaid']
       );
     }
     await revalidateTemple();
@@ -4178,10 +4279,10 @@ export async function createQueueEvent(data: any) {
     if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
 
     if (!client) {
-      db_queue_events.push({ id: `qe-${Date.now()}`, ...data, templeId, status: 'Draft' });
+      db_queue_events.push({ id: `qe-${Date.now()}`, ...data, templeId, status: 'Active' });
     } else {
       await client.query('INSERT INTO queue_events (id, temple_id, title, date, start_time, end_time, location, service_type, price, max_capacity, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Draft']);
+        [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Active']);
     }
     await revalidateTemple();
     return { success: true };
@@ -5047,9 +5148,47 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
   return { success: true };
 }
 
+export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS', action: string, target: string, operator: string, templeIdOverride?: string) {
+  const templeId = templeIdOverride || await getDynamicTempleId();
+  const timestamp = new Date().toLocaleString('zh-TW');
+  const newLog = { id: `log-${Date.now()}`, level, action, target, operator, timestamp, templeId };
+  
+  db_audit_logs.unshift(newLog);
+  if (gStore) gStore.db_audit_logs = db_audit_logs;
+
+  const { client } = await getDb();
+  if (client) {
+    try {
+      await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
+        id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
+      )`);
+      await client.query(
+        'INSERT INTO audit_logs (id, temple_id, level, action, target, operator, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [newLog.id, templeId, level, action, target, operator, timestamp]
+      );
+    } catch (e) { console.error('Error logging system event', e); }
+  }
+}
+
 export async function fetchAuditLogs() {
   const templeId = await getDynamicTempleId();
-  return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
+  const { client } = await getDb();
+  if (!client) {
+    return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
+  }
+  
+  try {
+    await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
+      id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
+    )`);
+    const res = await client.query('SELECT * FROM audit_logs WHERE temple_id = $1 ORDER BY timestamp DESC LIMIT 200', [templeId]);
+    return res.rows.map(r => ({
+      id: r.id, templeId: r.temple_id, level: r.level, action: r.action, target: r.target, operator: r.operator, timestamp: r.timestamp
+    }));
+  } catch (e) {
+    console.error('Error fetching audit logs', e);
+    return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
+  }
 }
 
 export async function getTempleBasicInfo(templeId?: string) {

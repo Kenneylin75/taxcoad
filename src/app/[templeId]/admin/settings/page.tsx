@@ -3,7 +3,7 @@
 
 import React, { useState, useTransition, useEffect } from 'react';
 import { 
-  updateServiceSettings, 
+  updateServiceSettings, fetchServiceSettings,
   fetchStoragePlans, 
   fetchTempleStorages, 
   upgradeTempleStorage, fetchTempleAiUsage, toggleTempleAiStatus, purchaseAiPlan, fetchAiPlans, fetchB2BPaymentConfig,
@@ -86,6 +86,19 @@ export default function AdvancedSettingsPage() {
       };
       setStorageInfo(myStorage);
     });
+
+    fetchServiceSettings().then(fetchedSettings => {
+      if (fetchedSettings) {
+        setSettings((prev: any) => ({
+          ...prev,
+          ...fetchedSettings,
+          modules: { ...prev.modules, ...(fetchedSettings.modules || {}) },
+          guestRequiredFields: { ...prev.guestRequiredFields, ...(fetchedSettings.guestRequiredFields || {}) },
+          rules: { ...prev.rules, ...(fetchedSettings.rules || {}) },
+          preferences: { ...prev.preferences, ...(fetchedSettings.preferences || {}) }
+        }));
+      }
+    });
   }, []);
 
   const handleToggle = (category: string, field: string) => {
@@ -105,7 +118,7 @@ export default function AdvancedSettingsPage() {
 
   const handleSave = () => {
     startTransition(async () => {
-      await updateServiceSettings();
+      await updateServiceSettings(settings);
       alert('✅ 系統配置已成功儲存並同步！');
     });
   };

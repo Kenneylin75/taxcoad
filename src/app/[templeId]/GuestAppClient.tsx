@@ -60,49 +60,51 @@ const IconLotus = ({ className }: { className?: string }) => (
 
 function QRScannerComponent({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) {
   useEffect(() => {
-    let html5QrcodeScanner: any;
+    let html5QrCode: any;
     let isUnmounted = false;
 
-    import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
+    import('html5-qrcode').then(({ Html5Qrcode }) => {
       if (isUnmounted) return;
-      html5QrcodeScanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
+      html5QrCode = new Html5Qrcode("qr-reader");
       
-      html5QrcodeScanner.render(
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText: string) => {
           if (isUnmounted) return;
-          html5QrcodeScanner.clear().catch(console.error);
-          onScan(decodedText);
+          html5QrCode.stop().then(() => {
+            html5QrCode.clear();
+            onScan(decodedText);
+          }).catch(console.error);
         },
-        (error: any) => {
-          // ignore scan errors
-        }
-      );
+        (error: any) => { /* ignore */ }
+      ).catch((err: any) => {
+        console.error("相機啟動失敗", err);
+        alert("無法啟動相機，請確認是否已授予相機權限");
+      });
     });
 
     return () => {
       isUnmounted = true;
-      if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().catch(console.error);
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => html5QrCode.clear()).catch(console.error);
       }
     };
   }, [onScan]);
 
   return (
     <div className="relative w-full max-w-[280px] mx-auto overflow-hidden rounded-[30px] bg-black">
-      <div id="qr-reader" className="w-full h-full text-white [&>div]:border-none [&_button]:bg-white/20 [&_button]:text-white [&_button]:rounded-xl [&_button]:py-2 [&_button]:px-4 [&_select]:text-black [&_select]:mb-2"></div>
+      <div id="qr-reader" className="w-full h-full text-white [&>div]:border-none"></div>
       
       {/* Fallback mock input (for debugging on PC) */}
       <input 
         type="text" 
-        placeholder="[開發用: 手動輸入QR內容]" 
-        className="absolute bottom-2 left-2 right-2 bg-black/50 border border-white/20 rounded-xl px-3 py-2 text-[10px] text-white outline-none focus:border-red-500 z-[999]"
+        placeholder="模擬掃碼輸入 (PC測試用)" 
+        className="w-full p-3 mt-4 text-black text-sm rounded-xl border border-gray-200"
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
-            onScan((e.target as HTMLInputElement).value);
+            onScan(e.currentTarget.value);
+            e.currentTarget.value = '';
           }
         }}
       />
@@ -254,11 +256,12 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     }
   }, [gregorianDate]);
 
-  const handleCancelAppointment = async (appId: number) => {
-    if (!confirm("確定要取消此預約嗎？")) return;
-    const res = await cancelAppointment(appId);
+  const handleCancelRecord = async (recordId: string, type: string) => {
+    if (!confirm(`確定要取消此${type}嗎？`)) return;
+    const { cancelServiceRecord } = await import('@/app/actions');
+    const res = await cancelServiceRecord(recordId, type);
     if (res.success) {
-      alert("預約已取消");
+      alert(`${type}已成功取消`);
       refreshAllData(guestUser?.phone || "");
     } else {
       alert(res.message || "取消失敗");
@@ -1036,7 +1039,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
 
   const renderAllRecords = () => {
     const allRecords = [
-      ...guestAppointments.map(a => ({ ...a, type: '預約', icon: '📅', color: 'text-indigo-600', bg: 'bg-indigo-50', rawTime: a.time })),
+      ...guestAppointments.map(a => ({ ...a, type: '預約', icon: '📅', color: 'text-indigo-600', bg: 'bg-indigo-50', time: `${a.date} ${a.time}`, rawTime: `${a.date}T${a.time}` })),
       ...guestRegistrations.map(r => ({ ...r, type: '活動', icon: '🏮', color: 'text-red-600', bg: 'bg-red-50', service: r.title, time: r.timestamp, rawTime: r.timestamp, staff: '本宮法師' })),
       ...guestTickets.map(t => ({ ...t, type: '排隊', icon: '🎟️', color: 'text-emerald-600', bg: 'bg-emerald-50', service: t.eventTitle, time: t.scannedAt || '尚未核銷', rawTime: t.scannedAt, staff: '現場候位' })),
       ...guestLamps.map(l => {
@@ -1059,13 +1062,17 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     const filtered = recordsTab === '全部' ? allRecords : allRecords.filter(r => r.type === recordsTab);
 
     const getDeadlineInfo = (record: any) => {
-      if (record.status !== 'Pending' && record.type !== '預約') return null;
+      if (record.status !== 'Pending' && record.status !== 'Confirmed' && record.status !== 'Queuing' && record.status !== 'Unpaid') return null;
       if (!serviceSettings) return null;
       
-      const recordDate = new Date(record.rawTime);
+      let recordDate = new Date();
+      if (record.type === '預約' || record.type === '活動') {
+         recordDate = new Date(record.rawTime);
+      }
+      
       if (isNaN(recordDate.getTime())) return null;
 
-      const cancelDeadline = new Date(recordDate.getTime() - serviceSettings.cancelHoursBefore * 60 * 60 * 1000);
+      const cancelDeadline = record.type === '排隊' ? new Date(new Date().getTime() + 1000000000) : new Date(recordDate.getTime() - serviceSettings.cancelHoursBefore * 60 * 60 * 1000);
       const modifyDeadline = new Date(recordDate.getTime() - serviceSettings.modifyHoursBefore * 60 * 60 * 1000);
       
       return { cancelDeadline, modifyDeadline };
@@ -1099,8 +1106,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             ) : filtered.map((record, idx) => {
               const deadlines = getDeadlineInfo(record);
               const now = new Date();
-              const canCancel = deadlines && now < deadlines.cancelDeadline;
-              const canModify = deadlines && now < deadlines.modifyDeadline;
+              const canCancel = deadlines && (serviceSettings?.allowCancel !== false) && now < deadlines.cancelDeadline;
+              const canModify = deadlines && (serviceSettings?.allowModify !== false) && record.type === '預約' && now < deadlines.modifyDeadline;
 
               return (
                 <div key={idx} className="app-card p-5 space-y-4">
@@ -1156,19 +1163,21 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                         </span>
                       </div>
                       <div className="flex gap-2">
+                        {record.type === '預約' && (
+                          <button 
+                            onClick={() => handleModifyClick(record.id)}
+                            disabled={!canModify}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canModify ? 'bg-white border border-gray-200 text-gray-700 active:bg-gray-50' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
+                          >
+                            更改預約
+                          </button>
+                        )}
                         <button 
-                          onClick={() => handleModifyClick(record.id)}
-                          disabled={!canModify}
-                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canModify ? 'bg-white border border-gray-200 text-gray-700 active:bg-gray-50' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
-                        >
-                          更改預約
-                        </button>
-                        <button 
-                          onClick={() => handleCancelAppointment(record.id)}
+                          onClick={() => handleCancelRecord(record.id, record.type)}
                           disabled={!canCancel}
                           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canCancel ? 'bg-red-50 border border-red-100 text-red-600 active:bg-red-100' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
                         >
-                          取消預約
+                          取消{record.type}
                         </button>
                       </div>
                     </div>
@@ -1605,22 +1614,26 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                             price: !slot.price && !selectedService?.price ? '隨喜功德' : `結緣金 ${slot.price || selectedService?.price}`,
                             description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：\n${slot.description || selectedService?.precautions || '無'}`,
                             onConfirm: async () => {
-                              const finalizeBooking = async () => {
-                                const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, 'Cash');
-                                
-                                if (res.success) {
-                                  setSuccessInfo({
-                                    title: '預約成功',
-                                    message: '您的預約已提交。由於採現金對帳，請依循現場人員指示完成繳費與報到手續。'
-                                  });
-                                  await refreshAllData(guestUser.phone);
-                                  const updatedSlots = await fetchAvailableSlots();
-                                  setSlots(updatedSlots);
-                                } else {
-                                  alert(`❌ 預約失敗: ${res.message}`);
+                              setPaymentIntent({
+                                amount: slot.price || selectedService?.price || 0,
+                                module: 'Booking',
+                                onPaid: async (method: string) => {
+                                  const amount = slot.price || selectedService?.price || 0;
+                                  const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, method, undefined, amount);
+                                  
+                                  if (res.success) {
+                                    setSuccessInfo({
+                                      title: '預約成功',
+                                      message: method === 'Cash' ? '您的預約已提交。由於採現場付款，請依循現場人員指示完成繳費與報到手續。' : '您的預約與付款已完成！祈願平安喜樂。'
+                                    });
+                                    await refreshAllData(guestUser.phone);
+                                    const updatedSlots = await fetchAvailableSlots();
+                                    setSlots(updatedSlots);
+                                  } else {
+                                    alert(`❌ 預約失敗: ${res.message}`);
+                                  }
                                 }
-                              };
-                              await finalizeBooking();
+                              });
                             }
                           });
                           setIsDetailModalOpen(true);
@@ -1635,11 +1648,6 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
               </div>
             </div>
           )}
-        </div>
-
-        {renderDetailModal()}
-        {renderPaymentModal()}
-        {successInfo && renderActionSuccess()}
       </div>
     );
   };
@@ -1753,9 +1761,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                              precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
                              description: `活動內容：${evt.description}\n日期：${evt.date}`,
                              onConfirm: async () => {
-                               await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price);
-                               setSuccessInfo({ title: '報名成功', message: '您已成功報名法會活動。' });
-                               refreshAllData(guestUser.phone);
+                               setPaymentIntent({
+                                 amount: evt.price,
+                                 module: 'Event',
+                                 onPaid: async (method: string) => {
+                                   await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price, method);
+                                   setSuccessInfo({ title: '報名成功', message: method === 'Cash' ? '您已成功報名法會活動，請於當日現場完成繳費報到。' : '您已成功報名法會活動與付款。' });
+                                   refreshAllData(guestUser.phone);
+                                 }
+                               });
                              }
                            });
                            setIsDetailModalOpen(true);
@@ -1775,8 +1789,6 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </div>
           </div>
         </div>
-        {renderDetailModal()}
-        {successInfo && renderActionSuccess()}
       </div>
     );
   };
@@ -1875,9 +1887,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
 
                       <button 
                         onClick={async () => {
-                          await joinQueue(evt.id, guestUser.phone, guestUser.name);
-                          setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
-                          refreshAllData(guestUser.phone);
+                          setPaymentIntent({
+                            amount: 0,
+                            module: 'Queue',
+                            onPaid: async (method: string) => {
+                              await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
+                              setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
+                              refreshAllData(guestUser.phone);
+                            }
+                          });
                         }}
                         className="btn-primary w-full py-3"
                       >
@@ -1890,7 +1908,6 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </div>
           )}
         </div>
-        {successInfo && renderActionSuccess()}
       </div>
     );
   };
@@ -1943,18 +1960,25 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       precautions: item.precautions || '點燈後將於三日內為您上燈，並寄送電子通知。',
                       description: `服務內容：${item.description || '祈福保平安'}\n天數：${item.durationDays || 365}天`,
                       onConfirm: async () => {
-                        const fd = new FormData();
-                        fd.append('phone', guestUser.phone);
-                        fd.append('guestName', guestUser.name);
-                        fd.append('categoryId', item.id);
-                        fd.append('categoryName', item.name);
-                        fd.append('price', (item.price ?? 0).toString());
-                        await createLightingOrder(fd);
-                        setSuccessInfo({
-                          title: '辦理成功',
-                          message: '您的點燈申請已提交，本宮將為您安排上燈法事。'
+                        setPaymentIntent({
+                          amount: item.price ?? 0,
+                          module: 'Lamp',
+                          onPaid: async (method: string) => {
+                            const fd = new FormData();
+                            fd.append('phone', guestUser.phone);
+                            fd.append('guestName', guestUser.name);
+                            fd.append('categoryId', item.id);
+                            fd.append('categoryName', item.name);
+                            fd.append('price', (item.price ?? 0).toString());
+                            fd.append('paymentMethod', method);
+                            await createLightingOrder(fd);
+                            setSuccessInfo({
+                              title: '辦理成功',
+                              message: method === 'Cash' ? '您的點燈申請已提交，請至現場完成繳費以利上燈。' : '您的點燈申請與付款已完成，本宮將為您安排上燈法事。'
+                            });
+                            refreshAllData(guestUser.phone);
+                          }
                         });
-                        refreshAllData(guestUser.phone);
                       }
                     });
                     setIsDetailModalOpen(true);
@@ -1967,8 +1991,6 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             ))}
           </div>
         </div>
-        {renderDetailModal()}
-        {successInfo && renderActionSuccess()}
       </div>
     );
   };

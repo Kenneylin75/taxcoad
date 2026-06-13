@@ -1,0 +1,53 @@
+PIVOT V8 - 付款 Modal Bug
+付款 Modal 只有「取消支付」
+預約流程完成 -> 付款 Modal 空白 -> 無法付款
+2026-06-12
+16:00 審查
+機密
+11. 操作路徑
+(1) 首頁 -> 預約 -> 選服務 -> 選時段
+(2) 跳出確認明細 -> 按「確認辦理」
+(3) 付款 Modal 出現：標題 + NT$100
+(4) 但只有「取消支付」按鈕
+(5) 沒有信用卡/LINE Pay/現金付款
+(6) 預約成功畫面也沒出現
+使用者說：「沒有跳出已預約~或者現場付現金」
+2. 按鈕為何不顯示
+顯示條件（GuestAppClient.tsx:1105-1143）：
+  paymentConfig?.cash?.enabled !== false -> 現金
+  paymentConfig?.thirdParty?.enabled !== false -> 信用卡
+  paymentConfig?.linePay?.enabled !== false -> LINE Pay
+fetchPaymentConfig() 預設值（actions.ts:755）：
+  cash: { enabled: true, allowBooking: true } <- 應顯示
+  thirdParty: { enabled: false }
+  linePay: { enabled: false }
+如果 paymentConfig=null -> undefined!==false=true
+-> 所有按鈕該顯示才對
+但你看到全部消失 -> paymentConfig 被存成 cash=false
+管理端可能在金流設定誤關閉了現金付款
+3. loadData() 不存在
+GuestAppClient.tsx:1524-1532 onPaid callback：
+  setSuccessInfo(...)
+  setIsDetailModalOpen(false)
+  loadData()  // <- 此函數不存在！拋 ReferenceError
+正確應為：refreshAllData(guestUser.phone)
+setSuccessInfo 被呼叫但 loadData 崩潰 -> 渲染中斷
+-> 使用者看不到「預約成功」畫面
+4. Booking Flow 9 道關卡
+Gate 1.選服務 [OK]
+Gate 2.選時段 [OK]
+Gate 3.確認明細 [OK]
+Gate 4.按確認辦理 [FAIL]
+Gate 5.付款按鈕 [FAIL]
+Gate 6.使用者付款 [FAIL]
+Gate 7.顯示成功 [FAIL]
+Gate 8.後台看到 [FAIL]
+Gate 9.後台核准 [FAIL]
+29關只過3關 = 33.3% 成功率5. 修復指令
+(P0) loadData() -> refreshAllData(guestUser.phone)
+(P0) 檢查 savePaymentConfig 勿誤關 cash
+(P1) 移除 prompt() 改用自製 Modal
+(P1) fetchPaymentConfig 預設永遠啟用現金
+(P2) Booking Flow 補 error boundary
+V8 報告 2026-06-12 15:50 機密
+3

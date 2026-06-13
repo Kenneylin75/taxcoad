@@ -174,6 +174,7 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
             )}
           </div>
 
+          <div className="flex justify-end gap-3 mt-8 border-t border-slate-100 pt-6 relative z-10">
             <button 
               type="button"
               onClick={() => { setActiveTab('list'); setEditingEvent(null); }}
