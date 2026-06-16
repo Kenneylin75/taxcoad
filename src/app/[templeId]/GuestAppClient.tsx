@@ -1648,6 +1648,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
               </div>
             </div>
           )}
+        </div>
       </div>
     );
   };
