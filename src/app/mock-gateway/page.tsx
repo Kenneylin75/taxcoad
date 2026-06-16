@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function MockGatewayPage() {
+function MockGatewayContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -104,5 +104,13 @@ export default function MockGatewayPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MockGatewayPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-400">載入金流模擬器中...</div>}>
+      <MockGatewayContent />
+    </Suspense>
   );
 }
