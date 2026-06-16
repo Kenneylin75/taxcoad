@@ -18,7 +18,7 @@ export async function revalidateTemple(templeId?: string) {
 export async function setGuestTempleContext(templeId: string) {
   try {
     const store = await cookies();
-    store.set('templeId', templeId, { secure: true, httpOnly: true, path: '/' });
+    store.set('templeId', templeId, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
   } catch (e: any) {
     // Silent fail if cookies can't be set
   }
@@ -139,6 +139,8 @@ export async function loginAccount(formData: FormData) {
   let assignedRole = "TempleAdmin";
   let loginStatus = "Active";
 
+  await ensurePlatformTables();
+
   const searchAccount = account.toLowerCase();
   const pData = (gStore.db_personnel || db_personnel);
 
@@ -147,26 +149,46 @@ export async function loginAccount(formData: FormData) {
     redirectPath = "/super-admin";
     loggedInName = "超級總裁";
     assignedRole = "SuperAdmin";
-  } else if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount && (a.password === password || !a.password))) {
+  } else if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount && a.password === password)) {
     success = true;
     redirectPath = "/super-admin";
     assignedRole = "SuperAdmin";
   } else {
-    const distributor = db_distributors.find(d => (d.account || "").toLowerCase() === searchAccount && (d.password === password || !d.password));
+    // 首先嘗試從 PostgreSQL 獲取經銷商
+    let distributor = null;
+    try {
+      const resDist = await dbQuery("SELECT * FROM distributors WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+      if (resDist && resDist.rowCount > 0) {
+        distributor = resDist.rows[0];
+      }
+    } catch (e) {}
+    if (!distributor) distributor = db_distributors.find(d => (d.account || "").toLowerCase() === searchAccount && d.password === password);
+
     if (distributor) {
       if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
       else {
         success = true;
-        redirectPath = `/${distributor.id}`;
+        redirectPath = `/dist-admin-portal/${distributor.id}`;
         assignedRole = "Distributor";
       }
     } else {
-      const salesPerson = db_dist_sales.find(s => (s.account || "").toLowerCase() === searchAccount && (s.password === password || !s.password));
+      // 首先嘗試從 PostgreSQL 獲取業務員
+      let salesPerson = null;
+      try {
+        const resSales = await dbQuery("SELECT * FROM dist_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+        if (resSales && resSales.rowCount > 0) {
+          salesPerson = resSales.rows[0];
+          // 為了兼容前後端屬性命名
+          salesPerson.distributorId = salesPerson.distributor_id;
+        }
+      } catch (e) {}
+      if (!salesPerson) salesPerson = db_dist_sales.find(s => (s.account || "").toLowerCase() === searchAccount && s.password === password);
+
       if (salesPerson) {
         if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
         else {
           success = true;
-          redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
+          redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/dist-sales-portal/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
           assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
         }
       } else {
@@ -248,7 +270,7 @@ export async function fetchAvailableSlots() {
     const res = await client.query('SELECT * FROM slots WHERE temple_id = $1 ORDER BY date, time', [templeId]);
     return res.rows.map(r => ({
       id: r.id,
-      date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
+      date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
       time: r.time,
       staff: r.staff,
       description: r.description,
@@ -456,8 +478,8 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
         await client.query(`
           INSERT INTO guests (temple_id, phone, name, status)
           VALUES ($1, $2, $3, $4)
-          ON CONFLICT (phone) DO NOTHING
-        `, [phone, guestName, 'Active']);
+          ON CONFLICT (temple_id, phone) DO NOTHING
+        `, [templeId, phone, guestName, 'Active']);
       }
     }
 
@@ -486,6 +508,72 @@ export async function cancelAppointment(appId: number) {
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
         ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
     }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+
+export async function rescheduleSingleAppointment(appointmentId: number, newSlotId: number) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    let guestName = "";
+    let oldTimeStr = "";
+    let newTimeStr = "";
+
+    if (!client) {
+      const appIdx = db_appointments.findIndex(a => a.id === appointmentId && (!a.templeId || a.templeId === templeId));
+      if (appIdx === -1) return { success: false, message: '找不到該預約' };
+      const app = db_appointments[appIdx];
+      guestName = app.guestName;
+      oldTimeStr = `${app.date} ${app.time}`;
+      
+      const newSlotIdx = db_slots.findIndex(s => String(s.id) === String(newSlotId));
+      if (newSlotIdx === -1) return { success: false, message: '找不到新選擇的時段' };
+      const newSlot = db_slots[newSlotIdx];
+      if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
+      
+      const oldSlot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+      if (oldSlot) {
+        oldSlot.status = 'Available';
+        oldSlot.guestName = '';
+      }
+      
+      newSlot.status = 'Booked';
+      newSlot.guestName = app.guestName;
+      
+      app.date = newSlot.date;
+      app.time = newSlot.time;
+      app.staff = newSlot.staff;
+      app.serviceId = newSlot.bound_service_id || newSlot.serviceId;
+      newTimeStr = `${newSlot.date} ${newSlot.time}`;
+      
+    } else {
+      const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appointmentId, templeId]);
+      if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
+      const app = appRes.rows[0];
+      guestName = app.guest_name;
+      oldTimeStr = `${app.date} ${app.time}`;
+      
+      const slotRes = await client.query('SELECT * FROM slots WHERE id = $1 AND temple_id = $2', [newSlotId, templeId]);
+      if (slotRes.rowCount === 0) return { success: false, message: '找不到新選擇的時段' };
+      const newSlot = slotRes.rows[0];
+      if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
+      
+      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
+        ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
+        
+      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', app.guest_name, newSlotId]);
+      
+      await client.query('UPDATE appointments SET date = $1, time = $2, staff = $3, service_id = $4 WHERE id = $5', 
+        [newSlot.date, newSlot.time, newSlot.staff, newSlot.bound_service_id, appointmentId]);
+      
+      newTimeStr = `${newSlot.date} ${newSlot.time}`;
+    }
+
+    const content = `親愛的信眾 ${guestName} 您好，您原本預約的 ${oldTimeStr} 時段，已由宮廟方為您手動改期至 ${newTimeStr}。造成不便敬請見諒，如有疑問請洽宮廟管理員。`;
+    await createNotification('【系統通知】您的預約已改期', content, new Date().toISOString());
+    await logSystemEvent('INFO', '預約單筆改期', `將預約 ${appointmentId} 改至時段 ${newSlotId}`, '系統管理員', templeId);
+
     await revalidateTemple();
     return { success: true };
   });
@@ -640,7 +728,7 @@ export async function fetchAppointments() {
       const res = await client.query('SELECT * FROM appointments WHERE temple_id = $1 ORDER BY date, time', [templeId]);
       return res.rows.map(r => ({
         id: r.id,
-        date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
+        date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
         time: r.time,
         staff: r.staff,
         guestName: r.guest_name,
@@ -908,6 +996,25 @@ export async function removeSingleSlot(id: any) {
   });
 }
 
+// 8.1 批次刪除多個時段
+export async function removeBatchSlots(ids: any[]) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      let currentSlots = gStore.db_slots || db_slots;
+      const filtered = currentSlots.filter((s: any) => !ids.includes(s.id) && !ids.includes(String(s.id)));
+      gStore.db_slots = [...filtered];
+      db_slots = gStore.db_slots;
+    } else {
+      for (const id of ids) {
+        await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+
 // 9. 智能分析受影響預約
 export async function analyzeAffectedAppointments(staff: string, start: string, end: string) {
   return db_appointments.filter((app: any) => 
@@ -1114,7 +1221,7 @@ export async function guestLogin(phone: string, inputName?: string) {
     }
 
     const store = await cookies();
-    store.set(`guestPhone_${templeId}`, phone, { secure: true, httpOnly: true, path: '/' });
+    store.set(`guestPhone_${templeId}`, phone, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
     
     await revalidateTemple();
     return { success: true, guestName: fullGuest.name, fullGuest };
@@ -1490,7 +1597,7 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
     }
   });
 }
-export type EventItem = { id: string; title: string; date: string; location: string; price: number; status: 'Active' | 'Draft' | 'Completed'; capacity: number; enrolled: number; imageUrl?: string };
+export type EventItem = { id: string; title: string; date: string; location: string; price: number; status: 'Active' | 'Draft' | 'Completed'; capacity: number; enrolled: number; imageUrl?: string; description?: string; precautions?: string };
 let db_events: any[] = initGlobal("db_events", []);
 
 export async function fetchEvents() {
@@ -1498,8 +1605,10 @@ export async function fetchEvents() {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) return [...db_events].filter(x => x.templeId === templeId);
     await client.query(`CREATE TABLE IF NOT EXISTS events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), location VARCHAR(255), price INTEGER, status VARCHAR(50), capacity INTEGER, enrolled INTEGER DEFAULT 0, image_url TEXT)`);
+    await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS description TEXT`);
+    await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS precautions TEXT`);
     const res = await client.query('SELECT * FROM events WHERE temple_id = $1', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, location: r.location, price: r.price, status: r.status, capacity: r.capacity, enrolled: r.enrolled, imageUrl: r.image_url }));
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, location: r.location, price: r.price, status: r.status, capacity: r.capacity, enrolled: r.enrolled, imageUrl: r.image_url, description: r.description, precautions: r.precautions }));
   });
 }
 export async function saveEvent(fd: FormData) { 
@@ -1510,6 +1619,8 @@ export async function saveEvent(fd: FormData) {
   const price = Number(fd.get('price')) || 0;
   const capacity = Number(fd.get('capacity')) || 0;
   const status = (fd.get('status') as any) || 'Draft';
+  const description = fd.get('description') as string || '';
+  const precautions = fd.get('precautions') as string || '';
   let imageUrl = fd.get('imageUrl') as string;
   const imageFile = fd.get('imageFile') as File | null;
   
@@ -1534,16 +1645,16 @@ export async function saveEvent(fd: FormData) {
       if (id) {
         const idx = db_events.findIndex(e => e.id === id && (!e.templeId || e.templeId === templeId));
         if (idx > -1) {
-          db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId, imageUrl };
+          db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId, imageUrl, description, precautions };
         }
       } else {
-        db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl });
+        db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl, description, precautions });
       }
     } else {
       if (id) {
-        await client.query('UPDATE events SET title = $1, date = $2, location = $3, price = $4, capacity = $5, status = $6, image_url = $7 WHERE id = $8 AND temple_id = $9', [title, date, location, price, capacity, status, imageUrl, id, templeId]);
+        await client.query('UPDATE events SET title = $1, date = $2, location = $3, price = $4, capacity = $5, status = $6, image_url = $7, description = $8, precautions = $9 WHERE id = $10 AND temple_id = $11', [title, date, location, price, capacity, status, imageUrl, description, precautions, id, templeId]);
       } else {
-        await client.query('INSERT INTO events (id, temple_id, title, date, location, price, capacity, status, enrolled, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9)', [`ev-${Date.now()}`, templeId, title, date, location, price, capacity, status, imageUrl]);
+        await client.query('INSERT INTO events (id, temple_id, title, date, location, price, capacity, status, enrolled, image_url, description, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11)', [`ev-${Date.now()}`, templeId, title, date, location, price, capacity, status, imageUrl, description, precautions]);
       }
     }
     await revalidateTemple();
@@ -1565,6 +1676,59 @@ export async function deleteEvent(id: string) {
     await revalidateTemple();
     return { success: true }; 
   });
+}
+
+// --- B2B SaaS 平台層資料表初始化 ---
+export async function ensurePlatformTables() {
+  await dbQuery(`
+    CREATE TABLE IF NOT EXISTS distributor_applications (
+      id VARCHAR(50) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      contact_name VARCHAR(255),
+      phone VARCHAR(50),
+      email VARCHAR(255),
+      tax_id VARCHAR(50),
+      address TEXT,
+      plan_id VARCHAR(50),
+      price INTEGER,
+      nodes INTEGER,
+      submitted_by VARCHAR(50),
+      status VARCHAR(50),
+      created_at VARCHAR(50),
+      account VARCHAR(255),
+      password VARCHAR(255),
+      expiration_date VARCHAR(50)
+    );
+  `);
+  await dbQuery(`
+    CREATE TABLE IF NOT EXISTS distributors (
+      id VARCHAR(50) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      account VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      plan_id VARCHAR(50),
+      plan_name VARCHAR(255),
+      price INTEGER,
+      status VARCHAR(50),
+      quota INTEGER,
+      joined_at VARCHAR(50),
+      expiration_date VARCHAR(50),
+      creator_sales_id VARCHAR(50)
+    );
+  `);
+  await dbQuery(`
+    CREATE TABLE IF NOT EXISTS dist_sales (
+      id VARCHAR(50) PRIMARY KEY,
+      distributor_id VARCHAR(50),
+      name VARCHAR(255) NOT NULL,
+      account VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL,
+      status VARCHAR(50),
+      joined_at VARCHAR(50),
+      performance INTEGER DEFAULT 0
+    );
+  `);
 }
 
 // --- B2B SaaS 多租戶與經銷架構全域變數 ---
@@ -2248,7 +2412,38 @@ export async function approveDistributorBySuperAdmin(id: string) {
   const app = db_distributor_applications.find(a => a.id === id);
   if (app) {
     app.status = 'Active';
-    // Create actual distributor account logic would go here
+    
+    // 建立實際經銷商帳戶
+    const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const plan = db_config.distributorPlans.find((p: any) => p.id === app.planId) || db_config.distributorPlans[0];
+    
+    const newDist = {
+      id: distId,
+      name: app.name,
+      account: app.account || app.name,
+      password: app.password || 'pivot2026',
+      planId: plan?.id || 'PLAN-A',
+      planName: plan?.name || '標準代理方案',
+      price: app.price || 0,
+      status: 'Active',
+      quota: plan?.nodes || 100,
+      joinedAt: new Date().toISOString().split('T')[0],
+      expirationDate: app.expirationDate || '',
+      creatorSalesId: app.submittedBy || ''
+    };
+
+    db_distributors.push(newDist);
+    
+    await ensurePlatformTables();
+    try {
+      await dbQuery(`
+        INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date, creator_sales_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (account) DO UPDATE SET status = 'Active'
+      `, [newDist.id, newDist.name, newDist.account, newDist.password, newDist.planId, newDist.planName, newDist.price, newDist.status, newDist.quota, newDist.joinedAt, newDist.expirationDate, newDist.creatorSalesId]);
+    } catch (e) {
+      console.error("DB Insert Error for distributor:", e);
+    }
   }
   revalidatePath('/super-admin');
   return { success: true };
@@ -2300,11 +2495,37 @@ export async function fetchAllAccountsForAdmin() {
     if (p.role === 'Admin') accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
   });
 
-  db_distributors.forEach(d => {
+  // 從 PostgreSQL 取出所有的經銷商
+  let pgDistributors: any[] = [];
+  try {
+    const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
+    if (resDist && resDist.rows) {
+      pgDistributors = resDist.rows;
+    }
+  } catch (e) {}
+
+  const allDistributorsMap = new Map();
+  db_distributors.forEach(d => allDistributorsMap.set(d.id, d));
+  pgDistributors.forEach(d => allDistributorsMap.set(d.id, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id }));
+  
+  Array.from(allDistributorsMap.values()).forEach(d => {
     accounts.push({ ...d, id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
   });
 
-  db_dist_sales.forEach(s => {
+  // 從 PostgreSQL 取出所有的業務員
+  let pgSales: any[] = [];
+  try {
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
+    if (resSales && resSales.rows) {
+      pgSales = resSales.rows;
+    }
+  } catch (e) {}
+
+  const allSalesMap = new Map();
+  db_dist_sales.forEach(s => allSalesMap.set(s.id, s));
+  pgSales.forEach(s => allSalesMap.set(s.id, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
+
+  Array.from(allSalesMap.values()).forEach(s => {
     if (s.role === 'SuperSales') {
       const overrides = db_super_sales_overrides[s.name];
       const mergedRules = overrides || s.commissionRules || db_config.defaultSuperSalesRates;
@@ -2628,6 +2849,8 @@ export async function createTempleAccount(data: any) {
     templeNo,
     templeName: data.name,
     ...rest,
+    distributorId: data.distributorId || null,
+    salesId: data.salesId || null,
     creatorRole,
     creatorId,
     paymentCycle: paymentCycle || 'Monthly',
@@ -2853,7 +3076,7 @@ export async function fetchRentPlans() {
 // --- 經銷商 (Distributor) 相關功能 ---
 export async function addSalesMember(data: any) { 
   const id = 'sales-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-  db_dist_sales.push({ 
+  const newSales = { 
     id: id, 
     distributorId: data.distributorId || 'dist-1', 
     account: data.account || `sales_${id}`, 
@@ -2868,12 +3091,37 @@ export async function addSalesMember(data: any) {
       rentYear3PlusPercent: data.rentYear3PlusPercent || 5
     },
     ...data 
-  });
+  };
+  db_dist_sales.push(newSales);
+
+  await ensurePlatformTables();
+  try {
+    await dbQuery(`
+      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT DO NOTHING
+    `, [newSales.id, newSales.distributorId, newSales.name || '未命名業務員', newSales.account, newSales.password, newSales.role, newSales.status, newSales.joinedAt]);
+  } catch (e) {
+    console.error("DB Insert Error for sales:", e);
+  }
   revalidatePath('/distributor');
   return { success: true, id }; 
 }
 export async function fetchDistributorTeam(distributorId: string) {
-  return db_dist_sales.filter(s => s.distributorId === distributorId);
+  let pgSales: any[] = [];
+  try {
+    const res = await dbQuery("SELECT * FROM dist_sales WHERE distributor_id = $1", [distributorId], () => null) as any;
+    if (res && res.rows) {
+      pgSales = res.rows;
+    }
+  } catch (e) {}
+
+  const memSales = db_dist_sales.filter(s => s.distributorId === distributorId);
+  const salesMap = new Map();
+  memSales.forEach(s => salesMap.set(s.id, s));
+  pgSales.forEach(s => salesMap.set(s.id, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
+
+  return Array.from(salesMap.values());
 }
 export async function fetchDistributorTemples(distributorId: string) {
   return db_temples.filter(t => t.distributorId === distributorId);
@@ -3266,7 +3514,7 @@ export async function fetchAllWithdrawals() {
       salesName: r.sales_name,
       amount: r.amount,
       status: r.status,
-      date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date
+      date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date
     }));
   });
 }
@@ -4027,6 +4275,47 @@ export async function fetchGuestHistory(p: string) {
       queueTickets: db_queue_tickets.filter((t: any) => normCompare(t.phone, p)),
       eventRegistrations: db_event_registrations.filter((e: any) => normCompare(e.phone, p))
     }; 
+  });
+}
+
+export async function fetchGuestRecords(phone: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, [], async (client) => {
+    // Memory fallback currently used for records
+    const normPhone = phone.replace(/-/g, '');
+    return db_deep_records.filter((r: any) => r.phone && r.phone.replace(/-/g, '') === normPhone);
+  });
+}
+
+export async function updateDeepRecord(recordId: string, phone: string, staffName: string, values: any) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, { success: false, message: "失敗" }, async (client) => {
+    // Memory fallback
+    const idx = db_deep_records.findIndex((r: any) => r.id === recordId);
+    if (idx !== -1) {
+      db_deep_records[idx] = {
+        ...db_deep_records[idx],
+        values,
+        staffName,
+        timestamp: new Date().toISOString()
+      };
+      gStore.db_deep_records = db_deep_records;
+
+      const serviceType = db_deep_records[idx].serviceType;
+      
+      db_activities.unshift({
+        id: `act-${Date.now()}`,
+        phone,
+        type: 'RECORD_MODIFIED',
+        content: `修改【${serviceType}】紀錄歸檔`,
+        timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
+      });
+      gStore.db_activities = db_activities;
+
+      await revalidateTemple();
+      return { success: true, message: "紀錄已更新" };
+    }
+    return { success: false, message: "找不到指定的案卷紀錄" };
   });
 }
 export async function saveDeepRecord(phone: string, eventId: string, serviceType: string, staffName: string, values: any) {
@@ -5156,39 +5445,41 @@ export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS
   db_audit_logs.unshift(newLog);
   if (gStore) gStore.db_audit_logs = db_audit_logs;
 
-  const { client } = await getDb();
-  if (client) {
-    try {
-      await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
-        id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
-      )`);
-      await client.query(
-        'INSERT INTO audit_logs (id, temple_id, level, action, target, operator, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [newLog.id, templeId, level, action, target, operator, timestamp]
-      );
-    } catch (e) { console.error('Error logging system event', e); }
-  }
+  return withTempleSession(templeId, false, async (client) => {
+    if (client) {
+      try {
+        await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
+          id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
+        )`);
+        await client.query(
+          'INSERT INTO audit_logs (id, temple_id, level, action, target, operator, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [newLog.id, templeId, level, action, target, operator, timestamp]
+        );
+      } catch (e) { console.error('Error logging system event', e); }
+    }
+  });
 }
 
 export async function fetchAuditLogs() {
   const templeId = await getDynamicTempleId();
-  const { client } = await getDb();
-  if (!client) {
-    return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
-  }
-  
-  try {
-    await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
-      id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
-    )`);
-    const res = await client.query('SELECT * FROM audit_logs WHERE temple_id = $1 ORDER BY timestamp DESC LIMIT 200', [templeId]);
-    return res.rows.map(r => ({
-      id: r.id, templeId: r.temple_id, level: r.level, action: r.action, target: r.target, operator: r.operator, timestamp: r.timestamp
-    }));
-  } catch (e) {
-    console.error('Error fetching audit logs', e);
-    return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
-  }
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
+    }
+    
+    try {
+      await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
+        id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
+      )`);
+      const res = await client.query('SELECT * FROM audit_logs WHERE temple_id = $1 ORDER BY timestamp DESC LIMIT 200', [templeId]);
+      return res.rows.map(r => ({
+        id: r.id, templeId: r.temple_id, level: r.level, action: r.action, target: r.target, operator: r.operator, timestamp: r.timestamp
+      }));
+    } catch (e) {
+      console.error('Error fetching audit logs', e);
+      return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
+    }
+  });
 }
 
 export async function getTempleBasicInfo(templeId?: string) {
@@ -5396,4 +5687,33 @@ export async function transferTemples(templeIds: string[], targetId: string | nu
   db_admin_logs.unshift({ id: `L-${Date.now()}`, user: 'System Admin', action: 'BATCH_TRANSFER', target: `${templeIds.length} temples to ${targetName}`, timestamp: new Date().toLocaleString() });
 
   return { success: true };
+}
+export async function confirmPaymentSuccess(orderId: string, method: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      // In-memory fallback
+      const app = db_appointments.find(a => a.id === parseInt(orderId) || a.id.toString() === orderId);
+      if (app) { app.paymentStatus = 'Paid'; app.paymentMethod = method; return true; }
+      const reg = db_event_registrations.find(r => r.id === orderId);
+      if (reg) { reg.paymentStatus = 'Paid'; return true; }
+      const tix = db_queue_tickets.find(t => t.id === orderId);
+      if (tix) { tix.paymentStatus = 'Paid'; return true; }
+      return false;
+    }
+    
+    // Check appointments
+    let res = await client.query('UPDATE appointments SET payment_status = , payment_method =  WHERE id =  RETURNING id', ['Paid', method, parseInt(orderId) || 0]);
+    if (res.rowCount > 0) return true;
+    
+    // Check event registrations
+    res = await client.query('UPDATE event_registrations SET payment_status =  WHERE id =  RETURNING id', ['Paid', orderId]);
+    if (res.rowCount > 0) return true;
+    
+    // Check queue tickets
+    res = await client.query('UPDATE queue_tickets SET payment_status =  WHERE id =  RETURNING id', ['Paid', orderId]);
+    if (res.rowCount > 0) return true;
+    
+    return false;
+  });
 }

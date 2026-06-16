@@ -115,8 +115,8 @@ export async function withTempleSession<T>(
  */
 export async function dbQuery<T>(
   sql: string,
-  params: any[],
-  fallback: () => T
+  params: any[] = [],
+  fallback: () => T = (() => null as unknown as T)
 ): Promise<T> {
   if (!pool) return fallback();
   
