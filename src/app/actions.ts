@@ -247,6 +247,28 @@ export async function loginAccount(formData: FormData) {
   return { success: false, error: "帳號或密碼錯誤" };
 }
 
+export async function checkAccountExists(account: string) {
+  if (!account) return false;
+  const searchAccount = account.toLowerCase();
+  const pData = (gStore.db_personnel || db_personnel);
+  
+  if (account === "PIVOTADMIN01") return true;
+  if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount)) return true;
+  if (db_distributors.some(d => (d.account || "").toLowerCase() === searchAccount)) return true;
+  if (db_dist_sales.some(s => (s.account || "").toLowerCase() === searchAccount)) return true;
+  if (pData.some((p: any) => (p.account || "").toLowerCase() === searchAccount)) return true;
+  
+  try {
+    const resDist = await dbQuery("SELECT id FROM distributors WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
+    if (resDist && resDist.rowCount > 0) return true;
+    
+    const resSales = await dbQuery("SELECT id FROM dist_sales WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
+    if (resSales && resSales.rowCount > 0) return true;
+  } catch(e) {}
+  
+  return false;
+}
+
 // 1. 抓取排班
 export async function fetchAvailableSlots() {
   const templeId = await getDynamicTempleId();
@@ -2310,6 +2332,9 @@ export async function fetchFreeApplications(distId?: string) {
 }
 
 export async function submitFreeAccountApplication(data: any) { 
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const { role, paymentCycle, ...formData } = data;
   
   const status = (role === 'distributor' || role === 'super-admin') ? 'Active' : 'Pending';
@@ -2609,6 +2634,9 @@ export async function uploadTool(formData: FormData) {
 }
 
 export async function createDistributorSales(distId: string, data: any) {
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const { name, phone, account, password, setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate } = data;
   const newSales = {
     id: 'dist-sales-' + Date.now(),
@@ -2752,6 +2780,9 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 // --- Super Admin Account Creation API ---
 
 export async function createSuperSalesAccount(data: any) {
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const id = `ss-${Date.now()}`;
   const commissionRates = {
     distributorAuthRate: Number(data.distributorAuthRate) || 15,
@@ -2796,6 +2827,9 @@ export async function createSuperSalesAccount(data: any) {
 }
 
 export async function createDistributorAccount(data: any) {
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const id = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
   const plan = db_config.distributorPlans.find((p: any) => p.id === data.planId) || db_config.distributorPlans[0];
   const finalPrice = Number(data.customPrice) || plan.price;
@@ -2833,6 +2867,9 @@ export async function createDistributorAccount(data: any) {
 }
 
 export async function createTempleAccount(data: any) {
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
   const creatorRole = reqRole;
