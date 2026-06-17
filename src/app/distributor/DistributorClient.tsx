@@ -63,9 +63,28 @@ export default function DistributorClient({
     name: '', account: '', 
     setupFeePercent: 20, rentYear1Percent: 15, rentYear2Percent: 10, rentYear3PlusPercent: 5 
   });
+  
+  const [accountError, setAccountError] = useState('');
+  
+  const validateAccount = async (acc: string) => {
+    if (!acc) { setAccountError(''); return; }
+    try {
+      const { checkAccountExists } = await import('../actions');
+      const exists = await checkAccountExists(acc);
+      if (exists) {
+        setAccountError(`此帳號不可使用，建議使用：${acc}${Math.floor(Math.random()*900)+100}`);
+      } else {
+        setAccountError('');
+      }
+    } catch(e) {}
+  };
 
   const handleAddSales = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (accountError) {
+      alert("目前帳號不可使用，請依照系統建議更換！");
+      return;
+    }
     const data = { ...salesForm, distributorId };
     const res = await addSalesMember(data);
     if (res.success) {
@@ -433,7 +452,13 @@ export default function DistributorClient({
               <div className="space-y-6">
                  <div className="grid grid-cols-2 gap-4">
                     <input type="text" placeholder="業務員姓名" value={salesForm.name} onChange={e => setSalesForm({...salesForm, name: e.target.value})} className="bg-slate-50 rounded-[20px] p-5 text-sm font-black outline-none border border-slate-100 focus:border-blue-500 transition-all" required />
-                    <input type="text" placeholder="系統登入 ID" value={salesForm.account} onChange={e => setSalesForm({...salesForm, account: e.target.value})} className="bg-slate-50 rounded-[20px] p-5 text-sm font-black outline-none border border-slate-100 focus:border-blue-500 transition-all" required />
+                    <div className="space-y-1">
+                      <input type="text" placeholder="系統登入 ID" value={salesForm.account} onChange={e => {
+                         setSalesForm({...salesForm, account: e.target.value});
+                         validateAccount(e.target.value);
+                      }} className={`w-full bg-slate-50 rounded-[20px] p-5 text-sm font-black outline-none border transition-all ${accountError ? 'border-rose-300 bg-rose-50 text-rose-900 focus:border-rose-500' : 'border-slate-100 focus:border-blue-500'}`} required />
+                      {accountError && <p className="text-[10px] text-rose-500 font-bold px-2">{accountError}</p>}
+                    </div>
                  </div>
                  <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[30px] font-black text-xs uppercase tracking-[0.3em] shadow-xl hover:bg-blue-600 transition-all">正式開通菁英帳戶 🚀</button>
               </div>

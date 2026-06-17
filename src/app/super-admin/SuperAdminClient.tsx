@@ -63,6 +63,21 @@ export default function SuperAdminClient({
   
   const [isPending, startTransition] = useTransition();
 
+  const [accountError, setAccountError] = useState('');
+  
+  const validateAccount = async (acc: string) => {
+    if (!acc) { setAccountError(''); return; }
+    try {
+      const { checkAccountExists } = await import('../actions');
+      const exists = await checkAccountExists(acc);
+      if (exists) {
+        setAccountError(`此帳號不可使用，建議使用：${acc}${Math.floor(Math.random()*900)+100}`);
+      } else {
+        setAccountError('');
+      }
+    } catch(e) {}
+  };
+
   // --- UI States ---
    const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -123,6 +138,10 @@ export default function SuperAdminClient({
 
   const handleCreateAccount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (accountError) {
+      alert("目前帳號不可使用，請依照系統建議更換！");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const data: any = Object.fromEntries(fd.entries());
     
@@ -487,7 +506,15 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8 text-lg font-black text-slate-400 tracking-tight italic">No.{String(idx+1).padStart(4, '0')}</td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-12 py-8 text-[12px] font-bold text-slate-600">{acc.distributorId ? initialAccounts.find(a => a.id === acc.distributorId)?.name : (acc.salesId ? initialAccounts.find(a => a.id === acc.salesId)?.name : '系統總部 HQ')}</td>
+                               <td className="px-12 py-8 text-[12px] font-bold text-slate-600">{(() => {
+                                  if (acc.distributorId && acc.distributorId !== 'system-hq') {
+                                     return initialAccounts.find((a: any) => a.id === acc.distributorId)?.name || '系統總部 HQ';
+                                  }
+                                  if (acc.salesId) {
+                                     return initialAccounts.find((a: any) => a.id === acc.salesId)?.name || '系統總部 HQ';
+                                  }
+                                  return '系統總部 HQ';
+                               })()}</td>
                                <td className="px-12 py-8">
                                   <button 
                                      onClick={async () => {
@@ -1413,7 +1440,7 @@ export default function SuperAdminClient({
                        <div className="grid grid-cols-2 gap-12">
                           <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">完整姓名 / 名稱</label><input name="name" type="text" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="例如：林精英 / 誠信經銷" required /></div>
                           <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">聯繫電話</label><input name="phone" type="text" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="0900-000-000" /></div>
-                          <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">登入 ID (Account)</label><input name="account" type="text" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="elite_manager_01" required /></div>
+                          <div className="space-y-4"><label className={`text-[11px] font-black uppercase tracking-widest ml-4 italic ${accountError ? 'text-rose-500' : 'text-slate-500'}`}>登入 ID (Account)</label><input name="account" type="text" onChange={e => validateAccount(e.target.value)} className={`w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black outline-none border focus:bg-white transition-all shadow-inner ${accountError ? 'border-rose-400 bg-rose-50 text-rose-900 focus:border-rose-600' : 'border-slate-100 text-slate-800 focus:border-slate-900'}`} placeholder="elite_manager_01" required />{accountError && <p className="text-rose-500 text-xs font-bold px-4">{accountError}</p>}</div>
                           <div className="space-y-4"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">安全密碼 (Password)</label><input name="password" type="password" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="••••••••" required /></div>
                           {accountType === 'SuperSales' && (
                              <div className="space-y-4 col-span-2"><label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">電子郵件 (Email)</label><input name="email" type="email" className="w-full bg-slate-50 rounded-[30px] p-8 text-lg font-black text-slate-800 outline-none border border-slate-100 focus:border-slate-900 focus:bg-white transition-all shadow-inner" placeholder="elite@system.tw" /></div>

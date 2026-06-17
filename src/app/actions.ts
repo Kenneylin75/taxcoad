@@ -246,7 +246,6 @@ export async function loginAccount(formData: FormData) {
 
   return { success: false, error: "帳號或密碼錯誤" };
 }
-
 export async function checkAccountExists(account: string) {
   if (!account) return false;
   const searchAccount = account.toLowerCase();
@@ -2352,18 +2351,19 @@ export async function submitFreeAccountApplication(data: any) {
     monthlyRent: data.freeType === 'Permanent' ? 0 : (db_config.fixedMonthlyRent || 3600),
     trialMonths: data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0,
     freeType: data.freeType || 'Normal',
-    role,
+    role: 'Temple',
     status,
-    creatorRole: reqRole,
+    creatorRole: role,
     creatorId: currentUser.name,
-    salesId: sales?.id,
-    distributorId: sales?.distributorId || (role === 'distributor' ? data.distributorId : 'system-hq'),
+    salesId: sales?.id || null,
+    distributorId: role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null)),
     timestamp: new Date().toISOString(),
     billingStartDate: data.freeType === 'Trial' ? 
       new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
       new Date().toISOString()
   };
   db_temples.push(newTemple);
+  gStore.db_temples = db_temples;
 
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
   if (status === 'Active' && data.account && data.password) {
@@ -2399,8 +2399,9 @@ export async function submitFreeAccountApplication(data: any) {
 
 export async function approveTempleBySuperAdmin(id: string) {
   const t = db_temples.find(x => x.id === id);
-  if (t) {
+   if (t) {
      t.status = 'Active';
+     gStore.db_temples = db_temples;
      if (t.account && t.password) {
        const pData = (gStore.db_personnel || db_personnel);
        // check if already exists
@@ -2442,6 +2443,9 @@ export async function approveDistributorBySuperAdmin(id: string) {
     const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
     const plan = db_config.distributorPlans.find((p: any) => p.id === app.planId) || db_config.distributorPlans[0];
     
+    // 反查業務員實際 ID
+    const actualSales = db_dist_sales.find(s => s.name === app.submittedBy);
+    
     const newDist = {
       id: distId,
       name: app.name,
@@ -2454,10 +2458,11 @@ export async function approveDistributorBySuperAdmin(id: string) {
       quota: plan?.nodes || 100,
       joinedAt: new Date().toISOString().split('T')[0],
       expirationDate: app.expirationDate || '',
-      creatorSalesId: app.submittedBy || ''
+      creatorSalesId: actualSales?.id || app.submittedBy || ''
     };
 
     db_distributors.push(newDist);
+    gStore.db_distributors = db_distributors;
     
     await ensurePlatformTables();
     try {
@@ -2645,12 +2650,14 @@ export async function createDistributorSales(distId: string, data: any) {
     account,
     password,
     distributorId: distId,
+    role: 'DistSales',
     commissionRates: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate },
     joinedAt: new Date().toISOString().split('T')[0],
     status: 'Active'
   };
   
   db_dist_sales.push(newSales);
+  gStore.db_dist_sales = db_dist_sales;
   return { success: true, data: newSales };
 }
 export async function deleteTool(toolId: string) {
@@ -2821,6 +2828,7 @@ export async function createSuperSalesAccount(data: any) {
   });
 
   db_super_sales_overrides[data.name] = commissionRates;
+  gStore.db_dist_sales = db_dist_sales;
 
   revalidatePath('/super-admin');
   return { success: true, id };
@@ -2861,15 +2869,14 @@ export async function createDistributorAccount(data: any) {
     owner: data.owner,
     date: new Date().toISOString().split('T')[0]
   });
+  
+  gStore.db_distributors = db_distributors;
 
   revalidatePath('/super-admin');
   return { success: true, id };
 }
 
 export async function createTempleAccount(data: any) {
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被使用，請更換其他帳號' };
-  }
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
   const creatorRole = reqRole;
@@ -2902,6 +2909,7 @@ export async function createTempleAccount(data: any) {
   };
   
   db_temples.push(newTemple);
+  gStore.db_temples = db_temples;
   
   // Create personnel account for login
   if (data.account && data.password) {

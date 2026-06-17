@@ -32,6 +32,7 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
     freeType: 'Normal' as 'Normal' | 'Trial' | 'Permanent',
     trialMonths: 0,
   });
+  const [accountError, setAccountError] = useState('');
 
   useEffect(() => {
     fetchRentPlans().then(setRentPlans);
@@ -40,8 +41,25 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
     });
   }, []);
 
+  const validateAccount = async (acc: string) => {
+    if (!acc) { setAccountError(''); return; }
+    try {
+      const { checkAccountExists } = await import('../actions');
+      const exists = await checkAccountExists(acc);
+      if (exists) {
+        setAccountError(`此帳號不可使用，建議使用：${acc}${Math.floor(Math.random()*900)+100}`);
+      } else {
+        setAccountError('');
+      }
+    } catch(e) {}
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (accountError) {
+      alert("目前帳號不可使用，請依照系統建議更換！");
+      return;
+    }
     setLoading(true);
     try {
       const { submitFreeAccountApplication } = await import('../actions');
@@ -140,8 +158,12 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
               
               <div className="grid grid-cols-2 gap-3">
                  <div className="relative group">
-                    <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10 group-focus-within:text-emerald-600 transition-colors">登入帳號</p>
-                    <input type="text" placeholder="建議用英數" value={form.account} onChange={e => setForm({...form, account: e.target.value})} className="app-input-v7" required />
+                    <p className={`absolute left-5 -top-2 bg-white px-2 text-[9px] font-black uppercase tracking-widest z-10 transition-colors ${accountError ? 'text-rose-600' : 'text-slate-400 group-focus-within:text-emerald-600'}`}>登入帳號</p>
+                    <input type="text" placeholder="建議用英數" value={form.account} onChange={e => {
+                       setForm({...form, account: e.target.value});
+                       validateAccount(e.target.value);
+                    }} className={`app-input-v7 ${accountError ? 'border-rose-300 bg-rose-50/30 text-rose-900 focus:border-rose-500 focus:ring-rose-500/20' : ''}`} required />
+                    {accountError && <p className="text-[10px] text-rose-500 font-bold mt-1.5 px-2 bg-rose-50 rounded-lg py-1">{accountError}</p>}
                  </div>
                  <div className="relative group">
                     <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10 group-focus-within:text-emerald-600 transition-colors">預設密碼</p>

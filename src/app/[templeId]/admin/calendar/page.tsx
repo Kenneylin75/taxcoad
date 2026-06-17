@@ -579,8 +579,9 @@ export default function CalendarPage() {
                       name="phone" 
                       type="tel" 
                       value={searchPhone}
-                      onChange={(e) => handlePhoneSearchChange(e.target.value)}
+                      onChange={(e) => handlePhoneSearchChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       placeholder="09XX-XXX-XXX" 
+                      pattern="^09\d{8}$" minLength={10} maxLength={10}
                       className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:border-amber-500 outline-none transition-colors" 
                       autoComplete="off"
                     />
@@ -674,7 +675,8 @@ export default function CalendarPage() {
                           type="tel" 
                           placeholder="電話" 
                           value={newGuestData.phone} 
-                          onChange={(e) => setNewGuestData({ ...newGuestData, phone: e.target.value })} 
+                          pattern="^09\d{8}$" minLength={10} maxLength={10}
+                          onChange={(e) => setNewGuestData({ ...newGuestData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} 
                           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-xs font-bold focus:border-amber-500 outline-none text-white" 
                         />
                       </div>

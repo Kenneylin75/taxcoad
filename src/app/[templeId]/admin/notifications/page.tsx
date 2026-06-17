@@ -244,14 +244,38 @@ export default function BelieverNotificationsPage() {
                             </p>
                           </div>
                           <div className="flex items-center justify-between mt-3 px-1">
-                            <span className="text-[8px] font-bold text-slate-300 font-mono">ID: {notif.id}</span>
-                            <span className="text-[8px] font-bold text-slate-300 font-mono">CREATED: {formatDate(notif.createdAt)}</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-300 font-mono">ID: {notif.id}</span>
+                              <span className="text-[8px] font-bold text-slate-300 font-mono">CREATED: {formatDate(notif.createdAt)}</span>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                setTitle(notif.title);
+                                setContent(notif.content);
+                                setSendType('immediate');
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="text-[10px] bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 px-3 py-1.5 rounded-lg transition-colors font-bold flex items-center gap-1 border border-slate-200"
+                            >
+                              <span>✏️</span> 複製為新公告
+                            </button>
                           </div>
                         </div>
                       )}
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {!isLoading && notifications.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-center pb-2">
+                <button 
+                  onClick={() => alert('已載入全部歷史紀錄')}
+                  className="px-6 py-2.5 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-100 hover:shadow-sm transition-all"
+                >
+                  載入更多歷史紀錄...
+                </button>
               </div>
             )}
           </div>

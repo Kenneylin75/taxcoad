@@ -109,6 +109,21 @@ export default function DistAdminClient({
     setupRate: 20, rentYear1Rate: 15, rentYear2Rate: 10, rentYear3PlusRate: 5
   });
 
+  const [accountError, setAccountError] = useState('');
+  
+  const validateAccount = async (acc: string) => {
+    if (!acc) { setAccountError(''); return; }
+    try {
+      const { checkAccountExists } = await import('@/app/actions');
+      const exists = await checkAccountExists(acc);
+      if (exists) {
+        setAccountError(`此帳號不可使用，建議使用：${acc}${Math.floor(Math.random()*900)+100}`);
+      } else {
+        setAccountError('');
+      }
+    } catch(e) {}
+  };
+
   const [logs, setLogs] = useState([{ id: 1, action: "系統初始化完成", target: "安全協議", operator: "System", time: "2026-05-04 00:00" }]);
 
   const addLog = (action: string, target: string) => {
@@ -136,6 +151,10 @@ export default function DistAdminClient({
 
   const handleAddSales = (e: React.FormEvent) => {
     e.preventDefault();
+    if (accountError) {
+      alert("目前帳號不可使用，請依照系統建議更換！");
+      return;
+    }
     startTransition(async () => {
       const { createDistributorSales } = await import('@/app/actions');
       const res = await createDistributorSales(distId, newSalesForm);
@@ -841,7 +860,13 @@ export default function DistAdminClient({
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">系統帳號 ID</p>
-                           <input type="text" placeholder="自定義登入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.account} onChange={e=>setNewSalesForm({...newSalesForm, account:e.target.value})} required />
+                           <div className="space-y-1">
+                             <input type="text" placeholder="自定義登入帳號" className={`w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 transition-all ${accountError ? 'border-rose-300 bg-rose-50 text-rose-900 focus:border-rose-500' : 'border-transparent focus:border-blue-200'}`} value={newSalesForm.account} onChange={e=>{
+                                setNewSalesForm({...newSalesForm, account:e.target.value});
+                                validateAccount(e.target.value);
+                             }} required />
+                             {accountError && <p className="text-[10px] text-rose-500 font-bold px-4">{accountError}</p>}
+                           </div>
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">安全密碼 Password</p>

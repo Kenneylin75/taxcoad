@@ -11,9 +11,27 @@ interface FormProps {
 
 export default function DistributorApplicationForm({ role, submittedBy, onSuccess, onCancel }: FormProps) {
   const [loading, setLoading] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  
+  const validateAccount = async (acc: string) => {
+    if (!acc) { setAccountError(''); return; }
+    try {
+      const { checkAccountExists } = await import('../actions');
+      const exists = await checkAccountExists(acc);
+      if (exists) {
+        setAccountError(`此帳號不可使用，建議使用：${acc}${Math.floor(Math.random()*900)+100}`);
+      } else {
+        setAccountError('');
+      }
+    } catch(e) {}
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (accountError) {
+      alert("目前帳號不可使用，請依照系統建議更換！");
+      return;
+    }
     setLoading(true);
     try {
       const fd = new FormData(e.target as HTMLFormElement);
@@ -85,8 +103,9 @@ export default function DistributorApplicationForm({ role, submittedBy, onSucces
              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest italic">02. 系統登入帳密設定</p>
           </div>
           <div className="space-y-2">
-             <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">登入帳號 (Account ID)</label>
-             <input name="account" type="text" placeholder="英文/數字組合" className="w-full bg-slate-50 rounded-2xl p-6 text-sm font-bold border border-slate-100 focus:bg-white focus:border-indigo-400 outline-none transition-all" required />
+             <label className={`text-[10px] font-black uppercase ml-4 tracking-widest transition-colors ${accountError ? 'text-rose-600' : 'text-slate-400'}`}>登入帳號 (Account ID)</label>
+             <input name="account" type="text" placeholder="英文/數字組合" onChange={e => validateAccount(e.target.value)} className={`w-full bg-slate-50 rounded-2xl p-6 text-sm font-bold border outline-none transition-all ${accountError ? 'border-rose-300 bg-rose-50/50 text-rose-900 focus:border-rose-500' : 'border-slate-100 focus:bg-white focus:border-indigo-400'}`} required />
+             {accountError && <p className="text-[10px] text-rose-500 font-bold px-4">{accountError}</p>}
           </div>
           <div className="space-y-2">
              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">初始密碼 (Password)</label>

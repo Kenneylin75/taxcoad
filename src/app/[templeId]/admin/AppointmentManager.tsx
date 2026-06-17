@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition } from 'react';
-import { markAppointmentCompleted } from '@/app/actions';
+import { markAppointmentCompleted, rescheduleSingleAppointment, fetchAvailableSlots } from '@/app/actions';
 
 interface Appointment {
   id: number;
@@ -27,6 +27,58 @@ export default function AppointmentManager({ initialAppointments }: AppointmentM
   const [dateFilter, setDateFilter] = useState('');
   const [isDataViewOpen, setIsDataViewOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // 改期相關狀態
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [selectedRescheduleApp, setSelectedRescheduleApp] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [availableSlotsForReschedule, setAvailableSlotsForReschedule] = useState<any[]>([]);
+  const [selectedNewSlotId, setSelectedNewSlotId] = useState<number | null>(null);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
+  React.useEffect(() => {
+    if (!rescheduleDate || !selectedRescheduleApp) {
+      setAvailableSlotsForReschedule([]);
+      return;
+    }
+    const fetchSlots = async () => {
+      const slots = await fetchAvailableSlots();
+      const filtered = slots.filter((s: any) => 
+        s.date === rescheduleDate && 
+        s.status === 'Available' && 
+        (s.service === selectedRescheduleApp.service || s.description === selectedRescheduleApp.service)
+      );
+      setAvailableSlotsForReschedule(filtered);
+    };
+    fetchSlots();
+  }, [rescheduleDate, selectedRescheduleApp]);
+
+  const handleRescheduleClick = (app: Appointment) => {
+    setSelectedRescheduleApp(app);
+    setRescheduleDate(app.time.split(' ')[0]);
+    setSelectedNewSlotId(null);
+    setShowRescheduleModal(true);
+  };
+
+  const handleRescheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRescheduleApp || !selectedNewSlotId) return;
+    setIsRescheduling(true);
+    try {
+      const res = await rescheduleSingleAppointment(selectedRescheduleApp.id, selectedNewSlotId);
+      if (res.success) {
+        alert('✅ 改期成功！已發送通知給信眾。');
+        setShowRescheduleModal(false);
+        window.location.reload();
+      } else {
+        alert('❌ 改期失敗：' + res.message);
+      }
+    } catch (err) {
+      alert('❌ 改期失敗，請稍後再試。');
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
@@ -189,13 +241,21 @@ export default function AppointmentManager({ initialAppointments }: AppointmentM
                       📜
                     </a>
                     {app.status === 'Pending' ? (
-                      <button 
-                        onClick={() => handleMarkCompleted(app.id)}
-                        disabled={isPending}
-                        className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-900 shadow-sm transition-all"
-                      >
-                        {isPending ? '處理中...' : '⚔️ 核定報到'}
-                      </button>
+                      <div className="flex gap-2 items-center">
+                        <button 
+                          onClick={() => handleRescheduleClick(app)}
+                          className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white shadow-sm transition-all"
+                        >
+                          🔄 改期
+                        </button>
+                        <button 
+                          onClick={() => handleMarkCompleted(app.id)}
+                          disabled={isPending}
+                          className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-900 shadow-sm transition-all"
+                        >
+                          {isPending ? '處理中...' : '⚔️ 核定報到'}
+                        </button>
+                      </div>
                     ) : (
                       <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest italic">
                         <span>✓</span> 已報到
@@ -246,6 +306,71 @@ export default function AppointmentManager({ initialAppointments }: AppointmentM
               →
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Reschedule Modal */}
+      {showRescheduleModal && selectedRescheduleApp && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <h3 className="font-bold text-slate-900 uppercase tracking-widest text-lg flex items-center gap-2">
+                   <span>🔄</span> 手動改期作業
+                 </h3>
+                 <button onClick={() => setShowRescheduleModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl font-bold">×</button>
+              </div>
+              <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-6">
+                 <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 space-y-2">
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">信眾當前預約資訊</p>
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm font-black text-slate-800">{selectedRescheduleApp.guestName}</span>
+                       <span className="text-xs font-bold text-slate-500">{selectedRescheduleApp.service}</span>
+                    </div>
+                    <p className="text-xs font-mono font-bold text-slate-500">{selectedRescheduleApp.time}</p>
+                 </div>
+
+                 <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">請選擇欲改期之新日期</label>
+                    <input 
+                      type="date" 
+                      required
+                      value={rescheduleDate}
+                      onChange={(e) => setRescheduleDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:border-indigo-600 outline-none transition-all" 
+                    />
+                 </div>
+
+                 <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">可選擇之新時段 (限原服務)</label>
+                    {availableSlotsForReschedule.length > 0 ? (
+                      <select 
+                        required
+                        value={selectedNewSlotId || ''}
+                        onChange={(e) => setSelectedNewSlotId(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:border-indigo-600 outline-none transition-all"
+                      >
+                         <option value="">請選擇空檔時段...</option>
+                         {availableSlotsForReschedule.map(slot => (
+                           <option key={slot.id} value={slot.id}>
+                             {slot.time.split(' ')[1]} - {slot.staff} 老師
+                           </option>
+                         ))}
+                      </select>
+                    ) : (
+                      <div className="bg-rose-50 border border-rose-100 rounded-xl px-4 py-3 text-xs font-bold text-rose-600">
+                         {rescheduleDate ? '該日期目前沒有可選的同服務空檔。' : '請先選擇上方日期。'}
+                      </div>
+                    )}
+                 </div>
+
+                 <div className="pt-4 border-t border-slate-100 flex gap-4">
+                    <button type="button" onClick={() => setShowRescheduleModal(false)} className="flex-1 py-3 bg-white text-slate-600 font-black rounded-xl border border-slate-200 hover:bg-slate-50 transition-all uppercase tracking-widest text-xs">取消</button>
+                    <button type="submit" disabled={!selectedNewSlotId || isRescheduling} className="flex-1 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 disabled:opacity-50 tracking-widest uppercase transition-all shadow-md text-xs">
+                       {isRescheduling ? "處理中..." : "確認改期並發送通知"}
+                    </button>
+                 </div>
+              </form>
+           </div>
         </div>
       )}
     </div>

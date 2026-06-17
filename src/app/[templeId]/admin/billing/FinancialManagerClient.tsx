@@ -34,13 +34,45 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const filteredRevenue = (initialData?.revenue || []).filter(rev => rev.timestamp.startsWith(selectedMonth));
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredRevenue = (initialData?.revenue || []).filter(rev => {
+    const matchMonth = rev.timestamp.startsWith(selectedMonth);
+    if (!searchTerm) return matchMonth;
+    const term = searchTerm.toLowerCase();
+    const matchSearch = (rev.title || '').toLowerCase().includes(term) ||
+                        (rev.guestName || '').toLowerCase().includes(term) ||
+                        (rev.source || '').toLowerCase().includes(term) ||
+                        (rev.paymentMethod || '').toLowerCase().includes(term);
+    return matchMonth && matchSearch;
+  });
   const monthlyRevenue = filteredRevenue.reduce((sum, rev) => sum + rev.amount, 0);
   const monthlyOrderCount = filteredRevenue.length;
   const averageOrderValue = monthlyOrderCount > 0 ? Math.round(monthlyRevenue / monthlyOrderCount) : 0;
 
   const filteredExpenses = (initialData?.expenses || []).filter(exp => (exp.billingDate && exp.billingDate.startsWith(selectedMonth)) || exp.status === 'Unpaid');
   const nearestDueDate = (initialData?.expenses || []).filter(e => e.status === 'Unpaid').sort((a,b) => a.dueDate.localeCompare(b.dueDate))[0]?.dueDate || '無';
+
+  const handleExportCSV = () => {
+    if (filteredRevenue.length === 0) return alert('目前沒有可匯出的資料');
+    const headers = ['項目類別/來源', '信眾名稱', '支付方式', '核定金額', '入帳時間', '狀態'];
+    const rows = filteredRevenue.map(r => [
+      `"${r.source} - ${r.title}"`,
+      `"${r.guestName}"`,
+      `"${r.paymentMethod}"`,
+      r.amount,
+      `"${r.timestamp}"`,
+      `"${r.status}"`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `帳務報表_${selectedMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
 
   const handleApprove = async (id: string) => {
@@ -76,6 +108,7 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
       case 'Appointment': return '📅';
       case 'Event': return '🧧';
       case 'Queue': return '🚶';
+      case 'Merit': return '✨';
       default: return '🧧';
     }
   };
@@ -182,14 +215,21 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                 <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                    <span className="text-amber-500">🏮</span> 信眾收入流水 Registry
                 </h3>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                   <input
+                     type="text"
+                     placeholder="關鍵字搜尋(信眾/項目/來源)..."
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                     className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white focus:border-amber-500 outline-none w-56 shadow-sm"
+                   />
                    <input 
                      type="month" 
                      value={selectedMonth}
                      onChange={(e) => setSelectedMonth(e.target.value)}
                      className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white focus:border-slate-900 outline-none"
                    />
-                   <button className="text-[10px] font-black text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-all shadow-sm">
+                   <button onClick={handleExportCSV} className="text-[10px] font-black text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition-all shadow-sm">
                       💾 匯出報表 EXPORT
                    </button>
                 </div>

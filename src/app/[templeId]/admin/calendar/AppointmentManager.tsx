@@ -355,8 +355,9 @@ export default function AppointmentManager({ initialAppointments }: { initialApp
                            <input 
                               type="tel" 
                               value={searchPhone}
-                              onChange={(e) => handlePhoneSearchChange(e.target.value)}
+                              onChange={(e) => handlePhoneSearchChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
                               placeholder="輸入電話搜尋..." 
+                              pattern="^09\d{8}$" minLength={10} maxLength={10}
                               className="w-full bg-slate-50 border-2 border-slate-100 rounded-[20px] px-6 py-4 text-lg font-black text-slate-900 outline-none focus:border-indigo-600 transition-all"
                               autoComplete="off"
                            />
@@ -514,7 +515,8 @@ export default function AppointmentManager({ initialAppointments }: { initialApp
                                     type="tel" 
                                     placeholder="電話" 
                                     value={newGuestData.phone} 
-                                    onChange={(e) => setNewGuestData({ ...newGuestData, phone: e.target.value })} 
+                                    pattern="^09\d{8}$" minLength={10} maxLength={10}
+                                    onChange={(e) => setNewGuestData({ ...newGuestData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} 
                                     className="w-full bg-slate-800 border border-slate-700 rounded-xl text-slate-950 px-4 py-2 text-xs font-bold focus:border-amber-500 outline-none" 
                                  />
                               </div>

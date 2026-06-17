@@ -22,6 +22,7 @@ import {
   GuestRecord,
   LampCategory
 } from '@/app/actions';
+import { Solar } from 'lunar-javascript';
 
 // 🎨 點燈類別專屬配色系統 (與點燈管理同步)
 const CATEGORY_UI_CONFIG = [
@@ -89,6 +90,31 @@ function DeepFileCenterContent() {
   const [paymentMethod, setPaymentMethod] = useState<'現金' | '匯款'>('現金');
   const [lastFive, setLastFive] = useState('');
   const [viewingRecord, setViewingRecord] = useState<DeepRecord | null>(null);
+
+  const lunarInfo = useMemo(() => {
+    if (!selectedGuest?.birthday) return null;
+    try {
+      const parts = selectedGuest.birthday.split('-');
+      if (parts.length !== 3) return null;
+      const solar = Solar.fromYmd(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+      const lunar = solar.getLunar();
+      const rocYear = parseInt(parts[0]) - 1911;
+      
+      const formattedLunar = `民國 ${rocYear}年 ${lunar.getYearInGanZhi()}年（${lunar.getYearShengXiao()}年）${lunar.getMonthInChinese()}月初${lunar.getDayInChinese().replace('初初', '初')}`;
+      const correctLunar = formattedLunar.includes('初十') || formattedLunar.includes('二十') || formattedLunar.includes('三十') || (!formattedLunar.includes('初一') && !formattedLunar.includes('初二') && !formattedLunar.includes('初三') && !formattedLunar.includes('初四') && !formattedLunar.includes('初五') && !formattedLunar.includes('初六') && !formattedLunar.includes('初七') && !formattedLunar.includes('初八') && !formattedLunar.includes('初九')) ? `民國 ${rocYear}年 ${lunar.getYearInGanZhi()}年（${lunar.getYearShengXiao()}年）${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}` : `民國 ${rocYear}年 ${lunar.getYearInGanZhi()}年（${lunar.getYearShengXiao()}年）${lunar.getMonthInChinese()}月初${lunar.getDayInChinese().replace('初初', '初')}`;
+
+      // 修正常見的農曆日期錯誤
+      const finalLunar = `民國 ${rocYear}年 ${lunar.getYearInGanZhi()}年（${lunar.getYearShengXiao()}年）${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`;
+
+      const suici = `${lunar.getYearInGanZhi()}年 ${lunar.getMonthInGanZhi()}月 ${lunar.getDayInGanZhi()}日`;
+      const shengxiao = `屬${lunar.getYearShengXiao()}`;
+      const week = `星期${solar.getWeekInChinese()}`;
+      
+      return { formattedLunar: finalLunar, suici, shengxiao, week };
+    } catch (e) {
+      return null;
+    }
+  }, [selectedGuest?.birthday]);
 
   const loadBaseData = async () => {
     try {
@@ -195,14 +221,22 @@ function DeepFileCenterContent() {
   const handleSaveRecord = async (values: any) => {
     if (!selectedGuest || !activeForm) return;
     setIsSaving(true);
-    await saveDeepRecord(selectedGuest.phone, activeForm.eventId, activeForm.serviceType, '管理人員', values);
+    const { saveDeepRecord, updateDeepRecord } = await import('@/app/actions');
     
-    // Auto-save form into media
-    try {
-       const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-       const fileName = `${activeForm.serviceType}_${dateStr}.pdf`;
-       await uploadCustomerMedia(selectedGuest.phone, `/icons/form-pdf-icon.png`, 'file', '系統自動歸檔', fileName);
-    } catch (e) { console.error('Failed to auto-archive form:', e); }
+    if (activeForm.recordId) {
+      await updateDeepRecord(activeForm.recordId, selectedGuest.phone, '管理人員', values);
+    } else {
+      await saveDeepRecord(selectedGuest.phone, activeForm.eventId, activeForm.serviceType, '管理人員', values);
+    }
+    
+    // Auto-save form into media only if it's a new record
+    if (!activeForm.recordId) {
+      try {
+         const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+         const fileName = `${activeForm.serviceType}_${dateStr}.pdf`;
+         await uploadCustomerMedia(selectedGuest.phone, `/icons/form-pdf-icon.png`, 'file', '系統自動歸檔', fileName);
+      } catch (e) { console.error('Failed to auto-archive form:', e); }
+    }
 
     await loadHistory(selectedGuest.phone);
     setActiveForm(null);
@@ -244,12 +278,17 @@ function DeepFileCenterContent() {
     const file = e.target.files?.[0];
     if (!file || !selectedGuest) return;
     setIsSaving(true);
-    const mockUrl = `/uploads/${Date.now()}_${file.name}`;
-    await uploadCustomerMedia(selectedGuest.phone, mockUrl, uploadType, 'Temple', file.name);
+    
+    // 為了讓展示環境中，使用者能「真的」看到自己上傳的影片與照片，
+    // 我們使用瀏覽器原生的 URL.createObjectURL 來產生一個本地的預覽連結，
+    // 取代原本會 404 的假路徑 (/uploads/...)。
+    const previewUrl = URL.createObjectURL(file);
+    
+    await uploadCustomerMedia(selectedGuest.phone, previewUrl, uploadType, 'Temple', file.name);
     await loadHistory(selectedGuest.phone);
     setIsSaving(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
-    alert(`✨ 檔案「${file.name}」已成功上傳歸檔至該信眾檔案庫中！`);
+    alert(`✨ 檔案「${file.name}」已成功上傳並歸檔至該信眾檔案庫中！`);
   };
 
   const handleCreateGuest = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -273,7 +312,7 @@ function DeepFileCenterContent() {
   const renderPreviewModal = () => {
     if (!previewFile) return null;
     return (
-      <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-6">
+      <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-6" style={{ zIndex: 99999 }}>
         <div className="w-full max-w-lg bg-white rounded-2xl shadow-3xl overflow-hidden border-4 border-slate-900 animate-in zoom-in-95 flex flex-col max-h-[85vh]">
           <header className="p-8 border-b-2 border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
             <div>
@@ -289,7 +328,10 @@ function DeepFileCenterContent() {
                 src={previewFile.url} 
                 className="max-w-full max-h-[50vh] object-contain rounded-3xl shadow-md border border-slate-100" 
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1543884149-bc91b61972ec?auto=format&fit=crop&q=80";
+                  const target = e.target as HTMLImageElement;
+                  if (target.getAttribute('data-error-handled')) return;
+                  target.setAttribute('data-error-handled', 'true');
+                  target.src = "https://images.unsplash.com/photo-1543884149-bc91b61972ec?auto=format&fit=crop&q=80";
                 }}
               />
             ) : previewFile.type === 'video' ? (
@@ -300,31 +342,32 @@ function DeepFileCenterContent() {
                   autoPlay
                   className="w-full h-full object-contain"
                   onError={(e) => {
-                    (e.target as HTMLVideoElement).src = "https://assets.mixkit.co/videos/preview/mixkit-worship-hands-raised-in-church-41716-large.mp4";
+                    const target = e.target as HTMLVideoElement;
+                    if (target.getAttribute('data-error-handled')) return;
+                    target.setAttribute('data-error-handled', 'true');
+                    target.src = "https://www.w3schools.com/html/mov_bbb.mp4";
                   }}
                 />
               </div>
             ) : (
-              <div className="w-full bg-slate-50 border-2 border-slate-100 rounded-[35px] p-8 space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="text-5xl">📄</div>
+              <div className="w-full bg-slate-50 border-2 border-slate-100 rounded-[35px] flex flex-col overflow-hidden min-h-[50vh]">
+                <div className="p-6 border-b-2 border-slate-100 flex items-center gap-4 bg-white shrink-0">
+                  <div className="text-3xl">📄</div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-black text-slate-900 text-lg truncate">{previewFile.name}</h4>
-                    <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">{previewFile.folder}</p>
+                    <h4 className="font-black text-slate-900 text-lg truncate">{previewFile.name || '文件檢視'}</h4>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{previewFile.folder}</p>
                   </div>
                 </div>
-                <div className="border-t-2 border-slate-200/60 pt-6 space-y-4">
-                  <div className="bg-white p-6 rounded-2xl border-2 border-slate-100 shadow-sm">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">宮廟端數位憑證歸檔閱讀</p>
-                    <p className="text-xs text-slate-600 leading-relaxed font-mono">
-                      【聖皇宮 數位憑證專用】<br/>
-                      歸檔電話：{previewFile.phone}<br/>
-                      檔案類別：{previewFile.type === 'photo' ? '照片' : previewFile.type === 'video' ? '影音' : '文件'}<br/>
-                      上傳戳記：{new Date().toLocaleString('zh-TW')}<br/>
-                      權限設定：已核定並同步至信眾手機個人空間。
-                    </p>
-                  </div>
-                </div>
+                
+                {previewFile.url?.startsWith('blob:') || previewFile.name?.toLowerCase().endsWith('.pdf') ? (
+                   <iframe src={previewFile.url} className="w-full flex-1 bg-white" title={previewFile.name} />
+                ) : (
+                   <div className="flex-1 p-10 flex flex-col items-center justify-center text-slate-500 space-y-4">
+                      <div className="text-6xl opacity-20">🗂️</div>
+                      <p className="font-bold text-sm">本格式暫不支援直接預覽，請點擊下方按鈕下載或開啟原檔</p>
+                      <p className="text-xs text-slate-400 font-mono">File: {previewFile.name}</p>
+                   </div>
+                )}
               </div>
             )}
           </div>
@@ -380,22 +423,43 @@ function DeepFileCenterContent() {
 
             <div className="p-12 space-y-12 max-w-5xl">
                {/* Quick Info */}
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 py-8 border-b border-slate-100 relative group">
-                  <div onClick={() => setShowAddModal(true)} className="absolute right-0 top-0 flex items-center justify-center gap-2 cursor-pointer bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all opacity-0 group-hover:opacity-100">
+               <div className="bg-slate-50 rounded-[35px] border-2 border-slate-100 p-8 relative group mb-8">
+                  <div onClick={() => setShowAddModal(true)} className="absolute right-6 top-6 flex items-center justify-center gap-2 cursor-pointer bg-white px-5 py-3 rounded-2xl border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:shadow-md transition-all opacity-0 group-hover:opacity-100 shadow-sm z-10">
                      <span className="text-sm">✏️</span>
-                     <span className="text-xs font-bold uppercase tracking-widest">快速修改資料</span>
+                     <span className="text-[10px] font-black uppercase tracking-widest">快速修改資料</span>
                   </div>
-                  <div className="space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
-                     <p className="text-xs font-medium text-slate-400 flex items-center gap-2">聯絡電話 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
-                     <p className="text-base text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.phone}</p>
-                  </div>
-                  <div className="space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
-                     <p className="text-xs font-medium text-slate-400 flex items-center gap-2">生辰案卷 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
-                     <div className="flex items-center gap-3"><span className="text-base text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.birthday || '未提供'}</span><span className="text-sm text-slate-500">{selectedGuest.lunarBirthday || ''}</span></div>
-                  </div>
-                  <div className="space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
-                     <p className="text-xs font-medium text-slate-400 flex items-center gap-2">通訊地址 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
-                     <p className="text-base text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.address || '未提供'}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                     <div className="md:col-span-3 space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">聯絡電話 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                        <p className="text-xl font-black text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.phone}</p>
+                     </div>
+                     <div className="md:col-span-5 space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">生日 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                        <div className="flex flex-col gap-2">
+                           <span className="text-xl font-black text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.birthday || '未提供'}</span>
+                           <div className="flex flex-wrap gap-2">
+                              {lunarInfo ? (
+                                <span className="text-xs font-bold text-slate-600 bg-white px-3 py-1.5 rounded-[10px] border border-slate-200 shadow-sm">
+                                  {lunarInfo.formattedLunar}
+                                </span>
+                              ) : selectedGuest.lunarBirthday ? (
+                                <span className="text-xs font-bold text-slate-600 bg-white px-3 py-1.5 rounded-[10px] border border-slate-200 shadow-sm">{selectedGuest.lunarBirthday}</span>
+                              ) : null}
+                              {selectedGuest.birthHour && <span className="text-xs font-bold text-slate-600 bg-white px-3 py-1.5 rounded-[10px] border border-slate-200 shadow-sm">{selectedGuest.birthHour}</span>}
+                           </div>
+                           {lunarInfo && (
+                             <div className="flex gap-3 mt-1">
+                                <span className="text-[10px] font-bold text-slate-400">歲次：{lunarInfo.suici}</span>
+                                <span className="text-[10px] font-bold text-slate-400">生肖：{lunarInfo.shengxiao}</span>
+                                <span className="text-[10px] font-bold text-slate-400">星期：{lunarInfo.week}</span>
+                             </div>
+                           )}
+                        </div>
+                     </div>
+                     <div className="md:col-span-4 space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">通訊地址 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                        <p className="text-base font-bold text-slate-900 leading-relaxed group-hover/item:text-indigo-600 transition-colors pr-20">{selectedGuest.address || '未提供'}</p>
+                     </div>
                   </div>
                </div>
 
@@ -432,14 +496,14 @@ function DeepFileCenterContent() {
                                      {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid') && (
                                         <button 
                                           onClick={async () => {
-                                            if (confirm('確定已收取現金並標記為已付款？')) {
+                                            if (confirm('確定要標記已收款？')) {
                                               await import('@/app/actions').then(m => m.confirmPayment(lamp.id, 'Lamp'));
                                               if (selectedGuest) await loadHistory(selectedGuest.phone);
                                             }
                                           }}
                                           className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors px-4 py-2 bg-red-50 rounded-lg border border-red-100"
                                         >
-                                          💵 標記為已付款
+                                          ✅ 標記已收款
                                         </button>
                                      )}
                                      {lamp.paymentStatus === 'Paid' && (
@@ -540,14 +604,14 @@ function DeepFileCenterContent() {
                                       {(event.paymentStatus === 'Pending' || event.paymentStatus === 'Unpaid') && (
                                         <button 
                                           onClick={async () => {
-                                            if (confirm('確定已收取現金並標記為已付款？')) {
+                                            if (confirm('確定要標記已收款？')) {
                                               await import('@/app/actions').then(m => m.confirmPayment(event.id.toString(), 'Appointment'));
                                               if (selectedGuest) await loadHistory(selectedGuest.phone);
                                             }
                                           }}
                                           className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors ml-4 px-3 py-1 bg-red-50 rounded-lg border border-red-100"
                                         >
-                                          💵 標記為已付款
+                                          ✅ 標記已收款
                                         </button>
                                       )}
                                       {event.paymentStatus === 'Paid' && (
@@ -577,14 +641,14 @@ function DeepFileCenterContent() {
                                  {(evt.paymentStatus === 'Pending' || evt.paymentStatus === 'Unpaid') && (
                                     <button 
                                       onClick={async () => {
-                                        if (confirm('確定已收取現金並標記為已付款？')) {
+                                        if (confirm('確定要標記已收款？')) {
                                           await import('@/app/actions').then(m => m.confirmPayment(evt.id, 'Event'));
                                           if (selectedGuest) await loadHistory(selectedGuest.phone);
                                         }
                                       }}
                                       className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
                                     >
-                                      💵 標記為已付款
+                                      ✅ 標記已收款
                                     </button>
                                  )}
                                  {evt.paymentStatus === 'Paid' && (
@@ -613,14 +677,14 @@ function DeepFileCenterContent() {
                                  {(tix.paymentStatus === 'Pending' || tix.paymentStatus === 'Unpaid') && (
                                     <button 
                                       onClick={async () => {
-                                        if (confirm('確定已收取現金並標記為已付款？')) {
+                                        if (confirm('確定要標記已收款？')) {
                                           await import('@/app/actions').then(m => m.confirmPayment(tix.id, 'Queue'));
                                           if (selectedGuest) await loadHistory(selectedGuest.phone);
                                         }
                                       }}
                                       className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
                                     >
-                                      💵 標記為已付款
+                                      ✅ 標記已收款
                                     </button>
                                  )}
                                  {tix.paymentStatus === 'Paid' && (
@@ -656,7 +720,18 @@ function DeepFileCenterContent() {
                                  {group.files.map((file) => (
                                     <div 
                                        key={file.id} 
-                                       onClick={() => setPreviewFile(file)}
+                                       onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (file.type === 'file' && file.name && file.name.endsWith('.pdf')) {
+                                             const possibleServiceType = file.name.split('_')[0];
+                                             const matchedRecord = history.records?.find((r: any) => r.serviceType === possibleServiceType);
+                                             if (matchedRecord) {
+                                                setViewingRecord(matchedRecord);
+                                                return;
+                                             }
+                                          }
+                                          setPreviewFile(file);
+                                       }}
                                        className="relative rounded-[45px] overflow-hidden border-4 border-slate-50 aspect-square bg-slate-50 shadow-sm hover:scale-105 hover:shadow-lg transition-all cursor-zoom-in flex items-center justify-center"
                                     >
                                        {file.type === 'photo' ? (
@@ -666,7 +741,7 @@ function DeepFileCenterContent() {
                                        ) : (
                                           <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-800 p-4 border border-slate-100 rounded-[40px]">
                                              <span className="text-5xl">📄</span>
-                                             <span className="text-[10px] font-black text-slate-500 mt-2 truncate w-full text-center px-2">{file.name}</span>
+                                             <span className="text-[10px] font-black text-slate-500 mt-2 truncate w-full text-center px-2">{file.name || '未知文件'}</span>
                                           </div>
                                        )}
                                     </div>
@@ -696,10 +771,14 @@ function DeepFileCenterContent() {
               <div className="p-16 space-y-10 max-h-[75vh] overflow-y-auto scrollbar-hide">
                  <div className="grid grid-cols-2 gap-10">
                    <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">信眾姓名</label><input name="name" placeholder="輸入全名" defaultValue={selectedGuest?.name} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" required /></div>
-                   <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">手機號碼</label><input name="phone" placeholder="09xx..." defaultValue={selectedGuest?.phone} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" required /></div>
+                   <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">手機號碼</label><input type="tel" name="phone" placeholder="09xx..." defaultValue={selectedGuest?.phone} pattern="^09\d{8}$" minLength={10} maxLength={10} onInput={(e) => { e.currentTarget.value = e.currentTarget.value.replace(/\D/g, ''); }} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" required title="請輸入 10 碼電話號碼" /></div>
                  </div>
                  <div className="grid grid-cols-2 gap-10">
                    <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">國曆生日</label><input name="birthday" type="date" defaultValue={selectedGuest?.birthday} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-5 text-lg font-black outline-none focus:border-indigo-600 shadow-inner" /></div>
+                   <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">農曆生日 (可手動校正)</label><input name="lunarBirthday" type="text" placeholder="例: 壬辰年 臘月 初五日" defaultValue={selectedGuest?.lunarBirthday} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-lg font-black outline-none focus:border-indigo-600 shadow-inner" /></div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-10">
+                   <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">出生時辰</label><select name="birthHour" defaultValue={selectedGuest?.birthHour || ""} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-lg font-black outline-none focus:border-indigo-600 shadow-inner appearance-none cursor-pointer"><option value="">-- 請選擇時辰 --</option><option value="吉時 (不知道)">吉時 (不知道)</option><option value="子時 (23:00~00:59)">子時 (23:00~00:59)</option><option value="丑時 (01:00~02:59)">丑時 (01:00~02:59)</option><option value="寅時 (03:00~04:59)">寅時 (03:00~04:59)</option><option value="卯時 (05:00~06:59)">卯時 (05:00~06:59)</option><option value="辰時 (07:00~08:59)">辰時 (07:00~08:59)</option><option value="巳時 (09:00~10:59)">巳時 (09:00~10:59)</option><option value="午時 (11:00~12:59)">午時 (11:00~12:59)</option><option value="未時 (13:00~14:59)">未時 (13:00~14:59)</option><option value="申時 (15:00~16:59)">申時 (15:00~16:59)</option><option value="酉時 (17:00~18:59)">酉時 (17:00~18:59)</option><option value="戌時 (19:00~20:59)">戌時 (19:00~20:59)</option><option value="亥時 (21:00~22:59)">亥時 (21:00~22:59)</option></select></div>
                    <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">LINE ID</label><input name="lineId" placeholder="@id" defaultValue={selectedGuest?.lineId} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-xl font-black outline-none focus:border-indigo-600 text-blue-600 shadow-inner" /></div>
                  </div>
                  <div className="space-y-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-6">通訊地址</label><input name="address" placeholder="請輸入完整通訊地址" defaultValue={selectedGuest?.address} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-6 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" /></div>
@@ -736,12 +815,87 @@ function DeepFileCenterContent() {
               </div>
               <div className="p-6 space-y-8 max-h-[60vh] overflow-y-auto">
                  <div className="grid grid-cols-1 gap-6">
-                    {Object.entries(viewingRecord.values || {}).map(([label, val]) => (
-                       <div key={label} className="p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">{label}</label>
-                          <p className="text-lg font-black text-slate-900 leading-relaxed">{String(val)}</p>
-                       </div>
-                    ))}
+                     {Object.entries(viewingRecord.values || {}).map(([label, val]) => {
+                        const srv = serviceDefs.find(s => s.name === viewingRecord.serviceType);
+                        const form = forms.find(f => f.id === srv?.linkedFormId);
+                        const fieldDef = form?.fields?.find((f: any) => f.label === label);
+                        
+                        return (
+                        <div key={label} className="p-6 bg-slate-50 rounded-3xl border-2 border-slate-100">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">{label}</label>
+                           
+                           {fieldDef?.type === 'select_single' ? (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {fieldDef.options?.map((opt: string) => (
+                                  <div
+                                    key={opt}
+                                    className={`px-4 py-2 rounded-xl text-[11px] font-bold border ${
+                                      val === opt
+                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                        : 'bg-white border-slate-200 text-slate-500 opacity-60'
+                                    }`}
+                                  >
+                                    {opt}
+                                  </div>
+                                ))}
+                              </div>
+                           ) : fieldDef?.type === 'select_multiple' ? (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {fieldDef.options?.map((opt: string) => {
+                                  const currentValues = Array.isArray(val) ? val : [];
+                                  const isSelected = currentValues.includes(opt);
+                                  return (
+                                    <div
+                                      key={opt}
+                                      className={`px-4 py-2 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 ${
+                                        isSelected
+                                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm'
+                                          : 'bg-white border-slate-200 text-slate-500 opacity-60'
+                                      }`}
+                                    >
+                                      {isSelected ? <div className="w-2 h-2 rounded-sm bg-emerald-500"></div> : <div className="w-2 h-2 rounded-sm border border-slate-300"></div>}
+                                      {opt}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                           ) : fieldDef?.type === 'select_ordered' ? (
+                              <div className="flex flex-col gap-2 mt-2">
+                                {fieldDef.options?.map((opt: string) => {
+                                  const currentValues = Array.isArray(val) ? val : [];
+                                  const selectedIndex = currentValues.indexOf(opt);
+                                  const isSelected = selectedIndex !== -1;
+                                  return (
+                                    <div
+                                      key={opt}
+                                      className={`px-4 py-3 rounded-xl border flex items-center justify-between ${
+                                        isSelected ? 'border-amber-100 bg-amber-50/80 text-amber-700 shadow-sm' : 'border-slate-200 bg-white text-slate-400 opacity-60'
+                                      } text-xs font-bold`}
+                                    >
+                                      <span>{opt}</span>
+                                      {isSelected ? (
+                                        <span className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-[11px] shadow-sm">{selectedIndex + 1}</span>
+                                      ) : (
+                                        <span className="w-6 h-6 rounded-full border-2 border-slate-200 bg-white"></span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                           ) : Array.isArray(val) ? (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                 {val.map((item: any, idx: number) => (
+                                    <div key={idx} className="px-4 py-2 rounded-xl border border-indigo-100 bg-indigo-50/80 text-xs font-bold text-indigo-700 flex items-center gap-2 shadow-sm">
+                                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                       {String(item)}
+                                    </div>
+                                 ))}
+                              </div>
+                           ) : (
+                              <p className="text-lg font-black text-slate-900 leading-relaxed">{String(val)}</p>
+                           )}
+                        </div>
+                     );})}
                     {(!viewingRecord.values || Object.keys(viewingRecord.values).length === 0) && (
                        <div className="py-20 text-center opacity-20 font-black italic">此案卷無詳細內容資料</div>
                     )}
@@ -763,13 +917,13 @@ function DeepFileCenterContent() {
                      let wrapperCss = 'margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;';
                      let containerCss = template?.borderStyle || 'padding: 40px; background: white;';
                      let templeHeader = template?.templeName || viewingRecord.serviceType;
-                     let watermarkHtml = template?.watermarkUrl ? '<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url(\'' + template.watermarkUrl + '\'); background-size: contain; background-position: center; background-repeat: no-repeat; opacity: ' + template.watermarkOpacity + '; pointer-events: none; z-index: -1;"></div>' : '';
+                     let watermarkHtml = template?.watermarkUrl ? `<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('${template.watermarkUrl}'); background-size: contain; background-position: center; background-repeat: no-repeat; opacity: ${template.watermarkOpacity}; pointer-events: none; z-index: -1;"></div>` : '';
 
                      const content = Object.entries(viewingRecord.values || {}).map(([k, v]) => '<div style="' + wrapperCss + '"><strong>' + k + '</strong><p style="margin-top: 5px;">' + v + '</p></div>').join('');
                      
-                     const htmlString = '<html lang="zh-TW"><head><title>' + viewingRecord.serviceType + ' - 列印</title>' +
+                     const htmlString = '<html lang="zh-TW"><head><title>' + viewingRecord.serviceType + ' - 下載</title>' +
                        '<style>' +
-                       'body { font-family: \'Microsoft JhengHei\', sans-serif; color: #333; margin: 0; padding: 20px; background: #f8fafc; } ' +
+                       "body { font-family: 'Microsoft JhengHei', sans-serif; color: #333; margin: 0; padding: 20px; background: #f8fafc; } " +
                        '.page-container { position: relative; width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; ' + containerCss + ' } ' +
                        'h1 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 30px; font-size: 28px; } ' +
                        '</style>' +
@@ -811,17 +965,16 @@ function DeepFileCenterContent() {
                      let wrapperCss = 'margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;';
                      let containerCss = template?.borderStyle || 'padding: 40px; background: white;';
                      let templeHeader = template?.templeName || viewingRecord.serviceType;
-                     let watermarkHtml = template?.watermarkUrl ? '<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url(\'' + template.watermarkUrl + '\'); background-size: contain; background-position: center; background-repeat: no-repeat; opacity: ' + template.watermarkOpacity + '; pointer-events: none; z-index: -1;"></div>' : '';
+                     let watermarkHtml = template?.watermarkUrl ? `<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('${template.watermarkUrl}'); background-size: contain; background-position: center; background-repeat: no-repeat; opacity: ${template.watermarkOpacity}; pointer-events: none; z-index: -1;"></div>` : '';
 
                      const content = Object.entries(viewingRecord.values || {}).map(([k, v]) => '<div style="' + wrapperCss + '"><strong>' + k + '</strong><p style="margin-top: 5px;">' + v + '</p></div>').join('');
                      
                      const htmlString = '<html lang="zh-TW"><head><title>' + viewingRecord.serviceType + ' - 列印</title>' +
                        '<style>' +
-                       'body { font-family: \'Microsoft JhengHei\', sans-serif; color: #333; margin: 0; padding: 20px; background: #f8fafc; } ' +
+                       "body { font-family: 'Microsoft JhengHei', sans-serif; color: #333; margin: 0; padding: 20px; background: #f8fafc; } " +
                        '.page-container { position: relative; width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; ' + containerCss + ' } ' +
                        'h1 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 30px; font-size: 28px; } ' +
                        '</style>' +
-                       '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>' +
                        '</head><body>' +
                        '<div id="pdf-content" class="page-container">' +
                        watermarkHtml +
@@ -837,6 +990,18 @@ function DeepFileCenterContent() {
                      printWindow.document.write(htmlString + scriptStr);
                      printWindow.document.close();
                    }} className="bg-slate-100 text-slate-700 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-slate-200 transition-all flex items-center gap-2">🖨️ 列印表單</button>
+                   <button onClick={() => {
+                     const srv = serviceDefs.find(s => s.name === viewingRecord.serviceType);
+                     const form = forms.find(f => f.id === srv?.linkedFormId) || null;
+                     setDynamicValues(viewingRecord.values || {});
+                     setActiveForm({ 
+                       recordId: viewingRecord.id, 
+                       eventId: viewingRecord.eventId, 
+                       serviceType: viewingRecord.serviceType, 
+                       form 
+                     });
+                     setViewingRecord(null);
+                   }} className="bg-amber-100 text-amber-700 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-amber-200 transition-all flex items-center gap-2">✏️ 修改表單</button>
                    <button onClick={() => setViewingRecord(null)} className="bg-slate-900 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all">關閉視窗</button>
                  </div>
               </div>
@@ -880,6 +1045,84 @@ function DeepFileCenterContent() {
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>
+                      ) : field.type === 'select_single' ? (
+                        <div className="flex flex-wrap gap-2">
+                          {field.options?.map((opt: string) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setDynamicValues({ ...dynamicValues, [field.label]: opt })}
+                              className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all border ${
+                                dynamicValues[field.label] === opt
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                  : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300 hover:bg-indigo-50'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      ) : field.type === 'select_multiple' ? (
+                        <div className="flex flex-wrap gap-2">
+                          {field.options?.map((opt: string) => {
+                            const currentValues = Array.isArray(dynamicValues[field.label]) ? dynamicValues[field.label] : [];
+                            const isSelected = currentValues.includes(opt);
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => {
+                                  let newValues;
+                                  if (isSelected) {
+                                    newValues = currentValues.filter((v: string) => v !== opt);
+                                  } else {
+                                    newValues = [...currentValues, opt];
+                                  }
+                                  setDynamicValues({ ...dynamicValues, [field.label]: newValues });
+                                }}
+                                className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all border flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:bg-emerald-50'
+                                }`}
+                              >
+                                {isSelected ? <div className="w-2 h-2 rounded-sm bg-emerald-500"></div> : <div className="w-2 h-2 rounded-sm border border-slate-300"></div>}
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : field.type === 'select_ordered' ? (
+                        <div className="flex flex-col gap-2">
+                          {field.options?.map((opt: string) => {
+                            const currentValues = Array.isArray(dynamicValues[field.label]) ? dynamicValues[field.label] : [];
+                            const selectedIndex = currentValues.indexOf(opt);
+                            const isSelected = selectedIndex !== -1;
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => {
+                                  let newValues;
+                                  if (isSelected) {
+                                    newValues = currentValues.filter((v: string) => v !== opt);
+                                  } else {
+                                    newValues = [...currentValues, opt];
+                                  }
+                                  setDynamicValues({ ...dynamicValues, [field.label]: newValues });
+                                }}
+                                className="px-4 py-3 rounded-xl border border-amber-100 bg-amber-50/30 text-xs font-bold text-slate-600 flex items-center justify-between hover:bg-amber-50 transition-colors"
+                              >
+                                <span>{opt}</span>
+                                {isSelected ? (
+                                  <span className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-[11px] shadow-sm">{selectedIndex + 1}</span>
+                                ) : (
+                                  <span className="w-6 h-6 rounded-full border-2 border-slate-200 bg-white"></span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       ) : field.type === 'number' ? (
                         <input
                           type="number"

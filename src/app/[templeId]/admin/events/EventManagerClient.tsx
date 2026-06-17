@@ -28,6 +28,8 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
               location: fd.get('location') as string,
               price: Number(fd.get('price')),
               capacity: Number(fd.get('capacity')),
+              description: fd.get('description') as string,
+              precautions: fd.get('precautions') as string,
               status: fd.get('status') as 'Active' | 'Draft' | 'Completed' || 'Draft'
            } : e));
         } else {
@@ -38,6 +40,8 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
              location: fd.get('location') as string,
              price: Number(fd.get('price')),
              capacity: Number(fd.get('capacity')),
+             description: fd.get('description') as string,
+             precautions: fd.get('precautions') as string,
              enrolled: 0,
              status: 'Draft'
            }]);
@@ -161,7 +165,15 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">人數限制 (Max Capacity)</label>
               <input required name="capacity" defaultValue={editingEvent?.capacity} type="number" min="1" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：500" />
             </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">活動內容 (Description)</label>
+              <textarea name="description" defaultValue={editingEvent?.description} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="詳細說明此法會活動的內容..."></textarea>
+            </div>
 
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">注意事項 (Precautions)</label>
+              <textarea name="precautions" defaultValue={editingEvent?.precautions} rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" placeholder="例如：請穿著素色衣物..."></textarea>
+            </div>
             {editingEvent && (
               <div className="space-y-2 md:col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">狀態 (Status)</label>

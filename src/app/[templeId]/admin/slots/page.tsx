@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchAvailableSlots, createSlot, updateSlot, removeSingleSlot, analyzeAffectedAppointments, executeEmergencyReschedule, fetchPersonnel, getCurrentRole, AppRole, fetchServiceDefinitions } from '@/app/actions';
+import { fetchAvailableSlots, createSlot, updateSlot, removeSingleSlot, removeBatchSlots, analyzeAffectedAppointments, executeEmergencyReschedule, fetchPersonnel, getCurrentRole, AppRole, fetchServiceDefinitions } from '@/app/actions';
 
 export default function AdminSlotsPage() {
   const [slots, setSlots] = useState<any[]>([]);
@@ -155,6 +155,23 @@ export default function AdminSlotsPage() {
     if(confirm("確定要取消此日時段嗎？")) {
       await removeSingleSlot(id);
       loadSlots();
+    }
+  };
+
+  const handleRemoveGroup = async (e: React.MouseEvent, groupKey: string, dates: any[]) => {
+    e.stopPropagation();
+    if(confirm(`確定要刪除這 ${dates.length} 個班次嗎？這將會永久移除這些尚未被預約的時段！`)) {
+      setIsSubmitting(true);
+      try {
+        const ids = dates.map(d => d.id);
+        await removeBatchSlots(ids);
+        await loadSlots();
+        alert('✅ 已成功刪除整個預約時段活動！');
+      } catch (err) {
+        alert('❌ 刪除失敗，請稍後再試。');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -387,11 +404,20 @@ export default function AdminSlotsPage() {
                                 {group.staff ? group.staff[0] : '?'}
                              </div>
                              <div className="space-y-2">
-                                <div className="flex items-center gap-4">
-                                  <h4 className="text-xl font-black text-slate-900 italic tracking-tighter">{group.staff} 老師</h4>
-                                  <span className="text-[10px] font-black text-white bg-slate-900 px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
-                                    {group.dates.length} 班次已發布
-                                  </span>
+                                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                                  <div className="flex items-center gap-4">
+                                    <h4 className="text-xl font-black text-slate-900 italic tracking-tighter">{group.staff} 老師</h4>
+                                    <span className="text-[10px] font-black text-white bg-slate-900 px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
+                                      {group.dates.length} 班次已發布
+                                    </span>
+                                  </div>
+                                  <button 
+                                    onClick={(e) => handleRemoveGroup(e, key, group.dates)}
+                                    className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white px-4 py-1.5 rounded-xl text-[10px] font-black tracking-widest transition-all shadow-sm flex items-center gap-2 uppercase"
+                                    title="一鍵刪除整個預約時段"
+                                  >
+                                    ✕ 刪除整個時段活動
+                                  </button>
                                 </div>
                                 <p className={`text-xs font-black uppercase tracking-[0.2em] transition-colors ${isExpanded ? 'text-indigo-600' : 'text-slate-400'}`}>
                                    🕓 定期時段: {group.time}

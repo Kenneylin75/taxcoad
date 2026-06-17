@@ -39,6 +39,7 @@ import {
   fetchActiveNotificationsForGuest,
   fetchActiveQueueCount,
   fetchTempleAiUsage,
+  fetchGuestRecords,
   type TempleNotification
 } from "@/app/actions";
 
@@ -152,6 +153,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [events, setEvents] = useState<any[]>([]);
   const [guestUser, setGuestUser] = useState<any | null>(null);
   const [guestFiles, setGuestFiles] = useState<any[]>([]);
+  const [guestRecords, setGuestRecords] = useState<any[]>([]);
   const [guestAppointments, setGuestAppointments] = useState<any[]>([]);
   const [serviceDefinitions, setServiceDefinitions] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -248,13 +250,32 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   useEffect(() => {
     if (gregorianDate) {
       try {
-        const parts = gregorianDate.split('-');
-        const solar = Solar.fromYmd(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
-        const lunar = solar.getLunar();
-        setLunarResult(`農曆 ${lunar.getYearInChinese()}年 ${lunar.getMonthInChinese()}月 ${lunar.getDayInChinese()}日`);
-      } catch (e) { setLunarResult(""); }
+        const [y, m, d] = gregorianDate.split('-');
+        if (y && m && d) {
+          const lunarInfo = Solar.fromYmd(parseInt(y), parseInt(m), parseInt(d)).getLunar();
+          setLunarResult(`${lunarInfo.getYearInGanZhi()}年 ${lunarInfo.getMonthInChinese()}月 ${lunarInfo.getDayInChinese()}日`);
+        }
+      } catch (e) {
+        // ignore invalid date
+      }
     }
   }, [gregorianDate]);
+
+  const initiatePayment = async (amount: number, module: any, onPaid: (method: string) => Promise<void>) => {
+    if (amount === 0) {
+      // 若金額為 0，直接當作免付款成功
+      await onPaid('Free');
+      setIsDetailModalOpen(false);
+    } else {
+      setPaymentIntent({ amount, module, onPaid });
+    }
+  };
+
+  const handleOnlinePaymentRedirect = (method: string, orderId: string, amount: number) => {
+    const returnUrl = encodeURIComponent(window.location.href);
+    window.location.href = `/mock-gateway?orderId=${orderId}&amount=${amount}&method=${method}&returnUrl=${returnUrl}`;
+  };
+
 
   const handleCancelRecord = async (recordId: string, type: string) => {
     if (!confirm(`確定要取消此${type}嗎？`)) return;
@@ -381,9 +402,10 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [guestTickets, setGuestTickets] = useState<any[]>([]);
   const [guestLamps, setGuestLamps] = useState<any[]>([]);
   const [previewFile, setPreviewFile] = useState<any>(null);
+  const [previewRecord, setPreviewRecord] = useState<any>(null);
 
   const refreshAllData = async (phone: string) => {
-    const [apps, files, regs, tix, lamps, latestNotif, activeNotifs, qCount] = await Promise.all([
+    const [apps, files, regs, tix, lamps, latestNotif, activeNotifs, qCount, records] = await Promise.all([
       fetchGuestAppointments(phone), 
       fetchGuestFiles(phone),
       fetchGuestRegistrations(phone),
@@ -391,7 +413,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
       fetchGuestLampRecords(phone),
       fetchLatestNotificationForGuest(),
       fetchActiveNotificationsForGuest(),
-      fetchActiveQueueCount()
+      fetchActiveQueueCount(),
+      fetchGuestRecords(phone)
     ]);
     setGuestAppointments(apps);
     setGuestFiles(files);
@@ -401,6 +424,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     setLatestNotification(latestNotif);
     setActiveNotifications(activeNotifs);
     setActiveQueueCount(qCount);
+    setGuestRecords(records);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -729,8 +753,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                           : 'bg-rose-50 text-rose-700'
                       }`}>
                         {activeAppointment.paymentMethod === 'Cash' 
-                          ? (activeAppointment.paymentStatus === 'Paid' ? '現金支付: 已付款' : '現金支付: 未付款')
-                          : (activeAppointment.paymentStatus === 'Paid' ? '已付款' : '未完成預約: 待付款/對帳')
+                          ? (activeAppointment.paymentStatus === 'Paid' ? '標記已完成支付' : '現金支付: 未付款')
+                          : (activeAppointment.paymentStatus === 'Paid' ? '標記已完成支付' : '未完成預約: 待付款/對帳')
                         }
                       </span>
                     )}
@@ -849,15 +873,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           </div>
         </div>
 
-        {/* Floating AI Assistant (LINE Style) */}
-        {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && (templeAiUsage.isVip || (new Date(templeAiUsage.expiryDate).getTime() > Date.now() && templeAiUsage.usedCount < templeAiUsage.chatLimit)) && (
-          <button 
-            onClick={() => setIsAgiModalOpen(true)}
-            className="fixed bottom-24 right-5 w-14 h-14 bg-red-700 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform z-40"
-          >
-            <span className="text-2xl">✨</span>
-          </button>
-        )}
+
       </main>
     );
   };
@@ -898,7 +914,17 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           {guestFiles.filter(f => f.type === activeFileTab && (f.name.includes(fileSearch) || f.folder.includes(fileSearch))).map(file => (
             <div 
               key={file.id} 
-              onClick={() => setPreviewFile(file)}
+              onClick={() => {
+                if (file.type === 'file' && file.name.endsWith('.pdf')) {
+                  const possibleServiceType = file.name.split('_')[0];
+                  const matchedRecord = guestRecords.find(r => r.serviceType === possibleServiceType);
+                  if (matchedRecord) {
+                    setPreviewRecord(matchedRecord);
+                    return;
+                  }
+                }
+                setPreviewFile(file);
+              }}
               className="app-card p-4 flex items-center gap-4 cursor-pointer hover:border-red-200 hover:shadow-md transition-all active:scale-[0.99]"
             >
               <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
@@ -951,8 +977,91 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         </div>
       </div>
       {renderPreviewModal()}
+      {renderRecordPreviewModal()}
     </div>
   );
+
+  const renderRecordPreviewModal = () => {
+    if (!previewRecord) return null;
+    return (
+      <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[85vh]">
+          <header className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-red-50/50">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-gray-900 truncate text-sm">{previewRecord.serviceType}</h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">案卷紀錄摘要 | {previewRecord.date}</p>
+            </div>
+            <button 
+              onClick={() => setPreviewRecord(null)} 
+              className="p-2 text-gray-400 hover:text-gray-900 rounded-full active:bg-gray-100"
+            >
+              ✕
+            </button>
+          </header>
+          
+          <div className="flex-1 overflow-y-auto p-5 bg-white space-y-4">
+             {Object.entries(previewRecord.values || {}).map(([label, val]) => (
+                <div key={label} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{label}</label>
+                   <p className="text-sm font-bold text-slate-900 leading-relaxed">{String(val)}</p>
+                </div>
+             ))}
+             {(!previewRecord.values || Object.keys(previewRecord.values).length === 0) && (
+                <div className="py-10 text-center opacity-30 font-black italic text-sm">此案卷無詳細內容資料</div>
+             )}
+          </div>
+
+          <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+             <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">歸檔人：{previewRecord.staffName}</span>
+             </div>
+             <div className="flex gap-2">
+               <button onClick={() => {
+                 const pdfWindow = window.open('', '', 'width=800,height=600');
+                 if (!pdfWindow) { alert('請允許彈出視窗以啟用 PDF 下載功能'); return; }
+
+                 const content = Object.entries(previewRecord.values || {}).map(([k, v]) => '<div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;"><strong>' + k + '</strong><p style="margin-top: 5px;">' + v + '</p></div>').join('');
+                 
+                 const htmlString = '<html lang="zh-TW"><head><title>' + previewRecord.serviceType + ' - 下載</title>' +
+                   '<style>' +
+                   'body { font-family: \\\'Microsoft JhengHei\\\', sans-serif; color: #333; margin: 0; padding: 40px; background: white; } ' +
+                   '.page-container { position: relative; width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; } ' +
+                   'h1 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 30px; font-size: 28px; } ' +
+                   '</style>' +
+                   '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>' +
+                   '</head><body>' +
+                   '<div id="pdf-content" class="page-container">' +
+                   '<h1>' + previewRecord.serviceType + '</h1>' +
+                   '<div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 20px;">' +
+                   '<span>歸檔日期: ' + previewRecord.date + '</span>' +
+                   '</div>' +
+                   '<div style="position: relative; z-index: 10;">' + content + '</div>' +
+                   '</div>';
+
+                 const scriptStr = '<script>' +
+                   'window.onload = function() { ' +
+                   '  const element = document.getElementById("pdf-content"); ' +
+                   '  html2pdf().set({ ' +
+                   '    margin: 10, ' +
+                   '    filename: "' + previewRecord.serviceType + '_表單紀錄.pdf", ' +
+                   '    image: { type: "jpeg", quality: 0.98 }, ' +
+                   '    html2canvas: { scale: 2, useCORS: true }, ' +
+                   '    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } ' +
+                   '  }).from(element).save().then(() => { setTimeout(() => window.close(), 1500); }); ' +
+                   '}; ' +
+                   '</script></body></html>';
+                 
+                 pdfWindow.document.write(htmlString + scriptStr);
+                 pdfWindow.document.close();
+               }} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold">下載 PDF</button>
+               <button onClick={() => setPreviewRecord(null)} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-bold">關閉</button>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderPreviewModal = () => {
     if (!previewFile) return null;
@@ -1054,7 +1163,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           time: `${l.startDate} ~ ${l.expiryDate}`, 
           rawTime: l.startDate,
           staff: '本宮法事',
-          remaining: remaining > 0 ? remaining : 0
+          remaining: remaining > 0 ? remaining : 0,
+          status: l.paymentStatus === 'Unpaid' ? 'Unpaid' : (l.status === 'Active' ? '生效中' : l.status)
         };
       })
     ].sort((a, b) => b.rawTime?.localeCompare(a.rawTime || '') || 0);
@@ -1122,6 +1232,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     <span className={`px-2 py-1 rounded text-xs font-bold ${
                       record.status === 'Pending' || record.status === 'Confirmed' ? 'bg-amber-50 text-amber-600' :
                       record.status === 'Arrived' ? 'bg-emerald-100 text-emerald-700' :
+                      record.status === 'Unpaid' ? 'bg-rose-50 text-rose-600' :
+                      record.status === '生效中' ? 'bg-emerald-50 text-emerald-600' :
                       record.status === 'Completed' || record.status === 'Paid' ? 'bg-green-50 text-green-600' :
                       'bg-gray-100 text-gray-600'
                     }`}>
@@ -1151,6 +1263,17 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       </div>
                     </div>
                   </div>
+                  {record.type === '預約' && record.amount !== undefined && record.amount !== null && (
+                    <div className="bg-gray-50 p-4 rounded-xl mt-2 flex items-center gap-3">
+                      <span className="text-gray-400">💰</span>
+                      <div>
+                         <p className="text-xs text-gray-500 font-bold">結緣金額</p>
+                         <p className="text-gray-900 font-bold text-sm">
+                            ${record.amount}
+                         </p>
+                      </div>
+                    </div>
+                  )}
 
                   {deadlines && (
                     <div className="pt-2 space-y-2">
@@ -1215,7 +1338,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                 (paymentIntent.module === 'Lamp' && paymentConfig?.thirdParty?.allowLamp !== false) ||
                 (paymentIntent.module === 'Event' && paymentConfig?.thirdParty?.allowEvent !== false) ||
                 (paymentIntent.module === 'Queue' && paymentConfig?.thirdParty?.allowQueue !== false)) && (
-               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('ecpay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="col-span-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
+               <button onClick={async () => { 
+                 await paymentIntent.onPaid('ecpay'); 
+                 setPaymentIntent(null); 
+                 setIsDetailModalOpen(false); 
+               }} className="col-span-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
                  💳 信用卡支付
                </button>
              )}
@@ -1225,7 +1352,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                 (paymentIntent.module === 'Lamp' && paymentConfig?.linePay?.allowLamp !== false) ||
                 (paymentIntent.module === 'Event' && paymentConfig?.linePay?.allowEvent !== false) ||
                 (paymentIntent.module === 'Queue' && paymentConfig?.linePay?.allowQueue !== false)) && (
-               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('linepay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="py-4 bg-[#06C755] text-white rounded-2xl font-black text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+               <button onClick={async () => { 
+                 await paymentIntent.onPaid('linepay'); 
+                 setPaymentIntent(null); 
+                 setIsDetailModalOpen(false); 
+               }} className="py-4 bg-[#06C755] text-white rounded-2xl font-black text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
                  LINE Pay
                </button>
              )}
@@ -1235,7 +1366,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                 (paymentIntent.module === 'Lamp' && paymentConfig?.customTransfer?.allowLamp !== false) ||
                 (paymentIntent.module === 'Event' && paymentConfig?.customTransfer?.allowEvent !== false) ||
                 (paymentIntent.module === 'Queue' && paymentConfig?.customTransfer?.allowQueue !== false)) && (
-               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('ecpay'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="py-4 bg-slate-100 text-slate-600 hover:text-slate-900 rounded-2xl font-black text-xs shadow-sm border border-slate-200 active:scale-95 transition-transform">
+               <button onClick={async () => { 
+                 await paymentIntent.onPaid('transfer'); 
+                 setPaymentIntent(null); 
+                 setIsDetailModalOpen(false); 
+               }} className="py-4 bg-slate-100 text-slate-600 hover:text-slate-900 rounded-2xl font-black text-xs shadow-sm border border-slate-200 active:scale-95 transition-transform">
                  轉帳匯款
                </button>
              )}
@@ -1245,7 +1380,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                 (paymentIntent.module === 'Lamp' && paymentConfig?.cash?.allowLamp !== false) ||
                 (paymentIntent.module === 'Event' && paymentConfig?.cash?.allowEvent !== false) ||
                 (paymentIntent.module === 'Queue' && paymentConfig?.cash?.allowQueue !== false)) && (
-               <button onClick={async () => { if (paymentIntent.onPaid) { await paymentIntent.onPaid('Cash'); } setPaymentIntent(null); setIsDetailModalOpen(false); }} className="col-span-2 py-4 bg-amber-500 text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2">
+               <button onClick={async () => { 
+                 await paymentIntent.onPaid('Cash'); 
+                 setPaymentIntent(null); 
+                 setIsDetailModalOpen(false); 
+               }} className="col-span-2 py-4 bg-amber-500 text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2">
                  💵 現場現金付款
                </button>
              )}
@@ -1528,8 +1667,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     )}
                     
                     <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">結緣項目</span>
-                      <span className="text-sm font-bold text-red-700 bg-red-50 px-3 py-1 rounded-lg">${svc.priceInfo || '隨喜'}</span>
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">結緣金額</span>
+                      <span className="text-sm font-bold text-red-700 bg-red-50 px-3 py-1 rounded-lg">{(svc.price !== undefined && svc.price > 0) ? `$${svc.price}` : '隨喜'}</span>
                     </div>
                   </button>
                 ))}
@@ -1614,24 +1753,27 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                             price: !slot.price && !selectedService?.price ? '隨喜功德' : `結緣金 ${slot.price || selectedService?.price}`,
                             description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：\n${slot.description || selectedService?.precautions || '無'}`,
                             onConfirm: async () => {
-                              setPaymentIntent({
-                                amount: slot.price || selectedService?.price || 0,
-                                module: 'Booking',
-                                onPaid: async (method: string) => {
-                                  const amount = slot.price || selectedService?.price || 0;
-                                  const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, method, undefined, amount);
-                                  
-                                  if (res.success) {
-                                    setSuccessInfo({
-                                      title: '預約成功',
-                                      message: method === 'Cash' ? '您的預約已提交。由於採現場付款，請依循現場人員指示完成繳費與報到手續。' : '您的預約與付款已完成！祈願平安喜樂。'
-                                    });
-                                    await refreshAllData(guestUser.phone);
-                                    const updatedSlots = await fetchAvailableSlots();
-                                    setSlots(updatedSlots);
-                                  } else {
-                                    alert(`❌ 預約失敗: ${res.message}`);
+                              const amount = slot.price || selectedService?.price || 0;
+                              initiatePayment(amount, 'Booking', async (method: string) => {
+                                const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, method, undefined, amount);
+                                
+                                if (res.success) {
+                                  if (method === 'ecpay' || method === 'linepay') {
+                                    handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), amount);
+                                    return;
                                   }
+
+                                  setSuccessInfo({
+                                    title: '預約成功',
+                                    message: method === 'Cash' ? '您的預約已提交。由於採現場付款，請依循現場指示完成繳費。' : 
+                                             method === 'Free' ? '已成功為您預約！隨喜功德，平安喜樂。' :
+                                             '您的預約與付款紀錄已送出！祈願平安。'
+                                  });
+                                  await refreshAllData(guestUser.phone);
+                                  const updatedSlots = await fetchAvailableSlots();
+                                  setSlots(updatedSlots);
+                                } else {
+                                  alert(`❌ 預約失敗: ${res.message}`);
                                 }
                               });
                             }
@@ -1760,15 +1902,19 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                              category: '活動',
                              price: `結緣價 $${evt.price}`,
                              precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
-                             description: `活動內容：${evt.description}\n日期：${evt.date}`,
+                             description: `活動內容：${evt.description || evt.content || '詳細內容請洽宮廟'}\n日期：${evt.date}`,
                              onConfirm: async () => {
-                               setPaymentIntent({
-                                 amount: evt.price,
-                                 module: 'Event',
-                                 onPaid: async (method: string) => {
-                                   await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price, method);
-                                   setSuccessInfo({ title: '報名成功', message: method === 'Cash' ? '您已成功報名法會活動，請於當日現場完成繳費報到。' : '您已成功報名法會活動與付款。' });
+                               initiatePayment(evt.price || 0, 'Event', async (method: string) => {
+                                 const res = await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price || 0, method);
+                                 if (res && res.success !== false) {
+                                   if (method === 'ecpay' || method === 'linepay') {
+                                     handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), evt.price || 0);
+                                     return;
+                                   }
+                                   setSuccessInfo({ title: '報名成功', message: method === 'Cash' ? '您已成功報名法會活動，請於當日現場完成繳費報到。' : method === 'Free' ? '報名成功！隨喜功德，平安喜樂。' : '您已成功報名法會活動與付款。' });
                                    refreshAllData(guestUser.phone);
+                                 } else {
+                                   alert(`❌ 報名失敗: ${res?.message || '未知錯誤'}`);
                                  }
                                });
                              }
@@ -1888,13 +2034,13 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
 
                       <button 
                         onClick={async () => {
-                          setPaymentIntent({
-                            amount: 0,
-                            module: 'Queue',
-                            onPaid: async (method: string) => {
-                              await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
+                          initiatePayment(0, 'Queue', async (method: string) => {
+                            const res = await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
+                            if (res && res.success !== false) {
                               setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
                               refreshAllData(guestUser.phone);
+                            } else {
+                              alert(`❌ 領取失敗: ${res?.message || '未知錯誤'}`);
                             }
                           });
                         }}
@@ -1931,7 +2077,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </p>
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
             {lampCategories.map(item => (
               <div key={item.id} className="app-card p-6 space-y-4 bg-white">
                 <div className="flex justify-between items-start">
@@ -1961,23 +2107,28 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       precautions: item.precautions || '點燈後將於三日內為您上燈，並寄送電子通知。',
                       description: `服務內容：${item.description || '祈福保平安'}\n天數：${item.durationDays || 365}天`,
                       onConfirm: async () => {
-                        setPaymentIntent({
-                          amount: item.price ?? 0,
-                          module: 'Lamp',
-                          onPaid: async (method: string) => {
-                            const fd = new FormData();
-                            fd.append('phone', guestUser.phone);
-                            fd.append('guestName', guestUser.name);
-                            fd.append('categoryId', item.id);
-                            fd.append('categoryName', item.name);
-                            fd.append('price', (item.price ?? 0).toString());
-                            fd.append('paymentMethod', method);
-                            await createLightingOrder(fd);
+                        const amt = item.price ?? 0;
+                        initiatePayment(amt, 'Lamp', async (method: string) => {
+                          const fd = new FormData();
+                          fd.append('phone', guestUser.phone);
+                          fd.append('guestName', guestUser.name);
+                          fd.append('categoryId', item.id);
+                          fd.append('categoryName', item.name);
+                          fd.append('price', amt.toString());
+                          fd.append('paymentMethod', method);
+                          const res = await createLightingOrder(fd);
+                          if (res && res.success !== false) {
+                            if (method === 'ecpay' || method === 'linepay') {
+                              handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), amt);
+                              return;
+                            }
                             setSuccessInfo({
                               title: '辦理成功',
-                              message: method === 'Cash' ? '您的點燈申請已提交，請至現場完成繳費以利上燈。' : '您的點燈申請與付款已完成，本宮將為您安排上燈法事。'
+                              message: method === 'Cash' ? '您的點燈申請已提交，請至現場完成繳費以利上燈。' : method === 'Free' ? '申請成功！隨喜功德。' : '您的點燈申請與付款已完成，本宮將為您安排上燈法事。'
                             });
                             refreshAllData(guestUser.phone);
+                          } else {
+                            alert(`❌ 辦理失敗: ${res?.message || '未知錯誤'}`);
                           }
                         });
                       }
@@ -2030,9 +2181,10 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     <input 
                       type="tel" 
                       value={loginPhone} 
-                      onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, ''))} 
+                      onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
                       className="app-input" 
                       placeholder="0912345678" 
+                      pattern="^09\d{8}$" minLength={10} maxLength={10}
                       required 
                     />
                   </div>
@@ -2144,6 +2296,17 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           </div>
         </div>
       )}
+      
+      {/* Floating AI Assistant (LINE Style) - 全域顯示 */}
+      {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && (templeAiUsage.isVip || (new Date(templeAiUsage.expiryDate).getTime() > Date.now() && templeAiUsage.usedCount < templeAiUsage.chatLimit)) && !isAgiModalOpen && (
+        <button 
+          onClick={() => setIsAgiModalOpen(true)}
+          className="fixed bottom-24 right-5 w-14 h-14 bg-red-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-transform z-40 hover:bg-red-800 border-2 border-white/20"
+        >
+          <span className="text-2xl">✨</span>
+        </button>
+      )}
+
       {isScanning && renderScanModal()}
       
       {modifyModalOpen && (

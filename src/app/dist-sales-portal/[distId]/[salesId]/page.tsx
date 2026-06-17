@@ -118,7 +118,7 @@ export default function DistSalesPage() {
       fetchRentPlans()
     ]);
     setPerformance(perf);
-    setApplications(apps.filter(a => a.submittedBy === salesName).sort((a, b) => b.timestamp.localeCompare(a.timestamp)));
+    setApplications(apps.filter((a: any) => a.salesId === salesId).sort((a: any, b: any) => b.timestamp.localeCompare(a.timestamp)));
     setVisits(visitData);
     setTools(toolData);
     setContracts(conData);
