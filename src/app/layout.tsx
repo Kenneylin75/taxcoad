@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pivot | 全方位雲端宮廟管理系統",
+  title: "Pivot | 全方位雲端營運主控台",
   description: "Pivot - Professional Temple Management SaaS",
 };
 

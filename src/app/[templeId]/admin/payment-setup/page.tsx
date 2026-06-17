@@ -34,10 +34,14 @@ export default function PaymentSetupPage() {
   };
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Mock image upload
     if (e.target.files && e.target.files[0]) {
-       const url = URL.createObjectURL(e.target.files[0]);
-       setConfig({ ...config, customQR: { ...config.customQR, qrImageUrl: url } });
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setConfig({ ...config, customQR: { ...config.customQR, qrImageUrl: base64String } });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -268,6 +272,7 @@ export default function PaymentSetupPage() {
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">備註說明 Instructions</label>
                  <input type="text" value={config.customQR.description} onChange={e => setConfig({...config, customQR: {...config.customQR, description: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-pink-500 transition-colors" placeholder="請掃描 QR Code 後，輸入正確金額並備註報名者姓名" />
               </div>
+              {renderModuleSelector('customQR', 'pink', 'pink')}
            </div>
         </div>
 

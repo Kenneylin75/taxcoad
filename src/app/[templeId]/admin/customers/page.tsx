@@ -482,18 +482,25 @@ function DeepFileCenterContent() {
                                      <div className="flex items-center gap-6">
                                         {/* 🎨 同步彩色 Icon 外圈 */}
                                         <div className={`w-16 h-16 rounded-[28px] flex items-center justify-center text-3xl border-4 shadow-sm ${styles.bg} ${styles.border}`}>🕯️</div>
-                                        <div><h4 className="text-2xl font-black text-slate-900 italic">{lamp.categoryName}</h4><p className={`text-xs font-black uppercase tracking-widest ${styles.text}`}>核定案號：{lamp.id}</p></div>
+                                        <div>
+                                           <h4 className="text-2xl font-black text-slate-900 italic flex items-center gap-3">
+                                              {lamp.categoryName}
+                                              {lamp.guestName && lamp.guestName !== selectedGuest.name && (
+                                                 <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1 rounded-full not-italic tracking-widest">家人代點：{lamp.guestName}</span>
+                                              )}
+                                           </h4>
+                                           <p className={`text-xs font-black uppercase tracking-widest ${styles.text} mt-1`}>核定案號：{lamp.id}</p>
+                                        </div>
                                      </div>
-                                     <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase border-2 ${isExpired ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{isExpired ? '已屆期' : '服務中'}</span>
+                                     <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase border-2 ${lamp.status === 'Cancelled' ? 'bg-slate-100 text-slate-400 border-slate-200' : isExpired ? 'bg-rose-50 text-rose-600 border-rose-100' : lamp.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{lamp.status === 'Cancelled' ? '已取消' : isExpired ? '已屆期' : lamp.status === 'Pending' ? '等待安奉' : '安奉中'}</span>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-6 bg-slate-50 p-8 rounded-3xl mb-8">
-                                     <div className="text-center border-r-2 border-slate-100"><p className="text-[9px] font-black text-slate-300 uppercase mb-1">安奉結緣金</p><p className="text-xl font-black text-slate-900">NT$ {lamp.price.toLocaleString()}</p></div>
-                                     <div className="text-center"><p className="text-[9px] font-black text-slate-300 uppercase mb-1">剩餘天數</p><p className={`text-xl font-black ${isExpired ? 'text-rose-500' : 'text-emerald-600'}`}>{isExpired ? '0' : diffDays} DAYS</p></div>
+                                  <div className="bg-slate-50 p-8 rounded-3xl mb-8 flex justify-center items-center">
+                                     <div className="text-center"><p className="text-[9px] font-black text-slate-300 uppercase mb-1">安奉結緣金</p><p className="text-xl font-black text-slate-900">NT$ {lamp.price.toLocaleString()}</p></div>
                                   </div>
                                   <div className="flex justify-between items-end">
                                      <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p><p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p></div>
                                      <div className="flex gap-2">
-                                     {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid') && (
+                                     {lamp.status !== 'Cancelled' && (lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid') && (
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
@@ -501,15 +508,68 @@ function DeepFileCenterContent() {
                                               if (selectedGuest) await loadHistory(selectedGuest.phone);
                                             }
                                           }}
-                                          className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors px-4 py-2 bg-red-50 rounded-lg border border-red-100"
+                                          className="text-xs font-bold text-slate-400 hover:text-emerald-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-emerald-50"
                                         >
-                                          ✅ 標記已收款
+                                          標記已結帳 ✓
                                         </button>
                                      )}
-                                     {lamp.paymentStatus === 'Paid' && (
-                                        <span className="text-xs font-medium text-emerald-600 px-4 py-2">✓ 已結帳</span>
+                                     {lamp.status !== 'Cancelled' && lamp.paymentStatus === 'Paid' && (
+                                        <div className="flex items-center gap-2">
+                                           <span className="text-xs font-medium text-emerald-600 px-4 py-2">✓ 已結帳</span>
+                                           <button 
+                                              onClick={async () => {
+                                                if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
+                                                  await import('@/app/actions').then(m => m.revertPayment(lamp.id, 'Lamp'));
+                                                  if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                                }
+                                              }}
+                                              className="text-xs font-medium text-emerald-600 hover:text-rose-600 hover:line-through transition-colors"
+                                           >
+                                              (恢復未付款)
+                                           </button>
+                                        </div>
                                      )}
-                                     <button onClick={async () => { if (confirm(`確定續點 ${lamp.categoryName}？`)) { const { renewLampRecord } = await import('@/app/actions'); await renewLampRecord(lamp.id, 365); await loadHistory(selectedGuest.phone); alert("🏮 續點成功！"); } }} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl">快速續點 ➔</button>
+                                     {lamp.status !== 'Cancelled' && (
+                                        <>
+                                           {lamp.status === 'Pending' ? (
+                                              <button 
+                                                onClick={async () => {
+                                                  if (confirm('確定要啟動安奉嗎？這將標記該點燈為服務中。')) {
+                                                    await import('@/app/actions').then(m => m.activateLampRecord(lamp.id));
+                                                    if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                                  }
+                                                }}
+                                                className="text-xs font-bold text-slate-400 hover:text-amber-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-amber-50"
+                                              >
+                                                啟動安奉
+                                              </button>
+                                           ) : (
+                                              <button 
+                                                onClick={async () => {
+                                                  if (confirm('確定要暫停安奉嗎？')) {
+                                                    await import('@/app/actions').then(m => m.deactivateLampRecord(lamp.id));
+                                                    if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                                  }
+                                                }}
+                                                className="text-xs font-bold text-slate-400 hover:text-amber-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-amber-50"
+                                              >
+                                                暫停安奉
+                                              </button>
+                                           )}
+                                           <button 
+                                             onClick={async () => {
+                                               if (confirm('確定要取消這個點燈項目嗎？這將同步取消信眾端的點燈。')) {
+                                                 await import('@/app/actions').then(m => m.cancelServiceRecord(lamp.id, '點燈'));
+                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                               }
+                                             }}
+                                             className="text-xs font-bold text-slate-400 hover:text-rose-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-rose-50"
+                                           >
+                                             取消點燈 ✕
+                                           </button>
+                                           <button onClick={async () => { if (confirm(`確定續點 ${lamp.categoryName}？`)) { const { renewLampRecord } = await import('@/app/actions'); await renewLampRecord(lamp.id, 365); await loadHistory(selectedGuest.phone); alert("🏮 續點成功！"); } }} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl">快速續點 ➔</button>
+                                        </>
+                                     )}
                                      </div>
                                   </div>
                                </div>
@@ -615,7 +675,30 @@ function DeepFileCenterContent() {
                                         </button>
                                       )}
                                       {event.paymentStatus === 'Paid' && (
-                                        <span className="text-sm font-medium text-emerald-600 ml-4">✓ 已結帳</span>
+                                        <button 
+                                          onClick={async () => {
+                                            if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
+                                              await import('@/app/actions').then(m => m.revertPayment(event.id.toString(), 'Appointment'));
+                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                            }
+                                          }}
+                                          className="text-sm font-medium text-emerald-600 ml-4 hover:text-rose-600 hover:line-through transition-colors"
+                                        >
+                                          ✓ 已結帳
+                                        </button>
+                                      )}
+                                      {event.status !== 'Cancelled' && (
+                                        <button 
+                                          onClick={async () => {
+                                            if (confirm('確定要取消這個預約嗎？這將同步取消信眾端的預約。')) {
+                                              await import('@/app/actions').then(m => m.cancelAppointment(Number(event.id)));
+                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                            }
+                                          }}
+                                          className="text-sm font-bold text-slate-400 hover:text-rose-600 transition-colors ml-4"
+                                        >
+                                          ❌ 取消預約
+                                        </button>
                                       )}
                                     </div>
                                   </div>
@@ -732,8 +815,18 @@ function DeepFileCenterContent() {
                                           }
                                           setPreviewFile(file);
                                        }}
-                                       className="relative rounded-[45px] overflow-hidden border-4 border-slate-50 aspect-square bg-slate-50 shadow-sm hover:scale-105 hover:shadow-lg transition-all cursor-zoom-in flex items-center justify-center"
+                                       className="relative rounded-[45px] overflow-hidden border-4 border-slate-50 aspect-square bg-slate-50 shadow-sm hover:scale-105 hover:shadow-lg transition-all cursor-zoom-in flex items-center justify-center group/file"
                                     >
+                                       <button 
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if(confirm('確定要刪除這個媒體檔案嗎？')) {
+                                               await import('@/app/actions').then(m => m.deleteGuestFile(file.id));
+                                               if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                            }
+                                          }}
+                                          className="absolute top-4 right-4 w-8 h-8 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity z-20 shadow-md hover:bg-rose-600 hover:scale-110"
+                                       >✕</button>
                                        {file.type === 'photo' ? (
                                           <img src={file.url} className="w-full h-full object-cover" />
                                        ) : file.type === 'video' ? (

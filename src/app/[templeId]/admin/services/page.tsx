@@ -396,9 +396,24 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                                        <div key={i} onClick={() => {
                                           setEditingForm({ id: 'f-' + Date.now(), name: t.name + ' (套用預設)', fields: t.fields });
                                           setShowTemplateMenu(false);
-                                       }} className="px-4 py-3 hover:bg-indigo-50 rounded-lg cursor-pointer flex justify-between items-center group">
-                                          <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 truncate mr-2">{t.name}</span>
-                                          <span className="text-[10px] text-slate-400 shrink-0">{t.fields?.length || 0} 欄位</span>
+                                       }} className="px-4 py-3 hover:bg-indigo-50 rounded-lg cursor-pointer flex justify-between items-center group relative">
+                                          <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 truncate mr-2 flex-1">{t.name}</span>
+                                          <span className="text-[10px] text-slate-400 shrink-0 group-hover:mr-8 transition-all">{t.fields?.length || 0} 欄位</span>
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (confirm(`確定要刪除預設模組 [${t.name}] 嗎？`)) {
+                                                const updated = tpls.filter((_: any, idx: number) => idx !== i);
+                                                localStorage.setItem(`temple_form_templates_${templeId}`, JSON.stringify(updated));
+                                                setShowTemplateMenu(false);
+                                                setTimeout(() => setShowTemplateMenu(true), 10);
+                                              }
+                                            }}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10"
+                                            title="刪除模組"
+                                          >
+                                            ✕
+                                          </button>
                                        </div>
                                     ));
                                  })()}

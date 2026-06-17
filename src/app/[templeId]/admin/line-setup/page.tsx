@@ -253,7 +253,8 @@ export default function LineSetupPage() {
           </div>
         ) : (
           <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
-             {/* Consolidated Reservation Rules & Thresholds */}
+             {/* Consolidated Reservation Rules & Thresholds (Temporarily Hidden by Request) */}
+             {false && (
              <div className="bg-white p-8 rounded-2xl border-2 border-slate-200 shadow-2xl space-y-8 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-6 opacity-5 text-5xl group-hover:scale-125 transition-transform duration-1000">🛡️</div>
                 
@@ -375,6 +376,7 @@ export default function LineSetupPage() {
                    </div>
                 </div>
              </div>
+             )}
 
              {/* Push Rules */}
              <div className="space-y-4">

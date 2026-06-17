@@ -100,7 +100,7 @@ export default function AnalyticsClient({ initialSettings, data }: { initialSett
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          {[
-            { label: '本季累計收支', value: `NT$ ${data.overview?.totalRevenue?.toLocaleString() || 0}`, growth: '即時', icon: '💎' },
+            { label: '本月累計收支', value: `NT$ ${data.overview?.totalRevenue?.toLocaleString() || 0}`, growth: '即時', icon: '💎' },
             { label: '信眾成長數', value: `${data.overview?.totalGuests || 0} 位`, growth: '即時', icon: '👥' },
             { label: '轉換效能', value: `${data.overview?.conversionRate || 0}%`, growth: '即時', icon: '🤖' },
             { label: '平均處理時效', value: `${data.overview?.avgProcessingTime || 0} 分鐘`, growth: '即時', icon: '⌛' }

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useTransition, useMemo, useEffect } from 'react';
+import React, { useState, useTransition, useMemo } from 'react';
+import { addSalesMember, approveTempleByDistributor, rejectTempleByDistributor } from '@/app/actions';
 import TempleApplicationForm from '@/app/components/TempleApplicationForm';
-import { fetchDistributorFinancials, fetchDistributorSalesPerformance, updateDistributorBankInfo } from '@/app/actions';
 
 /**
  * Aurora Background Component - Enhanced with more vibrant but subtle blobs
@@ -17,12 +17,11 @@ const AuroraBackground = () => (
 );
 
 export default function DistAdminClient({ 
-  distId, initialProfile, initialTeam, initialApps, initialCapacity, initialCommission, initialTools = []
+  initialProfile, initialTeam, initialApps, initialCapacity, initialCommission 
 }: { 
-  distId: string, initialProfile: any, initialTeam: any[], initialApps: any[], initialCapacity: any, initialCommission: any, initialTools: any[] 
+  initialProfile: any, initialTeam: any[], initialApps: any[], initialCapacity: any, initialCommission: any 
 }) {
-  const [activeToolPreview, setActiveToolPreview] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'approvals' | 'calendar' | 'financials' | 'tools' | 'profile' | 'logs' | 'temples' | 'b2b_payment'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'approvals' | 'calendar' | 'financials' | 'tools' | 'profile' | 'logs'>('overview');
   const [isPending, startTransition] = useTransition();
 
   // --- Financial Sub-Tab State ---
@@ -38,18 +37,11 @@ export default function DistAdminClient({
   // --- Global Modals State ---
   const [isAddSalesModalOpen, setIsAddSalesModalOpen] = useState(false);
   const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
-  const [isEditBankModalOpen, setIsEditBankModalOpen] = useState(false);
   const [isDirectCreateModalOpen, setIsDirectCreateModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isTempleListModalOpen, setIsTempleListModalOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-
-  const [editBankForm, setEditBankForm] = useState({
-    bankName: initialProfile?.bankInfo?.bankName || '國泰世華銀行 (013)',
-    accountName: initialProfile?.bankInfo?.accountName || '北區雲端宮廟代理有限公司',
-    accountNumber: initialProfile?.bankInfo?.accountNumber || '12345678901234'
-  });
-
+  
   // --- Selections ---
   const [selectedSales, setSelectedSales] = useState<any>(null);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
@@ -77,28 +69,86 @@ export default function DistAdminClient({
   ], []);
 
   // --- Official Tools Mock Data ---
-  const officialTools = initialTools;
+  const officialTools = useMemo(() => [
+    { id: 'TOOL-1', type: 'video', title: '雲端宮廟 2.0 系統操作全攻略', category: '系統教學', thumbnail: 'https://images.unsplash.com/photo-1528642463367-12544dd1479d?q=80&w=800&auto=format&fit=crop' },
+    { id: 'TOOL-2', type: 'video', title: '2026 數位轉型：宮廟現代化趨勢報告', category: '市場動態', thumbnail: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=800&auto=format&fit=crop' },
+    { id: 'TOOL-3', type: 'doc', title: '經銷商夥伴行銷資產包 (V8.2)', category: '素材下載', icon: '📂' },
+    { id: 'TOOL-4', type: 'doc', title: '標準電子合約範本 (正式版)', category: '法律文件', icon: '📄' },
+  ], []);
 
   // --- Performance & Payment Mock Data with Regions & History ---
-  const [paymentRecords, setPaymentRecords] = useState<any[]>([]);
-  const [bonusRequests, setBonusRequests] = useState<any[]>([]);
-  const [teamPerformance, setTeamPerformance] = useState<any[]>(initialTeam);
+  const [paymentRecords, setPaymentRecords] = useState([
+    { 
+      id: 'PAY-001', 
+      temple: "台北行天宮", 
+      region: "台北", 
+      amount: 12000, 
+      date: "2026-05-01", 
+      status: "Paid", 
+      type: "Setup",
+      history: [
+        { month: "2026-05", amount: 12000, type: "Setup", status: "Paid" },
+        { month: "2026-04", amount: 3600, type: "Monthly", status: "Paid" },
+        { month: "2026-03", amount: 3600, type: "Monthly", status: "Paid" },
+      ]
+    },
+    { 
+      id: 'PAY-002', 
+      temple: "龍山寺", 
+      region: "台北", 
+      amount: 3600, 
+      date: "2026-05-02", 
+      status: "Paid", 
+      type: "Monthly",
+      history: [
+        { month: "2026-05", amount: 3600, type: "Monthly", status: "Paid" },
+        { month: "2026-04", amount: 3600, type: "Monthly", status: "Paid" },
+      ]
+    },
+    { 
+      id: 'PAY-003', 
+      temple: "大甲鎮瀾宮", 
+      region: "台中", 
+      amount: 3600, 
+      date: "2026-05-05", 
+      status: "Overdue", 
+      type: "Monthly",
+      history: [
+        { month: "2026-05", amount: 3600, type: "Monthly", status: "Overdue" },
+        { month: "2026-04", amount: 3600, type: "Monthly", status: "Paid" },
+      ]
+    },
+    { 
+      id: 'PAY-004', 
+      temple: "北港朝天宮", 
+      region: "雲林", 
+      amount: 15000, 
+      date: "2026-05-08", 
+      status: "Paid", 
+      type: "Setup",
+      history: [
+        { month: "2026-05", amount: 15000, type: "Setup", status: "Paid" }
+      ]
+    },
+    { 
+      id: 'PAY-005', 
+      temple: "鹿港天后宮", 
+      region: "彰化", 
+      amount: 3600, 
+      date: "2026-05-10", 
+      status: "Paid", 
+      type: "Monthly",
+      history: [
+        { month: "2026-05", amount: 3600, type: "Monthly", status: "Paid" }
+      ]
+    },
+  ]);
 
-  useEffect(() => {
-    startTransition(async () => {
-      const [financials, performance] = await Promise.all([
-        fetchDistributorFinancials(distId),
-        fetchDistributorSalesPerformance(distId)
-      ]);
-      setPaymentRecords(financials.paymentRecords);
-      setBonusRequests(financials.bonusRequests);
-      
-      // Update team performance dynamically
-      if (performance && performance.length > 0) {
-        setTeamPerformance(performance);
-      }
-    });
-  }, [distId]);
+  const [bonusRequests, setBonusRequests] = useState([
+    { id: 'BN-101', sales: "陳小明", amount: 2400, date: "2026-05-11", status: "Paid" },
+    { id: 'BN-102', sales: "林志玲", amount: 1800, date: "2026-05-12", status: "Paid" },
+    { id: 'BN-103', sales: "王大錘", amount: 3000, date: "2026-05-12", status: "Verified" },
+  ]);
 
   // --- Forms ---
   const [rejectReason, setRejectReason] = useState("");
@@ -108,21 +158,6 @@ export default function DistAdminClient({
   const [editingRates, setEditingRates] = useState({
     setupRate: 20, rentYear1Rate: 15, rentYear2Rate: 10, rentYear3PlusRate: 5
   });
-
-  const [accountError, setAccountError] = useState('');
-  
-  const validateAccount = async (acc: string) => {
-    if (!acc) { setAccountError(''); return; }
-    try {
-      const { checkAccountExists } = await import('@/app/actions');
-      const exists = await checkAccountExists(acc);
-      if (exists) {
-        setAccountError(`此帳號不可使用，建議使用：${acc}${Math.floor(Math.random()*900)+100}`);
-      } else {
-        setAccountError('');
-      }
-    } catch(e) {}
-  };
 
   const [logs, setLogs] = useState([{ id: 1, action: "系統初始化完成", target: "安全協議", operator: "System", time: "2026-05-04 00:00" }]);
 
@@ -134,51 +169,53 @@ export default function DistAdminClient({
   const handleApprove = (id: string) => {
     if (initialCapacity.used >= initialCapacity.total) return alert("❌ 配額已滿！");
     startTransition(async () => {
-      addLog("核定開通宮廟", `案號: ${id}`);
-      alert("✅ 帳戶已成功開通");
-      window.location.reload();
+      try {
+        await approveTempleByDistributor(id);
+        addLog("核定開通宮廟", `案號: ${id}`);
+        alert("✅ 帳戶已成功開通");
+        window.location.reload();
+      } catch (err) {
+        alert("操作失敗，請稍後再試。");
+      }
     });
   };
 
   const handleReject = () => {
     if (!rejectReason) return alert("請輸入理由");
+    if (!selectedAppId) return alert("未選擇申請案");
     startTransition(async () => {
-      addLog("駁回申請", `原因: ${rejectReason}`);
-      setIsRejectModalOpen(false);
-      window.location.reload();
+      try {
+        await rejectTempleByDistributor(selectedAppId);
+        addLog("駁回申請", `案號: ${selectedAppId}, 原因: ${rejectReason}`);
+        setIsRejectModalOpen(false);
+        window.location.reload();
+      } catch (err) {
+        alert("操作失敗，請稍後再試。");
+      }
     });
   };
 
   const handleAddSales = (e: React.FormEvent) => {
     e.preventDefault();
-    if (accountError) {
-      alert("目前帳號不可使用，請依照系統建議更換！");
-      return;
-    }
     startTransition(async () => {
-      const { createDistributorSales } = await import('@/app/actions');
-      const res = await createDistributorSales(distId, newSalesForm);
-      if (res.success) {
+      try {
+        // Map the form fields to match the action's expected parameters
+        await addSalesMember({
+          distributorId: initialProfile.id,
+          name: newSalesForm.name,
+          account: newSalesForm.account,
+          password: newSalesForm.password,
+          phone: newSalesForm.phone,
+          setupFeePercent: newSalesForm.setupRate,
+          rentYear1Percent: newSalesForm.rentYear1Rate,
+          rentYear2Percent: newSalesForm.rentYear2Rate,
+          rentYear3PlusPercent: newSalesForm.rentYear3PlusRate
+        });
         addLog("新增業務", `${newSalesForm.name} (${newSalesForm.phone})`);
         setIsAddSalesModalOpen(false);
         window.location.reload();
-      } else {
-        alert("新增失敗");
-      }
-    });
-  };
-
-  const handleSaveBankInfo = (e: React.FormEvent) => {
-    e.preventDefault();
-    startTransition(async () => {
-      const success = await updateDistributorBankInfo(distId, editBankForm);
-      if (success) {
-        addLog("更新銀行帳戶資訊", `解付銀行: ${editBankForm.bankName}`);
-        setIsEditBankModalOpen(false);
-        alert('銀行帳戶資訊已更新！');
-        window.location.reload();
-      } else {
-        alert('更新失敗，請稍後再試。');
+      } catch (err) {
+        alert("新增失敗，請確認資料是否正確。");
       }
     });
   };
@@ -242,7 +279,7 @@ export default function DistAdminClient({
              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">👥</div>
              <div>
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">轄下業務菁英</p>
-                <h3 className="text-3xl font-black text-slate-900 mt-1">{teamPerformance.length} <span className="text-[10px] opacity-20 italic">Elite</span></h3>
+                <h3 className="text-3xl font-black text-slate-900 mt-1">{initialTeam.length} <span className="text-[10px] opacity-20 italic">Elite</span></h3>
              </div>
           </div>
           <div onClick={() => setActiveTab('approvals')} className="bg-slate-950 p-7 rounded-[35px] shadow-2xl flex flex-col justify-between h-44 cursor-pointer active:scale-95 hover:shadow-blue-500/20 transition-all duration-500">
@@ -291,15 +328,15 @@ export default function DistAdminClient({
              </div>
           </div>
           <div className="grid grid-cols-1 gap-8">
-             {officialTools.filter(t => ['video', 'photo'].includes(t.type)).map(tool => (
-                <div key={tool.id} onClick={() => setActiveToolPreview(tool)} className="group relative bg-white rounded-[45px] shadow-2xl border border-white overflow-hidden aspect-[16/10] hover:shadow-blue-200 transition-all duration-700 cursor-pointer">
-                   <img src={tool.thumbnail || tool.url || 'https://images.unsplash.com/photo-1528642463367-12544dd1479d?q=80&w=800&auto=format&fit=crop'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s]" />
+             {officialTools.filter(t => t.type === 'video').map(tool => (
+                <div key={tool.id} className="group relative bg-white rounded-[45px] shadow-2xl border border-white overflow-hidden aspect-[16/10] hover:shadow-blue-200 transition-all duration-700">
+                   <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s]" />
                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent p-10 flex flex-col justify-end">
                       <p className="text-[9px] font-black text-blue-400 uppercase mb-3 tracking-[0.3em] bg-blue-500/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">{tool.category}</p>
                       <h5 className="text-2xl font-black text-white leading-tight italic tracking-tighter">{tool.title}</h5>
                       <div className="mt-8 flex items-center gap-4">
                          <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl shadow-2xl shadow-blue-500/40 group-hover:scale-110 group-hover:bg-blue-500 transition-all duration-500">▶️</div>
-                         <span className="text-[10px] font-black text-white/60 uppercase tracking-widest group-hover:text-white transition-colors">點擊檢閱資源</span>
+                         <span className="text-[10px] font-black text-white/60 uppercase tracking-widest group-hover:text-white transition-colors">點擊播放官方宣導影片</span>
                       </div>
                    </div>
                 </div>
@@ -310,11 +347,25 @@ export default function DistAdminClient({
        {/* Document & Assets Section */}
        <section className="space-y-6">
           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">業務開發與法律文件 (官方規範)</h4>
-
+          <div className="bg-white/60 backdrop-blur-xl rounded-[45px] p-10 shadow-2xl border border-white space-y-8 group">
+             <div className="flex items-center gap-8 p-10 bg-blue-50/50 rounded-[40px] border border-blue-100/30 shadow-inner group-hover:bg-white transition-all duration-500">
+                <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-500">📄</div>
+                <div className="space-y-2">
+                   <h5 className="text-xl font-black text-slate-900 tracking-tighter italic leading-none">標準宮廟服務契約 V4.0</h5>
+                   <p className="text-[9px] text-blue-600 font-black mt-2 tracking-[0.2em] uppercase bg-blue-50 w-fit px-3 py-1 rounded-full">Verified by HQ Admin</p>
+                </div>
+             </div>
+             <button 
+               onClick={() => setIsContractModalOpen(true)}
+               className="w-full bg-slate-950 text-white py-8 rounded-[40px] font-black text-[10px] uppercase tracking-[0.5em] italic flex items-center justify-center gap-4 active:scale-95 hover:bg-blue-600 hover:shadow-blue-200 transition-all shadow-2xl"
+             >
+                ✍️ 啟動官方數位合約簽署
+             </button>
+          </div>
           <div className="grid grid-cols-2 gap-4">
-             {officialTools.filter(t => ['document', 'contract'].includes(t.type)).map(doc => (
-                <div key={doc.id} onClick={() => setActiveToolPreview(doc)} className="bg-white/60 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl flex flex-col items-center text-center space-y-4 hover:border-blue-500 transition-all duration-500 group cursor-pointer">
-                   <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-blue-600 group-hover:text-white transition-all">{doc.type === 'contract' ? '📑' : '📄'}</div>
+             {officialTools.filter(t => t.type === 'doc').map(doc => (
+                <div key={doc.id} className="bg-white/60 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl flex flex-col items-center text-center space-y-4 hover:border-blue-500 transition-all duration-500 group cursor-pointer">
+                   <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-blue-600 group-hover:text-white transition-all">{doc.icon}</div>
                    <div>
                       <h6 className="text-xs font-black text-slate-900 tracking-tight">{doc.title}</h6>
                       <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">{doc.category}</p>
@@ -323,8 +374,6 @@ export default function DistAdminClient({
              ))}
           </div>
        </section>
-
-       
     </div>
   );
 
@@ -340,7 +389,6 @@ export default function DistAdminClient({
              </div>
              <h1 className="text-4xl font-black tracking-tighter text-slate-900 italic leading-none drop-shadow-sm">
                 {activeTab === 'overview' && '控制台 Dash'}
-                {activeTab === 'temples' && '宮廟管理 Temples'}
                 {activeTab === 'team' && '業務團隊 Team'}
                 {activeTab === 'approvals' && '申請核定 Appr'}
                 {activeTab === 'calendar' && '拜訪監控 Log'}
@@ -348,7 +396,6 @@ export default function DistAdminClient({
                 {activeTab === 'tools' && '官方工具 Tools'}
                 {activeTab === 'profile' && '資料中心 Profile'}
                 {activeTab === 'logs' && '系統日誌 Sys'}
-                 {activeTab === 'b2b_payment' && 'B2B收款 B2B'}
              </h1>
           </div>
           <div onClick={() => setActiveTab('logs')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-2xl transition-all duration-500 hover:rotate-12 ${activeTab === 'logs' ? 'bg-blue-600 text-white scale-110' : 'bg-white/80 backdrop-blur-md border border-white text-slate-300'}`}>🛰️</div>
@@ -358,47 +405,11 @@ export default function DistAdminClient({
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'tools' && renderTools()}
 
-          {/* TAB: Temples */}
-          {activeTab === 'temples' && (
-            <div className="space-y-6 animate-in slide-in-from-right-10 duration-700">
-               {initialApps.length === 0 && (
-                 <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[45px] shadow-xl border border-white text-center py-20">
-                    <p className="text-slate-400 font-bold">目前旗下尚未綁定任何宮廟</p>
-                 </div>
-               )}
-               {initialApps.map((temple: any) => (
-                 <div key={temple.id} className="bg-white/60 backdrop-blur-xl p-8 rounded-[45px] shadow-xl border border-white space-y-6 group hover:bg-white transition-all duration-500">
-                    <div className="flex justify-between items-start">
-                       <div className="flex gap-5 items-center">
-                          <div className="w-16 h-16 rounded-[24px] bg-slate-900 text-white flex items-center justify-center text-2xl font-black italic shadow-2xl group-hover:bg-blue-600 transition-all duration-500">{(temple.templeName || '宮').substring(0,1)}</div>
-                          <div>
-                            <h4 className="text-xl font-black text-slate-900 tracking-tighter">{temple.templeName || '未命名宮廟'}</h4>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">ID: {temple.id}</p>
-                          </div>
-                       </div>
-                       <div className="flex flex-col items-end gap-2">
-                         <span className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest">{temple.status || 'Active'}</span>
-                       </div>
-                    </div>
-                    <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
-                       <div className="text-[10px] text-slate-400 font-bold">系統版本: {temple.version || 'v10'}</div>
-                       <button onClick={() => {
-                           import('@/app/actions').then(async m => { 
-                             const res = await m.impersonateTemple(temple.id as string, 'Distributor'); 
-                             if(res.success && res.redirectPath) window.location.href = res.redirectPath; 
-                           })
-                       }} className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">進入後台 🔑</button>
-                    </div>
-                 </div>
-               ))}
-            </div>
-          )}
-
           {/* TAB: Team */}
           {activeTab === 'team' && (
             <div className="space-y-6 animate-in slide-in-from-right-10 duration-700">
                <button onClick={() => setIsAddSalesModalOpen(true)} className="w-full py-6 bg-slate-900 text-blue-400 rounded-[30px] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-blue-600 hover:text-white transition-all">+ 新增正式業務人員</button>
-               {teamPerformance.map((m: any) => (
+               {initialTeam.map((m: any) => (
                  <div key={m.id} className="bg-white/60 backdrop-blur-xl p-8 rounded-[45px] shadow-xl border border-white space-y-6 group hover:bg-white transition-all duration-500">
                     <div className="flex justify-between items-start">
                        <div className="flex gap-5 items-center">
@@ -519,7 +530,7 @@ export default function DistAdminClient({
                      <div className="grid grid-cols-2 gap-8 divide-x divide-white/20">
                         <div className="space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">宮廟繳費總額</p>
-                           <h2 className="text-4xl font-black tracking-tighter italic text-white drop-shadow-md">${paymentRecords.reduce((sum, p) => sum + p.history.filter((h: any)=>h.status==='Paid').reduce((s: number, h: any)=>s+h.amount, 0), 0).toLocaleString()}</h2>
+                           <h2 className="text-4xl font-black tracking-tighter italic text-white drop-shadow-md">${paymentRecords.reduce((sum, p) => sum + p.history.filter(h=>h.status==='Paid').reduce((s, h)=>s+h.amount, 0), 0).toLocaleString()}</h2>
                         </div>
                         <div className="pl-8 space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">預計支出佣金</p>
@@ -548,7 +559,7 @@ export default function DistAdminClient({
                                       {expandedTempleId === p.id && (
                                          <div className="bg-slate-50/80 p-8 border-t border-white/50 space-y-4 animate-in slide-in-from-top-4 duration-500">
                                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 px-2">歷史付款紀錄 History Records</p>
-                                            <div className="space-y-2">{p.history.map((h: any, i: number) => (
+                                            <div className="space-y-2">{p.history.map((h, i) => (
                                                   <div key={i} className="flex justify-between items-center bg-white/50 p-4 rounded-2xl border border-white shadow-sm">
                                                      <div className="flex gap-4 items-center"><span className="text-[10px] font-black text-slate-900">{h.month}月度</span><span className="text-[8px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-md">{h.type}</span></div>
                                                      <div className="flex items-center gap-3"><span className="text-xs font-black text-slate-900">${h.amount.toLocaleString()}</span><div className={`w-1.5 h-1.5 rounded-full ${h.status === 'Paid' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div></div>
@@ -565,7 +576,7 @@ export default function DistAdminClient({
                   )}
                   {financialTab === 'performance' && (
                     <div className="space-y-4">
-                       {teamPerformance.map((s: any, idx: number) => (
+                       {initialTeam.map((s: any, idx: number) => (
                           <div key={s.id} className="bg-white/60 backdrop-blur-xl p-7 rounded-[40px] border border-white shadow-xl space-y-6 group hover:bg-white transition-all duration-500">
                              <div className="flex justify-between items-center"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-slate-950 text-white flex items-center justify-center text-sm font-black italic shadow-xl group-hover:bg-blue-600 transition-all">0{idx+1}</div><div><h4 className="text-sm font-black text-slate-900">{s.name}</h4><p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">ID: {s.account}</p></div></div><div className="text-right"><p className="text-xl font-black text-slate-900 italic tracking-tighter">${s.totalSales.toLocaleString()}</p></div></div>
                              <div className="space-y-2"><div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-slate-300"><span>績效達成率 Target Reach</span><span className="text-blue-600">82%</span></div><div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner"><div className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500 rounded-full group-hover:animate-pulse" style={{ width: '82%' }}></div></div></div>
@@ -629,12 +640,9 @@ export default function DistAdminClient({
                <section className="bg-white/60 backdrop-blur-xl p-10 rounded-[60px] shadow-2xl space-y-8 relative overflow-hidden group border border-white">
                   <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-[60px] -mr-10 -mt-10 group-hover:bg-blue-500/10 transition-all"></div>
                   
-                  <div className="flex justify-between items-center relative z-10 px-2">
-                     <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-4 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.4)]"></div>
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">銀行撥款帳戶資訊</h4>
-                     </div>
-                     <button onClick={() => setIsEditBankModalOpen(true)} className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest px-3 py-1 bg-blue-50 hover:bg-blue-100 rounded-full transition-all">編輯</button>
+                  <div className="flex items-center gap-3 relative z-10 px-2">
+                     <div className="w-1.5 h-4 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.4)]"></div>
+                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">銀行撥款帳戶資訊</h4>
                   </div>
 
                   <div className="space-y-5 relative z-10">
@@ -739,7 +747,6 @@ export default function DistAdminClient({
        <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-white/70 backdrop-blur-3xl rounded-[45px] px-3 py-4 flex justify-between items-center shadow-[0_25px_60px_rgba(0,0,0,0.15)] z-[100] border border-white/50">
           {[
             {id: 'overview', icon: '💎', label: '首頁'},
-            {id: 'temples', icon: '🏛️', label: '宮廟'},
             {id: 'team', icon: '👥', label: '團隊'},
             {id: 'approvals', icon: '⚡', label: '核定'},
             {id: 'calendar', icon: '📅', label: '監控'},
@@ -753,80 +760,6 @@ export default function DistAdminClient({
             </button>
           ))}
        </nav>
-
-{/* --- TOOL PREVIEW MODAL --- */}
-       {activeToolPreview && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
-             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="flex justify-between items-center p-6 border-b border-slate-100">
-                   <div>
-                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.type}</p>
-                   </div>
-                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
-                </div>
-                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
-                   {activeToolPreview.type === 'photo' ? (
-                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
-                   ) : activeToolPreview.type === 'video' ? (
-                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
-                   ) : (
-                      <div className="text-center space-y-4">
-                         <span className="text-6xl block">📄</span>
-                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
-                      </div>
-                   )}
-                   
-                   <button 
-                      className="px-8 py-4 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-lg hover:bg-blue-700 transition-all mt-4" 
-                      onClick={() => {
-                        const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
-                        if (!fileUrl) {
-                          alert('檔案連結無效，無法下載。');
-                          return;
-                        }
-                        try {
-                          if (fileUrl.startsWith('data:')) {
-                            const arr = fileUrl.split(',');
-                            const mime = arr[0].match(/:(.*?);/)[1];
-                            const bstr = atob(arr[1]);
-                            let n = bstr.length;
-                            const u8arr = new Uint8Array(n);
-                            while (n--) {
-                              u8arr[n] = bstr.charCodeAt(n);
-                            }
-                            const blob = new Blob([u8arr], { type: mime });
-                            const blobUrl = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = blobUrl;
-                            a.download = activeToolPreview.title || 'download';
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-                          } else {
-                            const a = document.createElement('a');
-                            a.href = fileUrl;
-                            a.download = activeToolPreview.title || 'download';
-                            a.target = '_blank';
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          }
-                        } catch (err) {
-                          alert('下載失敗，檔案可能已損壞或過大。');
-                          console.error(err);
-                        }
-                      }}
-                   >確認下載檔案 (Download)</button>
-                </div>
-             </div>
-          </div>
-       )}
-
-
 
        {/* --- MODALS --- */}
        {isAddSalesModalOpen && (
@@ -860,13 +793,7 @@ export default function DistAdminClient({
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">系統帳號 ID</p>
-                           <div className="space-y-1">
-                             <input type="text" placeholder="自定義登入帳號" className={`w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 transition-all ${accountError ? 'border-rose-300 bg-rose-50 text-rose-900 focus:border-rose-500' : 'border-transparent focus:border-blue-200'}`} value={newSalesForm.account} onChange={e=>{
-                                setNewSalesForm({...newSalesForm, account:e.target.value});
-                                validateAccount(e.target.value);
-                             }} required />
-                             {accountError && <p className="text-[10px] text-rose-500 font-bold px-4">{accountError}</p>}
-                           </div>
+                           <input type="text" placeholder="自定義登入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.account} onChange={e=>setNewSalesForm({...newSalesForm, account:e.target.value})} required />
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">安全密碼 Password</p>
@@ -903,36 +830,6 @@ export default function DistAdminClient({
                      簽署並正式簽發權限 🚀
                   </button>
                </div>
-            </form>
-         </div>
-       )}
-       {isEditBankModalOpen && (
-         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-end animate-in fade-in duration-300">
-            <form onSubmit={handleSaveBankInfo} className="bg-white w-full rounded-t-[60px] p-12 pb-20 shadow-2xl space-y-8 animate-in slide-in-from-bottom-20 duration-500 max-w-xl mx-auto relative">
-               <div className="flex justify-between items-center border-b border-slate-50 pb-6 mb-4">
-                  <div className="space-y-1">
-                     <h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">編輯銀行帳戶資訊</h3>
-                     <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">Bank Account Information</p>
-                  </div>
-                  <button type="button" onClick={() => setIsEditBankModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
-               </div>
-               
-               <div className="space-y-6">
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">解付銀行</label>
-                     <input required type="text" value={editBankForm.bankName} onChange={e => setEditBankForm({...editBankForm, bankName: e.target.value})} className="w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="例：國泰世華銀行 (013)" />
-                  </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">帳戶名稱</label>
-                     <input required type="text" value={editBankForm.accountName} onChange={e => setEditBankForm({...editBankForm, accountName: e.target.value})} className="w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                  </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">銀行帳號</label>
-                     <input required type="text" value={editBankForm.accountNumber} onChange={e => setEditBankForm({...editBankForm, accountNumber: e.target.value})} className="w-full bg-slate-50 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-                  </div>
-               </div>
-               
-               <button type="submit" className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black text-sm shadow-[0_15px_30px_rgba(37,99,235,0.3)] hover:bg-blue-500 transition-all">儲存變更</button>
             </form>
          </div>
        )}

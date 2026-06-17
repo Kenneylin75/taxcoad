@@ -128,8 +128,8 @@ export async function logoutAccount() {
 }
 
 export async function loginAccount(formData: FormData) {
-  const account = formData.get("account") as string;
-  const password = formData.get("password") as string;
+  const account = (formData.get("account") as string || "").trim();
+  const password = (formData.get("password") as string || "").trim();
 
   if (!account || !password) return { success: false, error: "請輸入帳號密碼" };
 
@@ -1733,10 +1733,13 @@ export async function ensurePlatformTables() {
       status VARCHAR(50),
       quota INTEGER,
       joined_at VARCHAR(50),
-      expiration_date VARCHAR(50),
-      creator_sales_id VARCHAR(50)
+      expiration_date VARCHAR(50)
     );
   `);
+  try {
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS creator_sales_id VARCHAR(50);`);
+  } catch(e) {}
+
   await dbQuery(`
     CREATE TABLE IF NOT EXISTS dist_sales (
       id VARCHAR(50) PRIMARY KEY,
@@ -1863,7 +1866,7 @@ let db_wallets: any[] = initGlobal('db_wallets', [
 let db_super_sales_overrides: Record<string, any> = initGlobal('db_super_sales_overrides', {});
 
 let db_distributor_applications: any[] = initGlobal('db_distributor_applications', [
-  { id: 'DAPP-001', name: '大甲區域授權中心', plan: 'PLAN-A', submittedBy: '超級精英業務', status: 'Pending', account: 'dajia_dist', owner: '顏主委', date: '2026-05-12' }
+  { id: 'DAPP-001', name: '大甲區域授權中心', plan: 'PLAN-A', submittedBy: '超級精英業務', status: 'Active', account: 'dajia_dist', owner: '顏主委', date: '2026-05-12' }
 ]);
 
 
@@ -2431,13 +2434,48 @@ export async function rejectTempleBySuperAdmin(id: string) {
 }
 
 export async function fetchPendingDistributors() {
-  return [...db_distributor_applications.filter(a => a.status === 'Pending')];
+  let pgApps: any[] = [];
+  try {
+    const res = await dbQuery("SELECT * FROM distributor_applications WHERE status = 'Pending'", [], () => null) as any;
+    if (res && res.rows) {
+      pgApps = res.rows.map((r: any) => ({
+        id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
+        taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
+        submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
+        password: r.password, expirationDate: r.expiration_date
+      }));
+    }
+  } catch(e) {}
+
+  const allApps = new Map();
+  db_distributor_applications.filter(a => a.status === 'Pending').forEach(a => allApps.set(a.id, a));
+  pgApps.forEach(a => allApps.set(a.id, a));
+
+  return Array.from(allApps.values());
 }
 
 export async function approveDistributorBySuperAdmin(id: string) {
-  const app = db_distributor_applications.find(a => a.id === id);
+  let app = db_distributor_applications.find(a => a.id === id);
+  if (!app) {
+    try {
+      const res = await dbQuery("SELECT * FROM distributor_applications WHERE id = $1", [id], () => null) as any;
+      if (res && res.rows && res.rows.length > 0) {
+        const r = res.rows[0];
+        app = {
+          id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
+          taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
+          submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
+          password: r.password, expirationDate: r.expiration_date
+        };
+      }
+    } catch(e) {}
+  }
+
   if (app) {
     app.status = 'Active';
+    const memApp = db_distributor_applications.find(a => a.id === id);
+    if (memApp) memApp.status = 'Active';
+    try { await dbQuery("UPDATE distributor_applications SET status = 'Active' WHERE id = $1", [id]); } catch(e) {}
     
     // 建立實際經銷商帳戶
     const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -2482,6 +2520,7 @@ export async function approveDistributorBySuperAdmin(id: string) {
 export async function rejectDistributorBySuperAdmin(id: string) {
   const idx = db_distributor_applications.findIndex(a => a.id === id);
   if (idx > -1) db_distributor_applications.splice(idx, 1);
+  try { await dbQuery("DELETE FROM distributor_applications WHERE id = $1", [id]); } catch(e) {}
   revalidatePath('/super-admin');
   return { success: true };
 }
@@ -2698,14 +2737,33 @@ export async function submitDistributorApplication(data: any) {
   const expirationDate = new Date();
   expirationDate.setFullYear(expirationDate.getFullYear() + (Number(data.years) || 2));
 
+  const safeAccount = (data.account || '').trim();
+  const safePassword = (data.password || '').trim();
+
   const newApp = {
-    id: 'DAPP-' + Math.random().toString(36).substr(2, 9),
+    id: 'DAPP-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
     ...data,
+    account: safeAccount,
+    password: safePassword,
     status: 'Pending',
     date: new Date().toISOString().split('T')[0],
     expirationDate: expirationDate.toISOString().split('T')[0]
   };
   db_distributor_applications.push(newApp);
+
+  await ensurePlatformTables();
+  try {
+    await dbQuery(`
+      INSERT INTO distributor_applications (id, name, contact_name, phone, email, tax_id, address, plan_id, price, nodes, submitted_by, status, created_at, account, password, expiration_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    `, [
+      newApp.id, data.name || '', data.contactName || '', data.phone || '', data.email || '', data.taxId || '', data.address || '', 
+      data.planId || '', Number(data.customPrice) || 0, Number(data.customNodes) || 0, data.submittedBy || '', 
+      'Pending', newApp.date, safeAccount, safePassword, newApp.expirationDate
+    ]);
+  } catch(e) {
+    console.error("Failed to insert distributor_application:", e);
+  }
 
   db_notifications.unshift({
     id: `N-DIST-${Date.now()}`,
@@ -2772,16 +2830,41 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     }
   }
 
-  const distributors = db_distributors.filter(d => d.creatorSalesId === salesId || d.salesId === salesId).map(d => ({
-    id: d.id,
-    name: d.name,
-    status: d.contractStatus || 'Active',
-    plan: '經銷專案',
-    date: d.joinedAt || '未知',
-    nodesUsed: db_temples.filter(t => t.distributorId === d.id).length
-  }));
+  const distributors = db_distributors.filter(d => d.creatorSalesId === salesId || d.salesId === salesId).map(d => {
+    const distTemples = db_temples.filter(t => t.distributorId === d.id);
+    const distSales = db_dist_sales.filter(s => s.distributorId === d.id);
+    const totalIncome = distTemples.reduce((acc, t) => acc + (Number(t.monthlyRent) || 0) * 12, 0);
+    const commissionExpense = Math.floor(totalIncome * 0.2); // 假設佣金支出佔 20%
+    const netRevenue = totalIncome - commissionExpense;
 
-  return { temples, distributors };
+    return {
+      id: d.id,
+      name: d.name,
+      status: d.contractStatus || d.status || 'Active',
+      plan: d.planName || '經銷專案',
+      date: d.joinedAt || '未知',
+      nodesUsed: distTemples.length,
+      templeCount: distTemples.length,
+      salesCount: distSales.length,
+      revenue: totalIncome,
+      expenses: commissionExpense,
+      netRevenue: netRevenue
+    };
+  });
+
+  const pendingTempleCount = db_temple_applications.filter(a => a.submittedBy === name && a.status === 'Pending').length;
+  let pgPendingDistCount = 0;
+  try {
+    const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name], () => null) as any;
+    if (res && res.rows && res.rows.length > 0) pgPendingDistCount = parseInt(res.rows[0].count);
+  } catch(e) {}
+
+  const memPendingDistCount = db_distributor_applications.filter(a => a.submittedBy === name && a.status === 'Pending').length;
+  const pendingDistCount = Math.max(pgPendingDistCount, memPendingDistCount);
+
+  const pendingCount = pendingTempleCount + pendingDistCount;
+
+  return { temples, distributors, pendingCount };
 }
 
 // --- Super Admin Account Creation API ---
@@ -2791,6 +2874,7 @@ export async function createSuperSalesAccount(data: any) {
     return { success: false, error: '帳號已被使用，請更換其他帳號' };
   }
   const id = `ss-${Date.now()}`;
+  const safeAccount = (data.account || '').trim();
   const commissionRates = {
     distributorAuthRate: Number(data.distributorAuthRate) || 15,
     templeSetupRate: Number(data.templeSetupRate) || 10,
@@ -2814,8 +2898,8 @@ export async function createSuperSalesAccount(data: any) {
   db_dist_sales.push({
     id,
     name: data.name,
-    account: data.account,
-    password: data.password,
+    account: safeAccount,
+    password: (data.password || '').trim(),
     phone: data.phone,
     email: data.email,
     bankInfo: {
@@ -2835,9 +2919,11 @@ export async function createSuperSalesAccount(data: any) {
 }
 
 export async function createDistributorAccount(data: any) {
-  if (data.account && await checkAccountExists(data.account)) {
+  if (data.account && await checkAccountExists(data.account.trim())) {
     return { success: false, error: '帳號已被使用，請更換其他帳號' };
   }
+  const safeAccount = (data.account || '').trim();
+  const safePassword = (data.password || '').trim();
   const id = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
   const plan = db_config.distributorPlans.find((p: any) => p.id === data.planId) || db_config.distributorPlans[0];
   const finalPrice = Number(data.customPrice) || plan.price;
@@ -2848,6 +2934,8 @@ export async function createDistributorAccount(data: any) {
   const newDist = {
     id,
     ...data,
+    account: safeAccount,
+    password: safePassword,
     planId: plan.id,
     planName: plan.name,
     price: finalPrice,
@@ -2865,12 +2953,24 @@ export async function createDistributorAccount(data: any) {
     price: finalPrice,
     submittedBy: 'System Admin',
     status: 'Active',
-    account: data.account,
+    account: safeAccount,
+    password: safePassword,
     owner: data.owner,
     date: new Date().toISOString().split('T')[0]
   });
   
   gStore.db_distributors = db_distributors;
+
+  await ensurePlatformTables();
+  try {
+    await dbQuery(`
+      INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (account) DO UPDATE SET status = 'Active'
+    `, [newDist.id, newDist.name, newDist.account, newDist.password, newDist.planId, newDist.planName, newDist.price, newDist.status, Number(data.customNodes) || 100, newDist.joinedAt, newDist.expirationDate]);
+  } catch (e) {
+    console.error("DB Insert Error for distributor:", e);
+  }
 
   revalidatePath('/super-admin');
   return { success: true, id };
@@ -3267,25 +3367,25 @@ export async function fetchComplexAnalyticsData() {
   };
 
   db_appointments.forEach((a: any) => {
-    if (a.paymentStatus === 'Paid' && a.status !== 'Cancelled') {
-      addRevenue(a.date, Number(a.amount) || 0, a.templeId);
+    if (a.paymentStatus !== 'Pending' && a.status !== 'Cancelled') {
+      addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0, a.templeId);
     }
   });
 
   db_lamp_records.forEach((r: any) => {
-    if (r.paymentStatus === 'Paid') {
+    if (r.paymentStatus !== 'Pending') {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
          const cat = db_lamp_categories.find((c: any) => c.id === r.categoryId);
          if (cat) price = cat.price;
       }
-      addRevenue(r.date || r.timestamp, Number(price) || 0, r.templeId);
+      addRevenue(r.createdAt || r.date || r.timestamp, Number(price) || 0, r.templeId);
     }
   });
 
   db_event_registrations.forEach((r: any) => {
-    if (r.paymentStatus === 'Paid') {
-      addRevenue(r.timestamp, Number(r.actualPrice) || 0, r.templeId);
+    if (r.paymentStatus !== 'Pending') {
+      addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice) || 0, r.templeId);
     }
   });
 
@@ -3359,7 +3459,9 @@ export async function fetchComplexAnalyticsData() {
   // --- New Analytics Sections ---
   // A. Overview
   let totalRevenue = 0;
-  months.forEach(m => totalRevenue += m.amount); // From the revenue loop above
+  if (months.length > 0) {
+    totalRevenue = months[months.length - 1].amount; // Only use the current month's accumulated revenue
+  }
   
   // Calculate Conversion Rate
   let totalOrders = 0;
@@ -3447,7 +3549,7 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  db_lamp_records.filter(r => r.templeId === templeId && r.price > 0).forEach(r => {
+  db_lamp_records.filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
     revenue.push({
       id: r.id,
       title: r.categoryName,
@@ -4450,7 +4552,6 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
       if (recordType === 'Lamp') {
         const idx = db_lamp_records.findIndex(r => r.id === recordId);
         if (idx > -1) {
-          db_lamp_records[idx].status = 'Active';
           db_lamp_records[idx].paymentStatus = 'Paid';
         }
       }
@@ -4480,7 +4581,7 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
         await client.query('UPDATE appointments SET status = \'Confirmed\', payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
       }
       if (recordType === 'Lamp') {
-        await client.query('UPDATE lamp_records SET status = \'Active\', payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+        await client.query('UPDATE lamp_records SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
       }
       if (recordType === 'Event') {
         await client.query('UPDATE event_registrations SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
@@ -4510,7 +4611,7 @@ export async function createLampRecord(data: any) {
       if(!cat) return { success: false, error: '未找到燈種類別' };
       const today = new Date();
       const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
-      const newRecord = { id: `LMP-${Date.now()}`, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Active', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Unpaid', createdAt: new Date().toISOString() };
+      const newRecord = { id: `LMP-${Date.now()}`, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Pending', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid'), createdAt: new Date().toISOString() };
       db_lamp_records.push(newRecord);
       if (typeof db_activities !== 'undefined') db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
     } else {
@@ -4520,7 +4621,7 @@ export async function createLampRecord(data: any) {
       const today = new Date();
       const newId = `LMP-${Date.now()}`;
       await client.query('INSERT INTO lamp_records (id, temple_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [newId, templeId, guestName, phone, cat.name, cat.price, 'Active', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Unpaid']
+        [newId, templeId, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
       );
     }
     await revalidateTemple();
@@ -5794,5 +5895,112 @@ export async function confirmPaymentSuccess(orderId: string, method: string) {
     if (res.rowCount > 0) return true;
     
     return false;
+  });
+}
+
+export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      if (recordType === 'Lamp') {
+        const idx = db_lamp_records.findIndex((r: any) => r.id === recordId);
+        if (idx > -1) {
+          db_lamp_records[idx].paymentStatus = 'Unpaid';
+        }
+      }
+      if (recordType === 'Appointment') {
+        const idx = db_appointments.findIndex((r: any) => r.id.toString() === recordId.toString());
+        if (idx > -1) {
+          db_appointments[idx].paymentStatus = 'Unpaid';
+        }
+      }
+      if (recordType === 'Event') {
+        const idx = db_event_registrations.findIndex((r: any) => r.id === recordId);
+        if (idx > -1) {
+          db_event_registrations[idx].paymentStatus = 'Unpaid';
+        }
+      }
+      if (recordType === 'Queue') {
+        if (typeof db_queue_tickets !== 'undefined') {
+          const idx = db_queue_tickets.findIndex((r: any) => r.id === recordId);
+          if (idx > -1) {
+            db_queue_tickets[idx].paymentStatus = 'Unpaid';
+          }
+        }
+      }
+    } else {
+      if (recordType === 'Appointment') {
+        await client.query('UPDATE appointments SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+      if (recordType === 'Lamp') {
+        await client.query('UPDATE lamp_records SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+      if (recordType === 'Event') {
+        await client.query('UPDATE event_registrations SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+      if (recordType === 'Queue') {
+        await client.query('UPDATE queue_tickets SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      }
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+
+
+export async function deleteGuestFile(fileId: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+       // local memory array deletion handled similarly if gStore has it
+    } else {
+      await client.query('DELETE FROM guest_files WHERE id = $1 AND temple_id = $2', [fileId, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+export async function activateLampRecord(recordId: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const idx = db_lamp_records.findIndex((r: any) => r.id === recordId);
+      if (idx > -1) {
+        db_lamp_records[idx].status = 'Active';
+        db_lamp_records[idx].startDate = new Date().toISOString().split('T')[0];
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + (db_lamp_records[idx].durationDays || 365));
+        db_lamp_records[idx].expiryDate = expiry.toISOString().split('T')[0];
+      }
+    } else {
+      const record = await client.query('SELECT lamp_type, created_at FROM lamp_records WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+      let durationDays = 365;
+      if (record.rowCount > 0) {
+         const cat = await client.query('SELECT duration_days FROM lamp_categories WHERE name = $1 AND temple_id = $2', [record.rows[0].lamp_type, templeId]);
+         if (cat.rowCount > 0) durationDays = cat.rows[0].duration_days || 365;
+      }
+      const today = new Date();
+      const expiry = new Date(today.getTime() + (durationDays * 24 * 60 * 60 * 1000));
+      await client.query('UPDATE lamp_records SET status = \'Active\', created_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, today.toISOString()]);
+      // Note: the pg schema in createLampRecord only has created_at, not start_date or expiry_date. We just update created_at so the UI logic counts from today.
+    }
+    await revalidateTemple();
+    return { success: true };
+  });
+}
+
+export async function deactivateLampRecord(recordId: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    if (!client) {
+      const idx = db_lamp_records.findIndex((r: any) => r.id === recordId);
+      if (idx > -1) {
+        db_lamp_records[idx].status = 'Pending';
+      }
+    } else {
+      await client.query('UPDATE lamp_records SET status = \'Pending\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+    }
+    await revalidateTemple();
+    return { success: true };
   });
 }

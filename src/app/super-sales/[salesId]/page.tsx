@@ -84,7 +84,7 @@ export default function SuperSalesPage() {
           </div>
           <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm space-y-1">
              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">待審核</p>
-             <p className="text-3xl font-black text-indigo-600">{notifications.filter(n => !n.isRead).length}</p>
+             <p className="text-3xl font-black text-indigo-600">{registry.pendingCount || 0}</p>
           </div>
        </div>
 
@@ -204,13 +204,37 @@ export default function SuperSalesPage() {
                       <span className="text-slate-900">{item.plan}</span>
                    </div>
                    {registryTab === 'distributors' && (
-                      <div className="space-y-2">
-                         <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${(item.nodesUsed || 0) / 1 || 42}%` }}></div>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                         <div className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-indigo-200 group/card">
+                            <div className="flex items-center gap-2 mb-3">
+                               <span className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-sm group-hover/card:scale-110 transition-transform">🏛️</span>
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">宮廟佈建規模</p>
+                            </div>
+                            <p className="text-3xl font-black text-slate-900">{item.templeCount || 0} <span className="text-[10px] text-slate-400 font-bold uppercase ml-1">Nodes</span></p>
                          </div>
-                         <div className="flex justify-between items-center text-[9px] font-bold">
-                            <p className="text-slate-400 uppercase">已部署 {item.nodesUsed || 42} / 100 節點</p>
-                            <p className="text-indigo-600">使用率 {item.nodesUsed || 42}%</p>
+                         <div className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-emerald-200 group/card">
+                            <div className="flex items-center gap-2 mb-3">
+                               <span className="w-7 h-7 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-sm group-hover/card:scale-110 transition-transform">🧑‍💼</span>
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">旗下業務團隊</p>
+                            </div>
+                            <p className="text-3xl font-black text-slate-900">{item.salesCount || 0} <span className="text-[10px] text-slate-400 font-bold uppercase ml-1">Staffs</span></p>
+                         </div>
+                         <div className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-rose-200 group/card">
+                            <div className="flex items-center gap-2 mb-3">
+                               <span className="w-7 h-7 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-sm group-hover/card:scale-110 transition-transform">💸</span>
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">累計佣金支出</p>
+                            </div>
+                            <p className="text-2xl font-black text-slate-900 italic tracking-tighter">${(item.expenses || 0).toLocaleString()}</p>
+                         </div>
+                         <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[24px] p-5 shadow-lg shadow-indigo-200/50 transition-all hover:shadow-xl hover:-translate-y-1 group">
+                            <div className="flex items-center gap-2 mb-3">
+                               <span className="w-7 h-7 bg-white/20 text-white rounded-xl flex items-center justify-center text-sm group-hover:scale-110 transition-transform shadow-inner">💰</span>
+                               <p className="text-[10px] font-black text-indigo-100 uppercase tracking-widest">總營收 / 淨利潤</p>
+                            </div>
+                            <div className="space-y-1">
+                               <p className="text-3xl font-black text-white italic tracking-tighter leading-none">${(item.revenue || 0).toLocaleString()}</p>
+                               <p className="text-[10px] font-bold text-indigo-200">淨利潤 <span className="text-white font-black">${(item.netRevenue || 0).toLocaleString()}</span></p>
+                            </div>
                          </div>
                       </div>
                    )}

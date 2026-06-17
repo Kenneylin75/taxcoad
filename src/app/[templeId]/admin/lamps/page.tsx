@@ -73,6 +73,7 @@ function LampManagementContent() {
   const [selectedGuest, setSelectedGuest] = useState<any>(null);
   const [guestSearch, setGuestSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [lampGuestName, setLampGuestName] = useState<string>('');
   const [price, setPrice] = useState<number>(0);
   const [duration, setDuration] = useState<number>(365);
   
@@ -148,7 +149,7 @@ function LampManagementContent() {
     setIsSubmitting(true);
     const res = await createLampRecord({
       phone: selectedGuest.phone,
-      guestName: selectedGuest.name,
+      guestName: lampGuestName || selectedGuest.name,
       categoryId: selectedCategory,
       categoryName: categories.find(c => c.id === selectedCategory)?.name || '未定義',
       price: price,
@@ -168,6 +169,7 @@ function LampManagementContent() {
     setSelectedGuest(null);
     setGuestSearch('');
     setSelectedCategory('');
+    setLampGuestName('');
     setPrice(0);
     setDuration(365);
     setShowQuickCreate(false);
@@ -253,46 +255,72 @@ function LampManagementContent() {
            {filteredRecords.map((record) => {
               const catIdx = categories.findIndex(c => c.id === record.categoryId);
               const styles = getUIStyles(catIdx === -1 ? 0 : catIdx);
-              const expiry = new Date(record.expiryDate || '');
               const start = new Date(record.startDate || '');
               const now = new Date();
               const totalDays = record.durationDays || categories.find(c => c.id === record.categoryId)?.durationDays || 365;
-              const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000*60*60*24));
-              const progress = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
-              const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              const isActiveAndPaid = record.status === 'Active' && record.paymentStatus === 'Paid';
+              const elapsedDays = isActiveAndPaid ? Math.ceil((now.getTime() - start.getTime()) / (1000*60*60*24)) : 0;
+              const progress = isActiveAndPaid ? Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100)) : 0;
+              const expiry = new Date(record.expiryDate || '');
+              const daysLeft = isActiveAndPaid ? Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : totalDays;
               return (
                 <div key={record.id} className="bg-white p-12 rounded-[60px] border-2 border-slate-50 shadow-sm hover:shadow-[0_50px_100px_rgba(0,0,0,0.06)] transition-all group flex flex-col h-full animate-in fade-in slide-in-from-bottom-4">
                    <div className="flex justify-between items-start mb-10">
                       <div className={`w-16 h-16 rounded-[28px] flex items-center justify-center text-4xl border-4 shadow-sm ${styles.bg} ${styles.border}`}>🕯️</div>
                       
-{record.paymentStatus === 'Pending' ? (
-  <div className="flex flex-col items-end gap-2">
-    <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase border-2 shadow-sm bg-rose-50 text-rose-600 border-rose-200 animate-pulse">待確認對帳</span>
-    {record.paymentRef && <span className="text-[10px] font-bold text-slate-400">對帳碼: {record.paymentRef}</span>}
+<div className="flex flex-col items-end gap-2">
+  <div className="flex gap-2">
+    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase border-2 shadow-sm ${record.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+      {record.paymentStatus === 'Paid' ? '已付款' : record.paymentStatus === 'Pending' ? '待確認對帳' : '待付款'}
+    </span>
+    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase border-2 shadow-sm ${record.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : record.status === 'Pending' ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'}`}>
+      {record.status === 'Active' ? '服務中' : record.status === 'Pending' ? '等待安奉' : '即將到期'}
+    </span>
   </div>
-) : (
-  <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase border-2 shadow-sm ${record.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'}`}>{record.status === 'Active' ? '服務中' : '即將到期'}</span>
-)}
+  {record.paymentStatus === 'Pending' && record.paymentRef && <span className="text-[10px] font-bold text-slate-400">對帳碼: {record.paymentRef}</span>}
+</div>
 
                    </div>
                    <div className="flex-1 space-y-2">
                       <p className={`text-sm font-black uppercase tracking-widest mb-1 ${styles.text}`}>{record.categoryName}</p>
-                      <h2 className="text-3xl font-black text-slate-950 tracking-tighter italic leading-tight">{record.guestName}</h2>
+                      <h2 className="text-3xl font-black text-slate-950 tracking-tighter italic leading-tight">
+                         {record.guestName}
+                      </h2>
+                      {(() => {
+                         const accountName = guests.find(g => g.phone === record.phone)?.name;
+                         if (accountName && accountName !== record.guestName) {
+                            return <p className="text-xs text-indigo-600 font-bold mt-1 bg-indigo-50 inline-block px-2 py-1 rounded">代點人 (主帳號)：{accountName}</p>;
+                         }
+                         return null;
+                      })()}
                       <p className="text-sm text-slate-400 font-bold mt-1 tracking-widest">{record.phone}</p>
                    </div>
                    <div className="mt-10 pt-10 border-t-2 border-slate-50 space-y-6">
                       <div className="space-y-2"><div className="flex justify-between text-[10px] font-black text-slate-300 uppercase"><span>消耗進度 ({totalDays}天)</span><span>{Math.round(progress)}%</span></div><div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden shadow-inner"><div className={`h-full rounded-full transition-all duration-1000 shadow-sm ${styles.fill}`} style={{ width: `${progress}%` }}></div></div></div>
                       <div className="flex items-center justify-between"><div className="text-center bg-slate-50 px-6 py-4 rounded-3xl border-2 border-slate-100 min-w-[100px] shadow-sm"><p className="text-2xl font-black text-slate-900 leading-none">{daysLeft > 0 ? daysLeft : 0}</p><p className="text-[10px] font-bold text-slate-400 uppercase mt-1">天 剩 餘</p></div><div className="text-right"><p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">結緣金</p><p className="text-2xl font-black text-slate-900 italic tracking-tight">NT$ {(record.price || 0).toLocaleString()}</p></div></div>
-                      {record.paymentStatus === 'Pending' && (
-                        <button onClick={async () => {
-                           if(confirm('確認已收到款項 (對帳碼: ' + record.paymentRef + ') 嗎？')) {
-                             const res = await confirmPayment(record.id, 'Lamp');
-                             if(res.success) { alert('✅ 服務已成功啟用！'); await loadData(); }
-                           }
-                        }} className="w-full mt-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase transition-colors shadow-lg active:scale-95">
-                           💵 核對收款並啟用服務
-                        </button>
-                      )}
+                      <div className="space-y-2 mt-4">
+                        {(record.paymentStatus === 'Unpaid' || record.paymentStatus === 'Pending') && (
+                          <button onClick={async () => {
+                             if(confirm('確認已收到款項嗎？' + (record.paymentRef ? ' (對帳碼: ' + record.paymentRef + ')' : ''))) {
+                               const res = await confirmPayment(record.id, 'Lamp');
+                               if(res.success) { alert('✅ 已標記為已收款！'); await loadData(); }
+                             }
+                          }} className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase transition-colors shadow-lg active:scale-95">
+                             💵 標記為已收款
+                          </button>
+                        )}
+                        {record.status === 'Pending' && (
+                          <button onClick={async () => {
+                             if(confirm('確定要啟動安奉嗎？')) {
+                               const { activateLampRecord } = await import('@/app/actions');
+                               const res = await activateLampRecord(record.id);
+                               if(res.success) { alert('✅ 安奉已啟動！'); await loadData(); }
+                             }
+                          }} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase transition-colors shadow-lg active:scale-95">
+                             🏮 啟動安奉
+                          </button>
+                        )}
+                      </div>
                    </div>
                 </div>
               );
@@ -364,7 +392,16 @@ function LampManagementContent() {
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 bg-slate-900 text-white p-4 rounded-2xl shadow-3xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-[100] border-2 border-white/10 scale-75 group-hover:scale-100 origin-bottom">
                            <div className="flex items-center gap-3 mb-2">
                               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-lg">🕯️</div>
-                              <p className="font-black text-sm">{record.guestName}</p>
+                              <div>
+                                 <p className="font-black text-sm">{record.guestName}</p>
+                                 {(() => {
+                                    const accountName = guests.find(g => g.phone === record.phone)?.name;
+                                    if (accountName && accountName !== record.guestName) {
+                                       return <p className="text-[9px] font-bold text-indigo-300 mt-0.5">主帳號：{accountName}</p>;
+                                    }
+                                    return null;
+                                 })()}
+                              </div>
                            </div>
                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{record.categoryName}</p>
                            <p className="text-[9px] font-black text-amber-400 mt-1">{record.phone}</p>
@@ -431,12 +468,24 @@ function LampManagementContent() {
                     )}
                  </div>
 
-                 {selectedGuest && (
-                    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pt-10 border-t-2 border-slate-50">
-                       <div className="space-y-6"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Step 2. 配置服務類別</label><div className="grid grid-cols-2 gap-8"><div className="space-y-3"><select value={selectedCategory} onChange={(e) => handleCategoryChange(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-5 font-black text-xl outline-none focus:border-indigo-600 appearance-none shadow-sm"><option value="">選擇燈種</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="relative flex items-center"><span className="absolute left-10 text-xl font-black text-slate-300">NT$</span><input type="number" value={price} onChange={e => setPrice(parseInt(e.target.value))} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] pl-20 pr-10 py-5 text-2xl font-black outline-none focus:border-indigo-600 shadow-inner text-center" /></div></div></div>
-                       <button onClick={handleSubmit} disabled={isSubmitting || !selectedCategory} className="w-full py-9 bg-slate-900 text-white rounded-[50px] font-black text-sm uppercase tracking-[0.5em] shadow-3xl hover:bg-indigo-600 transition-all active:scale-[0.98]">確 認 啟 燈 🚀</button>
-                    </div>
-                 )}
+                  {selectedGuest && (
+                     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pt-10 border-t-2 border-slate-50">
+                        <div className="space-y-6">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Step 2. 配置服務類別與點燈人</label>
+                           <div className="grid grid-cols-1 gap-6">
+                              <div className="space-y-2">
+                                 <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-4">點燈人姓名 (家人)</label>
+                                 <input type="text" value={lampGuestName} onChange={(e) => setLampGuestName(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-8 py-5 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" placeholder={`預設為：${selectedGuest.name}`} />
+                              </div>
+                           </div>
+                           <div className="grid grid-cols-2 gap-8">
+                              <div className="space-y-3"><select value={selectedCategory} onChange={(e) => handleCategoryChange(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-10 py-5 font-black text-xl outline-none focus:border-indigo-600 appearance-none shadow-sm"><option value="">選擇燈種</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                              <div className="relative flex items-center"><span className="absolute left-10 text-xl font-black text-slate-300">NT$</span><input type="number" value={price} onChange={e => setPrice(parseInt(e.target.value))} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] pl-20 pr-10 py-5 text-2xl font-black outline-none focus:border-indigo-600 shadow-inner text-center" /></div>
+                           </div>
+                        </div>
+                        <button onClick={handleSubmit} disabled={isSubmitting || !selectedCategory} className="w-full py-9 bg-slate-900 text-white rounded-[50px] font-black text-sm uppercase tracking-[0.5em] shadow-3xl hover:bg-indigo-600 transition-all active:scale-[0.98]">確 認 啟 燈 🚀</button>
+                     </div>
+                  )}
               </div>
            </div>
         </div>

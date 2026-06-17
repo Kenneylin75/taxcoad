@@ -133,9 +133,12 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [activeView, setActiveView] = useState<ViewState>('home');
   const [bookingStatus, setBookingStatus] = useState<"idle" | "booking" | "success">("idle");
   const [paymentIntent, setPaymentIntent] = useState<{ amount: number, module: 'Booking' | 'Lamp' | 'Event' | 'Queue', onPaid: (method: string, ref: string) => void } | null>(null);
+  const [paymentSubView, setPaymentSubView] = useState<'methods' | 'transfer' | 'customQR'>('methods');
+  const [paymentRefInput, setPaymentRefInput] = useState('');
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [customAmount, setCustomAmount] = useState<number>(100);
+  const [viewPaymentInfo, setViewPaymentInfo] = useState<'transfer' | 'customQR' | null>(null);
   const [paymentRef, setPaymentRef] = useState<string>('');
   
   // AGI Chat States
@@ -519,6 +522,18 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </div>
           )}
 
+          {detailContent.precautions && (
+            <div className="bg-amber-50 p-3 rounded-xl flex gap-3 items-start border border-amber-100 mt-4">
+              <span className="text-amber-600 text-sm">💡</span>
+              <div>
+                <p className="text-[10px] font-bold text-amber-700 uppercase">注意事項</p>
+                <div className="text-xs text-amber-800 mt-0.5 space-y-1">
+                  {detailContent.precautions.split('\n').map((line: string, i: number) => <p key={i}>{line}</p>)}
+                </div>
+              </div>
+            </div>
+          )}
+
           {detailContent.onConfirm && (
             <button 
               onClick={() => {
@@ -643,7 +658,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const renderHome = () => {
     // 篩選未完成的項目
     const activeAppointment = guestAppointments.find(a => a.status === 'Confirmed' || a.status === 'Pending');
-    const activeLamps = guestLamps.filter(l => l.status === 'Active');
+    const activeLamps = guestLamps.filter(l => l.status === 'Active' || l.status === 'Pending');
     const activeTicket = guestTickets.find(t => t.status === 'Pending' || t.status === 'Queuing' || t.status === 'Calling');
     const activeRegistration = guestRegistrations[0]; // 最新的活動報名
 
@@ -767,7 +782,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                         {(!activeAppointment.amount && activeAppointment.paymentMethod !== 'Cash') ? '隨喜功德' : 
                          (activeAppointment.amount ? `${activeAppointment.amount === 0 ? '隨喜功德' : '結緣金'}: NT$ ${activeAppointment.amount}` : '現場付現')}
                       </p>
-                      {activeAppointment.paymentStatus === 'Pending' && (
+                      {activeAppointment.paymentStatus === 'Pending' && activeAppointment.paymentMethod === 'Cash' && (
                         <button
                           onClick={() => {
                             alert('本宮目前採取現金對帳，請於現場出示此預約紀錄並完成繳費。');
@@ -775,6 +790,11 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                           className="mt-2 w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1"
                         >
                           💸 請至現場繳費核銷
+                        </button>
+                      )}
+                      {activeAppointment.paymentStatus === 'Pending' && (activeAppointment.paymentMethod === 'transfer' || activeAppointment.paymentMethod === 'customQR') && (
+                        <button onClick={() => setViewPaymentInfo(activeAppointment.paymentMethod as any)} className="mt-2 w-full py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 transition-colors">
+                          ⌛ 等待對帳中 (點擊查看{activeAppointment.paymentMethod === 'transfer' ? '匯款資訊' : '付款條碼'})
                         </button>
                       )}
                     </>
@@ -803,14 +823,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                         return (
                           <div key={lamp.id || idx} className={`${idx > 0 ? 'pt-2.5 border-t border-gray-100' : ''}`}>
                             <div className="flex justify-between items-center">
-                              <h4 className="font-bold text-gray-900 text-sm truncate">{lamp.categoryName}</h4>
-                              <span className="text-[10px] font-bold text-amber-600 bg-amber-50/50 px-1.5 py-0.5 rounded">安奉中</span>
+                              <h4 className="font-bold text-gray-900 text-sm truncate">
+                                {lamp.categoryName} {lamp.guestName && lamp.guestName !== guestUser?.name && <span className="text-xs text-gray-500 font-normal ml-1">({lamp.guestName})</span>}
+                              </h4>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${lamp.paymentStatus === 'Paid' ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>{lamp.paymentStatus === 'Paid' ? '已付款' : '待付款'}</span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${lamp.status === 'Pending' ? 'text-slate-500 bg-slate-100' : 'text-amber-600 bg-amber-50/50'}`}>{lamp.status === 'Pending' ? '等待安奉' : '安奉中'}</span>
+                              </div>
                             </div>
                             <div className="flex justify-between items-center mt-1">
-                              <p className="text-[11px] text-gray-500">到期日：{lamp.expiryDate}</p>
-                              <span className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
-                                剩餘 {daysLeft} 天
-                              </span>
                             </div>
                           </div>
                         );
@@ -1149,7 +1170,10 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const renderAllRecords = () => {
     const allRecords = [
       ...guestAppointments.map(a => ({ ...a, type: '預約', icon: '📅', color: 'text-indigo-600', bg: 'bg-indigo-50', time: `${a.date} ${a.time}`, rawTime: `${a.date}T${a.time}` })),
-      ...guestRegistrations.map(r => ({ ...r, type: '活動', icon: '🏮', color: 'text-red-600', bg: 'bg-red-50', service: r.title, time: r.timestamp, rawTime: r.timestamp, staff: '本宮法師' })),
+      ...guestRegistrations.map(r => {
+        const evt = events.find(e => e.id === r.eventId);
+        return { ...r, type: '活動', icon: '🏮', color: 'text-red-600', bg: 'bg-red-50', service: r.title, time: r.timestamp, rawTime: r.timestamp, staff: null, precautions: evt?.precautions };
+      }),
       ...guestTickets.map(t => ({ ...t, type: '排隊', icon: '🎟️', color: 'text-emerald-600', bg: 'bg-emerald-50', service: t.eventTitle, time: t.scannedAt || '尚未核銷', rawTime: t.scannedAt, staff: '現場候位' })),
       ...guestLamps.map(l => {
         const remaining = Math.ceil((new Date(l.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -1164,7 +1188,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           rawTime: l.startDate,
           staff: '本宮法事',
           remaining: remaining > 0 ? remaining : 0,
-          status: l.paymentStatus === 'Unpaid' ? 'Unpaid' : (l.status === 'Active' ? '生效中' : l.status)
+          status: l.paymentStatus === 'Unpaid' ? 'Unpaid' : (l.status === 'Active' ? '生效中' : (l.status === 'Pending' ? 'WaitingLamp' : l.status))
         };
       })
     ].sort((a, b) => b.rawTime?.localeCompare(a.rawTime || '') || 0);
@@ -1172,6 +1196,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
     const filtered = recordsTab === '全部' ? allRecords : allRecords.filter(r => r.type === recordsTab);
 
     const getDeadlineInfo = (record: any) => {
+      if (record.type === '點燈') return null;
       if (record.status !== 'Pending' && record.status !== 'Confirmed' && record.status !== 'Queuing' && record.status !== 'Unpaid') return null;
       if (!serviceSettings) return null;
       
@@ -1226,10 +1251,13 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${record.bg} ${record.color}`}>{record.icon}</div>
                       <div>
                         <p className="text-xs font-bold text-gray-500 mb-0.5">{record.type}</p>
-                        <h3 className="text-base font-bold text-gray-900 leading-tight">{record.service}</h3>
+                        <h3 className="text-base font-bold text-gray-900 leading-tight">
+                          {record.service} {record.type === '點燈' && record.guestName && record.guestName !== guestUser?.name && <span className="text-sm text-gray-500 font-normal ml-1">({record.guestName})</span>}
+                        </h3>
                       </div>
                     </div>
                     <span className={`px-2 py-1 rounded text-xs font-bold ${
+                      record.status === 'WaitingLamp' ? 'bg-slate-100 text-slate-500' :
                       record.status === 'Pending' || record.status === 'Confirmed' ? 'bg-amber-50 text-amber-600' :
                       record.status === 'Arrived' ? 'bg-emerald-100 text-emerald-700' :
                       record.status === 'Unpaid' ? 'bg-rose-50 text-rose-600' :
@@ -1237,7 +1265,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       record.status === 'Completed' || record.status === 'Paid' ? 'bg-green-50 text-green-600' :
                       'bg-gray-100 text-gray-600'
                     }`}>
-                      {record.status === 'Pending' || record.status === 'Confirmed' ? '已預約' : 
+                      {record.status === 'WaitingLamp' ? '等待安奉' :
+                       record.status === 'Pending' || record.status === 'Confirmed' ? '已預約' : 
                        record.status === 'Arrived' ? '已到場' :
                        record.status === 'Unpaid' ? '待付款' :
                        record.status === 'Completed' || record.status === 'Paid' ? '已完成' : 
@@ -1246,23 +1275,36 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                   </div>
                   
                   <div className="bg-gray-50 p-4 rounded-xl space-y-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-gray-400">📅</span>
-                      <div>
-                         <p className="text-xs text-gray-500 font-bold">時間與日期</p>
-                         <p className="text-gray-900 font-bold text-sm">{record.time}</p>
+                    {record.type !== '點燈' && (
+                       <div className="flex items-center gap-3">
+                         <span className="text-gray-400">📅</span>
+                         <div>
+                            <p className="text-xs text-gray-500 font-bold">時間與日期</p>
+                            <p className="text-gray-900 font-bold text-sm">{record.time}</p>
+                         </div>
+                       </div>
+                    )}
+                    {(record.type === '點燈' || (record.staff && record.type !== '活動')) && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-400">{record.type === '點燈' ? '⏳' : '👤'}</span>
+                        <div>
+                           <p className="text-xs text-gray-500 font-bold">{record.type === '點燈' ? '期限狀態' : '服務人員'}</p>
+                           <p className="text-gray-900 font-bold text-sm">
+                              {record.type === '點燈' ? (record.remaining <= 0 ? '已屆期' : record.status === 'WaitingLamp' || record.status === 'Pending' ? '等待安奉' : '安奉中') : record.staff}
+                           </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-gray-400">{record.type === '點燈' ? '⏳' : '👤'}</span>
-                      <div>
-                         <p className="text-xs text-gray-500 font-bold">{record.type === '點燈' ? '期限狀態' : '服務人員'}</p>
-                         <p className="text-gray-900 font-bold text-sm">
-                            {record.type === '點燈' ? `剩餘 ${record.remaining} 天` : record.staff}
-                         </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
+                  {record.precautions && (
+                     <div className="bg-amber-50 p-3 rounded-xl flex gap-3 items-start border border-amber-100 mt-2">
+                       <span className="text-amber-600 text-sm">💡</span>
+                       <div>
+                         <p className="text-[10px] font-bold text-amber-700 uppercase">注意事項</p>
+                         <p className="text-xs text-amber-800 mt-0.5 whitespace-pre-line">{record.precautions}</p>
+                       </div>
+                     </div>
+                  )}
                   {record.type === '預約' && record.amount !== undefined && record.amount !== null && (
                     <div className="bg-gray-50 p-4 rounded-xl mt-2 flex items-center gap-3">
                       <span className="text-gray-400">💰</span>
@@ -1275,18 +1317,26 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     </div>
                   )}
 
-                  {deadlines && (
+                  {/* 
+                    TEMPORARILY DISABLED BY TEMPLE: 
+                    deadlines && (serviceSettings?.allowCancel !== false || serviceSettings?.allowModify !== false) && ...
+                  */}
+                  {false && deadlines && (serviceSettings?.allowCancel !== false || serviceSettings?.allowModify !== false) && (
                     <div className="pt-2 space-y-2">
                       <div className="flex justify-between text-[10px] font-bold">
-                        <span className={canCancel ? 'text-gray-500' : 'text-red-400'}>
-                          最晚取消：{deadlines.cancelDeadline.toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span className={canModify ? 'text-gray-500' : 'text-red-400'}>
-                          最晚更改：{deadlines.modifyDeadline.toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        {serviceSettings?.allowCancel !== false && (
+                          <span className={canCancel ? 'text-gray-500' : 'text-red-400'}>
+                            最晚取消：{deadlines.cancelDeadline.toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                        {serviceSettings?.allowModify !== false && (
+                          <span className={canModify ? 'text-gray-500' : 'text-red-400'}>
+                            最晚更改：{deadlines.modifyDeadline.toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-2">
-                        {record.type === '預約' && (
+                        {record.type === '預約' && serviceSettings?.allowModify !== false && (
                           <button 
                             onClick={() => handleModifyClick(record.id)}
                             disabled={!canModify}
@@ -1295,13 +1345,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                             更改預約
                           </button>
                         )}
-                        <button 
-                          onClick={() => handleCancelRecord(record.id, record.type)}
-                          disabled={!canCancel}
-                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canCancel ? 'bg-red-50 border border-red-100 text-red-600 active:bg-red-100' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
-                        >
-                          取消{record.type}
-                        </button>
+                        {serviceSettings?.allowCancel !== false && (
+                          <button 
+                            onClick={() => handleCancelRecord(record.id, record.type)}
+                            disabled={!canCancel}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${canCancel ? 'bg-red-50 border border-red-100 text-red-600 active:bg-red-100' : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'}`}
+                          >
+                            取消{record.type}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1309,6 +1361,56 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
               );
             })}
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPaymentInfoModal = () => {
+    if (!viewPaymentInfo) return null;
+    return (
+      <div className="fixed inset-0 z-[450] bg-black/60 flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="bg-white w-full max-w-sm rounded-3xl p-6 flex flex-col space-y-6 shadow-2xl animate-in zoom-in-95 duration-300">
+          <div className="text-center space-y-2">
+            <h3 className="text-xl font-black text-gray-900 italic tracking-tighter">
+              {viewPaymentInfo === 'transfer' ? '匯款資訊' : '付款條碼'}
+            </h3>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Information</p>
+          </div>
+          
+          {viewPaymentInfo === 'transfer' && (
+            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-3">
+               <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
+                  <span className="text-[10px] font-bold text-amber-700/70">銀行代碼</span>
+                  <span className="text-sm font-black text-amber-900">{paymentConfig?.customTransfer?.bankCode}</span>
+               </div>
+               <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
+                  <span className="text-[10px] font-bold text-amber-700/70">收款帳號</span>
+                  <span className="text-sm font-black text-amber-900 font-mono tracking-wider">{paymentConfig?.customTransfer?.accountNo}</span>
+               </div>
+               <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
+                  <span className="text-[10px] font-bold text-amber-700/70">戶名</span>
+                  <span className="text-sm font-black text-amber-900">{paymentConfig?.customTransfer?.accountName}</span>
+               </div>
+               <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-amber-700/70">銀行名稱</span>
+                  <span className="text-xs font-black text-amber-900">{paymentConfig?.customTransfer?.bankName}</span>
+               </div>
+            </div>
+          )}
+
+          {viewPaymentInfo === 'customQR' && (
+            <div className="bg-pink-50 p-4 rounded-2xl border border-pink-200 flex flex-col items-center justify-center text-center space-y-4">
+               {paymentConfig?.customQR?.qrImageUrl ? (
+                  <img src={paymentConfig.customQR.qrImageUrl} alt="QR Code" className="max-w-[200px] rounded-xl shadow-sm" />
+               ) : (
+                  <p className="text-xs text-pink-400">尚未設定條碼圖片</p>
+               )}
+               <p className="text-xs font-bold text-pink-800">{paymentConfig?.customQR?.description || '請掃描 QR Code 付款'}</p>
+            </div>
+          )}
+
+          <button onClick={() => setViewPaymentInfo(null)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-slate-800 shadow-md transition-colors">關閉</button>
         </div>
       </div>
     );
@@ -1332,64 +1434,149 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-             {paymentConfig?.thirdParty?.enabled !== false && 
-               ((paymentIntent.module === 'Booking' && paymentConfig?.thirdParty?.allowBooking !== false) ||
-                (paymentIntent.module === 'Lamp' && paymentConfig?.thirdParty?.allowLamp !== false) ||
-                (paymentIntent.module === 'Event' && paymentConfig?.thirdParty?.allowEvent !== false) ||
-                (paymentIntent.module === 'Queue' && paymentConfig?.thirdParty?.allowQueue !== false)) && (
-               <button onClick={async () => { 
-                 await paymentIntent.onPaid('ecpay'); 
-                 setPaymentIntent(null); 
-                 setIsDetailModalOpen(false); 
-               }} className="col-span-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
-                 💳 信用卡支付
-               </button>
-             )}
-             
-             {paymentConfig?.linePay?.enabled !== false && 
-               ((paymentIntent.module === 'Booking' && paymentConfig?.linePay?.allowBooking !== false) ||
-                (paymentIntent.module === 'Lamp' && paymentConfig?.linePay?.allowLamp !== false) ||
-                (paymentIntent.module === 'Event' && paymentConfig?.linePay?.allowEvent !== false) ||
-                (paymentIntent.module === 'Queue' && paymentConfig?.linePay?.allowQueue !== false)) && (
-               <button onClick={async () => { 
-                 await paymentIntent.onPaid('linepay'); 
-                 setPaymentIntent(null); 
-                 setIsDetailModalOpen(false); 
-               }} className="py-4 bg-[#06C755] text-white rounded-2xl font-black text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
-                 LINE Pay
-               </button>
-             )}
+          {paymentSubView === 'methods' && (
+            <div className="grid grid-cols-2 gap-4">
+               {paymentConfig?.thirdParty?.enabled !== false && 
+                 ((paymentIntent.module === 'Booking' && paymentConfig?.thirdParty?.allowBooking !== false) ||
+                  (paymentIntent.module === 'Lamp' && paymentConfig?.thirdParty?.allowLamp !== false) ||
+                  (paymentIntent.module === 'Event' && paymentConfig?.thirdParty?.allowEvent !== false) ||
+                  (paymentIntent.module === 'Queue' && paymentConfig?.thirdParty?.allowQueue !== false)) && (
+                 <button onClick={async () => { 
+                   await paymentIntent.onPaid('ecpay', ''); 
+                   setPaymentIntent(null); 
+                   setPaymentSubView('methods');
+                   setPaymentRefInput('');
+                   setIsDetailModalOpen(false); 
+                 }} className="col-span-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
+                   💳 信用卡支付
+                 </button>
+               )}
+               
+               {paymentConfig?.linePay?.enabled !== false && 
+                 ((paymentIntent.module === 'Booking' && paymentConfig?.linePay?.allowBooking !== false) ||
+                  (paymentIntent.module === 'Lamp' && paymentConfig?.linePay?.allowLamp !== false) ||
+                  (paymentIntent.module === 'Event' && paymentConfig?.linePay?.allowEvent !== false) ||
+                  (paymentIntent.module === 'Queue' && paymentConfig?.linePay?.allowQueue !== false)) && (
+                 <button onClick={async () => { 
+                   await paymentIntent.onPaid('linepay', ''); 
+                   setPaymentIntent(null); 
+                   setPaymentSubView('methods');
+                   setPaymentRefInput('');
+                   setIsDetailModalOpen(false); 
+                 }} className="py-4 bg-[#06C755] text-white rounded-2xl font-black text-xs shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                   LINE Pay
+                 </button>
+               )}
 
-             {paymentConfig?.customTransfer?.enabled !== false && 
-               ((paymentIntent.module === 'Booking' && paymentConfig?.customTransfer?.allowBooking !== false) ||
-                (paymentIntent.module === 'Lamp' && paymentConfig?.customTransfer?.allowLamp !== false) ||
-                (paymentIntent.module === 'Event' && paymentConfig?.customTransfer?.allowEvent !== false) ||
-                (paymentIntent.module === 'Queue' && paymentConfig?.customTransfer?.allowQueue !== false)) && (
-               <button onClick={async () => { 
-                 await paymentIntent.onPaid('transfer'); 
-                 setPaymentIntent(null); 
-                 setIsDetailModalOpen(false); 
-               }} className="py-4 bg-slate-100 text-slate-600 hover:text-slate-900 rounded-2xl font-black text-xs shadow-sm border border-slate-200 active:scale-95 transition-transform">
-                 轉帳匯款
-               </button>
-             )}
+               {paymentConfig?.customTransfer?.enabled !== false && 
+                 ((paymentIntent.module === 'Booking' && paymentConfig?.customTransfer?.allowBooking !== false) ||
+                  (paymentIntent.module === 'Lamp' && paymentConfig?.customTransfer?.allowLamp !== false) ||
+                  (paymentIntent.module === 'Event' && paymentConfig?.customTransfer?.allowEvent !== false) ||
+                  (paymentIntent.module === 'Queue' && paymentConfig?.customTransfer?.allowQueue !== false)) && (
+                 <button onClick={() => setPaymentSubView('transfer')} className="py-4 bg-slate-100 text-slate-600 hover:text-slate-900 rounded-2xl font-black text-xs shadow-sm border border-slate-200 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                   🏦 轉帳匯款
+                 </button>
+               )}
 
-             {paymentConfig?.cash?.enabled !== false && 
-               ((paymentIntent.module === 'Booking' && paymentConfig?.cash?.allowBooking !== false) ||
-                (paymentIntent.module === 'Lamp' && paymentConfig?.cash?.allowLamp !== false) ||
-                (paymentIntent.module === 'Event' && paymentConfig?.cash?.allowEvent !== false) ||
-                (paymentIntent.module === 'Queue' && paymentConfig?.cash?.allowQueue !== false)) && (
-               <button onClick={async () => { 
-                 await paymentIntent.onPaid('Cash'); 
-                 setPaymentIntent(null); 
-                 setIsDetailModalOpen(false); 
-               }} className="col-span-2 py-4 bg-amber-500 text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2">
-                 💵 現場現金付款
-               </button>
-             )}
-          </div>
-          <button onClick={() => setPaymentIntent(null)} className="py-2 text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">取消支付</button>
+               {paymentConfig?.customQR?.enabled !== false && 
+                 ((paymentIntent.module === 'Booking' && paymentConfig?.customQR?.allowBooking !== false) ||
+                  (paymentIntent.module === 'Lamp' && paymentConfig?.customQR?.allowLamp !== false) ||
+                  (paymentIntent.module === 'Event' && paymentConfig?.customQR?.allowEvent !== false) ||
+                  (paymentIntent.module === 'Queue' && paymentConfig?.customQR?.allowQueue !== false)) && (
+                 <button onClick={() => setPaymentSubView('customQR')} className="py-4 bg-pink-50 text-pink-600 hover:bg-pink-700 rounded-2xl font-black text-xs shadow-sm border border-pink-200 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                   🔗 自訂條碼
+                 </button>
+               )}
+
+               {paymentConfig?.cash?.enabled !== false && 
+                 ((paymentIntent.module === 'Booking' && paymentConfig?.cash?.allowBooking !== false) ||
+                  (paymentIntent.module === 'Lamp' && paymentConfig?.cash?.allowLamp !== false) ||
+                  (paymentIntent.module === 'Event' && paymentConfig?.cash?.allowEvent !== false) ||
+                  (paymentIntent.module === 'Queue' && paymentConfig?.cash?.allowQueue !== false)) && (
+                 <button onClick={async () => { 
+                   await paymentIntent.onPaid('Cash', ''); 
+                   setPaymentIntent(null); 
+                   setPaymentSubView('methods');
+                   setPaymentRefInput('');
+                   setIsDetailModalOpen(false); 
+                 }} className="col-span-2 py-4 bg-amber-500 text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2">
+                   💵 現場現金付款
+                 </button>
+               )}
+            </div>
+          )}
+
+          {paymentSubView === 'transfer' && (
+            <div className="space-y-4 animate-in fade-in zoom-in-95">
+               <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-3">
+                  <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
+                     <span className="text-[10px] font-bold text-amber-700/70">銀行代碼</span>
+                     <span className="text-sm font-black text-amber-900">{paymentConfig?.customTransfer?.bankCode}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
+                     <span className="text-[10px] font-bold text-amber-700/70">收款帳號</span>
+                     <span className="text-sm font-black text-amber-900 font-mono tracking-wider">{paymentConfig?.customTransfer?.accountNo}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
+                     <span className="text-[10px] font-bold text-amber-700/70">戶名</span>
+                     <span className="text-sm font-black text-amber-900">{paymentConfig?.customTransfer?.accountName}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                     <span className="text-[10px] font-bold text-amber-700/70">銀行名稱</span>
+                     <span className="text-xs font-black text-amber-900">{paymentConfig?.customTransfer?.bankName}</span>
+                  </div>
+               </div>
+               <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">請輸入您的帳號末五碼 (對帳用)</label>
+                  <input type="text" maxLength={5} placeholder="例如: 12345" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/50"
+                     value={paymentRefInput} onChange={e => setPaymentRefInput(e.target.value)} />
+               </div>
+               <div className="flex gap-2">
+                  <button onClick={() => setPaymentSubView('methods')} className="py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors">返回</button>
+                  <button onClick={async () => {
+                    await paymentIntent.onPaid('transfer', paymentRefInput || '無');
+                    setPaymentIntent(null);
+                    setPaymentSubView('methods');
+                    setPaymentRefInput('');
+                    setIsDetailModalOpen(false);
+                  }} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-black text-xs hover:bg-emerald-600 shadow-md transition-colors">我已完成匯款</button>
+               </div>
+            </div>
+          )}
+
+          {paymentSubView === 'customQR' && (
+            <div className="space-y-4 animate-in fade-in zoom-in-95">
+               <div className="bg-pink-50 p-4 rounded-2xl border border-pink-200 flex flex-col items-center justify-center text-center space-y-4">
+                  {paymentConfig?.customQR?.qrImageUrl && (
+                     <img src={paymentConfig.customQR.qrImageUrl} alt="QR Code" className="max-w-[200px] rounded-xl shadow-sm" />
+                  )}
+                  <p className="text-xs font-bold text-pink-800">{paymentConfig?.customQR?.description || '請掃描 QR Code 付款'}</p>
+               </div>
+               <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">帳號末五碼 / 轉帳備註 (對帳用)</label>
+                  <input type="text" placeholder="以便工作人員核對" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-pink-500/50"
+                     value={paymentRefInput} onChange={e => setPaymentRefInput(e.target.value)} />
+               </div>
+               <div className="flex gap-2">
+                  <button onClick={() => setPaymentSubView('methods')} className="py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors">返回</button>
+                  <button onClick={async () => {
+                    await paymentIntent.onPaid('customQR', paymentRefInput || '無');
+                    setPaymentIntent(null);
+                    setPaymentSubView('methods');
+                    setPaymentRefInput('');
+                    setIsDetailModalOpen(false);
+                  }} className="flex-1 py-3 bg-pink-500 text-white rounded-xl font-black text-xs hover:bg-pink-600 shadow-md transition-colors">付款完成</button>
+               </div>
+            </div>
+          )}
+
+          {paymentSubView === 'methods' && (
+            <button onClick={() => {
+              setPaymentIntent(null);
+              setPaymentSubView('methods');
+              setPaymentRefInput('');
+            }} className="py-2 text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors">取消支付</button>
+          )}
         </div>
       </div>
     );
@@ -1877,7 +2064,9 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
           <div className="space-y-4">
             <h5 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">{selectedDate} 活動列表</h5>
             <div className="grid gap-4">
-              {eventsOnSelectedDate.length > 0 ? eventsOnSelectedDate.map(evt => (
+              {eventsOnSelectedDate.length > 0 ? eventsOnSelectedDate.map(evt => {
+                const isRegistered = guestRegistrations.some(r => r.eventId === evt.id && r.status !== 'Cancelled');
+                return (
                 <div key={evt.id} className="app-card overflow-hidden">
                   <div className="h-48 w-full relative bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center overflow-hidden">
                     <div className="text-amber-500/20 text-6xl absolute">🏮</div>
@@ -1903,7 +2092,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                              price: `結緣價 $${evt.price}`,
                              precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
                              description: `活動內容：${evt.description || evt.content || '詳細內容請洽宮廟'}\n日期：${evt.date}`,
-                             onConfirm: async () => {
+                             onConfirm: isRegistered ? undefined : async () => {
                                initiatePayment(evt.price || 0, 'Event', async (method: string) => {
                                  const res = await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price || 0, method);
                                  if (res && res.success !== false) {
@@ -1921,14 +2110,15 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                            });
                            setIsDetailModalOpen(true);
                          }}
-                         className="btn-primary py-2 px-6"
+                         className={isRegistered ? "bg-gray-100 text-gray-400 py-2 px-6 rounded-2xl font-bold text-sm" : "btn-primary py-2 px-6"}
                        >
-                         報名
+                         {isRegistered ? '已報名' : '報名'}
                        </button>
                     </div>
                   </div>
                 </div>
-              )) : (
+                );
+              }) : (
                 <div key="no-events" className="py-12 text-center app-card">
                   <p className="text-gray-500 font-bold text-sm">此日期暫無法會活動</p>
                 </div>
@@ -2077,7 +2267,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+          <div className="grid grid-cols-1 gap-4 w-full">
             {lampCategories.map(item => (
               <div key={item.id} className="app-card p-6 space-y-4 bg-white">
                 <div className="flex justify-between items-start">
@@ -2217,6 +2407,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
       {activeView === 'lighting' && renderLighting()}
       {renderNotificationsModal()}
       {renderDetailModal()}
+      {renderPaymentInfoModal()}
       {renderPaymentModal()}
       {successInfo && renderActionSuccess()}
       

@@ -168,7 +168,7 @@ export default function DashboardContainer({
             <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
               {greeting}，<br className="hidden md:block" />歡迎回到營運主控台
             </h1>
-            <p className="text-slate-400 font-medium text-sm mt-2">{todayDisplay} ． 宮廟管理系統 v10</p>
+            <p className="text-slate-400 font-medium text-sm mt-2">{todayDisplay} ． 營運主控台 v10</p>
           </div>
           <div className="hidden md:block">
             <div className="w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-3xl shadow-xl">
