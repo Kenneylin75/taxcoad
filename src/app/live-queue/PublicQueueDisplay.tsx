@@ -96,7 +96,7 @@ export default function PublicQueueDisplay({ events, tickets }: { events: any[],
                        </div>
                        <div>
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">電話 Phone</label>
-                          <input type="tel" value={regPhone} onChange={e=>setRegPhone(e.target.value)} required className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold focus:border-indigo-600 outline-none transition-all" placeholder="例如：0912345678" />
+                          <input type="tel" value={regPhone} onChange={e=>setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} pattern="^09\d{8}$" minLength={10} maxLength={10} required className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold focus:border-indigo-600 outline-none transition-all" placeholder="例如：0912345678" />
                        </div>
                     </div>
                     <button type="submit" disabled={isPending || selectedEvents.length === 0} className="w-full bg-slate-900 text-amber-500 py-4 rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50 shadow-xl">
@@ -241,7 +241,7 @@ export default function PublicQueueDisplay({ events, tickets }: { events: any[],
                        </div>
                        <div>
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">電話 Phone</label>
-                          <input type="tel" value={regPhone} onChange={e=>setRegPhone(e.target.value)} required className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold focus:border-indigo-600 outline-none transition-all" placeholder="例如：0912345678" />
+                          <input type="tel" value={regPhone} onChange={e=>setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} pattern="^09\d{8}$" minLength={10} maxLength={10} required className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold focus:border-indigo-600 outline-none transition-all" placeholder="例如：0912345678" />
                        </div>
                     </div>
                     <button type="submit" disabled={isPending || selectedEvents.length === 0} className="w-full bg-slate-900 text-amber-500 py-4 rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50 shadow-xl">

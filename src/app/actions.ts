@@ -3446,6 +3446,38 @@ export async function fetchFinancialOverview() {
     totalRevenue += (a.amount || 0);
   });
 
+  db_deep_records.filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType.includes('功德'))).forEach(r => {
+    let amt = 0;
+    if (r.values && r.values['金額']) {
+      amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
+    }
+    revenue.push({
+      id: r.id,
+      title: r.serviceType,
+      source: 'Merit',
+      amount: amt,
+      timestamp: r.date,
+      guestName: r.guestName || (r.values && r.values['付款人']) || r.phone || '信眾',
+      paymentMethod: (r.values && r.values['支付方式']) || '現金/臨櫃',
+      status: 'Paid'
+    });
+    totalRevenue += amt;
+  });
+
+  db_queue_tickets.filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
+    revenue.push({
+      id: t.id,
+      title: '現場排隊服務',
+      source: 'Queue',
+      amount: t.price || 0,
+      timestamp: t.scannedAt || t.date || new Date().toISOString().split('T')[0],
+      guestName: t.phone || '現場信眾',
+      paymentMethod: '現金/臨櫃',
+      status: 'Paid'
+    });
+    totalRevenue += (t.price || 0);
+  });
+
   revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const expenses: ExpenseEntry[] = db_temple_bills
@@ -4319,8 +4351,10 @@ export async function updateDeepRecord(recordId: string, phone: string, staffNam
   });
 }
 export async function saveDeepRecord(phone: string, eventId: string, serviceType: string, staffName: string, values: any) {
+  const templeId = await getDynamicTempleId();
   const newRecord = {
     id: `rec-${Date.now()}`,
+    templeId,
     phone,
     eventId,
     serviceType,
