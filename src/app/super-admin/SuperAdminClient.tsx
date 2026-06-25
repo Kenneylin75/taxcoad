@@ -879,73 +879,73 @@ export default function SuperAdminClient({
                          {/* Core Engines */}
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Chat Engine */}
-                            <div className="bg-white/10 border border-white/10 p-8 rounded-[2rem] backdrop-blur-md space-y-6">
+                            <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2rem] space-y-6">
                                <div className="flex items-center gap-4">
                                   <div className="w-12 h-12 bg-indigo-500/20 rounded-full flex items-center justify-center text-2xl">🧠</div>
                                   <div>
-                                     <h5 className="text-white font-black italic">對話大腦引擎 (主引擎)</h5>
+                                     <h5 className="text-slate-900 font-black italic">對話大腦引擎 (主引擎)</h5>
                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Intelligent QA Chat</p>
                                   </div>
                                </div>
                                <div className="space-y-4">
                                   <div>
                                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">API URL</label>
-                                     <input value={config?.aiEndpoints?.chatApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiUrl: e.target.value}})} className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-5 py-3 text-sm font-bold text-slate-300 outline-none focus:border-indigo-500 transition-colors" placeholder="https://api.openai.com/v1/chat/completions" />
+                                     <input value={config?.aiEndpoints?.chatApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiUrl: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-colors" placeholder="https://api.openai.com/v1/chat/completions" />
                                   </div>
                                   <div>
                                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">API Key</label>
-                                     <input type="password" value={config?.aiEndpoints?.chatApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiKey: e.target.value}})} className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-5 py-3 text-sm font-bold text-slate-300 outline-none focus:border-indigo-500 transition-colors" placeholder="sk-..." />
+                                     <input type="password" value={config?.aiEndpoints?.chatApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiKey: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-colors" placeholder="sk-..." />
                                   </div>
                                </div>
                             </div>
                             
                             {/* OCR Engine */}
-                            <div className="bg-white/10 border border-white/10 p-8 rounded-[2rem] backdrop-blur-md space-y-6">
+                            <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2rem] space-y-6">
                                <div className="flex items-center gap-4">
                                   <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center text-2xl">👁️</div>
                                   <div>
-                                     <h5 className="text-white font-black italic">視知識別引擎 (OCR)</h5>
+                                     <h5 className="text-slate-900 font-black italic">視知識別引擎 (OCR)</h5>
                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Vision & Scanning</p>
                                   </div>
                                </div>
                                <div className="space-y-4">
                                   <div>
                                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">API URL</label>
-                                     <input value={config?.aiEndpoints?.ocrApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiUrl: e.target.value}})} className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-5 py-3 text-sm font-bold text-slate-300 outline-none focus:border-emerald-500 transition-colors" placeholder="https://api.openai.com/v1/chat/completions" />
+                                     <input value={config?.aiEndpoints?.ocrApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiUrl: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-sm transition-colors" placeholder="https://api.openai.com/v1/chat/completions" />
                                   </div>
                                   <div>
                                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">API Key</label>
-                                     <input type="password" value={config?.aiEndpoints?.ocrApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiKey: e.target.value}})} className="w-full bg-slate-950/50 border border-white/5 rounded-xl px-5 py-3 text-sm font-bold text-slate-300 outline-none focus:border-emerald-500 transition-colors" placeholder="sk-..." />
+                                     <input type="password" value={config?.aiEndpoints?.ocrApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiKey: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-5 py-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-sm transition-colors" placeholder="sk-..." />
                                   </div>
                                </div>
                             </div>
                          </div>
 
                          {/* Fallback Models List */}
-                         <div className="bg-slate-950/30 rounded-[2rem] p-8 border border-white/5 space-y-6">
+                         <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 space-y-6">
                             <div className="flex justify-between items-center mb-2">
-                               <h5 className="text-white font-black italic">擴充備用模型庫 (Fallback Models Pool)</h5>
+                               <h5 className="text-slate-900 font-black italic">擴充備用模型庫 (Fallback Models Pool)</h5>
                                <button onClick={() => setAiModels([...aiModels, { id: 'NEW-'+Date.now(), name: '', apiKey: '', isEnabled: false }])} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors">+ 新增備用模型</button>
                             </div>
                             <div className="space-y-4">
                                {aiModels.map((model, i) => (
-                                  <div key={i} className="flex flex-col md:flex-row gap-4 items-center bg-white/5 p-4 rounded-2xl border border-white/5">
+                                  <div key={i} className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                                     <div className="w-full md:w-1/3">
                                       <input type="text" value={model.name} onChange={e => {
                                         const copy = [...aiModels]; copy[i].name = e.target.value; setAiModels(copy);
-                                      }} placeholder="模型名稱 (e.g. Claude 3 Opus)" className="w-full bg-transparent border-b border-slate-700 px-2 py-2 text-sm font-bold text-slate-300 outline-none focus:border-indigo-500 placeholder-slate-600" />
+                                      }} placeholder="模型名稱 (e.g. Claude 3 Opus)" className="w-full bg-transparent border-b border-slate-700 px-2 py-2 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm placeholder-slate-600" />
                                     </div>
                                     <div className="w-full md:w-1/2">
                                       <input type="password" value={model.apiKey} onChange={e => {
                                         const copy = [...aiModels]; copy[i].apiKey = e.target.value; setAiModels(copy);
-                                      }} placeholder="API Key" className="w-full bg-transparent border-b border-slate-700 px-2 py-2 text-sm font-bold text-slate-300 outline-none focus:border-indigo-500 placeholder-slate-600" />
+                                      }} placeholder="API Key" className="w-full bg-transparent border-b border-slate-700 px-2 py-2 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm placeholder-slate-600" />
                                     </div>
                                     <div className="w-full md:w-auto flex justify-end">
                                       <label className="relative inline-flex items-center cursor-pointer">
                                         <input type="checkbox" className="sr-only peer" checked={model.isEnabled} onChange={e => {
                                           const copy = [...aiModels]; copy[i].isEnabled = e.target.checked; setAiModels(copy);
                                         }} />
-                                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full shadow-inner peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
                                       </label>
                                     </div>
                                   </div>
