@@ -2351,27 +2351,33 @@ export async function submitFreeAccountApplication(data: any) {
   const currentUser = await getCurrentUser();
   const templeNo = (gStore.db_temples || db_temples).length + 1;
 
-  const newTemple = {
-    id: `temple-${Math.random().toString(36).substring(2, 10)}`,
-    templeNo,
-    ...formData,
-    paymentCycle: paymentCycle || 'Monthly',
-    monthlyRent: data.freeType === 'Permanent' ? 0 : (db_config.fixedMonthlyRent || 3600),
-    trialMonths: data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0,
-    freeType: data.freeType || 'Normal',
-    role: 'Temple',
-    status,
-    creatorRole: role,
-    creatorId: currentUser.name,
-    salesId: sales?.id || null,
-    distributorId: role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null)),
-    timestamp: new Date().toISOString(),
-    billingStartDate: data.freeType === 'Trial' ? 
-      new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
-      new Date().toISOString()
-  };
-  db_temples.push(newTemple);
-  gStore.db_temples = db_temples;
+      const newTemple = {
+      id: 	emple-,
+      templeNo,
+      ...formData,
+      paymentCycle: paymentCycle || 'Monthly',
+      monthlyRent: data.freeType === 'Permanent' ? 0 : (db_config.fixedMonthlyRent || 3600),
+      trialMonths: data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0,
+      freeType: data.freeType || 'Normal',
+      role: 'Temple',
+      status,
+      creatorRole: role,
+      creatorId: currentUser.name,
+      salesId: sales?.id || null,
+      distributorId: role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null)),
+      timestamp: new Date().toISOString(),
+      billingStartDate: data.freeType === 'Trial' ? 
+        new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
+        new Date().toISOString()
+    };
+    db_temples.push(newTemple);
+    gStore.db_temples = db_temples;
+
+    if (data.freeType === 'Permanent') {
+      await grantTempleAiVip(newTemple.id, true);
+      await grantTempleStorageVip(newTemple.id, true);
+    }
+
 
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
   if (status === 'Active' && data.account && data.password) {
@@ -3033,21 +3039,28 @@ export async function createTempleAccount(data: any) {
     gStore.db_personnel = pData;
   }
 
-  // Deduct quota if Distributor/Sales
-  const { cookies } = require("next/headers");
-  const cookieStore = await cookies();
-  const currentRole = cookieStore.get("admin_role")?.value || "SuperAdmin";
-  const accountStr = cookieStore.get("admin_account")?.value || "system";
-
-  if (currentRole === 'Distributor' || currentRole === 'DistSales') {
-    if (currentRole === 'Distributor') {
-      const dist = db_distributors.find((d: any) => d.account === accountStr);
-      if (dist) {
-         if (dist.quota <= 0) return { success: false, message: '您的授權配額已耗盡，無法開設新宮廟' };
-         dist.quota -= 1;
+  
+    // Deduct quota if Distributor/Sales
+    const { cookies } = require("next/headers");
+    const cookieStore = await cookies();
+    const currentRole = cookieStore.get("admin_role")?.value || "SuperAdmin";
+    const accountStr = cookieStore.get("admin_account")?.value || "system";
+  
+    if (currentRole === 'Distributor' || currentRole === 'DistSales') {
+      if (currentRole === 'Distributor') {
+        const dist = db_distributors.find((d: any) => d.account === accountStr);
+        if (dist) {
+           if (dist.quota <= 0) return { success: false, message: '配額已耗盡，無法開設新宮廟' };
+           dist.quota -= 1;
+        }
       }
     }
-  }
+
+    if (data.freeType === 'Permanent') {
+      await grantTempleAiVip(id, true);
+      await grantTempleStorageVip(id, true);
+    }
+
 
   // Generate initial bill
   let payeeRole = 'SuperAdmin';
@@ -5552,7 +5565,7 @@ export async function fetchAllTempleAiUsage() {
       ...usage, 
       templeName: temple.templeName || temple.name || '未知宮廟', 
       city: temple.city || '未知',
-      planName: plan.name, 
+      planName: usage.planId === 'VIP' ? usage.planName : plan.name, 
       chatLimit: plan.chatLimit || 0 
     };
   });
