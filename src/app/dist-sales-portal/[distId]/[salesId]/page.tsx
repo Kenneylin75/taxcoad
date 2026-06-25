@@ -13,8 +13,7 @@ import {
   fetchDistributorCapacity,
   fetchCommissionHistory,
   fetchSalesProfile,
-  fetchSalesProfileById,
-  updateSalesBankAccount,
+  updateSuperSalesBankInfo,
   fetchRentPlans
 } from "@/app/actions";
 import { TAIWAN_CITIES } from "@/app/shared-types";

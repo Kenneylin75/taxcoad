@@ -6062,6 +6062,7 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
   return { success: true };
 }
 
+
 export async function fetchDataBridgeTree() {
   const superSales = await fetchSuperSalesAccounts();
   const gStore = globalThis as any;
@@ -6069,10 +6070,96 @@ export async function fetchDataBridgeTree() {
   const distSales = gStore.db_dist_sales || [];
   const temples = gStore.db_temples || [];
   
-  return {
-    superSales,
-    distributors,
-    distSales,
-    temples
-  };
+  // Build a tree
+  return superSales.map((ss: any) => {
+     const myDists = distributors.filter((d: any) => d.superSalesId === ss.id);
+     return {
+        id: ss.id,
+        name: ss.name,
+        type: 'super-sales',
+        children: myDists.map((d: any) => {
+           const mySales = distSales.filter((ds: any) => ds.distributorId === d.id);
+           return {
+              id: d.id,
+              name: d.name,
+              type: 'distributor',
+              children: mySales.map((s: any) => {
+                 const myTemples = temples.filter((t: any) => t.salesId === s.id);
+                 return {
+                    id: s.id,
+                    name: s.name,
+                    type: 'dist-sales',
+                    children: myTemples.map((t: any) => ({
+                       id: t.id,
+                       name: t.name,
+                       type: 'temple'
+                    }))
+                 };
+              })
+           };
+        })
+     };
+  });
+}
+
+
+export async function updateDistributorProfile(distId: string, data: any) {
+  const dist = db_distributors.find(d => d.id === distId);
+  if (dist) {
+    if (data.name) dist.name = data.name;
+    if (data.account) dist.account = data.account;
+    if (data.password) dist.password = data.password;
+    if (data.bankInfo) dist.bankInfo = data.bankInfo;
+    
+    // add to audit log
+    if (!gStore.db_admin_logs) gStore.db_admin_logs = [];
+    gStore.db_admin_logs.push({
+      id: 'log-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      adminId: distId,
+      adminName: dist.name,
+      action: 'UPDATE_DIST_PROFILE',
+      target: distId,
+      details: '經銷商更新了個人資料或銀行帳戶'
+    });
+    
+    return { success: true };
+  }
+  return { success: false, error: 'Distributor not found' };
+}
+
+export async function updateDistributorPaymentConfig(distId: string, paymentConfig: any) {
+  const dist = db_distributors.find(d => d.id === distId);
+  if (dist) {
+    dist.b2bPayment = paymentConfig;
+    
+    // add to audit log
+    if (!gStore.db_admin_logs) gStore.db_admin_logs = [];
+    gStore.db_admin_logs.push({
+      id: 'log-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      adminId: distId,
+      adminName: dist.name,
+      action: 'UPDATE_DIST_PAYMENT',
+      target: distId,
+      details: '經銷商更新了B2B收款設定'
+    });
+    
+    return { success: true };
+  }
+  return { success: false, error: 'Distributor not found' };
+}
+
+export async function verifySaasOrder(orderId: string, status: 'paid' | 'rejected') {
+  const order = db_saas_orders.find(o => o.id === orderId);
+  if (order) {
+    order.status = status;
+    return { success: true };
+  }
+  return { success: false, error: 'Order not found' };
+}
+
+export async function fetchSuperSalesWithdrawals(salesId: string) {
+  const allWithdrawals = await fetchAllWithdrawals();
+  return allWithdrawals.filter((w: any) => w.userId === salesId);
 }
