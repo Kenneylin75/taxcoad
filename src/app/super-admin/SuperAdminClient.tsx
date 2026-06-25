@@ -1910,7 +1910,7 @@ export default function SuperAdminClient({
                                   <button 
                                     onClick={async () => {
                                       if (!adminUpgradeStoragePlanId) return alert('請選擇方案');
-                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId, 'Monthly');
+                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId, 'Monthly', true);
                                       const newData = await fetchTempleStorages();
                                       setTempleStorages(newData);
                                       setAdminUpgradeStoragePlanId('');
