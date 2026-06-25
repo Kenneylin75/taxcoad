@@ -7,7 +7,7 @@ import {
   fetchStoragePlans, 
   fetchTempleStorages, 
   upgradeTempleStorage, fetchTempleAiUsage, toggleTempleAiStatus, purchaseAiPlan, fetchAiPlans, fetchB2BPaymentConfig,
-  getTempleBasicInfo, updateTempleBasicInfo, getTempleCreatorInfo
+  getTempleBasicInfo, updateTempleBasicInfo, getTempleCreatorInfo, createSaasOrder
 } from '@/app/actions';
 
 export default function AdvancedSettingsPage() {
@@ -56,11 +56,13 @@ export default function AdvancedSettingsPage() {
 
   const [b2bConfig, setB2bConfig] = useState<any>(null);
   const [b2bModalOpen, setB2bModalOpen] = useState(false);
-  const [b2bTarget, setB2bTarget] = useState<any>(null); // { type: 'storage' | 'ai' }
+  const [b2bTarget, setB2bTarget] = useState<{type: 'storage' | 'ai', amount: number}>({type: 'storage', amount: 0});
+  const [receiptImage, setReceiptImage] = useState<string>('');
   const [selectedB2bMethod, setSelectedB2bMethod] = useState('creditCard');
   const [transferLast5, setTransferLast5] = useState('');
 
   const [basicInfo, setBasicInfo] = useState<any>(null);
+  const [saasOrders, setSaasOrders] = useState<any[]>([]);
 
   useEffect(() => {
     // Load storage info and plans
@@ -72,6 +74,9 @@ export default function AdvancedSettingsPage() {
     const currentTempleId = decodeURIComponent(window.location.pathname.split('/')[1]);
     
     getTempleBasicInfo(currentTempleId).then(setBasicInfo);
+    import('@/app/actions').then(m => m.fetchSaasOrders && m.fetchSaasOrders()).then(res => {
+      if(res) setSaasOrders(res.filter((o:any) => o.templeId === currentTempleId));
+    });
     getTempleCreatorInfo(currentTempleId).then(setCreatorInfo);
     
     fetchB2BPaymentConfig(currentTempleId).then(setB2bConfig);
@@ -248,6 +253,56 @@ export default function AdvancedSettingsPage() {
          </div>
       </div>
 
+      
+      {/* SaaS Pending Orders */}
+      {saasOrders.length > 0 && (() => {
+         const isFreeSuperAdminTemple = basicInfo?.creatorRole === 'SuperAdmin' && basicInfo?.freeType === 'Permanent';
+         
+         return (
+         <div className={`rounded-2xl border-2 shadow-sm p-6 space-y-4 relative overflow-hidden ${isFreeSuperAdminTemple ? 'bg-slate-50 border-slate-200' : 'bg-rose-50/50 border-rose-200'}`}>
+            <div className="absolute right-0 top-0 opacity-5 text-8xl -translate-y-4 translate-x-4">🧾</div>
+            <div className={`flex justify-between items-center pb-4 border-b relative z-10 ${isFreeSuperAdminTemple ? 'border-slate-200' : 'border-rose-100'}`}>
+               <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg text-white flex items-center justify-center text-sm shadow-md ${isFreeSuperAdminTemple ? 'bg-slate-400' : 'bg-rose-500'}`}>🧾</div>
+                  <div>
+                     <h3 className={`text-sm font-black uppercase tracking-widest ${isFreeSuperAdminTemple ? 'text-slate-600' : 'text-rose-900'}`}>SaaS 訂閱帳單</h3>
+                     <p className={`text-[8px] font-bold uppercase tracking-widest mt-0.5 ${isFreeSuperAdminTemple ? 'text-slate-400' : 'text-rose-600'}`}>Pending B2B Billings</p>
+                  </div>
+               </div>
+            </div>
+            <div className="space-y-3 relative z-10">
+               {saasOrders.map((order: any) => (
+                  <div key={order.id} className={`p-4 rounded-xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 ${isFreeSuperAdminTemple ? 'bg-slate-50/50 border-slate-200 opacity-80' : 'bg-white border-rose-100'}`}>
+                     <div>
+                        <div className="flex items-center gap-2 mb-1">
+                           <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest ${isFreeSuperAdminTemple ? 'bg-slate-200 text-slate-500' : order.status === 'pending' ? 'bg-amber-100 text-amber-700' : order.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                              {order.status === 'pending' ? '待審核' : order.status === 'paid' ? '已核銷' : '已駁回'}
+                           </span>
+                           <span className={`text-xs font-black ${isFreeSuperAdminTemple ? 'text-slate-500' : 'text-slate-800'}`}>{order.type === 'storage' ? '雲端空間升級' : order.type === 'ai' ? 'AI 服務續約' : '系統開辦費'}</span>
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400">訂單編號: {order.id} | 金額: NT$ {order.amount.toLocaleString()} ({order.paymentMethod})</p>
+                     </div>
+                     {isFreeSuperAdminTemple ? (
+                        <span className="text-[10px] font-black text-slate-500 bg-slate-200/50 px-4 py-2 rounded-xl border border-slate-200 text-center">免費使用帳戶</span>
+                     ) : order.status === 'pending' && (!order.receiptImage ? (
+                        <button onClick={() => {
+                           // Open B2B modal to re-upload receipt
+                           setB2bTarget({ type: order.type, amount: order.amount });
+                           setSelectedB2bMethod(order.paymentMethod === '信用卡' ? 'creditCard' : order.paymentMethod === 'LINE Pay' ? 'linePay' : 'transfer');
+                           setB2bModalOpen(true);
+                        }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 shadow-md">
+                           上傳付款憑證 ⬆️
+                        </button>
+                     ) : (
+                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">憑證審核中...</span>
+                     ))}
+                  </div>
+               ))}
+            </div>
+         </div>
+         );
+      })()}
+      
       {/* Creator Info */}
       {creatorInfo && (
          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm p-6 space-y-4">
@@ -338,8 +393,10 @@ export default function AdvancedSettingsPage() {
 
 
 
-         {/* Sidebar: AI Assistant Manager */}
-         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+         {/* Right Sidebar Container */}
+         <div className="space-y-6">
+            {/* Sidebar: AI Assistant Manager */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
             <div className="flex items-center gap-3">
                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-sm shadow-inner">🤖</div>
                <div>
@@ -356,7 +413,7 @@ export default function AdvancedSettingsPage() {
                <div className="space-y-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 shadow-inner">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                      <span>當前方案</span>
-                     <span className="text-slate-800">{aiInfo.planName}</span>
+                     <span className="text-slate-800">{aiInfo.isVip ? '無限使用方案 (系統授權)' : aiInfo.planName}</span>
                   </div>
 
                   <div className="space-y-2">
@@ -381,17 +438,24 @@ export default function AdvancedSettingsPage() {
                   </div>
 
                   <button 
-                     onClick={() => setIsAiModalOpen(true)}
-                     className="w-full py-3 bg-slate-900 text-fuchsia-400 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-md hover:bg-slate-800 hover:-translate-y-0.5 transition-all"
+                     onClick={() => {
+                        if (aiInfo.isVip) return;
+                        setIsAiModalOpen(true);
+                     }}
+                     disabled={aiInfo.isVip}
+                     className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                        aiInfo.isVip 
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
+                        : 'bg-slate-900 text-fuchsia-400 shadow-md hover:bg-slate-800 hover:-translate-y-0.5'
+                     }`}
                   >
-                     升級與續約方案
+                     {aiInfo.isVip ? '⭐ 已由系統開通無限使用，無須升級' : '升級與續約方案'}
                   </button>
                </div>
             )}
          </div>
          {/* Sidebar: Cloud Storage & Quota Manager */}
-         <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
                <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-sm shadow-inner">☁️</div>
                   <div>
@@ -404,30 +468,40 @@ export default function AdvancedSettingsPage() {
                   <div className="space-y-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 shadow-inner">
                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                         <span>當前方案</span>
-                        <span className="text-slate-800">{storageInfo.planName}</span>
+                        <span className="text-slate-800">{storageInfo.isVip ? '無限使用方案 (系統授權)' : storageInfo.planName}</span>
                      </div>
 
                      <div className="space-y-2">
                         <div className="flex justify-between text-[11px] font-black italic">
-                           <span className="text-slate-800">{usedGb.toFixed(2)} GB 已使用</span>
-                           <span className="text-slate-400">配額上限 {quotaGb} GB</span>
+                           <span className="text-slate-800">{storageInfo.isVip ? '免費無限' : `${usedGb.toFixed(2)} GB 已使用`}</span>
+                           <span className="text-slate-400">{storageInfo.isVip ? '無限制' : `配額上限 ${quotaGb} GB`}</span>
                         </div>
-                        <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                           <div 
-                              className={`h-full rounded-full transition-all ${
-                                 percentage >= 85 ? 'bg-rose-500 animate-pulse' : 'bg-amber-500'
-                              }`}
-                              style={{ width: `${percentage}%` }}
-                           ></div>
-                        </div>
+                        {!storageInfo.isVip && (
+                           <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                              <div 
+                                 className={`h-full rounded-full transition-all ${
+                                    percentage >= 85 ? 'bg-rose-500 animate-pulse' : 'bg-amber-500'
+                                 }`}
+                                 style={{ width: `${percentage}%` }}
+                              ></div>
+                           </div>
+                        )}
                         <p className="text-[8px] font-bold text-slate-400 italic">適用於信眾預約上傳、相片歸檔、法會影像雲端備份等儲存功能。</p>
                      </div>
 
                      <button 
-                        onClick={() => setIsUpgradeModalOpen(true)}
-                        className="w-full py-3 bg-slate-900 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-md hover:bg-slate-800 hover:-translate-y-0.5 transition-all"
+                        onClick={() => {
+                           if (storageInfo.isVip) return;
+                           setIsUpgradeModalOpen(true);
+                        }}
+                        disabled={storageInfo.isVip}
+                        className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+                           storageInfo.isVip 
+                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
+                           : 'bg-slate-900 text-amber-500 shadow-md hover:bg-slate-800 hover:-translate-y-0.5'
+                        }`}
                      >
-                        ⚡ 點擊升級容量空間
+                        {storageInfo.isVip ? '⭐ 已由系統開通無限空間，無須升級' : '⚡ 點擊升級容量空間'}
                      </button>
                   </div>
                )}
@@ -544,7 +618,7 @@ export default function AdvancedSettingsPage() {
               <div className="p-8 space-y-6 overflow-y-auto">
                  <h4 className="text-sm font-black text-slate-800">選擇付款方式</h4>
                  <div className="grid grid-cols-1 gap-3">
-                    {b2bConfig.enabledMethods.includes('creditCard') && (
+                    {b2bConfig?.thirdParty?.enabled && (
                        <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedB2bMethod === 'creditCard' ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-300'}`}>
                           <input type="radio" name="b2bMethod" className="sr-only" checked={selectedB2bMethod === 'creditCard'} onChange={() => setSelectedB2bMethod('creditCard')} />
                           <span className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-xl">💳</span>
@@ -555,7 +629,7 @@ export default function AdvancedSettingsPage() {
                           {selectedB2bMethod === 'creditCard' && <div className="ml-auto w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">✓</div>}
                        </label>
                     )}
-                    {b2bConfig.enabledMethods.includes('linePay') && (
+                    {b2bConfig?.linePay?.enabled && (
                        <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedB2bMethod === 'linePay' ? 'border-green-500 bg-green-50' : 'border-slate-100 hover:border-slate-300'}`}>
                           <input type="radio" name="b2bMethod" className="sr-only" checked={selectedB2bMethod === 'linePay'} onChange={() => setSelectedB2bMethod('linePay')} />
                           <span className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-xl">📱</span>
@@ -566,7 +640,7 @@ export default function AdvancedSettingsPage() {
                           {selectedB2bMethod === 'linePay' && <div className="ml-auto w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">✓</div>}
                        </label>
                     )}
-                    {b2bConfig.enabledMethods.includes('transfer') && (
+                    {b2bConfig?.customTransfer?.enabled && (
                        <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedB2bMethod === 'transfer' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-300'}`}>
                           <input type="radio" name="b2bMethod" className="sr-only" checked={selectedB2bMethod === 'transfer'} onChange={() => setSelectedB2bMethod('transfer')} />
                           <span className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-xl">🏦</span>
@@ -582,25 +656,38 @@ export default function AdvancedSettingsPage() {
                  {/* Transfer Details */}
                  {selectedB2bMethod === 'transfer' && (
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mt-4 animate-in fade-in zoom-in-95">
+                       {b2bConfig.customQR?.enabled && b2bConfig.customQR.qrImageUrl && (
+                          <div className="mb-6 flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-slate-200">
+                             <img src={b2bConfig.customQR.qrImageUrl} alt="Payment QR" className="max-h-40 rounded-lg shadow-sm mb-2" />
+                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">{b2bConfig.customQR.description || '請掃描官方收款碼'}</p>
+                          </div>
+                       )}
                        <h5 className="text-xs font-black text-slate-800 mb-4 uppercase tracking-widest">請匯款至以下帳戶</h5>
                        <div className="space-y-3 mb-6">
                           <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                              <span className="text-[10px] font-bold text-slate-500">銀行代碼</span>
-                             <span className="text-sm font-black text-slate-800">{b2bConfig.transfer.bankCode}</span>
+                             <span className="text-sm font-black text-slate-800">{b2bConfig.customTransfer?.bankCode}</span>
                           </div>
                           <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                              <span className="text-[10px] font-bold text-slate-500">收款帳號</span>
-                             <span className="text-sm font-black text-slate-800 font-mono tracking-wider text-emerald-600">{b2bConfig.transfer.accountNumber}</span>
+                             <span className="text-sm font-black text-slate-800 font-mono tracking-wider text-emerald-600">{b2bConfig.customTransfer?.accountNo}</span>
                           </div>
                           <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                              <span className="text-[10px] font-bold text-slate-500">戶名</span>
-                             <span className="text-sm font-black text-slate-800">{b2bConfig.transfer.accountName}</span>
+                             <span className="text-sm font-black text-slate-800">{b2bConfig.customTransfer?.accountName}</span>
                           </div>
                        </div>
+                       
                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-1">您的匯款帳號末五碼</label>
-                          <input type="text" maxLength={5} placeholder="例如: 12345" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/50"
-                             value={transferLast5} onChange={e => setTransferLast5(e.target.value)} />
+                          <label className="block text-[10px] font-bold text-slate-500 mb-2">上傳匯款憑證 (必填)</label>
+                          <input type="file" accept="image/*" onChange={e => {
+                             const file = e.target.files?.[0];
+                             if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setReceiptImage(reader.result as string);
+                                reader.readAsDataURL(file);
+                             }
+                          }} className="text-xs" />
                        </div>
                     </div>
                  )}
@@ -609,29 +696,38 @@ export default function AdvancedSettingsPage() {
               <div className="p-8 bg-slate-50 border-t border-slate-100 shrink-0">
                  <button 
                     onClick={() => {
-                       if (selectedB2bMethod === 'transfer' && transferLast5.length < 5) {
-                          return alert('請輸入完整的帳號末五碼！');
+                       if (selectedB2bMethod === 'transfer' && !receiptImage) {
+                          return alert('請上傳匯款憑證！');
                        }
                        setIsPaying(true);
                        startTransition(async () => {
                           const currentTempleId = window.location.pathname.split('/')[1];
-                          const methodStr = selectedB2bMethod === 'creditCard' ? '信用卡' : selectedB2bMethod === 'linePay' ? 'LINE Pay' : `轉帳(${transferLast5})`;
+                          const methodStr = selectedB2bMethod === 'creditCard' ? '信用卡' : selectedB2bMethod === 'linePay' ? 'LINE Pay' : '銀行轉帳';
+                          
+                          const { createSaasOrder } = await import('../../../actions');
                           
                           if (b2bTarget.type === 'storage') {
-                             const res = await upgradeTempleStorage(currentTempleId, selectedPlanId, selectedCycle);
-                             if (res.success) {
-                                alert(`✅ [${methodStr}] 付款/通報成功！雲端空間已即時擴充！`);
-                                fetchTempleStorages().then(list => {
-                                  const myStorage = list.find(s => s.templeId === currentTempleId);
-                                  if (myStorage) setStorageInfo(myStorage);
-                                });
-                             }
+                             await createSaasOrder({
+                                templeId: currentTempleId,
+                                type: 'storage',
+                                planId: selectedPlanId,
+                                amount: b2bTarget.amount,
+                                cycle: selectedCycle,
+                                paymentMethod: methodStr,
+                                receiptImage: receiptImage
+                             });
+                             alert('訂單及憑證已送出！等待系統管理員審核開通。');
                           } else if (b2bTarget.type === 'ai') {
-                             const res = await purchaseAiPlan(selectedAiPlanId, methodStr);
-                             if (res.success) {
-                                alert(`✅ [${methodStr}] 付款/通報成功！AI 方案已升級！`);
-                                fetchTempleAiUsage().then(setAiInfo);
-                             }
+                             await createSaasOrder({
+                                templeId: currentTempleId,
+                                type: 'ai',
+                                planId: selectedAiPlanId,
+                                amount: b2bTarget.amount,
+                                cycle: 'Monthly',
+                                paymentMethod: methodStr,
+                                receiptImage: receiptImage
+                             });
+                             alert('訂單及憑證已送出！等待系統管理員審核開通。');
                           }
                           setIsPaying(false);
                           setB2bModalOpen(false);
@@ -680,12 +776,12 @@ export default function AdvancedSettingsPage() {
                  <button 
                     onClick={() => {
                        if (!selectedAiPlanId) return alert('請選擇方案');
-                       if (!b2bConfig || !b2bConfig.enabledMethods || b2bConfig.enabledMethods.length === 0) {
+                       if ((!b2bConfig || (!b2bConfig?.thirdParty?.enabled && !b2bConfig?.linePay?.enabled && !b2bConfig?.customTransfer?.enabled))) {
                          alert('上層機構尚未設定收款方式，請聯繫代理商或系統客服。');
                          return;
                        }
                        setB2bTarget({ type: 'ai' });
-                       setSelectedB2bMethod(b2bConfig.enabledMethods[0]);
+                       setSelectedB2bMethod(b2bConfig?.thirdParty?.enabled ? 'creditCard' : b2bConfig?.linePay?.enabled ? 'linePay' : 'transfer');
                        setIsAiModalOpen(false); // Close AI plan modal
                        setB2bModalOpen(true);
                     }}

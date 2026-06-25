@@ -138,7 +138,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [customAmount, setCustomAmount] = useState<number>(100);
-  const [viewPaymentInfo, setViewPaymentInfo] = useState<'transfer' | 'customQR' | null>(null);
+  const [viewPaymentInfo, setViewPaymentInfo] = useState<{ method: 'transfer' | 'customQR', recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration' } | null>(null);
   const [paymentRef, setPaymentRef] = useState<string>('');
   
   // AGI Chat States
@@ -793,8 +793,8 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                         </button>
                       )}
                       {activeAppointment.paymentStatus === 'Pending' && (activeAppointment.paymentMethod === 'transfer' || activeAppointment.paymentMethod === 'customQR') && (
-                        <button onClick={() => setViewPaymentInfo(activeAppointment.paymentMethod as any)} className="mt-2 w-full py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 transition-colors">
-                          ⌛ 等待對帳中 (點擊查看{activeAppointment.paymentMethod === 'transfer' ? '匯款資訊' : '付款條碼'})
+                        <button onClick={() => setViewPaymentInfo({ method: activeAppointment.paymentMethod as any, recordId: activeAppointment.id.toString(), recordType: 'Appointment' })} className="mt-2 w-full py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 transition-colors">
+                          ⌛ 等待對帳中 (點擊查看{activeAppointment.paymentMethod === 'transfer' ? '匯款資訊' : '付款條碼'}及上傳截圖)
                         </button>
                       )}
                     </>
@@ -1317,6 +1317,14 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                     </div>
                   )}
 
+                  {(record.status === 'Unpaid' || record.status === 'Pending') && record.type !== '排隊' && record.paymentMethod !== 'Cash' && (
+                     <div className="pt-2 mt-2 border-t border-slate-100">
+                       <button onClick={() => setViewPaymentInfo({ method: (record.paymentMethod as any) || 'transfer', recordId: record.id.toString(), recordType: record.type === '預約' ? 'Appointment' : record.type === '活動' ? 'EventRegistration' : 'LampRecord' })} className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black tracking-widest flex items-center justify-center gap-2 transition-colors">
+                         <span>⌛</span> 查看付款資訊與上傳截圖
+                       </button>
+                     </div>
+                  )}
+
                   {/* 
                     TEMPORARILY DISABLED BY TEMPLE: 
                     deadlines && (serviceSettings?.allowCancel !== false || serviceSettings?.allowModify !== false) && ...
@@ -1373,12 +1381,12 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
         <div className="bg-white w-full max-w-sm rounded-3xl p-6 flex flex-col space-y-6 shadow-2xl animate-in zoom-in-95 duration-300">
           <div className="text-center space-y-2">
             <h3 className="text-xl font-black text-gray-900 italic tracking-tighter">
-              {viewPaymentInfo === 'transfer' ? '匯款資訊' : '付款條碼'}
+              {viewPaymentInfo.method === 'transfer' ? '匯款資訊與上傳截圖' : '付款條碼與上傳截圖'}
             </h3>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Information</p>
           </div>
           
-          {viewPaymentInfo === 'transfer' && (
+          {viewPaymentInfo.method === 'transfer' && (
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-3">
                <div className="flex justify-between items-center border-b border-amber-200/50 pb-2">
                   <span className="text-[10px] font-bold text-amber-700/70">銀行代碼</span>
@@ -1399,7 +1407,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             </div>
           )}
 
-          {viewPaymentInfo === 'customQR' && (
+          {viewPaymentInfo.method === 'customQR' && (
             <div className="bg-pink-50 p-4 rounded-2xl border border-pink-200 flex flex-col items-center justify-center text-center space-y-4">
                {paymentConfig?.customQR?.qrImageUrl ? (
                   <img src={paymentConfig.customQR.qrImageUrl} alt="QR Code" className="max-w-[200px] rounded-xl shadow-sm" />
@@ -1409,6 +1417,40 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                <p className="text-xs font-bold text-pink-800">{paymentConfig?.customQR?.description || '請掃描 QR Code 付款'}</p>
             </div>
           )}
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+             <p className="text-xs font-bold text-slate-700 text-center">完成付款後，請上傳您的匯款截圖以便廟方對帳</p>
+             <input 
+               type="file" 
+               accept="image/*"
+               className="hidden"
+               id="payment-proof-upload"
+               onChange={async (e) => {
+                 const file = e.target.files?.[0];
+                 if (!file || !guestUser?.phone) return;
+                 setIsLoading(true);
+                 try {
+                   // 產生一個預覽用的 URL 或實際準備上傳
+                   const previewUrl = URL.createObjectURL(file);
+                   const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                   await uploadPaymentProof(viewPaymentInfo.recordId, viewPaymentInfo.recordType, previewUrl, guestUser.phone);
+                   alert('✅ 匯款截圖已成功上傳！廟方將盡快為您對帳。');
+                   setViewPaymentInfo(null);
+                   refreshAllData(guestUser.phone);
+                 } catch (err) {
+                   alert('⚠️ 上傳失敗，請重試');
+                 } finally {
+                   setIsLoading(false);
+                 }
+               }}
+             />
+             <label 
+               htmlFor="payment-proof-upload" 
+               className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-xs hover:bg-indigo-700 shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
+             >
+               <span>📸</span> 上傳付款截圖
+             </label>
+          </div>
 
           <button onClick={() => setViewPaymentInfo(null)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-slate-800 shadow-md transition-colors">關閉</button>
         </div>

@@ -500,7 +500,13 @@ function DeepFileCenterContent() {
                                   <div className="flex justify-between items-end">
                                      <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p><p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p></div>
                                      <div className="flex gap-2">
-                                     {lamp.status !== 'Cancelled' && (lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid') && (
+                                     {lamp.status !== 'Cancelled' && (lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
+                                        <>
+                                        {lamp.paymentProofUrl && (
+                                          <button onClick={() => setPreviewFile({ type: 'photo', url: lamp.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                            <span>📸</span> 查看截圖
+                                          </button>
+                                        )}
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
@@ -512,6 +518,7 @@ function DeepFileCenterContent() {
                                         >
                                           標記已結帳 ✓
                                         </button>
+                                        </>
                                      )}
                                      {lamp.status !== 'Cancelled' && lamp.paymentStatus === 'Paid' && (
                                         <div className="flex items-center gap-2">
@@ -661,7 +668,13 @@ function DeepFileCenterContent() {
                                         </button>
                                       )}
                                       
-                                      {(event.paymentStatus === 'Pending' || event.paymentStatus === 'Unpaid') && (
+                                      {(event.paymentStatus === 'Pending' || event.paymentStatus === 'Unpaid' || event.paymentStatus === 'PENDING_REVIEW') && (
+                                        <>
+                                        {event.paymentProofUrl && (
+                                          <button onClick={() => setPreviewFile({ type: 'photo', url: event.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                            <span>📸</span> 查看截圖
+                                          </button>
+                                        )}
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
@@ -673,6 +686,7 @@ function DeepFileCenterContent() {
                                         >
                                           ✅ 標記已收款
                                         </button>
+                                        </>
                                       )}
                                       {event.paymentStatus === 'Paid' && (
                                         <button 
@@ -721,7 +735,13 @@ function DeepFileCenterContent() {
                                  <p className="text-sm text-slate-500 mt-1">結緣金：{evt.price > 0 ? `$${evt.price}` : '隨喜'}</p>
                               </div>
                               <div className="flex gap-4 items-center">
-                                 {(evt.paymentStatus === 'Pending' || evt.paymentStatus === 'Unpaid') && (
+                                 {(evt.paymentStatus === 'Pending' || evt.paymentStatus === 'Unpaid' || evt.paymentStatus === 'PENDING_REVIEW') && (
+                                    <>
+                                    {evt.paymentProofUrl && (
+                                      <button onClick={() => setPreviewFile({ type: 'photo', url: evt.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                        <span>📸</span> 查看截圖
+                                      </button>
+                                    )}
                                     <button 
                                       onClick={async () => {
                                         if (confirm('確定要標記已收款？')) {
@@ -733,6 +753,7 @@ function DeepFileCenterContent() {
                                     >
                                       ✅ 標記已收款
                                     </button>
+                                   </>
                                  )}
                                  {evt.paymentStatus === 'Paid' && (
                                     <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>

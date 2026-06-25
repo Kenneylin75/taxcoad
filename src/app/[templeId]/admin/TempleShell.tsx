@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { AppRole, logoutAccount } from '@/app/actions';
+import AdminBell from './AdminBell';
 
 export default function TempleShell({ children, currentRole, currentUser, templeId }: { children: React.ReactNode, currentRole: AppRole, currentUser: { name: string, avatar: string }, templeId: string }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -133,12 +134,15 @@ export default function TempleShell({ children, currentRole, currentUser, temple
 
       <main className={`flex-1 transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-64'}`}>
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm">
-          <div className="flex items-center gap-4">
+           <div className="flex items-center gap-4">
              <h1 className="text-xl font-black tracking-tight text-slate-900 italic">營運主控台</h1>
              <h2 className="text-sm font-bold text-slate-400 flex items-center gap-2">
                <span className="text-slate-300">/</span>
                {navigation.flatMap(n => n.items || [n]).find(n => n.href === pathname)?.name || '服務管理'}
              </h2>
+          </div>
+          <div className="flex items-center gap-4">
+             <AdminBell />
           </div>
         </header>
         <div className="p-8 max-w-7xl mx-auto">{children}</div>

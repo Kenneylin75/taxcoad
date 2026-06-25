@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from 'react';
-import { fetchSystemConfig, requestPasswordReset } from '@/app/actions';
+import { fetchSystemConfig, requestPasswordReset, requestWithdrawal, fetchSuperSalesWithdrawals } from '@/app/actions';
 import DistributorApplicationForm from '@/app/components/DistributorApplicationForm';
 
 export default function SuperSalesClient({ 
@@ -24,8 +24,12 @@ export default function SuperSalesClient({
   const [paymentCycle, setPaymentCycle] = useState<'Monthly' | 'Yearly'>('Monthly');
   const [config, setConfig] = useState<any>(null);
 
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
+
   useEffect(() => {
     fetchSystemConfig().then(setConfig);
+    fetchSuperSalesWithdrawals(initialProfile.name).then(setWithdrawals);
   }, []);
 
   // --- Financial Mock Data (Enhanced) ---
@@ -42,6 +46,16 @@ export default function SuperSalesClient({
     alert(`🚀 申請案 [${name}] 已成功提報至超級管理員！`);
     setIsAddDistModalOpen(false);
     setIsAddTempleModalOpen(false);
+  };
+
+  const handleSubmitWithdrawal = async () => {
+    // 假設提領餘額為 $856,400 (依照原本介面寫死的值為例)
+    if (confirm(`確定要提領您的帳戶餘額嗎？`)) {
+      await requestWithdrawal(initialProfile.name, 856400);
+      alert('提領申請已送出！');
+      setIsWithdrawModalOpen(false);
+      fetchSuperSalesWithdrawals(initialProfile.name).then(setWithdrawals);
+    }
   };
 
   const handlePasswordResetRequest = async () => {
@@ -196,7 +210,40 @@ export default function SuperSalesClient({
                    </div>
                 ))}
              </div>
-          </div>
+
+              {/* 提領紀錄 */}
+              <div className="space-y-6 pt-8">
+                 <div className="flex justify-between items-center px-4">
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest italic underline decoration-amber-200 decoration-4">提領紀錄 (WITHDRAWALS)</h3>
+                 </div>
+                 {withdrawals.length === 0 && <p className="text-center text-slate-400 font-bold text-sm">尚無提領紀錄</p>}
+                 {withdrawals.map(w => (
+                    <div key={w.id} className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm flex flex-col gap-4 group hover:shadow-xl transition-all">
+                       <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-5">
+                             <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-xl shadow-inner italic font-black text-amber-600">🏛️</div>
+                             <div>
+                                <p className="text-base font-black text-slate-900">${w.amount.toLocaleString()}</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{w.date} | {w.id}</p>
+                             </div>
+                          </div>
+                          <div className="text-right">
+                             {w.status === 'Approved' ? (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-black uppercase">已匯款</span>
+                             ) : (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-4 py-2 rounded-full font-black uppercase">處理中</span>
+                             )}
+                          </div>
+                       </div>
+                       {w.status === 'Approved' && w.receiptUrl && (
+                          <button onClick={() => setViewingReceiptUrl(w.receiptUrl)} className="w-full py-4 bg-slate-50 text-slate-600 rounded-[24px] text-[10px] font-black tracking-widest hover:bg-slate-100 transition-all uppercase">
+                             🖼️ 查看匯款憑證 (VIEW RECEIPT)
+                          </button>
+                       )}
+                    </div>
+                 ))}
+              </div>
+           </div>
         )}
 
         {/* --- TAB: TOOLKIT --- */}
@@ -279,6 +326,28 @@ export default function SuperSalesClient({
       </nav>
 
       {/* --- MODALS --- */}
+
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-2xl z-[300] flex items-center justify-center animate-in fade-in duration-500 p-4">
+           <div className="bg-white w-full max-w-sm rounded-[50px] p-10 shadow-2xl space-y-8">
+              <h3 className="text-2xl font-black text-slate-900 italic tracking-tighter">確認提領</h3>
+              <p className="text-sm font-bold text-slate-500">將提領您目前所有可用餘額，審核通過後，中央總部會將款項匯入您綁定的帳戶。</p>
+              <div className="flex gap-4">
+                 <button onClick={() => setIsWithdrawModalOpen(false)} className="flex-1 py-4 bg-slate-100 rounded-full text-xs font-black text-slate-500">取消</button>
+                 <button onClick={handleSubmitWithdrawal} className="flex-1 py-4 bg-indigo-600 rounded-full text-xs font-black text-white shadow-lg">確認送出申請</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {viewingReceiptUrl && (
+         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4" onClick={() => setViewingReceiptUrl(null)}>
+            <div className="bg-white p-4 rounded-[40px] max-w-lg w-full" onClick={e => e.stopPropagation()}>
+               <img src={viewingReceiptUrl} alt="Receipt" className="w-full h-auto rounded-[30px]" />
+               <button onClick={() => setViewingReceiptUrl(null)} className="w-full mt-4 py-4 bg-slate-100 text-slate-600 rounded-full text-xs font-black hover:bg-slate-200 transition-all uppercase tracking-widest">關閉視窗</button>
+            </div>
+         </div>
+      )}
 
       {/* 1. Modal: 開設新經銷商 */}
       {isAddDistModalOpen && (

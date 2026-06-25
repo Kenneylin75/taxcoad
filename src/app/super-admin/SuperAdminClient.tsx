@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useTransition, useEffect } from 'react';
 import TempleApplicationForm from '../components/TempleApplicationForm';
@@ -19,18 +19,24 @@ import {
   fetchSyncQueue,
   createSuperSalesAccount,
   createDistributorAccount,
-transferTempleOwnership,
-transferDistributorOwnership,
+  transferTempleOwnership,
+  transferDistributorOwnership,
   createTempleAccount,
   createAdminAccount,
+  fetchAllAccountsForAdmin,
   fetchAggregatedAnalytics,
-  fetchStoragePlans, fetchAiPlans, saveAiPlan, deleteAiPlan, fetchAiApiModels, saveAiApiModels, fetchAllTempleAiUsage, grantTempleAiVip,
+  fetchStoragePlans, createStoragePlan, updateStoragePlan, deleteStoragePlan, fetchAiPlans, saveAiPlan, deleteAiPlan, fetchAiApiModels, saveAiApiModels, fetchAllTempleAiUsage, grantTempleAiVip,
   updateStoragePlans,
   updateAccountPassword,
   fetchTempleStorages,
   fetchRoleWallets,
   fetchSuperAdminFinancials,
-  logoutAccount
+  fetchDataBridgeTree,
+  approveWithdrawal,
+  logoutAccount,
+  upgradeTempleStorage,
+  grantTempleStorageVip,
+  purchaseAiPlanByAdmin
 } from '../actions';
 
 export default function SuperAdminClient({ 
@@ -43,6 +49,7 @@ export default function SuperAdminClient({
   const [config, setConfig] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [finance, setFinance] = useState<any>(null);
+  const [financeMonth, setFinanceMonth] = useState('2026-06');
   const [syncQueue, setSyncQueue] = useState<any[]>([]);
   const [pendingDistributors, setPendingDistributors] = useState<any[]>([]);
   const [mediaList, setMediaList] = useState<any[]>(initialMedia);
@@ -58,8 +65,13 @@ export default function SuperAdminClient({
   const [allTempleAiUsage, setAllTempleAiUsage] = useState<any[]>([]);
   const [templeStorages, setTempleStorages] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
+  const [bridgeTree, setBridgeTree] = useState<any[]>([]);
   const [searchTemple, setSearchTemple] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
+  const [logUserFilter, setLogUserFilter] = useState('');
+  const [logActionFilter, setLogActionFilter] = useState('');
+  const [bridgeSearch, setBridgeSearch] = useState('');
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   
   const [isPending, startTransition] = useTransition();
 
@@ -97,12 +109,18 @@ export default function SuperAdminClient({
    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
    const [paymentCycle, setPaymentCycle] = useState<'Monthly' | 'Yearly'>('Monthly');
    const [viewingAccountDetail, setViewingAccountDetail] = useState<any>(null);
+   const [editDistributorForm, setEditDistributorForm] = useState<any>({});
+   const [adminUpgradeStoragePlanId, setAdminUpgradeStoragePlanId] = useState('');
+   const [adminUpgradeAiPlanId, setAdminUpgradeAiPlanId] = useState('');
    const [newPassword, setNewPassword] = useState('');
   
   // --- Data Fetching ---
   useEffect(() => {
     fetchAggregatedAnalytics().then(setAnalytics);
-    fetchSystemConfig().then(setConfig);
+    fetchSystemConfig().then(c => {
+       setConfig(c);
+       if (c.b2bPayment) setB2bPayment(c.b2bPayment);
+    });
     fetchAdminLogs().then(setLogs);
     fetchSuperAdminFinancials().then(data => {
       setFinance({ records: data.records, summary: data.summary });
@@ -115,6 +133,7 @@ export default function SuperAdminClient({
     fetchAiApiModels().then(setAiModels);
     fetchAllTempleAiUsage().then(setAllTempleAiUsage);
     fetchTempleStorages().then(setTempleStorages);
+    fetchDataBridgeTree().then(setBridgeTree);
   }, []);
 
   // --- Handlers ---
@@ -293,10 +312,10 @@ export default function SuperAdminClient({
               <div className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
                  <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
                     {[
-                      { label: '年度累計總營收', value: `$${(analytics?.overview?.monthlyRevenue * 12).toLocaleString()}`, change: '+12.5%', color: 'indigo' },
-                      { label: '全球活動節點數', value: (analytics?.overview?.activeTemples || 0).toLocaleString(), change: '+42', color: 'emerald' },
-                      { label: '授權經銷商數', value: (analytics?.overview?.totalDistributors || 0).toLocaleString(), change: '穩定', color: 'slate' },
-                      { label: '系統運行健康度', value: `${analytics?.overview?.systemHealth}%`, change: 'Optimal', color: 'rose' }
+                      { label: '年度累計總營收', value: `$${(analytics?.overview?.monthlyRevenue || 0).toLocaleString()}`, change: 'Realtime', color: 'indigo' },
+                      { label: '全球活動節點數', value: (analytics?.overview?.activeTemples || 0).toLocaleString(), change: 'Realtime', color: 'emerald' },
+                      { label: '授權經銷商數', value: (analytics?.overview?.totalDistributors || 0).toLocaleString(), change: 'Realtime', color: 'slate' },
+                      { label: '系統運行健康度', value: `${analytics?.overview?.systemHealth || 100}%`, change: 'Optimal', color: 'rose' }
                     ].map((stat, i) => (
                       <div key={i} className="bg-white p-10 rounded-[50px] border border-slate-100 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
                          <div className={`absolute top-0 right-0 w-32 h-32 bg-${stat.color}-500/5 rounded-full blur-3xl -mr-10 -mt-10 transition-all group-hover:bg-${stat.color}-500/10`}></div>
@@ -604,7 +623,18 @@ export default function SuperAdminClient({
                        {storagePlans.map((plan) => (
                           <div key={plan.id} className="p-8 bg-slate-50/50 rounded-[40px] border border-white shadow-inner space-y-6 hover:bg-white hover:shadow-xl transition-all duration-300">
                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase">{plan.id}</span>
+                                <div className="flex items-center gap-3">
+                                   <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase">{plan.id}</span>
+                                   <button 
+                                      onClick={() => {
+                                         setStoragePlans(storagePlans.filter(p => p.id !== plan.id));
+                                      }}
+                                      className="w-6 h-6 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all text-xs"
+                                      title="刪除此方案"
+                                   >
+                                      ✕
+                                   </button>
+                                </div>
                                 <input 
                                    type="text" 
                                    defaultValue={plan.name} 
@@ -647,7 +677,15 @@ export default function SuperAdminClient({
                           </div>
                        ))}
                     </div>
-                    <div className="flex justify-end pt-4">
+                    <div className="flex justify-end pt-4 gap-4">
+                       <button 
+                          onClick={() => {
+                             setStoragePlans([...storagePlans, { id: `SP-${Date.now()}`, name: '新方案', sizeGb: 100, priceMonthly: 0 }]);
+                          }}
+                          className="px-10 py-4 bg-slate-100 text-slate-600 rounded-[25px] text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:bg-slate-200 transition-all"
+                       >
+                          + 新增方案 (ADD PLAN)
+                       </button>
                        <button 
                           onClick={() => {
                              startTransition(async () => {
@@ -1015,37 +1053,98 @@ export default function SuperAdminClient({
              </div>
            )}
 
-           {activeTab === 'finance' && (
+           {activeTab === 'finance' && (() => {
+              const filteredRecords = finance?.records?.filter((r: any) => r.date?.startsWith(financeMonth)) || [];
+              const dynTotalRevenue = filteredRecords.filter((r: any) => r.type === 'INCOME').reduce((s: number, r: any) => s + r.amount, 0);
+              const dynTotalCommission = filteredRecords.filter((r: any) => r.type === 'EXPENSE').reduce((s: number, r: any) => s + r.amount, 0);
+              const dynNetProfit = dynTotalRevenue - dynTotalCommission;
+              const templeIncome = filteredRecords.filter((r: any) => r.type === 'INCOME' && r.category !== 'AUTH_FEE').reduce((s: number, r: any) => s + r.amount, 0);
+              const distIncome = filteredRecords.filter((r: any) => r.type === 'INCOME' && r.category === 'AUTH_FEE').reduce((s: number, r: any) => s + r.amount, 0);
+
+              return (
               <div className="space-y-16 animate-in fade-in slide-in-from-bottom-10 duration-700">
+                 {/* Month Filter Header */}
+                 <div className="flex justify-between items-end px-4">
+                    <div className="space-y-2">
+                       <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] italic">Dynamic Ledger</p>
+                       <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic">中央財務結算</h3>
+                    </div>
+                    <div className="flex items-center gap-4 bg-white p-2 rounded-full border border-slate-200 shadow-sm">
+                       <span className="text-[11px] font-black text-slate-400 pl-4 uppercase tracking-widest">結算月份</span>
+                       <select 
+                         value={financeMonth}
+                         onChange={(e) => setFinanceMonth(e.target.value)}
+                         className="bg-slate-50 text-slate-900 border-none font-black rounded-full px-6 py-3 text-sm focus:ring-2 focus:ring-emerald-500 cursor-pointer outline-none transition-all"
+                       >
+                         <option value="2026-06">2026 年 6 月</option>
+                         <option value="2026-05">2026 年 5 月</option>
+                         <option value="2026-04">2026 年 4 月</option>
+                         <option value="2026-03">2026 年 3 月</option>
+                       </select>
+                    </div>
+                 </div>
+
                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                    <div className="lg:col-span-2 bg-white p-16 rounded-[70px] border border-slate-100 shadow-sm space-y-12">
-                       <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">系統財務結算清單 Financial Ledger</h4>
-                       <div className="space-y-6">
-                          {finance?.records.map((r: any, i: number) => (
-                             <div key={i} className="flex justify-between items-center border-b border-slate-50 pb-8 last:border-0">
+                    <div className="lg:col-span-2 bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-10">
+                       <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">交易明細 ({financeMonth})</h4>
+                       
+                       <div className="space-y-4">
+                          {filteredRecords.length > 0 ? filteredRecords.map((r: any, i: number) => {
+                             const isTemple = r.type === 'INCOME' && r.category !== 'AUTH_FEE';
+                             const isDist = r.type === 'INCOME' && r.category === 'AUTH_FEE';
+                             const isExpense = r.type === 'EXPENSE';
+
+                             return (
+                             <div key={i} className="flex justify-between items-center bg-slate-50/50 p-6 rounded-[30px] border border-slate-100 hover:shadow-md hover:bg-white transition-all group">
                                 <div className="flex items-center gap-6">
-                                   <div className={`w-14 h-14 rounded-2xl ${r.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center text-xl font-black shadow-inner italic`}>{r.type === 'INCOME' ? '+' : '-'}</div>
+                                   <div className={`w-14 h-14 rounded-2xl ${isTemple ? 'bg-indigo-50 text-indigo-600' : isDist ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center text-xl font-black shadow-inner italic`}>{isExpense ? '-' : '+'}</div>
                                    <div>
-                                      <p className="text-base font-black text-slate-900">{r.source}</p>
-                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{r.category} | {r.date}</p>
+                                      <p className="text-base font-black text-slate-900 group-hover:text-emerald-600 transition-colors">{r.source}</p>
+                                      <div className="flex gap-2 items-center mt-1">
+                                         {isTemple && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md text-[9px] font-black uppercase">宮廟端</span>}
+                                         {isDist && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[9px] font-black uppercase">經銷端</span>}
+                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{r.category} | {r.date}</p>
+                                      </div>
                                    </div>
                                 </div>
                                 <div className="text-right">
-                                   <p className={`text-2xl font-black italic ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-500'}`}>${r.amount.toLocaleString()}</p>
-                                   <p className="text-[9px] font-black text-slate-300 uppercase">Transaction ID: TX-{Math.floor(Math.random()*9000)}</p>
+                                   <p className={`text-2xl font-black italic ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>${r.amount.toLocaleString()}</p>
+                                   <p className="text-[9px] font-black text-slate-300 uppercase mt-1">TX-{Math.floor(Math.random()*90000)}</p>
                                 </div>
                              </div>
-                          ))}
+                             )
+                          }) : (
+                             <div className="py-16 text-center opacity-50">
+                                <div className="text-4xl mb-4">📭</div>
+                                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{financeMonth} 沒有任何交易紀錄</p>
+                             </div>
+                          )}
                        </div>
                     </div>
-                    <div className="bg-slate-900 p-16 rounded-[70px] shadow-2xl text-white space-y-10">
-                       <div><p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mb-2 italic">Global Summary</p><h4 className="text-4xl font-black italic tracking-tighter leading-tight">財務統計中心</h4></div>
-                       <div className="space-y-8 bg-white/5 p-10 rounded-[50px] border border-white/5">
-                          <div className="flex justify-between border-b border-white/10 pb-6"><span className="text-[11px] font-bold text-slate-400 uppercase">總營收 (Total Rev)</span><span className="text-xl font-black italic">${finance?.summary.totalRevenue.toLocaleString()}</span></div>
-                          <div className="flex justify-between border-b border-white/10 pb-6"><span className="text-[11px] font-bold text-slate-400 uppercase">總分潤 (Commission)</span><span className="text-xl font-black italic">${finance?.summary.totalCommission.toLocaleString()}</span></div>
-                          <div className="flex justify-between pt-2"><span className="text-[11px] font-black text-emerald-400 uppercase">累計淨利 (Profit)</span><span className="text-3xl font-black italic text-white">${finance?.summary.netProfit.toLocaleString()}</span></div>
+                    
+                    <div className="space-y-8">
+                       {/* Dynamic Summary Panel */}
+                       <div className="bg-slate-900 p-12 rounded-[60px] shadow-2xl text-white space-y-10 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-[80px] -mr-20 -mt-20 group-hover:bg-emerald-500/30 transition-all duration-1000"></div>
+                          <div className="relative z-10">
+                             <div><p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mb-2 italic">Monthly Summary ({financeMonth})</p><h4 className="text-3xl font-black italic tracking-tighter leading-tight">當月統計中心</h4></div>
+                             
+                             <div className="space-y-6 mt-10">
+                                {/* 分類收入 */}
+                                <div className="space-y-4 bg-white/5 p-6 rounded-[30px] border border-white/5">
+                                   <div className="flex justify-between items-center"><span className="text-[10px] font-bold text-indigo-300 uppercase">宮廟端收入</span><span className="text-lg font-black italic text-indigo-100">${templeIncome.toLocaleString()}</span></div>
+                                   <div className="flex justify-between items-center"><span className="text-[10px] font-bold text-amber-300 uppercase">經銷端授權收入</span><span className="text-lg font-black italic text-amber-100">${distIncome.toLocaleString()}</span></div>
+                                </div>
+
+                                <div className="space-y-6 bg-white/10 p-8 rounded-[40px] border border-white/10 shadow-inner backdrop-blur-xl">
+                                   <div className="flex justify-between border-b border-white/10 pb-4"><span className="text-[11px] font-bold text-slate-300 uppercase">當月總營收</span><span className="text-xl font-black italic">${dynTotalRevenue.toLocaleString()}</span></div>
+                                   <div className="flex justify-between border-b border-white/10 pb-4"><span className="text-[11px] font-bold text-slate-300 uppercase">當月支出/分潤</span><span className="text-xl font-black italic text-rose-300">-${dynTotalCommission.toLocaleString()}</span></div>
+                                   <div className="flex justify-between pt-2"><span className="text-[11px] font-black text-emerald-400 uppercase">當月淨利</span><span className="text-3xl font-black italic text-white">${dynNetProfit.toLocaleString()}</span></div>
+                                </div>
+                             </div>
+                             <button className="w-full mt-8 py-6 bg-emerald-600 text-white rounded-[30px] font-black text-[11px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-500 active:scale-95 transition-all">核發本月分潤 💳</button>
+                          </div>
                        </div>
-                       <button className="w-full py-8 bg-emerald-600 text-white rounded-[35px] font-black text-xs uppercase tracking-[0.4em] shadow-xl hover:bg-emerald-500 transition-all">全網財務清算對帳 💳</button>
                     </div>
                  </div>
 
@@ -1054,78 +1153,188 @@ export default function SuperAdminClient({
                     <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">分佈式錢包結算帳戶 (Wallets Ledger)</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                        {wallets.map((w, idx) => (
-                          <div key={idx} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-center hover:shadow-md transition-all">
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{w.role === 'SuperAdmin' ? '系統總部' : w.role === 'Distributor' ? '經銷代理' : w.role === 'SuperSales' ? '超級業務' : '經銷業務'} ({w.name})</p>
-                             <p className="text-2xl font-black text-slate-900 italic">${w.balance.toLocaleString()}</p>
+                          <div key={idx} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-center hover:shadow-md hover:bg-indigo-50 transition-all group">
+                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-indigo-500">{w.role === 'SuperAdmin' ? '系統總部' : w.role === 'Distributor' ? '經銷代理' : w.role === 'SuperSales' ? '超級業務' : '經銷業務'} ({w.name})</p>
+                             <p className="text-2xl font-black text-slate-900 italic group-hover:text-indigo-600">${w.balance.toLocaleString()}</p>
                           </div>
                        ))}
                     </div>
                  </div>
               </div>
-           )}
+              );
+           })()}
 
            {/* --- 6. DATA BRIDGE --- */}
-           {activeTab === 'bridge' && (
-              <div className="space-y-16 animate-in fade-in zoom-in-95 duration-700">
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 h-[600px]">
-                    <div className="bg-slate-900 rounded-[100px] shadow-2xl p-16 text-white flex flex-col justify-between relative overflow-hidden">
-                       <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] -mr-40 -mt-40"></div>
-                       <div className="space-y-6 relative z-10">
-                          <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.5em] italic">Database Connection: Stable</p>
-                          <h3 className="text-5xl font-black italic tracking-tighter leading-tight">中央資料庫匯流核心<br/>Live Bridge Status</h3>
+           {activeTab === 'bridge' && (() => {
+              const filterBridgeNode = (node: any): boolean => {
+                 if (!bridgeSearch) return true;
+                 if (node.name?.toLowerCase().includes(bridgeSearch.toLowerCase())) return true;
+                 if (node.children) {
+                    return node.children.some((child: any) => filterBridgeNode(child));
+                 }
+                 return false;
+              };
+
+              const toggleNode = (id: string) => {
+                 const next = new Set(expandedNodes);
+                 if (next.has(id)) next.delete(id);
+                 else next.add(id);
+                 setExpandedNodes(next);
+              };
+
+              const renderNode = (node: any, level: number) => {
+                 if (!filterBridgeNode(node)) return null;
+                 
+                 const isSearching = bridgeSearch.length > 0;
+                 const isExpanded = isSearching ? true : expandedNodes.has(node.id);
+                 const hasChildren = node.children && node.children.length > 0;
+                 const indent = level * 32;
+                 
+                 const icons: any = {
+                    'super-sales': '👑',
+                    'distributor': '🏢',
+                    'dist-sales': '👔',
+                    'temple': '⛩️'
+                 };
+                 const badges: any = {
+                    'super-sales': '超級業務',
+                    'distributor': '經銷代理商',
+                    'dist-sales': '經銷業務',
+                    'temple': '宮廟'
+                 };
+                 const colors: any = {
+                    'super-sales': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                    'distributor': 'bg-amber-50 text-amber-700 border-amber-200',
+                    'dist-sales': 'bg-blue-50 text-blue-700 border-blue-200',
+                    'temple': 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                 };
+
+                 const isMatch = bridgeSearch && node.name?.toLowerCase().includes(bridgeSearch.toLowerCase());
+
+                 return (
+                    <div key={node.id} className="w-full">
+                       <div 
+                         className={`flex items-center gap-4 p-4 border-b border-slate-50 hover:bg-slate-50 transition-all cursor-pointer ${isMatch ? 'bg-yellow-50/50' : ''}`}
+                         style={{ paddingLeft: `${indent + 16}px` }}
+                         onClick={() => hasChildren && toggleNode(node.id)}
+                       >
+                          <div className="w-6 flex justify-center">
+                             {hasChildren ? (
+                                <span className="text-slate-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
+                             ) : <span className="w-6"></span>}
+                          </div>
+                          <span className="text-2xl">{icons[node.type]}</span>
+                          <span className={`text-sm font-black ${isMatch ? 'text-slate-900' : 'text-slate-700'}`}>{node.name}</span>
+                          <span className={`px-2 py-1 text-[10px] font-black rounded-md border ${colors[node.type]}`}>{badges[node.type]}</span>
                        </div>
-                       <div className="flex items-center gap-12 relative z-10">
-                          <div className="text-center space-y-2"><p className="text-5xl font-black italic">24ms</p><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Network Latency</p></div>
-                          <div className="text-center space-y-2"><p className="text-5xl font-black italic">100%</p><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Uptime Performance</p></div>
-                       </div>
+                       {isExpanded && hasChildren && (
+                          <div className="w-full border-l-2 border-slate-100 ml-[28px]">
+                             {node.children.map((child: any) => renderNode(child, level + 1))}
+                          </div>
+                       )}
                     </div>
-                    <div className="bg-white border-2 border-slate-100 rounded-[100px] p-12 shadow-sm flex flex-col items-center justify-center space-y-10 relative">
-                       <div className="w-48 h-48 bg-slate-50 rounded-full flex items-center justify-center text-7xl shadow-inner animate-pulse">🛰️</div>
-                       <div className="space-y-2 text-center">
-                          <h4 className="text-xl font-black text-slate-900 tracking-widest uppercase italic">全球分點同步中</h4>
-                          <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.4em]">Node-A1, Node-B2, Node-C3 Online</p>
-                       </div>
-                       <div className="grid grid-cols-3 gap-4 w-full">
-                          {[1,2,3,4,5,6].map(i => <div key={i} className="h-2 bg-emerald-500/20 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 w-full"></div></div>)}
-                       </div>
+                 );
+              };
+
+              return (
+              <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                 <div className="flex justify-between items-end px-4">
+                    <div className="space-y-2">
+                       <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] italic">Database Connection</p>
+                       <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic">中央數據連動 (Data Bridge)</h3>
+                    </div>
+                    <div className="flex items-center gap-4 bg-white p-2 rounded-full border border-slate-200 shadow-sm w-96">
+                       <span className="pl-4 text-slate-400">🔍</span>
+                       <input 
+                         type="text" 
+                         placeholder="搜尋節點名稱 (自動展開)..." 
+                         value={bridgeSearch}
+                         onChange={(e) => setBridgeSearch(e.target.value)}
+                         className="w-full bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-900 outline-none"
+                       />
+                    </div>
+                 </div>
+
+                 <div className="bg-white border border-slate-200 rounded-[40px] shadow-sm overflow-hidden min-h-[500px]">
+                    <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                       <span className="text-sm font-black uppercase tracking-widest italic text-indigo-300">全網節點拓樸視圖</span>
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global Node Topology</span>
+                    </div>
+                    <div className="py-4">
+                       {bridgeTree.map(ss => renderNode(ss, 0))}
+                       {bridgeTree.length === 0 && (
+                          <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-sm">
+                             尚無資料節點
+                          </div>
+                       )}
                     </div>
                  </div>
               </div>
-           )}
+              );
+           })()}
 
            {/* --- 7. LOGS --- */}
-           {activeTab === 'logs' && (
+           {activeTab === 'logs' && (() => {
+              const filteredLogs = logs.filter(l => {
+                 const uName = (l.user || l.adminId || 'SuperAdmin').toLowerCase();
+                 const act = (l.action || '').toLowerCase();
+                 if (logUserFilter && !uName.includes(logUserFilter.toLowerCase())) return false;
+                 if (logActionFilter && !act.includes(logActionFilter.toLowerCase())) return false;
+                 return true;
+              });
+
+              return (
               <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
                  <div className="flex justify-between items-end px-4">
                     <div className="space-y-2"><p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] italic">System Audit Trail</p><h3 className="text-4xl font-black text-slate-900 tracking-tighter italic">決策日誌與審計紀錄</h3></div>
-                    <button onClick={handleDownloadLogs} className="px-10 py-5 bg-slate-900 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-600 transition-all flex items-center gap-4">
-                       💾 匯出歷史日誌紀錄 (CSV)
-                    </button>
+                    <div className="flex gap-4">
+                       <input 
+                         type="text" 
+                         placeholder="篩選執行者..." 
+                         value={logUserFilter}
+                         onChange={(e) => setLogUserFilter(e.target.value)}
+                         className="px-6 py-4 bg-white border border-slate-200 rounded-full text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                       />
+                       <input 
+                         type="text" 
+                         placeholder="篩選事件分類..." 
+                         value={logActionFilter}
+                         onChange={(e) => setLogActionFilter(e.target.value)}
+                         className="px-6 py-4 bg-white border border-slate-200 rounded-full text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                       />
+                       <button onClick={handleDownloadLogs} className="px-8 py-4 bg-slate-900 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-600 transition-all flex items-center gap-3">
+                          💾 匯出過濾結果 (CSV)
+                       </button>
+                    </div>
                  </div>
-                 <section className="bg-white rounded-[60px] border border-slate-100 shadow-sm overflow-hidden">
+                 <section className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
                     <table className="w-full text-left border-collapse">
                        <thead className="bg-slate-50/50">
                           <tr>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">時間戳記 Timestamp</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">執行者 User</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">事件描述 Action</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">標記</th>
+                             <th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest italic border-b border-slate-100">時間戳記 Timestamp</th>
+                             <th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest italic border-b border-slate-100">執行者 User</th>
+                             <th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest italic border-b border-slate-100">事件分類 Action</th>
+                             <th className="px-12 py-8 text-[11px] font-black text-slate-400 uppercase tracking-widest italic border-b border-slate-100">詳細紀錄 Details</th>
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-50">
-                          {logs.map((log: any, i) => (
-                            <tr key={i} className="hover:bg-slate-50/30 transition-all group">
-                               <td className="px-12 py-8 text-[12px] font-bold text-slate-400">{log.timestamp}</td>
-                               <td className="px-12 py-8"><span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black uppercase italic text-slate-600">{log.user}</span></td>
-                               <td className="px-12 py-8 text-sm font-black text-slate-700 tracking-tight italic">{log.action}：{log.target}</td>
-                               <td className="px-12 py-8 text-right"><div className="flex items-center justify-end gap-2 text-[10px] font-black text-emerald-500 italic uppercase"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>Audit Passed</div></td>
+                          {filteredLogs.map((log: any, i) => (
+                            <tr key={i} className="hover:bg-slate-50/50 transition-all group">
+                               <td className="px-12 py-6 text-[12px] font-bold text-slate-400 whitespace-nowrap">{log.timestamp ? log.timestamp.replace('T', ' ').substring(0, 19) : ''}</td>
+                               <td className="px-12 py-6"><span className="px-4 py-1.5 bg-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-700 rounded-full text-[10px] font-black uppercase italic text-slate-600 transition-colors">{log.user || log.adminId || 'SuperAdmin'}</span></td>
+                               <td className="px-12 py-6 text-[11px] font-black text-slate-500 tracking-widest uppercase"><span className="px-3 py-1 bg-slate-800 text-white rounded-md">{log.action || 'SYSTEM_ACTION'}</span></td>
+                               <td className="px-12 py-6 text-sm font-bold text-slate-700 italic">{log.target ? `${log.target} | ` : ''}{log.details || log.action}</td>
                             </tr>
                           ))}
+                          {filteredLogs.length === 0 && (
+                             <tr><td colSpan={4} className="px-12 py-16 text-center text-slate-400 font-bold uppercase tracking-widest">沒有符合條件的日誌紀錄</td></tr>
+                          )}
                        </tbody>
                     </table>
                  </section>
               </div>
-           )}
+              );
+           })()}
 
            {/* --- 8. SETTINGS --- */}
            {activeTab === 'settings' && (
@@ -1189,12 +1398,26 @@ export default function SuperAdminClient({
                                </div>
 
                                <div className="pt-8">
-                                  <button 
+                                  <button
                                      onClick={() => {
-                                        const rent = (document.getElementById('fixedMonthlyRent') as HTMLInputElement).value;
-                                        const disc = (document.getElementById('yearlyDiscountRate') as HTMLInputElement).value;
+                                        const rentInput = document.getElementById('fixedMonthlyRent') as HTMLInputElement;
+                                        const discInput = document.getElementById('yearlyDiscountRate') as HTMLInputElement;
+                                        const rent = parseInt(rentInput.value);
+                                        const disc = parseInt(discInput.value);
+                                        
+                                        if (isNaN(rent) || rent < 0) {
+                                            alert('錯誤：月租費必須為大於或等於 0 的數字');
+                                            rentInput.focus();
+                                            return;
+                                        }
+                                        if (isNaN(disc) || disc < 0 || disc > 100) {
+                                            alert('錯誤：年繳優惠折扣率必須介於 0 到 100 之間');
+                                            discInput.focus();
+                                            return;
+                                        }
+                                        
                                         startTransition(async () => {
-                                           await updateSystemConfig({ fixedMonthlyRent: parseInt(rent), yearlyDiscountRate: parseInt(disc) });
+                                           await updateSystemConfig({ fixedMonthlyRent: rent, yearlyDiscountRate: disc });
                                            alert('🚀 全域核心參數已成功同步至分佈式網路！');
                                         });
                                      }}
@@ -1215,123 +1438,116 @@ export default function SuperAdminClient({
 
         </div>
       
-           {activeTab === 'b2b_payment' && (
-              <div className="p-16 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl">
-                 <div className="mb-12">
-                    <h3 className="text-3xl font-black text-slate-900 italic tracking-tighter">超級管理員 B2B 收款設定</h3>
-                    <p className="text-sm font-bold text-slate-400 mt-2 tracking-widest uppercase">System B2B Payment Gateway</p>
+           {activeTab === 'b2b_payment' && b2bPayment && b2bPayment.serviceMapping && (
+              <div className="p-16 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto space-y-12">
+                 <div className="text-center space-y-4 mb-16">
+                    <h3 className="text-4xl font-black text-slate-900 italic tracking-tighter">超級管理員 B2B 收款與分流設定</h3>
+                    <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">Payment Gateway & Service Routing</p>
                  </div>
                  
-                 <div className="space-y-8">
-                    <div className="bg-white p-10 rounded-[30px] border-2 border-slate-100 shadow-2xl relative overflow-hidden">
-                       <h4 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                          <span className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl">💳</span>
-                          啟用之收款方式
+                 <div className="space-y-12">
+                    {/* 支付通道憑證設定 */}
+                    <div className="bg-slate-900 p-12 rounded-[50px] shadow-2xl relative overflow-hidden text-white">
+                       <h4 className="text-2xl font-black mb-8 flex items-center gap-4">
+                          <span className="text-3xl">🔐</span> 通道憑證配置 (Gateway Credentials)
                        </h4>
-                       <div className="flex gap-4">
-                          {['creditCard', 'linePay', 'transfer'].map(method => (
-                             <label key={method} className="flex items-center gap-3 cursor-pointer">
-                                <input type="checkbox" className="w-5 h-5 accent-indigo-600 rounded" 
-                                   checked={b2bPayment.enabledMethods.includes(method)}
-                                   onChange={e => {
-                                      const newMethods = e.target.checked 
-                                         ? [...b2bPayment.enabledMethods, method]
-                                         : b2bPayment.enabledMethods.filter((m: string) => m !== method);
-                                      setB2bPayment({...b2bPayment, enabledMethods: newMethods});
-                                   }}
-                                />
-                                <span className="font-bold text-slate-700">
-                                   {method === 'creditCard' ? '信用卡 (ECPay)' : method === 'linePay' ? 'LINE Pay' : '銀行轉帳'}
-                                </span>
-                             </label>
-                          ))}
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {/* ECPay */}
+                          <div className="bg-white/5 p-8 rounded-3xl border border-white/10 space-y-4">
+                             <div className="flex justify-between items-center mb-6">
+                               <h5 className="font-black text-lg italic tracking-widest text-indigo-300">ECPay 綠界科技</h5>
+                               <input type="checkbox" className="w-5 h-5 accent-indigo-500" checked={b2bPayment.thirdParty?.enabled} onChange={e => setB2bPayment({...b2bPayment, thirdParty: {...b2bPayment.thirdParty, enabled: e.target.checked}})} />
+                             </div>
+                             <input type="text" placeholder="Merchant ID" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none" value={b2bPayment.thirdParty?.merchantId || ''} onChange={e => setB2bPayment({...b2bPayment, thirdParty: {...b2bPayment.thirdParty, merchantId: e.target.value}})} />
+                             <input type="text" placeholder="Hash Key" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none" value={b2bPayment.thirdParty?.hashKey || ''} onChange={e => setB2bPayment({...b2bPayment, thirdParty: {...b2bPayment.thirdParty, hashKey: e.target.value}})} />
+                             <input type="text" placeholder="Hash IV" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none" value={b2bPayment.thirdParty?.hashIV || ''} onChange={e => setB2bPayment({...b2bPayment, thirdParty: {...b2bPayment.thirdParty, hashIV: e.target.value}})} />
+                          </div>
+                          
+                          {/* LINE Pay */}
+                          <div className="bg-white/5 p-8 rounded-3xl border border-white/10 space-y-4">
+                             <div className="flex justify-between items-center mb-6">
+                               <h5 className="font-black text-lg italic tracking-widest text-emerald-400">LINE Pay</h5>
+                               <input type="checkbox" className="w-5 h-5 accent-emerald-500" checked={b2bPayment.linePay?.enabled} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, enabled: e.target.checked}})} />
+                             </div>
+                             <input type="text" placeholder="Channel ID" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500/50 outline-none" value={b2bPayment.linePay?.channelId || ''} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelId: e.target.value}})} />
+                             <input type="text" placeholder="Channel Secret" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500/50 outline-none" value={b2bPayment.linePay?.channelSecret || ''} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelSecret: e.target.value}})} />
+                          </div>
+
+                          {/* Bank Transfer */}
+                          <div className="bg-white/5 p-8 rounded-3xl border border-white/10 space-y-4 md:col-span-2">
+                             <div className="flex justify-between items-center mb-6">
+                               <h5 className="font-black text-lg italic tracking-widest text-amber-300">銀行匯款帳戶</h5>
+                               <input type="checkbox" className="w-5 h-5 accent-amber-500" checked={b2bPayment.customTransfer?.enabled} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, enabled: e.target.checked}})} />
+                             </div>
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <input type="text" placeholder="銀行代碼" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500/50 outline-none" value={b2bPayment.customTransfer?.bankCode || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankCode: e.target.value}})} />
+                                <input type="text" placeholder="帳戶名稱" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500/50 outline-none md:col-span-2" value={b2bPayment.customTransfer?.accountName || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountName: e.target.value}})} />
+                                <input type="text" placeholder="銀行帳號" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500/50 outline-none md:col-span-3" value={b2bPayment.customTransfer?.accountNo || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountNo: e.target.value}})} />
+                             </div>
+                          </div>
                        </div>
                     </div>
 
-                    {b2bPayment.enabledMethods.includes('creditCard') && (
-                       <div className="bg-white p-10 rounded-[30px] border-2 border-indigo-100 shadow-xl relative overflow-hidden">
-                          <h4 className="text-xl font-black text-indigo-900 mb-6 flex items-center gap-3">
-                             <span className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-xl text-indigo-500">🔒</span>
-                             ECPay 信用卡設定
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Merchant ID</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-indigo-500/20 transition-all"
-                                   value={b2bPayment.ecpay.merchantId} onChange={e => setB2bPayment({...b2bPayment, ecpay: {...b2bPayment.ecpay, merchantId: e.target.value}})} />
+                    {/* 服務分流設定 */}
+                    <div className="bg-white p-12 rounded-[50px] border-2 border-slate-100 shadow-xl relative">
+                       <h4 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-4">
+                          <span className="text-3xl">🔀</span> 服務分流設定 (Service Routing)
+                       </h4>
+                       <div className="space-y-6">
+                          {[
+                             { id: 'storage', name: '擴充空間方案', icon: '💾' },
+                             { id: 'ai', name: 'AI 引擎方案', icon: '🤖' },
+                             { id: 'rent', name: '宮廟系統租費', icon: '⛩️' }
+                          ].map(service => (
+                             <div key={service.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-slate-50 rounded-3xl border border-slate-100 gap-6">
+                                <div className="flex items-center gap-4">
+                                   <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-slate-100">{service.icon}</div>
+                                   <div>
+                                      <h5 className="font-black text-slate-800 text-lg">{service.name}</h5>
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{service.id}_ROUTING</p>
+                                   </div>
+                                </div>
+                                <div className="flex flex-wrap gap-4">
+                                   {['thirdParty', 'linePay', 'customTransfer'].map(provider => {
+                                      const label = provider === 'thirdParty' ? 'ECPay' : provider === 'linePay' ? 'LINE Pay' : '銀行匯款';
+                                      const isChecked = b2bPayment.serviceMapping[service.id]?.includes(provider);
+                                      return (
+                                         <label key={provider} className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}>
+                                            <input 
+                                              type="checkbox" 
+                                              className="hidden" 
+                                              checked={isChecked}
+                                              onChange={(e) => {
+                                                 const current = b2bPayment.serviceMapping[service.id] || [];
+                                                 const next = e.target.checked ? [...current, provider] : current.filter((p: string) => p !== provider);
+                                                 setB2bPayment({
+                                                    ...b2bPayment,
+                                                    serviceMapping: { ...b2bPayment.serviceMapping, [service.id]: next }
+                                                 });
+                                              }}
+                                            />
+                                            <div className={`w-3 h-3 rounded-full ${isChecked ? 'bg-indigo-500' : 'bg-slate-300'}`}></div>
+                                            <span className="font-black text-xs uppercase tracking-widest">{label}</span>
+                                         </label>
+                                      )
+                                   })}
+                                </div>
                              </div>
-                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Hash Key</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-indigo-500/20 transition-all"
-                                   value={b2bPayment.ecpay.hashKey} onChange={e => setB2bPayment({...b2bPayment, ecpay: {...b2bPayment.ecpay, hashKey: e.target.value}})} />
-                             </div>
-                             <div className="md:col-span-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Hash IV</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-indigo-500/20 transition-all"
-                                   value={b2bPayment.ecpay.hashIV} onChange={e => setB2bPayment({...b2bPayment, ecpay: {...b2bPayment.ecpay, hashIV: e.target.value}})} />
-                             </div>
-                          </div>
+                          ))}
                        </div>
-                    )}
-
-                    {b2bPayment.enabledMethods.includes('linePay') && (
-                       <div className="bg-white p-10 rounded-[30px] border-2 border-green-100 shadow-xl relative overflow-hidden">
-                          <h4 className="text-xl font-black text-green-900 mb-6 flex items-center gap-3">
-                             <span className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-xl">📱</span>
-                             LINE Pay 設定
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Channel ID</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-green-500/20 transition-all"
-                                   value={b2bPayment.linePay.channelId} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelId: e.target.value}})} />
-                             </div>
-                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Channel Secret</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-green-500/20 transition-all"
-                                   value={b2bPayment.linePay.channelSecret} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelSecret: e.target.value}})} />
-                             </div>
-                          </div>
-                       </div>
-                    )}
-
-                    {b2bPayment.enabledMethods.includes('transfer') && (
-                       <div className="bg-white p-10 rounded-[30px] border-2 border-emerald-100 shadow-xl relative overflow-hidden">
-                          <h4 className="text-xl font-black text-emerald-900 mb-6 flex items-center gap-3">
-                             <span className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-xl">🏦</span>
-                             銀行轉帳設定
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">銀行代碼</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-emerald-500/20 transition-all"
-                                   value={b2bPayment.transfer.bankCode} onChange={e => setB2bPayment({...b2bPayment, transfer: {...b2bPayment.transfer, bankCode: e.target.value}})} />
-                             </div>
-                             <div className="md:col-span-2">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">收款帳號</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-emerald-500/20 transition-all"
-                                   value={b2bPayment.transfer.accountNumber} onChange={e => setB2bPayment({...b2bPayment, transfer: {...b2bPayment.transfer, accountNumber: e.target.value}})} />
-                             </div>
-                             <div className="md:col-span-3">
-                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">戶名</label>
-                                <input type="text" className="w-full bg-slate-50 border-0 rounded-2xl px-6 py-5 text-slate-900 font-bold focus:ring-4 focus:ring-emerald-500/20 transition-all"
-                                   value={b2bPayment.transfer.accountName} onChange={e => setB2bPayment({...b2bPayment, transfer: {...b2bPayment.transfer, accountName: e.target.value}})} />
-                             </div>
-                          </div>
-                       </div>
-                    )}
+                    </div>
 
                     <button 
                        onClick={() => {
                           startTransition(async () => {
                              await updateSystemConfig({ b2bPayment });
-                             alert('B2B 收款設定已儲存！');
+                             alert('🚀 B2B 收款與分流設定已成功套用至全系統！');
                           });
                        }}
                        disabled={isPending}
-                       className="w-full py-8 bg-slate-950 text-white rounded-[30px] font-black text-lg uppercase tracking-[0.4em] shadow-xl hover:bg-slate-800 transition-all"
+                       className="w-full py-8 bg-slate-950 text-white rounded-[30px] font-black text-lg uppercase tracking-[0.4em] shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:bg-indigo-600 hover:-translate-y-1 active:translate-y-0 transition-all"
                     >
-                       {isPending ? '儲存中...' : '儲存收款設定'}
+                       {isPending ? '儲存中...' : '儲存分流與收款設定 💾'}
                     </button>
                  </div>
               </div>
@@ -1607,16 +1823,118 @@ export default function SuperAdminClient({
                          </div>
                          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
                             <span className="text-xs font-bold text-slate-400">月租費 (Monthly Rent)</span>
-                            <span className="text-sm font-black text-slate-900">NT$ {viewingAccountDetail.monthlyRent || 0}</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.freeType === 'Permanent' || viewingAccountDetail.monthlyRent === 0 ? '免費' : `NT$ ${viewingAccountDetail.monthlyRent || 0}`}</span>
                          </div>
                          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
                             <span className="text-xs font-bold text-slate-400">建置費 (Setup Fee)</span>
-                            <span className="text-sm font-black text-slate-900">NT$ {viewingAccountDetail.setupFee || 0}</span>
+                            <span className="text-sm font-black text-slate-900">{viewingAccountDetail.freeType === 'Permanent' || viewingAccountDetail.setupFee === 0 ? '免費' : `NT$ ${viewingAccountDetail.setupFee || 0}`}</span>
                          </div>
                          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
                             <span className="text-xs font-bold text-slate-400">建立時間 (Created At)</span>
                             <span className="text-[10px] font-black text-slate-900">{viewingAccountDetail.timestamp ? new Date(viewingAccountDetail.timestamp).toLocaleString() : '未知'}</span>
                          </div>
+
+                         {/* 宮廟獨立雲端儲存數據 */}
+                         <div className="mt-6 pt-4 border-t border-slate-200">
+                            <h4 className="text-xs font-black text-slate-800 uppercase mb-3">宮廟獨立雲端儲存數據</h4>
+                            {(() => {
+                               const storage = templeStorages.find(s => s.templeId === viewingAccountDetail.id);
+                               return storage ? (
+                                  <div className="bg-slate-50 rounded-xl p-4">
+                                     <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs text-slate-500">目前方案: <strong className="text-slate-800">{storage.planName}</strong></span>
+                                        <span className="text-xs font-bold text-slate-700">用量: {storage.isVip ? '無限使用' : `${((storage.usedBytes || 0) / 1e9).toFixed(2)} GB / ${storage.capacityGb || 0} GB`}</span>
+                                     </div>
+                                     {!storage.isVip && (
+                                        <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2 overflow-hidden">
+                                           <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, ((storage.usedBytes || 0) / ((storage.capacityGb || 1) * 1e9)) * 100)}%` }}></div>
+                                        </div>
+                                     )}
+                                  </div>
+                               ) : <p className="text-xs text-slate-400">尚未啟用獨立儲存空間</p>;
+                            })()}
+                            
+                            {/* SuperAdmin 專屬升級介面 */}
+                            <div className="mt-3 flex gap-2 items-center">
+                                  <select 
+                                    className="text-xs border border-slate-200 rounded px-2 py-1 flex-1"
+                                    value={adminUpgradeStoragePlanId}
+                                    onChange={e => setAdminUpgradeStoragePlanId(e.target.value)}
+                                  >
+                                    <option value="">-- 選擇空間方案 --</option>
+                                    {storagePlans.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sizeGb}GB)</option>)}
+                                  </select>
+                                  <button 
+                                    onClick={async () => {
+                                      if (!adminUpgradeStoragePlanId) return alert('請選擇方案');
+                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId);
+                                      const newData = await fetchTempleStorages();
+                                      setTempleStorages(newData);
+                                      setAdminUpgradeStoragePlanId('');
+                                      alert('空間方案已升級');
+                                    }}
+                                    className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-100"
+                                  >套用</button>
+                                  <button 
+                                    onClick={async () => {
+                                      await grantTempleStorageVip(viewingAccountDetail.id);
+                                      const newData = await fetchTempleStorages();
+                                      setTempleStorages(newData);
+                                      alert('已開通免費無限空間 (VIP)');
+                                    }}
+                                    className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100"
+                                  >設為無限免費</button>
+                               </div>
+                         </div>
+
+                         {/* 宮廟 AI 助理數據 */}
+                         <div className="mt-6 pt-4 border-t border-slate-200">
+                            <h4 className="text-xs font-black text-slate-800 uppercase mb-3">宮廟 AI 助理數據</h4>
+                            {(() => {
+                               const ai = allTempleAiUsage.find(a => a.templeId === viewingAccountDetail.id);
+                               return ai ? (
+                                  <div className="bg-slate-50 rounded-xl p-4">
+                                     <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs text-slate-500">目前方案: <strong className="text-slate-800">{ai.planName}</strong></span>
+                                        <span className="text-xs font-bold text-slate-700">用量: {ai.isVip ? '無限使用' : `${ai.usedTokens || 0} / ${ai.monthlyTokenLimit || 0} Tokens`}</span>
+                                     </div>
+                                  </div>
+                               ) : <p className="text-xs text-slate-400">尚未啟用 AI 助理</p>;
+                            })()}
+                            
+                            {/* SuperAdmin 專屬 AI 升級介面 */}
+                            <div className="mt-3 flex gap-2 items-center">
+                                  <select 
+                                    className="text-xs border border-slate-200 rounded px-2 py-1 flex-1"
+                                    value={adminUpgradeAiPlanId}
+                                    onChange={e => setAdminUpgradeAiPlanId(e.target.value)}
+                                  >
+                                    <option value="">-- 選擇 AI 方案 --</option>
+                                    {aiPlans.map(p => <option key={p.id} value={p.id}>{p.name} ({p.tokenLimit} Tokens)</option>)}
+                                  </select>
+                                  <button 
+                                    onClick={async () => {
+                                      if (!adminUpgradeAiPlanId) return alert('請選擇方案');
+                                      await purchaseAiPlanByAdmin(viewingAccountDetail.id, adminUpgradeAiPlanId);
+                                      const newData = await fetchAllTempleAiUsage();
+                                      setAllTempleAiUsage(newData);
+                                      setAdminUpgradeAiPlanId('');
+                                      alert('AI 方案已升級');
+                                    }}
+                                    className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-100"
+                                  >套用</button>
+                                  <button 
+                                    onClick={async () => {
+                                      await grantTempleAiVip(viewingAccountDetail.id);
+                                      const newData = await fetchAllTempleAiUsage();
+                                      setAllTempleAiUsage(newData);
+                                      alert('已開通免費無限 AI (VIP)');
+                                    }}
+                                    className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100"
+                                  >設為無限免費</button>
+                               </div>
+                         </div>
+
                        </>
                     )}
                     

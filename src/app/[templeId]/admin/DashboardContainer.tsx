@@ -222,16 +222,17 @@ export default function DashboardContainer({
         <div className="bg-white/90 backdrop-blur-xl rounded-2xl border border-white/50 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-lg transition-all duration-300 group flex flex-col justify-between">
           <div className="flex justify-between items-start mb-2">
              <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-gray-200 rounded-xl flex items-center justify-center text-slate-600 group-hover:scale-110 transition-transform">☁️</div>
-             <button onClick={() => setShowUpgradeModal(true)} className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded font-black uppercase hover:bg-amber-100 transition-colors">升級容量</button>
           </div>
           <div>
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-xs font-bold text-slate-400">雲端空間使用量</p>
-              <p className="text-xs font-bold text-slate-700">{(storage?.used || 0).toFixed(1)} / {storage?.total || 100} GB</p>
+              <p className="text-xs font-bold text-slate-700">{storage?.isVip ? '免費無限' : `${(storage?.used || 0).toFixed(1)} / ${storage?.total || 100} GB`}</p>
             </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-1000" style={{ width: `${((storage?.used || 0) / (storage?.total || 100)) * 100}%` }}></div>
-            </div>
+            {!storage?.isVip && (
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-1000" style={{ width: `${((storage?.used || 0) / (storage?.total || 100)) * 100}%` }}></div>
+              </div>
+            )}
           </div>
         </div>
 

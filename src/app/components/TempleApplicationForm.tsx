@@ -31,6 +31,9 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
     contactPhone: "",
     freeType: 'Normal' as 'Normal' | 'Trial' | 'Permanent',
     trialMonths: 0,
+    enableAi: true,
+    cloudStorage: '50GB',
+    aiLife: 'Basic'
   });
   const [accountError, setAccountError] = useState('');
 
@@ -224,6 +227,57 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
               </div>
            </div>
         </div>
+
+        
+         {/* Cloud Storage and AI Life Settings */}
+         <div className="pt-6 border-t border-slate-50 space-y-4">
+            <div className="flex items-center gap-2 border-l-4 border-indigo-500 pl-3">
+               <h3 className="text-base font-black text-slate-900 tracking-tighter uppercase italic">4. 附加服務 Additional Services</h3>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+               <div className="relative group">
+                  <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">雲端空間</p>
+                  <select value={form.cloudStorage || '50GB'} onChange={e => setForm({...form, cloudStorage: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
+                     <option value="50GB">50GB 標準版</option>
+                     <option value="100GB">100GB 進階版</option>
+                     <option value="500GB">500GB 專業版</option>
+                     {role === 'super-admin' && <option value="Free">免費 (Free)</option>}
+                  </select>
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
+               </div>
+
+               <div className="relative group">
+                  <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 生活</p>
+                  <select value={form.aiLife || 'Basic'} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
+                     <option value="Basic">基礎版 (Basic)</option>
+                     <option value="Pro">專業版 (Pro)</option>
+                     {role === 'super-admin' && <option value="Free">免費 (Free)</option>}
+                  </select>
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
+               </div>
+            </div>
+         </div>
+
+              {/* AI Assistant Toggle */}
+              <div className="pt-6 border-t border-slate-50">
+                 <div className="flex items-center justify-between p-6 bg-slate-50/50 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm border border-slate-100">🤖</div>
+                       <div>
+                          <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-widest italic">AI 智能香客管家模組</h4>
+                          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">內建自動客服、語意理解與香客自動應答</p>
+                       </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setForm({...form, enableAi: !form.enableAi})}
+                      className={`w-14 h-8 rounded-full transition-colors relative shadow-inner ${form.enableAi ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                    >
+                      <div className={`absolute top-1 left-1 bg-white w-6 h-6 rounded-full shadow-md transition-transform duration-300 ${form.enableAi ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                 </div>
+              </div>
 
         <div className="flex flex-col gap-3 pt-8">
            <button type="submit" disabled={loading} className="w-full py-5 rounded-[24px] font-black text-white bg-slate-900 shadow-xl active:scale-95 transition-all hover:bg-emerald-600 text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">

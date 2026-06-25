@@ -13,9 +13,9 @@ import {
   fetchDistributorCapacity,
   fetchCommissionHistory,
   fetchSalesProfile,
-  fetchSalesProfileById,
-  updateSalesBankAccount,
-  fetchRentPlans
+  fetchRentPlans,
+  requestBonus,
+  fetchSalesBonusRequests
 } from "@/app/actions";
 import { TAIWAN_CITIES } from "@/app/shared-types";
 import TempleApplicationForm from "@/app/components/TempleApplicationForm";
@@ -44,7 +44,7 @@ export default function DistSalesPage() {
   const salesId = params.salesId as string;
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [salesName] = useState("王業務");
+  const [salesName, setSalesName] = useState("");
   const [performance, setPerformance] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
@@ -56,6 +56,10 @@ export default function DistSalesPage() {
   const [profile, setProfile] = useState<any>(null);
   const [rentPlans, setRentPlans] = useState<any[]>([]);
 
+  // Withdrawal States
+  const [bonusRequests, setBonusRequests] = useState<any[]>([]);
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
+
   // Search & Filter States
   const [templeSearch, setTempleSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -65,13 +69,12 @@ export default function DistSalesPage() {
   const [commMonth, setCommMonth] = useState("05");
 
   // Calendar Dynamic States
-  const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1); // 1-indexed
-  const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate());
+  const [calYear, setCalYear] = useState(2026);
+  const [calMonth, setCalMonth] = useState(5); // 1-indexed
+  const [selectedDay, setSelectedDay] = useState<number | null>(5); // Default to highlighted day
 
   // Form States
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
-
 
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [visitForm, setVisitForm] = useState({
@@ -106,45 +109,54 @@ export default function DistSalesPage() {
        });
     });
     return events;
-  }, [visits, applications]);
-
-  const [isEditingBank, setIsEditingBank] = useState(false);
-  const [bankForm, setBankForm] = useState({ bankCode: '', bankName: '', accountName: '', accountNo: '' });
+  }, [visits, applications, salesName]);
 
   const loadData = async () => {
-    const [perf, apps, visitData, toolData, conData, capData, profData, plans] = await Promise.all([
-      fetchSalesPerformance(salesName),
+    const { fetchSalesProfileById } = await import("@/app/actions");
+    const profData = await fetchSalesProfileById(salesId);
+    if (!profData) return;
+    
+    setProfile(profData);
+    setSalesName(profData.name);
+    
+    const currentName = profData.name;
+
+    const [perf, apps, visitData, toolData, conData, capData, plans, bonusReqs] = await Promise.all([
+      fetchSalesPerformance(currentName),
       fetchFreeApplications(),
-      fetchVisitationRecords(salesName),
+      fetchVisitationRecords(currentName),
       fetchSalesTools(),
-      fetchEContracts(salesName),
-      fetchDistributorCapacity(),
-      fetchSalesProfileById(salesId),
-      fetchRentPlans()
+      fetchEContracts(currentName),
+      fetchDistributorCapacity(distId),
+      fetchRentPlans(),
+      fetchSalesBonusRequests(currentName)
     ]);
+    
     setPerformance(perf);
     setApplications(apps.filter((a: any) => a.salesId === salesId).sort((a: any, b: any) => b.timestamp.localeCompare(a.timestamp)));
     setVisits(visitData);
     setTools(toolData);
     setContracts(conData);
     setCapacity(capData);
-    setProfile(profData);
-    if (profData?.bankAccount) setBankForm(profData.bankAccount);
     setRentPlans(plans);
+    setBonusRequests(bonusReqs);
   };
 
   const loadCommission = async () => {
+    if (!salesId) return;
     const commData = await fetchCommissionHistory(salesId, commYear, commMonth);
     setCommission(commData);
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [salesId]);
 
   useEffect(() => {
-    loadCommission();
-  }, [commYear, commMonth]);
+    if (salesName) {
+      loadCommission();
+    }
+  }, [commYear, commMonth, salesName]);
 
   // Calendar Logic
   const calendarDays = useMemo(() => {
@@ -186,6 +198,13 @@ export default function DistSalesPage() {
 
 
 
+  const handleVisitSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await addVisitationRecord({ ...visitForm, salesName });
+    setIsVisitModalOpen(false);
+    loadData();
+  };
+
   const handleRequestWithdrawal = async () => {
     if (!commission || !commission.balance || commission.balance <= 0) {
       alert("目前無可用餘額提領！");
@@ -207,24 +226,6 @@ export default function DistSalesPage() {
       alert("提領申請已送出！");
       loadData();
     }
-  };
-
-  const handleSaveBankInfo = async () => {
-    const res = await updateSalesBankAccount(salesId, bankForm);
-    if (res.success) {
-      alert("銀行帳戶更新成功！");
-      setIsEditingBank(false);
-      loadData();
-    } else {
-      alert("更新失敗：" + res.error);
-    }
-  };
-
-  const handleVisitSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await addVisitationRecord({ ...visitForm, salesName });
-    setIsVisitModalOpen(false);
-    loadData();
   };
 
   const handleSignContract = async () => {
@@ -351,12 +352,12 @@ export default function DistSalesPage() {
                     <div>
                        <div className="flex items-center gap-3">
                           <h4 className="font-black text-slate-900">{app.templeName}</h4>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase ${app.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : app.status === 'UnderReview' ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' : app.status === 'PendingPayment' ? 'bg-purple-50 text-purple-600 border border-purple-100 animate-pulse' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
-                             {app.status === 'Active' ? '已開通營運' : app.status === 'UnderReview' ? '待經銷商核款' : app.status === 'PendingPayment' ? '待付開辦費' : '待經銷商審核'}
-                          </span>
-                          {app.trialMonths > 0 && app.status === 'Active' && (
+                           <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase ${app.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : app.status === 'UnderReview' ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' : app.status === 'PendingPayment' ? 'bg-purple-50 text-purple-600 border border-purple-100 animate-pulse' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
+                              {app.status === 'Active' ? '已開通營運' : app.status === 'UnderReview' ? '待經銷商核款' : app.status === 'PendingPayment' ? '待付開辦費' : '待經銷商審核'}
+                           </span>
+                           {app.trialMonths > 0 && app.status === 'Active' && (
                              <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2 py-0.5 rounded-full text-[9px] font-black ml-2 shadow-sm">免費體驗中</span>
-                          )}
+                           )}
                        </div>
                        <div className="flex items-center gap-2 mt-0.5">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.chairpersonName}</p>
@@ -411,19 +412,8 @@ export default function DistSalesPage() {
              </div>
              <button 
                onClick={() => {
-                 const today = new Date();
-                 const selectedDate = new Date(calYear, calMonth - 1, selectedDay || 1);
-                 
-                 // If the computed date is in the past, default to today
-                 let finalDateStr = '';
-                 if (selectedDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
-                    finalDateStr = today.toISOString().split('T')[0];
-                 } else {
-                    const d = selectedDay || 1;
-                    finalDateStr = `${calYear}-${calMonth.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-                 }
-                 
-                 setVisitForm({...visitForm, date: finalDateStr});
+                 const d = selectedDay || 1;
+                 setVisitForm({...visitForm, date: `${calYear}-${calMonth.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`});
                  setIsVisitModalOpen(true);
                }}
                className="bg-emerald-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-emerald-100"
@@ -439,30 +429,18 @@ export default function DistSalesPage() {
              {calendarDays.map((day, i) => {
                const isSelected = selectedDay === day;
                const colorClass = day ? getDayColor(day) : '';
-               
-               // Check if date is in the past
-               const today = new Date();
-               const isPast = day && (
-                  calYear < today.getFullYear() || 
-                  (calYear === today.getFullYear() && calMonth < today.getMonth() + 1) || 
-                  (calYear === today.getFullYear() && calMonth === today.getMonth() + 1 && day < today.getDate())
-               );
-
                return (
                  <div 
                    key={i} 
-                   onClick={() => {
-                     if (day && !isPast) setSelectedDay(day);
-                   }}
+                   onClick={() => day && setSelectedDay(day)}
                    className={`h-11 rounded-xl flex items-center justify-center font-black text-sm transition-all relative ${
                      day === null ? 'opacity-0' : 
-                     isPast ? 'text-slate-300 bg-slate-50 opacity-50 cursor-not-allowed' :
                      isSelected ? 'bg-slate-900 text-white shadow-xl scale-110 z-10' : 
-                     colorClass ? `${colorClass} shadow-md cursor-pointer` : 'text-slate-700 bg-slate-50 hover:bg-emerald-50 cursor-pointer'
+                     colorClass ? `${colorClass} shadow-md` : 'text-slate-700 bg-slate-50 hover:bg-emerald-50 cursor-pointer'
                    }`}
                  >
                    {day}
-                   {colorClass && !isSelected && !isPast && (
+                   {colorClass && !isSelected && (
                       <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white bg-inherit"></div>
                    )}
                  </div>
@@ -612,29 +590,6 @@ export default function DistSalesPage() {
           </div>
        </div>
 
-       {commission?.pendingRequests?.length > 0 && (
-         <div className="space-y-4">
-            <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
-               <span className="w-1 h-4 bg-orange-500 rounded-full"></span>
-               等待提領審核區
-            </h3>
-            <div className="space-y-4">
-               {commission.pendingRequests.map((req: any) => (
-                  <div key={req.id} className="bg-orange-50 p-6 rounded-[32px] shadow-sm border border-orange-100 flex justify-between items-center">
-                     <div className="flex items-center gap-5">
-                        <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-sm">⏳</div>
-                        <div>
-                           <h4 className="font-black text-slate-900">審核中</h4>
-                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{req.date} | 申請提領</p>
-                        </div>
-                     </div>
-                     <span className="text-lg font-black text-orange-600">-${req.amount.toLocaleString()}</span>
-                  </div>
-               ))}
-            </div>
-         </div>
-       )}
-
        <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
              <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
@@ -657,6 +612,40 @@ export default function DistSalesPage() {
              ))}
           </div>
        </div>
+
+       {/* Withdrawal Records */}
+       <div className="space-y-4 pt-4">
+           <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
+              <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
+              提領申請紀錄
+           </h3>
+           <div className="space-y-4">
+              {bonusRequests.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 font-bold bg-white rounded-[40px] border border-slate-100">尚無提領紀錄</div>
+              ) : bonusRequests.map((req: any) => (
+                 <div key={req.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom-2">
+                    <div className="flex justify-between items-center">
+                       <div>
+                          <p className="text-[10px] text-slate-400 font-bold tracking-widest">{req.date}</p>
+                          <p className="text-lg font-black text-slate-900">${req.amount.toLocaleString()}</p>
+                       </div>
+                       <div>
+                          {req.status === 'Verified' || req.status === 'Approved' ? (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-black uppercase">已匯款</span>
+                          ) : (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full font-black uppercase">審核中</span>
+                          )}
+                       </div>
+                    </div>
+                    {(req.status === 'Verified' || req.status === 'Approved') && req.receiptUrl && (
+                       <button onClick={() => setViewingReceiptUrl(req.receiptUrl)} className="w-full py-3 bg-slate-50 text-slate-600 rounded-[20px] text-[10px] font-black tracking-widest hover:bg-slate-100 transition-all">
+                          🖼️ 查看匯款憑證
+                       </button>
+                    )}
+                 </div>
+              ))}
+           </div>
+        </div>
     </div>
   );
 
@@ -738,65 +727,6 @@ export default function DistSalesPage() {
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">登入帳號</p>
                 <p className="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{profile?.account}</p>
              </div>
-          </div>
-
-          {/* Bank Account Section */}
-          <div className="space-y-4 pt-6 border-t border-slate-100">
-             <div className="flex justify-between items-center px-2">
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                   <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
-                   提領帳戶設定
-                </h3>
-                {!isEditingBank && (
-                  <button onClick={() => setIsEditingBank(true)} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl">編輯</button>
-                )}
-             </div>
-
-             {isEditingBank ? (
-                <div className="bg-slate-50 p-6 rounded-[32px] space-y-4">
-                   <div className="space-y-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">銀行代碼</p>
-                      <input type="text" value={bankForm.bankCode} onChange={e => setBankForm({...bankForm, bankCode: e.target.value})} className="w-full bg-white rounded-2xl px-4 py-3 text-sm font-black outline-none border border-slate-200 focus:border-emerald-500" placeholder="例: 808" />
-                   </div>
-                   <div className="space-y-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">銀行名稱</p>
-                      <input type="text" value={bankForm.bankName} onChange={e => setBankForm({...bankForm, bankName: e.target.value})} className="w-full bg-white rounded-2xl px-4 py-3 text-sm font-black outline-none border border-slate-200 focus:border-emerald-500" placeholder="例: 玉山銀行" />
-                   </div>
-                   <div className="space-y-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">戶名</p>
-                      <input type="text" value={bankForm.accountName} onChange={e => setBankForm({...bankForm, accountName: e.target.value})} className="w-full bg-white rounded-2xl px-4 py-3 text-sm font-black outline-none border border-slate-200 focus:border-emerald-500" placeholder="例: 王大明" />
-                   </div>
-                   <div className="space-y-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">銀行帳號</p>
-                      <input type="text" value={bankForm.accountNo} onChange={e => setBankForm({...bankForm, accountNo: e.target.value})} className="w-full bg-white rounded-2xl px-4 py-3 text-sm font-black outline-none border border-slate-200 focus:border-emerald-500" placeholder="輸入帳號" />
-                   </div>
-                   <div className="grid grid-cols-2 gap-4 pt-4">
-                      <button onClick={() => { setIsEditingBank(false); if(profile?.bankAccount) setBankForm(profile.bankAccount); }} className="py-4 bg-slate-200 text-slate-600 rounded-2xl font-black text-xs">取消</button>
-                      <button onClick={handleSaveBankInfo} className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs shadow-lg shadow-emerald-500/20">儲存帳戶</button>
-                   </div>
-                </div>
-             ) : (
-                <div className="bg-slate-50 p-6 rounded-[32px] space-y-4">
-                   {profile?.bankAccount?.accountNo ? (
-                      <>
-                         <div className="flex justify-between items-center">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">銀行名稱</p>
-                            <p className="text-sm font-black text-slate-900">{profile.bankAccount.bankCode} {profile.bankAccount.bankName}</p>
-                         </div>
-                         <div className="flex justify-between items-center">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">戶名</p>
-                            <p className="text-sm font-black text-slate-900">{profile.bankAccount.accountName}</p>
-                         </div>
-                         <div className="flex justify-between items-center">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">帳號</p>
-                            <p className="text-sm font-black text-slate-900 tracking-wider">{profile.bankAccount.accountNo}</p>
-                         </div>
-                      </>
-                   ) : (
-                      <div className="py-8 text-center text-slate-400 font-bold text-sm">尚未設定銀行帳戶</div>
-                   )}
-                </div>
-             )}
           </div>
           <button className="w-full py-6 bg-rose-50 text-rose-600 rounded-[32px] font-black text-sm active:scale-95 hover:bg-rose-100 transition-all tracking-widest uppercase">登出系統</button>
        </div>
@@ -900,7 +830,6 @@ export default function DistSalesPage() {
                       type="date" 
                       value={visitForm.date} 
                       onChange={e => setVisitForm({...visitForm, date: e.target.value})} 
-                      min={new Date().toISOString().split('T')[0]}
                       className="app-input-v6" 
                     />
                  </div>
@@ -1156,6 +1085,14 @@ export default function DistSalesPage() {
           </div>
        )}
     
+    {viewingReceiptUrl && (
+       <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4" onClick={() => setViewingReceiptUrl(null)}>
+          <div className="bg-white p-4 rounded-[40px] max-w-lg w-full" onClick={e => e.stopPropagation()}>
+             <img src={viewingReceiptUrl} alt="Receipt" className="w-full h-auto rounded-[30px]" />
+             <button onClick={() => setViewingReceiptUrl(null)} className="w-full mt-4 py-4 bg-slate-100 text-slate-600 rounded-full text-xs font-black hover:bg-slate-200 transition-all">關閉</button>
+          </div>
+       </div>
+    )}
 </div>
   );
 }

@@ -1,5 +1,5 @@
-// @ts-nocheck
 "use client";
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { loginAccount } from '@/app/actions';
 
@@ -20,11 +20,17 @@ export default function LoginPage() {
     setErrorMsg("");
     const formData = new FormData(e.currentTarget);
 
-    const res = await loginAccount(formData);
-    if (res.success) {
-      window.location.href = res.redirectPath || '/admin';
-    } else {
-      setErrorMsg(res.error || "登入失敗");
+    try {
+      const res = await loginAccount(formData);
+      if (res.success) {
+        window.location.href = res.redirectPath || '/admin';
+      } else {
+        setErrorMsg(res.error || "登入失敗");
+        setIsSubmitting(false);
+      }
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      setErrorMsg("系統發生錯誤：" + (err.message || String(err)));
       setIsSubmitting(false);
     }
   };

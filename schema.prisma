@@ -37,6 +37,7 @@ model Temple {
   events      Event[]
   lampCategories LampCategory[]
   queueEvents QueueEvent[]
+  adminNotifs AdminNotification[]
 }
 
 /// 系統人員 (宮廟管理員 / 經銷商 / 超級管理員)
@@ -78,6 +79,7 @@ model Guest {
   lampRecords   LampRecord[]
   eventRegs     EventRegistration[]
   queueTickets  QueueTicket[]
+  adminNotifs   AdminNotification[]
 }
 
 // ---------------------------------------------------------------------
@@ -97,6 +99,7 @@ model Appointment {
   paymentMethod String?  // 'Cash', 'LinePayApi', 'ECPay'
   paymentStatus String   @default("Pending") // 'Pending', 'Paid', 'Failed', 'Refunded'
   paymentRef    String?  // 交易序號
+  paymentProofUrl String? // 信眾上傳的匯款截圖
   status        String   @default("Pending") // 'Pending', 'Confirmed', 'Completed', 'Cancelled'
   createdAt     DateTime @default(now())
 
@@ -133,6 +136,7 @@ model LampRecord {
   actualPrice   Int      @default(0)
   paymentMethod String?
   paymentStatus String   @default("Pending")
+  paymentProofUrl String? // 信眾上傳的匯款截圖
   status        String   @default("Pending") // 'Pending', 'Active', 'Expired'
   createdAt     DateTime @default(now())
 
@@ -170,6 +174,7 @@ model EventRegistration {
   actualPrice   Int      @default(0)
   paymentMethod String?
   paymentStatus String   @default("Pending")
+  paymentProofUrl String? // 信眾上傳的匯款截圖
   createdAt     DateTime @default(now())
 
   event         Event    @relation(fields: [eventId], references: [id])
@@ -204,4 +209,23 @@ model QueueTicket {
 
   queueEvent  QueueEvent @relation(fields: [eventId], references: [id])
   guest       Guest      @relation(fields: [guestId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 系統通知 (Admin Notifications)
+// ---------------------------------------------------------------------
+
+/// 廟方後台通知 (左上角鈴鐺)
+model AdminNotification {
+  id          String   @id @default(cuid())
+  templeId    String
+  guestId     String?  // 若是信眾觸發的事件，可綁定
+  category    String   // 'GENERAL' (一般), 'PENDING_REVIEW' (待確認), 'IMPORTANT' (重要)
+  message     String   // 通知文字
+  isRead      Boolean  @default(false)
+  linkPath    String?  // 點擊後跳轉的路徑
+  createdAt   DateTime @default(now())
+
+  temple      Temple   @relation(fields: [templeId], references: [id])
+  guest       Guest?   @relation(fields: [guestId], references: [id])
 }
