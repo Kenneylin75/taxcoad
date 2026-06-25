@@ -1776,10 +1776,20 @@ let db_config = initGlobal('db_config', {
     templeRentRates: [15, 12, 10]
   },
   distributorPlans: [
-    { id: 'PLAN-A', name: '標準代理方案', price: 1600000, durationYears: 2, nodes: 100, color: 'indigo' },
-    { id: 'PLAN-B', name: '區域旗艦方案', price: 3200000, durationYears: 4, nodes: 250, color: 'emerald' },
-    { id: 'PLAN-C', name: '全球戰略方案', price: 8000000, durationYears: 10, nodes: 1000, color: 'slate' }
+    { id: 'PLAN-A', name: '標準經銷方案', price: 1600000, durationYears: 2, nodes: 100, color: 'indigo' },
+    { id: 'PLAN-B', name: '菁英經銷方案', price: 3200000, durationYears: 4, nodes: 250, color: 'emerald' },
+    { id: 'PLAN-C', name: '企業戰略方案', price: 8000000, durationYears: 10, nodes: 1000, color: 'slate' }
   ],
+  b2bPayment: {
+    thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
+    linePay: { enabled: false, channelId: '', channelSecret: '' },
+    customTransfer: { enabled: true, bankCode: '808', accountName: '天首科技有限公司', accountNo: '808-1234-5678-901' },
+    serviceMapping: {
+      'new-temple': ['customTransfer'],
+      'monthly-rent': ['thirdParty', 'customTransfer'],
+      'distributor-auth': ['customTransfer']
+    }
+  },
   aiEndpoints: {
     ocrApiUrl: '',
     ocrApiKey: '',
