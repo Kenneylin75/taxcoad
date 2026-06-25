@@ -927,18 +927,18 @@ export default function SuperAdminClient({
                             {aiModels.map((model, i) => (
                                <div key={i} className="flex flex-col md:flex-row gap-4 items-center bg-white p-3 rounded-xl border border-slate-100 hover:border-indigo-100 transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
                                  <div className="w-full md:w-1/3">
-                                   <input type="text" value={model.name} onChange={e => {
+                                   <input type="text" value={model.name || ''} onChange={e => {
                                      const copy = [...aiModels]; copy[i].name = e.target.value; setAiModels(copy);
                                    }} placeholder="模型名稱 (e.g. Claude 3 Opus)" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:bg-white transition-all" />
                                  </div>
                                  <div className="w-full md:w-1/2">
-                                   <input type="password" value={model.apiKey} onChange={e => {
+                                   <input type="password" value={model.apiKey || ''} onChange={e => {
                                      const copy = [...aiModels]; copy[i].apiKey = e.target.value; setAiModels(copy);
                                    }} placeholder="API Key" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:bg-white transition-all" />
                                  </div>
                                  <div className="w-full md:w-auto flex justify-end">
                                    <label className="relative inline-flex items-center cursor-pointer">
-                                     <input type="checkbox" className="sr-only peer" checked={model.isEnabled} onChange={e => {
+                                     <input type="checkbox" className="sr-only peer" checked={!!model.isEnabled} onChange={e => {
                                        const copy = [...aiModels]; copy[i].isEnabled = e.target.checked; setAiModels(copy);
                                      }} />
                                      <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
@@ -1503,7 +1503,7 @@ export default function SuperAdminClient({
                                 <div className="flex justify-between items-center mb-6">
                                   <h5 className="font-black text-lg italic tracking-widest text-indigo-500">ECPay 綠界科技</h5>
                                   <label className="relative inline-flex items-center cursor-pointer">
-                                     <input type="checkbox" className="sr-only peer" checked={b2bPayment.thirdParty?.enabled} onChange={e => setB2bPayment({...b2bPayment, thirdParty: {...b2bPayment.thirdParty, enabled: e.target.checked}})} />
+                                     <input type="checkbox" className="sr-only peer" checked={!!b2bPayment.thirdParty?.enabled} onChange={e => setB2bPayment({...b2bPayment, thirdParty: {...b2bPayment.thirdParty, enabled: e.target.checked}})} />
                                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
                                   </label>
                                 </div>
@@ -1517,7 +1517,7 @@ export default function SuperAdminClient({
                                 <div className="flex justify-between items-center mb-6">
                                   <h5 className="font-black text-lg italic tracking-widest text-emerald-500">LINE Pay</h5>
                                   <label className="relative inline-flex items-center cursor-pointer">
-                                     <input type="checkbox" className="sr-only peer" checked={b2bPayment.linePay?.enabled} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, enabled: e.target.checked}})} />
+                                     <input type="checkbox" className="sr-only peer" checked={!!b2bPayment.linePay?.enabled} onChange={e => setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, enabled: e.target.checked}})} />
                                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                                   </label>
                                 </div>
@@ -1530,7 +1530,7 @@ export default function SuperAdminClient({
                                 <div className="flex justify-between items-center mb-6">
                                   <h5 className="font-black text-lg italic tracking-widest text-amber-500">銀行匯款帳戶</h5>
                                   <label className="relative inline-flex items-center cursor-pointer">
-                                     <input type="checkbox" className="sr-only peer" checked={b2bPayment.customTransfer?.enabled} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, enabled: e.target.checked}})} />
+                                     <input type="checkbox" className="sr-only peer" checked={!!b2bPayment.customTransfer?.enabled} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, enabled: e.target.checked}})} />
                                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
                                   </label>
                                 </div>
@@ -1566,7 +1566,7 @@ export default function SuperAdminClient({
                                 <div className="flex flex-wrap gap-4">
                                    {['thirdParty', 'linePay', 'customTransfer'].map(provider => {
                                       const label = provider === 'thirdParty' ? 'ECPay' : provider === 'linePay' ? 'LINE Pay' : '銀行匯款';
-                                      const isChecked = b2bPayment.serviceMapping[service.id]?.includes(provider);
+                                      const isChecked = !!b2bPayment.serviceMapping[service.id]?.includes(provider);
                                       return (
                                          <label key={provider} className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}>
                                             <input 
