@@ -2352,7 +2352,7 @@ export async function submitFreeAccountApplication(data: any) {
   const templeNo = (gStore.db_temples || db_temples).length + 1;
 
       const newTemple = {
-      id: 	emple-,
+      id: `temple-${Math.random().toString(36).substring(2, 10)}`,
       templeNo,
       ...formData,
       paymentCycle: paymentCycle || 'Monthly',
