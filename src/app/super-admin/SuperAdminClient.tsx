@@ -1064,13 +1064,13 @@ export default function SuperAdminClient({
                                     <td className="px-6 py-5">
                                        <div className="flex justify-between items-end mb-1.5">
                                           <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{u.isVip ? '無限制' : 'Usage'}</span>
-                                          <span className={	ext-[10px] font-black tracking-widest }>
-                                             {u.isVip ? '∞' : ${u.usedCount} / }
+                                          <span className={`text-[10px] font-black tracking-widest ${usagePercent > 90 ? 'text-rose-500' : 'text-indigo-500'}`}>
+                                             {u.isVip ? '∞' : `${u.usedCount} / ${u.chatLimit}`}
                                           </span>
                                        </div>
                                        {!u.isVip && (
                                           <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                             <div className={h-full rounded-full transition-all duration-1000 } style={{ width: ${usagePercent}% }}></div>
+                                             <div className={`h-full rounded-full transition-all duration-1000 ${usagePercent > 90 ? 'bg-rose-500' : usagePercent > 70 ? 'bg-amber-400' : 'bg-indigo-400'}`} style={{ width: `${usagePercent}%` }}></div>
                                           </div>
                                        )}
                                     </td>
@@ -1079,7 +1079,7 @@ export default function SuperAdminClient({
                                        <button onClick={async () => {
                                           await grantTempleAiVip(u.templeId, !u.isVip);
                                           fetchAllTempleAiUsage().then(setAllTempleAiUsage);
-                                       }} className={px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all active:scale-95 }>
+                                       }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all active:scale-95 ${u.isVip ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700' : 'bg-slate-800 border-slate-800 text-white shadow hover:bg-indigo-600 hover:border-indigo-600'}`}>
                                           {u.isVip ? '取消特權 (Revoke)' : '✨ 設為無限免費'}
                                        </button>
                                     </td>
