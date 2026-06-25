@@ -2325,7 +2325,7 @@ export async function fetchSystemConfig() {
   const gStore = globalThis as any;
   const config = gStore.db_config || db_config;
   
-  if (!config.b2bPayment) {
+  if (!config.b2bPayment || !config.b2bPayment.thirdParty) {
     config.b2bPayment = {
       thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
       linePay: { enabled: false, channelId: '', channelSecret: '' },
