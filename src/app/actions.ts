@@ -2322,7 +2322,24 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
 export async function fetchSyncQueue() { return [...db_sync_queue]; }
 
 export async function fetchSystemConfig() {
-  return { ...db_config };
+  const gStore = globalThis as any;
+  const config = gStore.db_config || db_config;
+  
+  if (!config.b2bPayment) {
+    config.b2bPayment = {
+      thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
+      linePay: { enabled: false, channelId: '', channelSecret: '' },
+      customTransfer: { enabled: true, bankCode: '808', accountName: '天首科技有限公司', accountNo: '808-1234-5678-901' },
+      serviceMapping: {
+        'new-temple': ['customTransfer'],
+        'monthly-rent': ['thirdParty', 'customTransfer'],
+        'distributor-auth': ['customTransfer']
+      }
+    };
+    gStore.db_config = config;
+  }
+  
+  return { ...config };
 }
 
 export async function updateSystemConfig(data: any) {
