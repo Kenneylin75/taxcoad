@@ -2015,7 +2015,7 @@ export async function fetchTempleStorages() {
   });
 }
 
-export async function upgradeTempleStorage(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly') {
+export async function upgradeTempleStorage(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly', isManualGrant: boolean = false) {
   return withTempleSession(templeId, true, async (client) => {
     if (!client) {
       const plan = db_storage_plans.find((p: any) => p.id === planId);
@@ -2025,20 +2025,22 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
-      const adminWallet = db_wallets.find(w => w.role === 'SuperAdmin');
-      if (adminWallet) {
-        adminWallet.balance += finalAmount;
-      }
+      if (!isManualGrant) {
+        const adminWallet = db_wallets.find(w => w.role === 'SuperAdmin');
+        if (adminWallet) {
+          adminWallet.balance += finalAmount;
+        }
 
-      const temple = db_temples.find(t => t.id === templeId);
-      db_finance_records.unshift({
-        id: `F-${Date.now()}`,
-        type: 'INCOME',
-        category: 'SPACE_UPGRADE',
-        amount: finalAmount,
-        source: `${temple?.templeName || '宮廟'}-升級空間 ${plan.sizeGb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`,
-        date: new Date().toISOString().split('T')[0]
-      });
+        const temple = db_temples.find(t => t.id === templeId);
+        db_finance_records.unshift({
+          id: `F-${Date.now()}`,
+          type: 'INCOME',
+          category: 'SPACE_UPGRADE',
+          amount: finalAmount,
+          source: `${temple?.templeName || '宮廟'}-升級空間 ${plan.sizeGb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`,
+          date: new Date().toISOString().split('T')[0]
+        });
+      }
 
       let storage = db_temple_storages.find(s => s.templeId === templeId);
       if (!storage) {
@@ -2066,18 +2068,21 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.price_monthly * priceFactor);
 
-      await client.query(
-        `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, $3, $4) 
-         ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance`,
-        ['SuperAdmin', '超級管理員', finalAmount]
-      );
-
       const templeRes = await client.query('SELECT * FROM temples WHERE id = $1', [templeId]);
       const temple = templeRes.rows[0];
-      await client.query(
-        'INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)',
-        [temple?.temple_name || '宮廟', `升級空間 ${plan.size_gb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`, finalAmount, 100, '超級管理員']
-      );
+
+      if (!isManualGrant) {
+        await client.query(
+          `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, $3, $4) 
+           ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance`,
+          ['SuperAdmin', '超級管理員', finalAmount]
+        );
+
+        await client.query(
+          'INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)',
+          [temple?.temple_name || '宮廟', `升級空間 ${plan.size_gb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`, finalAmount, 100, '超級管理員']
+        );
+      }
 
       const allocatedBytes = plan.size_gb * 1024 * 1024 * 1024;
       await client.query(
@@ -2622,12 +2627,14 @@ export async function fetchAllAccountsForAdmin() {
   return accounts.reverse();
 }
 
+
 export async function fetchSuperSalesAccounts() {
-  return [
-    { id: 'ss-1', name: '超級精英業務', role: 'SuperSales', rates: db_super_sales_overrides['超級精英業務'] || db_config.defaultSuperSalesRates },
-    { id: 'ss-2', name: '王牌開路先鋒', role: 'SuperSales', rates: db_super_sales_overrides['王牌開路先鋒'] || db_config.defaultSuperSalesRates }
-  ];
+  return db_dist_sales.filter(s => s.role === 'SuperSales').map(ss => ({
+    ...ss,
+    rates: db_super_sales_overrides[ss.name] || db_config.defaultSuperSalesRates
+  }));
 }
+
 
 export async function addVisitationRecord(data: any) { 
   db_sales_visits.push({
