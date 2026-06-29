@@ -2110,7 +2110,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3">
                         <div className="text-orange-500 mt-0.5">⚠️</div>
                         <div>
-                          <h5 className="text-sm font-bold text-orange-800 mb-1">注意資料 / 報到須知</h5>
+                          <h5 className="text-sm font-bold text-orange-800 mb-1">注意事項</h5>
                           <p className="text-xs text-orange-700 leading-relaxed whitespace-pre-wrap">{evt.precautions}</p>
                         </div>
                       </div>
