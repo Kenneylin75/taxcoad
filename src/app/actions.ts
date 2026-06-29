@@ -3168,6 +3168,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   }
   
   let totalEarned = 0;
+  let totalRevenue = 0;
   const records: any[] = [];
   
   const overrides = salesName ? db_super_sales_overrides[salesName] : null;
@@ -3187,6 +3188,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     if (monthsDiff === 0) {
       const setupFeeCom = (t.setupFee || 12000) * (setupRate / 100);
       totalEarned += setupFeeCom;
+      totalRevenue += (t.setupFee || 12000);
       records.push({
         id: `${t.id}-setup`, 
         templeName: t.templeName, 
@@ -3212,6 +3214,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     
     const rentCom = (t.monthlyRent || 3600) * (rentPercent / 100);
     totalEarned += rentCom;
+    totalRevenue += (t.monthlyRent || 3600);
     
     records.push({
       id: `${t.id}-rent-${monthsDiff}`, 
@@ -3244,6 +3247,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   
   return {
     totalEarned,
+    totalRevenue,
     balance: wallet ? wallet.balance : totalEarned, 
     totalWithdrawn: 0,
     records,

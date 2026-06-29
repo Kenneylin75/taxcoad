@@ -71,7 +71,7 @@ export default function SuperAdminClient({
   const [logUserFilter, setLogUserFilter] = useState('');
   const [logActionFilter, setLogActionFilter] = useState('');
   const [bridgeSearch, setBridgeSearch] = useState('');
-  const [bridgeDateFilter, setBridgeDateFilter] = useState('today');
+  const [bridgeDateFilter, setBridgeDateFilter] = useState('all');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   
   const [isPending, startTransition] = useTransition();
@@ -1305,6 +1305,27 @@ export default function SuperAdminClient({
                  );
               };
 
+              const handleExportBridge = () => {
+                 let csv = "\\uFEFF節點類型,節點名稱,節點ID,建立日期\\n";
+                 const extract = (node: any) => {
+                    if (filterBridgeNode(node)) {
+                       const nodeDate = node.timestamp ? new Date(node.timestamp).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '未知';
+                       const typeStr = node.type === 'super-sales' ? '超級業務' : node.type === 'distributor' ? '經銷代理商' : node.type === 'dist-sales' ? '經銷業務' : '宮廟';
+                       csv += `${typeStr},${node.name},${node.id},${nodeDate}\\n`;
+                    }
+                    if (node.children) {
+                       node.children.forEach(extract);
+                    }
+                 };
+                 bridgeTree.forEach(extract);
+                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                 const url = window.URL.createObjectURL(blob);
+                 const a = document.createElement('a');
+                 a.href = url;
+                 a.download = `data_bridge_export_${new Date().toISOString().split('T')[0]}.csv`;
+                 a.click();
+              };
+
               return (
               <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
                  <div className="flex justify-between items-end px-4">
@@ -1312,15 +1333,28 @@ export default function SuperAdminClient({
                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] italic">Database Connection</p>
                        <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic">中央數據連動 (Data Bridge)</h3>
                     </div>
-                    <div className="flex items-center gap-4 bg-white p-2 rounded-full border border-slate-200 shadow-sm w-96">
-                       <span className="pl-4 text-slate-400">🔍</span>
-                       <input 
-                         type="text" 
-                         placeholder="搜尋節點名稱 (自動展開)..." 
-                         value={bridgeSearch}
-                         onChange={(e) => setBridgeSearch(e.target.value)}
-                         className="w-full bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-900 outline-none"
-                       />
+                    <div className="flex items-center gap-4">
+                       <select
+                         value={bridgeDateFilter}
+                         onChange={(e) => setBridgeDateFilter(e.target.value)}
+                         className="px-6 py-3 rounded-full border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all shadow-sm"
+                       >
+                         <option value="all">全部日期紀錄</option>
+                         <option value="today">今日新增節點</option>
+                       </select>
+                       <div className="flex items-center gap-4 bg-white p-2 rounded-full border border-slate-200 shadow-sm w-80">
+                          <span className="pl-4 text-slate-400">🔍</span>
+                          <input 
+                            type="text" 
+                            placeholder="搜尋節點名稱 (自動展開)..." 
+                            value={bridgeSearch}
+                            onChange={(e) => setBridgeSearch(e.target.value)}
+                            className="w-full bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-900 outline-none"
+                          />
+                       </div>
+                       <button onClick={handleExportBridge} className="px-6 py-3 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center gap-2">
+                          💾 匯出拓樸
+                       </button>
                     </div>
                  </div>
 

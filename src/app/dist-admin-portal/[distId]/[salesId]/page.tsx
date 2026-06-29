@@ -260,7 +260,7 @@ export default function DistSalesPage() {
         </div>
         <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 relative overflow-hidden group hover:border-emerald-200 transition-all">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">本月業績 ({commMonth}月)</p>
-          <p className="text-4xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">${(commission?.totalEarned || 0).toLocaleString()}</p>
+          <p className="text-4xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">${((commission?.totalRevenue) || commission?.totalEarned || 0).toLocaleString()}</p>
           <p className="text-[10px] font-bold text-emerald-600 mt-2">餘額：${(commission?.balance || 0).toLocaleString()}</p>
         </div>
       </section>
