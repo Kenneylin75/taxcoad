@@ -1980,7 +1980,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                             title: selectedService?.name,
                             category: '預約',
                             price: !slot.price && !selectedService?.price ? '隨喜功德' : `結緣金 ${slot.price || selectedService?.price}`,
-                            description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：\n${slot.description || selectedService?.precautions || '無'}`,
+                            description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：${slot.description || selectedService?.precautions || '無'}`,
                             onConfirm: async () => {
                               const amount = slot.price || selectedService?.price || 0;
                               initiatePayment(amount, 'Booking', async (method: string) => {
