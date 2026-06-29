@@ -1890,12 +1890,7 @@ export interface TempleAiUsage {
 }
 let db_temple_ai_usage: TempleAiUsage[] = initGlobal('db_temple_ai_usage', []);
 
-let db_wallets: any[] = initGlobal('db_wallets', [
-  { role: 'SuperAdmin', id: 'system-hq', name: '系統中央總部', balance: 8540000 },
-  { role: 'Distributor', id: 'dist-1', name: '北區總代理', balance: 250000 },
-  { role: 'DistSales', id: 'sales-1', name: '王業務', balance: 35000 },
-  { role: 'SuperSales', id: 'ss-1', name: '超級精英業務', balance: 180000 }
-]);
+let db_wallets: any[] = initGlobal('db_wallets', []);
 
 let db_super_sales_overrides: Record<string, any> = initGlobal('db_super_sales_overrides', {});
 
