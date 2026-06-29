@@ -168,7 +168,7 @@ export async function loginAccount(formData: FormData) {
       if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
       else {
         success = true;
-        redirectPath = `/dist-admin-portal/${distributor.id}`;
+        redirectPath = `/distributor/${distributor.id}`;
         assignedRole = "Distributor";
       }
     } else {
