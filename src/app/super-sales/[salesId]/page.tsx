@@ -619,7 +619,11 @@ export default function SuperSalesPage() {
              <p className="text-[10px] text-amber-700 font-bold leading-relaxed">安全提示：為了確保全球業務體系的帳戶安全，超級業務員無法自行更改密碼。如需變更，請點擊上方申請，系統將通知超級管理員進行人工審核與重配。</p>
           </div>
           
-          <button className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-sm uppercase tracking-[0.4em] shadow-xl hover:bg-rose-600 transition-all active:scale-95">登出業務終端 ⏻</button>
+          <button onClick={async () => {
+             const { logoutAccount } = await import('@/app/actions');
+             await logoutAccount();
+             window.location.href = '/login';
+          }} className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-sm uppercase tracking-[0.4em] shadow-xl hover:bg-rose-600 transition-all active:scale-95">登出業務終端 ⏻</button>
        </div>
     </div>
   );
