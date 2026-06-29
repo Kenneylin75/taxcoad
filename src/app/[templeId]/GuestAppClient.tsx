@@ -2025,7 +2025,12 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
   };
 
   const renderEvents = () => {
-    const eventsOnSelectedDate = events.filter(e => e.date === selectedDate);
+    // Filter by the selected Year and Month
+    const eventsOnSelectedMonth = events.filter(e => {
+      if (!e.date) return false;
+      const [y, m] = e.date.split('-');
+      return parseInt(y) === currentYear && parseInt(m) === (currentMonth + 1);
+    });
     
     return (
       <div className="min-h-screen pb-32">
@@ -2036,98 +2041,93 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
             <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Active Events</p>
           </div>
 
-          {/* Calendar Widget */}
+          {/* Month Selector */}
           <div className="app-card p-4">
-            <div className="flex justify-between items-center mb-4 px-2">
+            <div className="flex justify-between items-center px-2">
               <button onClick={() => {
                 if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(v => v - 1); }
                 else setCurrentMonth(v => v - 1);
-              }} className="p-2 text-gray-600 active:bg-gray-100 rounded-full">◀</button>
+              }} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">◀</button>
               
               <div className="text-center">
-                <span className="font-bold text-gray-900">{currentYear}年 {currentMonth + 1}月</span>
+                <span className="font-bold text-xl text-gray-900">{currentYear}年 {currentMonth + 1}月</span>
               </div>
 
               <button onClick={() => {
                 if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(v => v + 1); }
                 else setCurrentMonth(v => v + 1);
-              }} className="p-2 text-gray-600 active:bg-gray-100 rounded-full">▶</button>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">
-              {['日', '一', '二', '三', '四', '五', '六'].map(d => (
-                <div key={d} className="text-xs font-bold text-gray-500 py-1">{d}</div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: new Date(currentYear, currentMonth, 1).getDay() }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square"></div>
-              ))}
-              {Array.from({ length: new Date(currentYear, currentMonth + 1, 0).getDate() }).map((_, i) => {
-                const day = i + 1;
-                const dateStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-                const hasEvent = events.some(e => e.date === dateStr);
-                const isSelected = selectedDate === dateStr;
-                
-                const today = new Date();
-                const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-                const isPast = dateStr < todayStr;
-
-                let btnClass = "aspect-square rounded-full flex flex-col items-center justify-center font-bold text-sm transition-all relative ";
-                if (isSelected) {
-                  btnClass += "bg-red-700 text-white shadow-md";
-                  if (hasEvent) btnClass += " ring-2 ring-red-300 ring-offset-2";
-                } else if (isPast) {
-                  btnClass += "text-gray-300";
-                  if (hasEvent) btnClass += " border-2 border-gray-200 text-gray-400";
-                } else {
-                  if (hasEvent) {
-                    btnClass += "text-red-700 bg-red-50 border-2 border-red-500 hover:bg-red-100";
-                  } else {
-                    btnClass += "text-gray-600 hover:bg-gray-100";
-                  }
-                }
-
-                return (
-                  <button 
-                    key={i} 
-                    onClick={() => setSelectedDate(dateStr)}
-                    className={btnClass}
-                  >
-                    <span>{day}</span>
-                    {hasEvent && !isSelected && <div className={`absolute bottom-1 w-1 h-1 rounded-full ${isPast ? 'bg-gray-300' : 'bg-red-500'}`}></div>}
-                  </button>
-                );
-              })}
+              }} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">▶</button>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h5 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">{selectedDate} 活動列表</h5>
-            <div className="grid gap-4">
-              {eventsOnSelectedDate.length > 0 ? eventsOnSelectedDate.map(evt => {
+            <h5 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">{currentYear}年 {currentMonth + 1}月 活動列表</h5>
+            <div className="grid gap-6">
+              {eventsOnSelectedMonth.length > 0 ? eventsOnSelectedMonth.map(evt => {
                 const isRegistered = guestRegistrations.some(r => r.eventId === evt.id && r.status !== 'Cancelled');
+                // Registration stats logic
+                const enrolled = evt.enrolled || 0;
+                const capacity = evt.capacity || 0;
+                const progressPercent = capacity > 0 ? Math.min(100, Math.round((enrolled / capacity) * 100)) : 0;
+                const isFull = capacity > 0 && enrolled >= capacity;
+
                 return (
-                <div key={evt.id} className="app-card overflow-hidden">
-                  <div className="h-48 w-full relative bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center overflow-hidden">
-                    <div className="text-amber-500/20 text-6xl absolute">🏮</div>
+                <div key={evt.id} className="app-card overflow-hidden bg-white shadow-sm border border-gray-100 rounded-3xl">
+                  {/* Image Section */}
+                  <div className="h-56 w-full relative bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center overflow-hidden">
+                    <div className="text-amber-500/20 text-7xl absolute">🏮</div>
                     {evt.imageUrl ? (
                       <img src={evt.imageUrl} className="absolute inset-0 w-full h-full object-cover z-10" onError={(e) => { e.currentTarget.style.display='none'; }} />
                     ) : null}
                   </div>
-                  <div className="p-5 space-y-4">
-                    <div className="flex justify-between items-start">
-                       <h4 className="text-xl font-bold text-gray-900 leading-tight">{evt.title}</h4>
-                       <span className="font-bold text-red-700 bg-red-50 px-2 py-1 rounded text-sm">${evt.price}</span>
-                    </div>
-                    <p className="text-gray-600 text-sm">{evt.description}</p>
-                    <div className="flex items-center justify-between pt-2">
-                       <div className="flex -space-x-2">
-                          {[1,2,3].map(i => <div key={i} className="w-8 h-8 rounded-full border border-white bg-gray-100 flex items-center justify-center text-[10px] text-gray-400">👤</div>)}
+
+                  {/* Content Section */}
+                  <div className="p-5 space-y-5">
+                    {/* Basic Info */}
+                    <div className="flex justify-between items-start gap-3">
+                       <div>
+                         <h4 className="text-xl font-bold text-gray-900 leading-tight mb-1">{evt.title}</h4>
+                         <p className="text-sm font-bold text-red-600">{evt.date}</p>
                        </div>
+                       <span className="font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-xl text-sm border border-red-100 shrink-0">
+                         ${evt.price}
+                       </span>
+                    </div>
+
+                    <p className="text-gray-600 text-sm leading-relaxed">{evt.description}</p>
+
+                    {/* Precautions Block */}
+                    {evt.precautions && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3">
+                        <div className="text-orange-500 mt-0.5">⚠️</div>
+                        <div>
+                          <h5 className="text-sm font-bold text-orange-800 mb-1">注意資料 / 報到須知</h5>
+                          <p className="text-xs text-orange-700 leading-relaxed">{evt.precautions}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Registration Stats */}
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
+                       <div className="flex justify-between text-xs font-bold">
+                         <span className="text-gray-500">能接受 {capacity > 0 ? capacity : '無限制'} 人</span>
+                         <span className={isFull ? "text-red-500" : "text-emerald-600"}>已經報名 {enrolled} 人</span>
+                       </div>
+                       {capacity > 0 && (
+                         <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                           <div className={`h-2.5 rounded-full ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${progressPercent}%` }}></div>
+                         </div>
+                       )}
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-2">
                        <button 
                          onClick={() => {
+                           if (isFull && !isRegistered) {
+                             alert('很抱歉，此活動已額滿！');
+                             return;
+                           }
                            setDetailContent({
                              title: evt.title,
                              category: '活動',
@@ -2152,17 +2152,24 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                            });
                            setIsDetailModalOpen(true);
                          }}
-                         className={isRegistered ? "bg-gray-100 text-gray-400 py-2 px-6 rounded-2xl font-bold text-sm" : "btn-primary py-2 px-6"}
+                         className={`w-full py-3.5 rounded-2xl font-black text-[15px] tracking-wide transition-all ${
+                           isRegistered 
+                             ? "bg-gray-100 text-gray-400 cursor-default" 
+                             : isFull
+                               ? "bg-red-50 text-red-400 border border-red-100 cursor-not-allowed"
+                               : "btn-primary shadow-lg shadow-red-500/30"
+                         }`}
                        >
-                         {isRegistered ? '已報名' : '報名'}
+                         {isRegistered ? '已報名' : isFull ? '已額滿' : '立即報名'}
                        </button>
                     </div>
                   </div>
                 </div>
                 );
               }) : (
-                <div key="no-events" className="py-12 text-center app-card">
-                  <p className="text-gray-500 font-bold text-sm">此日期暫無法會活動</p>
+                <div key="no-events" className="py-16 text-center app-card">
+                  <div className="text-5xl mb-4 opacity-50">🗓️</div>
+                  <p className="text-gray-500 font-bold text-sm">此月份暫無法會活動</p>
                 </div>
               )}
             </div>
