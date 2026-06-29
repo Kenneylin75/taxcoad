@@ -12,7 +12,7 @@ import {
   submitEContract,
   fetchDistributorCapacity,
   fetchCommissionHistory,
-  fetchSalesProfile,
+  fetchSalesProfileById,
   updateSuperSalesBankInfo,
   fetchRentPlans
 } from "@/app/actions";

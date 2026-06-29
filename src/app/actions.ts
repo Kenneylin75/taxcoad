@@ -6276,3 +6276,9 @@ export async function fetchSuperSalesWithdrawals(salesId: string) {
   const allWithdrawals = await fetchAllWithdrawals();
   return allWithdrawals.filter((w: any) => w.userId === salesId);
 }
+
+export async function fetchSalesProfileById(salesId: string) {
+  const sales = db_dist_sales.find(s => s.id === salesId);
+  const dist = db_distributors.find(d => d.id === sales?.distributorId);
+  return { name: sales?.name || '未知', parentDistributor: dist?.name || '未指派', account: sales?.account };
+}
