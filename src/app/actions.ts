@@ -6,7 +6,7 @@ import { withTempleSession, dbQuery } from "../db/db";
 
 // Helper to dynamically get templeId from cookies or fallback
 
-export function getRoleLabel(name: string): string {
+function getRoleLabel(name: string): string {
   if (!name) return '未知人員';
   
   // 1. Check DistSales (SuperSales / DistSales)
