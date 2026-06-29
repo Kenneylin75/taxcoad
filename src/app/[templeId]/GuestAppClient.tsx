@@ -2353,7 +2353,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                       category: '點燈',
                       price: (!item.price || item.price === 0) ? '結緣價：隨喜功德' : `結緣價 $${item.price}`,
                       precautions: item.precautions || '點燈後將於三日內為您上燈，並寄送電子通知。',
-                      description: `服務內容：${item.description || '祈福保平安'}\n天數：${item.durationDays || 365}天`,
+                      description: `服務內容：${item.description || '祈福保平安'}`,
                       onConfirm: async () => {
                         const amt = item.price ?? 0;
                         initiatePayment(amt, 'Lamp', async (method: string) => {
