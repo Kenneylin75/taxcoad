@@ -71,6 +71,7 @@ export default function SuperAdminClient({
   const [logUserFilter, setLogUserFilter] = useState('');
   const [logActionFilter, setLogActionFilter] = useState('');
   const [bridgeSearch, setBridgeSearch] = useState('');
+  const [bridgeDateFilter, setBridgeDateFilter] = useState('today');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   
   const [isPending, startTransition] = useTransition();
@@ -1209,9 +1210,33 @@ export default function SuperAdminClient({
 
            {/* --- 6. DATA BRIDGE --- */}
            {activeTab === 'bridge' && (() => {
+              const todayStr = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+                
               const filterBridgeNode = (node: any): boolean => {
-                 if (!bridgeSearch) return true;
-                 if (node.name?.toLowerCase().includes(bridgeSearch.toLowerCase())) return true;
+                 let dateMatch = true;
+                 if (bridgeDateFilter === 'today') {
+                    if (!node.timestamp) dateMatch = false;
+                    else {
+                       const nodeDateStr = new Date(node.timestamp).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
+                       if (nodeDateStr !== todayStr) dateMatch = false;
+                    }
+                 } else if (bridgeDateFilter !== 'all') {
+                    if (!node.timestamp) dateMatch = false;
+                    else {
+                       const nodeDateStr = new Date(node.timestamp).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replace(/\//g, '-');
+                       if (nodeDateStr !== bridgeDateFilter.replace(/\//g, '-')) dateMatch = false;
+                    }
+                 }
+
+                 let searchMatch = true;
+                 if (bridgeSearch) {
+                    searchMatch = !!node.name?.toLowerCase().includes(bridgeSearch.toLowerCase());
+                 }
+                 
+                 // If node itself matches both, return true
+                 if (dateMatch && searchMatch) return true;
+
+                 // If it doesn't match, check if any child matches
                  if (node.children) {
                     return node.children.some((child: any) => filterBridgeNode(child));
                  }
@@ -1253,6 +1278,7 @@ export default function SuperAdminClient({
                  };
 
                  const isMatch = bridgeSearch && node.name?.toLowerCase().includes(bridgeSearch.toLowerCase());
+                 const nodeDate = node.timestamp ? new Date(node.timestamp).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '未知';
 
                  return (
                     <div key={node.id} className="w-full">
@@ -1263,7 +1289,7 @@ export default function SuperAdminClient({
                        >
                           <div className="w-6 flex justify-center">
                              {hasChildren ? (
-                                <span className="text-slate-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
+                                <span className="text-slate-400 text-xs">{isExpanded ? '🔽' : '▶️'}</span>
                              ) : <span className="w-6"></span>}
                           </div>
                           <span className="text-2xl">{icons[node.type]}</span>

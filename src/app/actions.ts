@@ -6127,41 +6127,69 @@ export async function fetchDataBridgeTree() {
 
   const tree: any[] = [];
 
-  const getTempleNodes = (salesId: string) => {
+  const getTempleNodes = (salesId?: string | null, distributorId?: string | null) => {
     return temples
-      .filter((t: any) => t.salesId === salesId)
-      .map((t: any) => ({ id: t.id, name: t.templeName || t.name, type: 'temple' }));
+      .filter((t: any) => {
+        if (salesId) return t.salesId === salesId && !t.distributorId;
+        if (distributorId) return t.distributorId === distributorId && !t.salesId;
+        return !t.salesId && !t.distributorId;
+      })
+      .map((t: any) => ({ 
+        id: t.id, 
+        name: t.templeName || t.name, 
+        type: 'temple',
+        timestamp: t.timestamp 
+      }));
   };
 
   const getDistSalesNodes = (distId: string) => {
     return distSales
-      .filter((ds: any) => ds.distributorId === distId)
+      .filter((ds: any) => ds.distributorId === distId && ds.role !== 'SuperSales')
       .map((s: any) => ({
         id: s.id,
         name: s.name,
         type: 'dist-sales',
-        children: getTempleNodes(s.id)
+        timestamp: s.timestamp,
+        parentDistId: distId,
+        children: temples.filter((t: any) => t.salesId === s.id).map((t: any) => ({
+          id: t.id,
+          name: t.templeName || t.name,
+          type: 'temple',
+          timestamp: t.timestamp
+        }))
       }));
   };
 
   const getDistributorNodes = (superSalesId: string) => {
     return distributors
       .filter((d: any) => d.superSalesId === superSalesId)
-      .map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        type: 'distributor',
-        children: getDistSalesNodes(d.id)
-      }));
+      .map((d: any) => {
+        const children = [
+          ...getDistSalesNodes(d.id),
+          ...getTempleNodes(null, d.id)
+        ];
+        return {
+          id: d.id,
+          name: d.name,
+          type: 'distributor',
+          timestamp: d.timestamp,
+          children
+        };
+      });
   };
 
   // 1. All SuperSales
   superSales.forEach((ss: any) => {
+    const children = [
+      ...getDistributorNodes(ss.id),
+      ...getTempleNodes(ss.id, null)
+    ];
     tree.push({
       id: ss.id,
       name: ss.name,
       type: 'super-sales',
-      children: getDistributorNodes(ss.id)
+      timestamp: ss.timestamp,
+      children
     });
   });
 
@@ -6172,16 +6200,23 @@ export async function fetchDataBridgeTree() {
       id: 'hq-distributors',
       name: '總部直屬經銷商',
       type: 'super-sales',
-      children: orphanDists.map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        type: 'distributor',
-        children: getDistSalesNodes(d.id)
-      }))
+      children: orphanDists.map((d: any) => {
+        const children = [
+          ...getDistSalesNodes(d.id),
+          ...getTempleNodes(null, d.id)
+        ];
+        return {
+          id: d.id,
+          name: d.name,
+          type: 'distributor',
+          timestamp: d.timestamp,
+          children
+        };
+      })
     });
   }
 
-  // 3. Orphan DistSales (ignoring SuperSales objects which might be in db_dist_sales depending on role, but we filter by role)
+  // 3. Orphan DistSales
   const orphanSales = distSales.filter((s: any) => s.role !== 'SuperSales' && (!s.distributorId || !distributors.find((d: any) => d.id === s.distributorId)));
   if (orphanSales.length > 0) {
     tree.push({
@@ -6192,23 +6227,26 @@ export async function fetchDataBridgeTree() {
         id: s.id,
         name: s.name,
         type: 'dist-sales',
-        children: getTempleNodes(s.id)
+        timestamp: s.timestamp,
+        parentDistId: 'hq',
+        children: temples.filter((t: any) => t.salesId === s.id).map((t: any) => ({
+          id: t.id,
+          name: t.templeName || t.name,
+          type: 'temple',
+          timestamp: t.timestamp
+        }))
       }))
     });
   }
 
   // 4. Orphan Temples
-  const orphanTemples = temples.filter((t: any) => !t.salesId || !distSales.find((s: any) => s.id === t.salesId));
+  const orphanTemples = getTempleNodes(null, null);
   if (orphanTemples.length > 0) {
     tree.push({
       id: 'hq-temples',
       name: '總部直營宮廟',
       type: 'dist-sales',
-      children: orphanTemples.map((t: any) => ({
-        id: t.id,
-        name: t.templeName || t.name || '未知宮廟',
-        type: 'temple'
-      }))
+      children: orphanTemples
     });
   }
 
