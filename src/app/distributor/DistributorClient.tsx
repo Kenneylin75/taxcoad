@@ -94,14 +94,18 @@ export default function DistributorClient({
     status: v.status || 'Pending'
   })) || [], [initialVisits]);
 
-  const officialTools = useMemo(() => initialTools?.map((t, idx) => ({
+  const officialTools = useMemo(() => initialTools?.map((t: any, idx: number) => ({
     id: t.id || `TOOL-${idx}`,
     type: t.type === 'contract' ? 'doc' : (t.type === 'document' ? 'doc' : t.type || 'video'),
+    originalType: t.type,
     title: t.title || '工具檔案',
     category: t.category || '官方資源',
     thumbnail: t.thumbnail || t.url || '',
+    url: t.url || '',
     icon: t.type === 'contract' ? '📄' : '📂'
   })) || [], [initialTools]);
+
+  const [activeToolPreview, setActiveToolPreview] = useState<any>(null);
   const [paymentRecords, setPaymentRecords] = useState(initialFinancials?.paymentRecords || []);
   const [bonusRequests, setBonusRequests] = useState(initialFinancials?.bonusRequests || []);
 
@@ -492,7 +496,7 @@ export default function DistributorClient({
                </div>
              ) : (
                officialTools.filter(t => t.type === 'video').map(tool => (
-                  <div key={tool.id} className="group relative bg-slate-900 rounded-[45px] shadow-2xl border border-white overflow-hidden aspect-[16/10] hover:shadow-blue-200 transition-all duration-700">
+                  <div key={tool.id} onClick={() => setActiveToolPreview({...tool, type: tool.originalType})} className="group relative bg-slate-900 rounded-[45px] shadow-2xl border border-white overflow-hidden aspect-[16/10] hover:shadow-blue-200 transition-all duration-700 cursor-pointer">
                      {tool.thumbnail && <img src={tool.thumbnail} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-[2s]" />}
                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent p-10 flex flex-col justify-end">
                         <p className="text-[9px] font-black text-blue-400 uppercase mb-3 tracking-[0.3em] bg-blue-500/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">{tool.category}</p>
@@ -518,7 +522,7 @@ export default function DistributorClient({
                 </div>
              ) : (
                 officialTools.filter(t => t.type === 'doc').map(doc => (
-                   <div key={doc.id} onClick={() => { if(doc.title.includes('契約') || doc.title.includes('合約')) setIsContractModalOpen(true); }} className="bg-white/60 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl flex flex-col items-center text-center space-y-4 hover:border-blue-500 transition-all duration-500 group cursor-pointer">
+                   <div key={doc.id} onClick={() => setActiveToolPreview({...doc, type: doc.originalType})} className="bg-white/60 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl flex flex-col items-center text-center space-y-4 hover:border-blue-500 transition-all duration-500 group cursor-pointer">
                       <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-blue-600 group-hover:text-white transition-all">{doc.icon}</div>
                       <div>
                          <h6 className="text-xs font-black text-slate-900 tracking-tight">{doc.title}</h6>
@@ -529,6 +533,77 @@ export default function DistributorClient({
              )}
           </div>
        </section>
+
+       {activeToolPreview && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
+             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-center p-6 border-b border-slate-100">
+                   <div>
+                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.originalType || activeToolPreview.type}</p>
+                   </div>
+                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
+                </div>
+                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
+                   {activeToolPreview.originalType === 'photo' || activeToolPreview.type === 'photo' ? (
+                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
+                   ) : activeToolPreview.originalType === 'video' || activeToolPreview.type === 'video' ? (
+                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
+                   ) : (
+                      <div className="text-center space-y-4">
+                         <span className="text-6xl block">📄</span>
+                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
+                      </div>
+                   )}
+                   
+                   <button 
+                      className="px-8 py-4 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-lg hover:bg-blue-700 transition-all mt-4" 
+                      onClick={() => {
+                        const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
+                        if (!fileUrl) {
+                          alert('檔案連結無效，無法下載。');
+                          return;
+                        }
+                        try {
+                          if (fileUrl.startsWith('data:')) {
+                            const arr = fileUrl.split(',');
+                            const mime = arr[0].match(/:(.*?);/)[1];
+                            const bstr = atob(arr[1]);
+                            let n = bstr.length;
+                            const u8arr = new Uint8Array(n);
+                            while (n--) {
+                              u8arr[n] = bstr.charCodeAt(n);
+                            }
+                            const blob = new Blob([u8arr], { type: mime });
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = activeToolPreview.title || 'download';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                          } else {
+                            const a = document.createElement('a');
+                            a.href = fileUrl;
+                            a.download = activeToolPreview.title || 'download';
+                            a.target = '_blank';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                          }
+                        } catch (err) {
+                          alert('下載失敗，檔案可能已損壞或過大。');
+                          console.error(err);
+                        }
+                      }}
+                   >確認下載檔案 (Download)</button>
+                </div>
+             </div>
+          </div>
+       )}
     </div>
   );
 

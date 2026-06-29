@@ -810,6 +810,41 @@ export default function SuperAdminClient({
                     </div>
                  </div>
 
+                 <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 mb-10">
+                     <h4 className="text-lg font-black text-slate-900">上傳新資源</h4>
+                     <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        const formData = new FormData(form);
+                        const { uploadTool, fetchSalesTools } = await import('@/app/actions');
+                        const res = await uploadTool(formData);
+                        if (res.success) {
+                           alert('上傳成功！已同步至全球網路。');
+                           const newTools = await fetchSalesTools();
+                           setMediaList(newTools);
+                           form.reset();
+                        } else {
+                           alert('上傳失敗');
+                        }
+                     }} className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                           <select name="type" className="bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none">
+                              <option value="video">影片 (Video)</option>
+                              <option value="photo">照片 (Photo)</option>
+                              <option value="document">檔案 (Document)</option>
+                              <option value="contract">電子合約 (E-Contract)</option>
+                           </select>
+                           <input name="title" placeholder="資源標題" required className="bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none" />
+                           <input name="category" placeholder="分類 (例如: 業務培訓)" required className="bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none" />
+                           <input name="thumbnail" placeholder="縮圖 URL (選填)" className="bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none" />
+                        </div>
+                        <div className="flex items-center gap-4">
+                           <input type="file" name="file" className="flex-1 bg-slate-50 rounded-2xl p-3 text-sm font-bold text-slate-700 outline-none" required />
+                           <button type="submit" className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all">上傳同步 📤</button>
+                        </div>
+                     </form>
+                  </div>
+
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                     {mediaList.map((tool, i) => (
                        <div key={i} className="bg-white rounded-[60px] border border-slate-100 shadow-sm overflow-hidden group hover:shadow-2xl transition-all">
@@ -829,14 +864,18 @@ export default function SuperAdminClient({
                              <h5 className="text-xl font-black text-slate-900 tracking-tight italic">{tool.title}</h5>
                              <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                 <span className="text-[10px] font-black text-emerald-500 uppercase italic">Synced All Nodes</span>
-                                <button onClick={async () => {
-                                   if(confirm('確定要移除此資源嗎？移除後全球網域皆會同步刪除。')) {
-                                      const res = await deleteTool(tool.id);
-                                      if (res.success) {
-                                         setMediaList(mediaList.filter(t => t.id !== tool.id));
+                                <div className="flex gap-4">
+                                   <button onClick={() => window.open(tool.url, '_blank')} className="text-xs font-black text-indigo-500 hover:text-indigo-700 transition-all">查看</button>
+                                   <a href={tool.url} download className="text-xs font-black text-slate-500 hover:text-slate-700 transition-all">下載</a>
+                                   <button onClick={async () => {
+                                      if(confirm('確定要移除此資源嗎？移除後全球網域皆會同步刪除。')) {
+                                         const res = await deleteTool(tool.id);
+                                         if (res.success) {
+                                            setMediaList(mediaList.filter(t => t.id !== tool.id));
+                                         }
                                       }
-                                   }
-                                }} className="text-xs font-black text-slate-300 hover:text-rose-500 transition-all">移除</button>
+                                   }} className="text-xs font-black text-rose-300 hover:text-rose-500 transition-all">移除</button>
+                                </div>
                              </div>
                           </div>
                        </div>
