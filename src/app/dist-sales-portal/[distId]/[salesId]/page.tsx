@@ -43,7 +43,7 @@ export default function DistSalesPage() {
   const salesId = params.salesId as string;
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [salesName] = useState("王業務");
+  const [salesName, setSalesName] = useState("");
   const [performance, setPerformance] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
@@ -111,14 +111,20 @@ export default function DistSalesPage() {
   const [bankForm, setBankForm] = useState({ bankCode: '', bankName: '', accountName: '', accountNo: '' });
 
   const loadData = async () => {
-    const [perf, apps, visitData, toolData, conData, capData, profData, plans] = await Promise.all([
-      fetchSalesPerformance(salesName),
+    const profData = await fetchSalesProfileById(salesId);
+    if (!profData) return;
+    setProfile(profData);
+    setSalesName(profData.name);
+    
+    const currentName = profData.name;
+
+    const [perf, apps, visitData, toolData, conData, capData, plans] = await Promise.all([
+      fetchSalesPerformance(currentName),
       fetchFreeApplications(),
-      fetchVisitationRecords(salesName),
+      fetchVisitationRecords(currentName),
       fetchSalesTools(),
-      fetchEContracts(salesName),
-      fetchDistributorCapacity(),
-      fetchSalesProfileById(salesId),
+      fetchEContracts(currentName),
+      fetchDistributorCapacity(distId),
       fetchRentPlans()
     ]);
     setPerformance(perf);
@@ -127,7 +133,6 @@ export default function DistSalesPage() {
     setTools(toolData);
     setContracts(conData);
     setCapacity(capData);
-    setProfile(profData);
     if (profData?.bankAccount) setBankForm(profData.bankAccount);
     setRentPlans(plans);
   };
