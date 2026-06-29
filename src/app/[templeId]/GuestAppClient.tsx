@@ -2094,7 +2094,16 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                        </span>
                     </div>
 
-                    <p className="text-gray-600 text-sm leading-relaxed">{evt.description}</p>
+                    {/* Event Description Block */}
+                    {evt.description && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex gap-3">
+                        <div className="text-slate-500 mt-0.5">📝</div>
+                        <div>
+                          <h5 className="text-sm font-bold text-slate-800 mb-1">活動內容</h5>
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{evt.description}</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Precautions Block */}
                     {evt.precautions && (
@@ -2102,7 +2111,7 @@ export default function GuestAppClient({ templeId, forceLogin }: { templeId: str
                         <div className="text-orange-500 mt-0.5">⚠️</div>
                         <div>
                           <h5 className="text-sm font-bold text-orange-800 mb-1">注意資料 / 報到須知</h5>
-                          <p className="text-xs text-orange-700 leading-relaxed">{evt.precautions}</p>
+                          <p className="text-xs text-orange-700 leading-relaxed whitespace-pre-wrap">{evt.precautions}</p>
                         </div>
                       </div>
                     )}
