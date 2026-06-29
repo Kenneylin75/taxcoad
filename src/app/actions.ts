@@ -12,22 +12,22 @@ export function getRoleLabel(name: string): string {
   // 1. Check DistSales (SuperSales / DistSales)
   const sales = db_dist_sales.find((s: any) => s.name === name);
   if (sales) {
-    if (sales.role === 'SuperSales') return \超級業務 \\;
+    if (sales.role === 'SuperSales') return \`超級業務 \${name}\`;
     if (sales.role === 'DistSales') {
       const dist = db_distributors.find((d: any) => d.id === sales.distributorId);
       const distName = dist ? dist.name : '經銷商';
-      return \\ 經銷業務 \\;
+      return \`\${distName} 經銷業務 \${name}\`;
     }
   }
 
   // 2. Check Distributor Admin
   const distAdmin = db_distributors.find((d: any) => d.name === name || d.contactName === name);
   if (distAdmin) {
-    return \經銷商 \\;
+    return \`經銷商 \${name}\`;
   }
 
   // Fallback
-  return \人員 \\;
+  return \`人員 \${name}\`;
 }
 
 export async function revalidateTemple(templeId?: string) {
