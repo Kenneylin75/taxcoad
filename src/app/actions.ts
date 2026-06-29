@@ -6,6 +6,30 @@ import { withTempleSession, dbQuery } from "../db/db";
 
 // Helper to dynamically get templeId from cookies or fallback
 
+export function getRoleLabel(name: string): string {
+  if (!name) return '未知人員';
+  
+  // 1. Check DistSales (SuperSales / DistSales)
+  const sales = db_dist_sales.find((s: any) => s.name === name);
+  if (sales) {
+    if (sales.role === 'SuperSales') return \超級業務 \\;
+    if (sales.role === 'DistSales') {
+      const dist = db_distributors.find((d: any) => d.id === sales.distributorId);
+      const distName = dist ? dist.name : '經銷商';
+      return \\ 經銷業務 \\;
+    }
+  }
+
+  // 2. Check Distributor Admin
+  const distAdmin = db_distributors.find((d: any) => d.name === name || d.contactName === name);
+  if (distAdmin) {
+    return \經銷商 \\;
+  }
+
+  // Fallback
+  return \人員 \\;
+}
+
 export async function revalidateTemple(templeId?: string) {
   try {
     const tId = templeId || await getDynamicTempleId();
@@ -2425,7 +2449,7 @@ export async function submitFreeAccountApplication(data: any) {
   db_notifications.unshift({
     id: `N-${Date.now()}`,
     title: '新宮廟核定申請',
-    content: `超級業務 ${data.submittedBy} 提報了「${newTemple.templeName}」開戶申請。`,
+    content: `${getRoleLabel(data.submittedBy)} 提報了「${newTemple.templeName}」開戶申請。`,
     date: new Date().toISOString().split('T')[0],
     isRead: false
   });
@@ -2808,7 +2832,7 @@ export async function submitDistributorApplication(data: any) {
   db_notifications.unshift({
     id: `N-DIST-${Date.now()}`,
     title: '新經銷商授權申請',
-    content: `業務員 ${data.submittedBy} 提交了「${data.name}」的經銷授權申請案。`,
+    content: `${getRoleLabel(data.submittedBy)} 提交了「${data.name}」的經銷授權申請案。`,
     date: new Date().toISOString().split('T')[0],
     isRead: false
   });
@@ -3891,7 +3915,7 @@ export async function requestPasswordReset(salesName: string) {
   db_notifications.unshift({
     id: `N-PR-${Date.now()}`,
     title: '密碼重設申請',
-    content: `超級業務「${salesName}」發起了密碼重設請求，請至核定中心處理。`,
+    content: `${getRoleLabel(salesName)} 發起了密碼重設請求，請至核定中心處理。`,
     date: new Date().toISOString().split('T')[0],
     isRead: false
   });
