@@ -489,7 +489,7 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
                                   <button onClick={() => setTransferModalData({id: acc.id, role: 'Distributor', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
-                                     window.location.href = `/${acc.id}`;
+                                     window.location.href = `/distributor/${acc.id}`;
                                   }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
                                   <button onClick={() => setViewingAccountDetail(acc)} className="text-[11px] font-black text-slate-300 uppercase hover:text-slate-900 transition-all border-b-2 border-transparent hover:border-slate-900 italic mt-2">VIEW DETAIL 🔑</button>
                                </td>
