@@ -38,7 +38,7 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
   const [isPending, startTransition] = useTransition();
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [currentPayingBill, setCurrentPayingBill] = useState<ExpenseEntry | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'linepay'>('linepay');
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'linepay' | 'ecpay'>('linepay');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -161,8 +161,10 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
   const getExpenseTypeLabel = (type: string) => {
     switch (type) {
       case 'SetupFee': return '系統開辦建置費';
-      case 'MonthlyFee': return '系統月租費';
-      case 'YearlyFee': return '系統年租費';
+      case 'MonthlyFee': 
+      case 'MONTHFEE': return '系統月租費';
+      case 'YearlyFee': 
+      case 'YEARFEE': return '系統年租費';
       case 'StorageUpgrade': return '空間擴展費';
       case 'AgiService': return 'AGI 智能管家流量';
       default: return type;
@@ -453,14 +455,19 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                  <p className="text-[10px] text-slate-400">繳款期限: {currentPayingBill.dueDate}</p>
               </div>
 
-              <div className="flex gap-2 mb-6">
+              <div className="flex gap-2 mb-6 flex-wrap">
+                 {initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.thirdParty?.enabled && (
+                   <button onClick={() => setPaymentMethod('ecpay')} className={`flex-1 min-w-[100px] py-3 text-xs font-black rounded-xl border-2 transition-all ${paymentMethod === 'ecpay' ? 'border-[#333333] bg-[#333333]/10 text-[#333333]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                      ECPay 綠界
+                   </button>
+                 )}
                  {initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.linePay?.enabled && (
-                   <button onClick={() => setPaymentMethod('linepay')} className={`flex-1 py-3 text-xs font-black rounded-xl border-2 transition-all ${paymentMethod === 'linepay' ? 'border-[#00C300] bg-[#00C300]/10 text-[#00C300]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>
-                      LINE Pay / 信用卡
+                   <button onClick={() => setPaymentMethod('linepay')} className={`flex-1 min-w-[100px] py-3 text-xs font-black rounded-xl border-2 transition-all ${paymentMethod === 'linepay' ? 'border-[#00C300] bg-[#00C300]/10 text-[#00C300]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                      LINE Pay
                    </button>
                  )}
                  {initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.enabled && (
-                   <button onClick={() => setPaymentMethod('bank')} className={`flex-1 py-3 text-xs font-black rounded-xl border-2 transition-all ${paymentMethod === 'bank' ? 'border-red-600 bg-red-50 text-red-600' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                   <button onClick={() => setPaymentMethod('bank')} className={`flex-1 min-w-[100px] py-3 text-xs font-black rounded-xl border-2 transition-all ${paymentMethod === 'bank' ? 'border-red-600 bg-red-50 text-red-600' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}>
                       銀行匯款
                    </button>
                  )}
@@ -476,13 +483,29 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                        {isPending ? '處理中...' : '前往 LINE Pay 結帳'}
                     </button>
                  </div>
+              ) : paymentMethod === 'ecpay' ? (
+                 <div className="space-y-4 text-center">
+                    <div className="w-full bg-[#333333]/5 border border-[#333333]/20 rounded-2xl p-6">
+                       <p className="text-sm font-bold text-[#333333] mb-2">系統將自動核銷</p>
+                       <p className="text-[10px] text-slate-500">當您完成 ECPay (信用卡/ATM/超商代碼) 支付後，系統會自動將帳單狀態改為「已付款」，無需等待人工確認。</p>
+                    </div>
+                    <button onClick={() => alert('開發中：ECPay 串接')} disabled={isPending} className="w-full py-4 bg-[#333333] text-white rounded-xl font-black shadow-lg shadow-[#333333]/30 hover:bg-black transition-all disabled:opacity-50">
+                       {isPending ? '處理中...' : '前往 ECPay 結帳'}
+                    </button>
+                 </div>
               ) : (
                  <div className="space-y-4">
                      <div className="bg-red-50/50 border border-red-100 rounded-2xl p-5 space-y-2">
                         <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">收款方銀行帳戶</p>
-                        <p className="text-sm font-bold text-slate-700">銀行：{initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankName || initialData.payeeInfo?.bankName || '未提供'} {initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankCode ? `(${initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankCode})` : ''}</p>
-                        <p className="text-sm font-bold text-slate-700">帳號：{initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.accountNo || initialData.payeeInfo?.account || '未提供'}</p>
-                        <p className="text-sm font-bold text-slate-700">戶名：{initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.accountName || initialData.payeeInfo?.name || '未提供'}</p>
+                        <p className="text-sm font-bold text-slate-700">
+                           銀行：{initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankCode ? `代碼 ${initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankCode}` : (initialData.payeeInfo?.bankName || '未提供')}
+                        </p>
+                        <p className="text-sm font-bold text-slate-700">
+                           帳號：{initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.accountNo || initialData.payeeInfo?.account || '未提供'}
+                        </p>
+                        <p className="text-sm font-bold text-slate-700">
+                           戶名：{initialData.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.accountName || initialData.payeeInfo?.name || '未提供'}
+                        </p>
                      </div>
                     
                     <div className="space-y-2">

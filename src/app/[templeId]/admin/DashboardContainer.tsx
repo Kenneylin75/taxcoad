@@ -228,7 +228,7 @@ export default function DashboardContainer({
           <div>
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-xs font-bold text-slate-400">雲端空間使用量</p>
-              <p className="text-xs font-bold text-slate-700">{storage?.isVip ? `${(storage?.used || 0).toFixed(1)} GB / 無限使用` : `${(storage?.used || 0).toFixed(1)} GB / ${storage?.total >= 1000 ? (storage?.total/1000).toFixed(0) + ' TB' : (storage?.total || 100) + ' GB'}`}</p>
+              <p className="text-xs font-bold text-slate-700">{storage?.isVip ? `${(storage?.used || 0).toFixed(1)} GB / 無限使用` : `${(storage?.used || 0).toFixed(1)} GB / ${storage?.planName || (storage?.total >= 1000 ? (storage?.total/1000).toFixed(0) + ' TB' : (storage?.total || 100) + ' GB')}`}</p>
             </div>
             {!storage?.isVip && (
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">

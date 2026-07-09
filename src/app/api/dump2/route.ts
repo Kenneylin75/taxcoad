@@ -1,0 +1,1 @@
+export async function GET() { return new Response(JSON.stringify({dist: (globalThis as any).db_distributors, apps: (globalThis as any).db_distributor_applications}), { headers: { 'Content-Type': 'application/json' } }); }

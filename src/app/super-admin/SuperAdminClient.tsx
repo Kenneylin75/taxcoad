@@ -582,7 +582,11 @@ export default function SuperAdminClient({
                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter italic">{app.templeName}</h4>
                                    <span className="bg-indigo-50 text-indigo-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Pending Review</span>
                                  </div>
-                                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">申請身份：超級業務員 | 提交：超級管理員 | 日期：{app.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0]}</p>
+                                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+                                    申請身份：{app.creatorRole === 'SuperSales' ? `超級業務員 ${app.creatorId || ''}` : app.creatorRole === 'Distributor' ? `經銷商 ${app.creatorId || ''}` : app.creatorRole === 'System' ? '超級管理員' : (app.creatorRole || '超級業務員')} | 
+                                    提交：超級管理員 | 
+                                    日期：{app.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                 </p>
                                  <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
                                     <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.freeType === 'Trial' ? '免費試用' : app.freeType === 'Permanent' ? '永久免費' : '標準方案'}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded">繳費：{app.paymentCycle === 'Yearly' ? '年繳' : '月繳'}</span>
@@ -613,7 +617,7 @@ export default function SuperAdminClient({
                                  <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
                                     <span className="bg-slate-100 px-2 py-1 rounded">簽約金：${Number(app.customPrice || 0).toLocaleString()}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded">授權：{app.customDuration || app.years || 2} 年</span>
-                                    <span className="bg-slate-100 px-2 py-1 rounded">配額：{app.customNodes || 100} 組</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">配額：{app.nodes || app.customNodes || 100} 組</span>
                                  </div>
                                  <div className="flex gap-4 text-[11px] font-medium text-slate-400 mt-1">
                                     <span>負責人：{app.owner || app.contactName || '未提供'}</span>
@@ -1410,13 +1414,30 @@ export default function SuperAdminClient({
               };
 
               const renderNode = (node: any, level: number) => {
-                 if (!filterBridgeNode(node)) return null;
-                 
+                 const hasChildren = node.children && node.children.length > 0;
+                 const isMatch = filterBridgeNode(node);
+                 if (!isMatch && (!node.children || !node.children.some(filterBridgeNode))) return null;
+
                  const isSearching = bridgeSearch.length > 0;
                  const isExpanded = isSearching ? true : expandedNodes.has(node.id);
-                 const hasChildren = node.children && node.children.length > 0;
-                 const indent = level * 32;
-                 
+                 const isQuotaEditable = node.type === 'distributor' || node.type === 'dist-sales';
+
+                 const handleEditQuota = async (e: React.MouseEvent, targetNode: any) => {
+                    e.stopPropagation();
+                    const q = window.prompt(`修改 ${targetNode.name} 的帳戶配額 (目前為 ${targetNode.nodes || 100})`, String(targetNode.nodes || 100));
+                    if (!q || isNaN(Number(q))) return;
+                    const newQuota = Number(q);
+                    try {
+                       const { updateDistributorQuota } = await import('@/app/actions');
+                       await updateDistributorQuota(targetNode.id, newQuota);
+                       alert('配額修改成功，系統將重整。');
+                       window.location.reload();
+                    } catch (err) {
+                       console.error(err);
+                       alert('配額修改失敗');
+                    }
+                 };
+
                  const icons: any = {
                     'super-admin': '🌐',
                     'super-sales': '👑',
@@ -1439,20 +1460,28 @@ export default function SuperAdminClient({
                     'temple': 'bg-emerald-50 text-emerald-700 border-emerald-200'
                  };
 
-                 const isMatch = bridgeSearch && node.name?.toLowerCase().includes(bridgeSearch.toLowerCase());
-
                   return (
-                     <div key={node.id} className="w-full">
+                     <div key={node.id} className="relative group">
                         <div 
-                          className={`flex items-center gap-4 p-4 border-b border-slate-50 hover:bg-slate-50 transition-all cursor-pointer ${isMatch ? 'bg-yellow-50/50' : ''}`}
-                          style={{ paddingLeft: `${indent + 16}px` }}
-                          onClick={() => hasChildren && toggleNode(node.id)}
+                           onClick={() => toggleNode(node.id)}
+                           className={`flex items-center gap-4 py-3 px-4 rounded-2xl cursor-pointer transition-all duration-300 relative z-10
+                              ${level === 0 ? 'hover:bg-slate-50' : 'hover:bg-slate-50/50'}
+                           `}
+                           style={{ paddingLeft: `${level * 28 + 16}px` }}
                         >
-                           <div className="w-6 flex justify-center shrink-0">
-                              {hasChildren ? (
-                                 <span className="text-slate-400 text-xs">{isExpanded ? '🔽' : '▶️'}</span>
-                              ) : <span className="w-6"></span>}
+                           {/* 連接線 */}
+                           {level > 0 && (
+                              <div className="absolute left-[calc(-14px)] top-1/2 w-4 border-t-2 border-slate-200" />
+                           )}
+
+                           <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                              {hasChildren && (
+                                 <span className="text-slate-400 hover:text-indigo-600 transition-colors">
+                                    {isExpanded ? '▼' : '▶'}
+                                 </span>
+                              )}
                            </div>
+                           
                            <span className="text-2xl shrink-0">{icons[node.type]}</span>
                            
                            <div className="flex flex-col flex-1">
@@ -1824,10 +1853,11 @@ export default function SuperAdminClient({
                                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
                                   </label>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                    <input type="text" placeholder="銀行代碼" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 outline-none transition-all placeholder:text-slate-400" value={b2bPayment.customTransfer?.bankCode || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankCode: e.target.value}})} />
+                                   <input type="text" placeholder="銀行名稱" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 outline-none transition-all placeholder:text-slate-400 md:col-span-1" value={b2bPayment.customTransfer?.bankName || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankName: e.target.value}})} />
                                    <input type="text" placeholder="帳戶名稱" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 outline-none transition-all placeholder:text-slate-400 md:col-span-2" value={b2bPayment.customTransfer?.accountName || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountName: e.target.value}})} />
-                                   <input type="text" placeholder="銀行帳號" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 outline-none transition-all placeholder:text-slate-400 md:col-span-3" value={b2bPayment.customTransfer?.accountNo || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountNo: e.target.value}})} />
+                                   <input type="text" placeholder="銀行帳號" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 outline-none transition-all placeholder:text-slate-400 md:col-span-4" value={b2bPayment.customTransfer?.accountNo || ''} onChange={e => setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountNo: e.target.value}})} />
                                 </div>
                              </div>
                           </div>

@@ -3163,6 +3163,32 @@ export async function createSuperSalesAccount(data: any) {
   return { success: true, id };
 }
 
+export async function updateDistributorQuota(distId: string, newQuota: number) {
+  const dist = db_distributors.find((d: any) => d.id === distId || d.account === distId);
+  if (dist) {
+    dist.quota = newQuota;
+    dist.customNodes = newQuota;
+    dist.nodes = newQuota;
+  }
+  
+  const app = db_distributor_applications.find((a: any) => a.id === distId || a.account === distId);
+  if (app) {
+    app.customNodes = String(newQuota);
+    app.nodes = newQuota;
+  }
+
+  gStore.db_distributors = db_distributors;
+  gStore.db_distributor_applications = db_distributor_applications;
+
+  return withGlobalSession(async (client) => {
+    if (client) {
+       await client.query(`UPDATE distributors SET quota = $1 WHERE id = $2 OR account = $2`, [newQuota, distId]);
+       await client.query(`UPDATE distributor_applications SET custom_nodes = $1 WHERE id = $2 OR account = $2`, [newQuota, distId]);
+    }
+    return { success: true };
+  });
+}
+
 export async function createDistributorAccount(data: any) {
   if (data.account && await checkAccountExists(data.account.trim())) {
     return { success: false, error: '帳號已被使用，請更換其他帳號' };
@@ -3961,8 +3987,9 @@ export async function fetchFinancialOverview() {
     .filter(b => b.templeId === templeId)
     .map(b => {
       const t = (globalThis as any).db_temples?.find((x: any) => x.id === templeId);
-      const fallbackRole = t?.distributorId ? 'Distributor' : 'SuperAdmin';
-      const fallbackId = t?.distributorId || 'system-hq';
+      const isSuperAdminService = b.type === 'StorageUpgrade' || b.type === 'AgiService';
+      const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
+      const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
       return {
         id: b.id,
         type: b.type,
@@ -3982,8 +4009,10 @@ export async function fetchFinancialOverview() {
     if (rows && rows.length > 0) {
       expenses = rows.map((r: any) => {
         const t = (globalThis as any).db_temples?.find((x: any) => x.id === r.temple_id);
-        const fallbackRole = t?.distributorId ? 'Distributor' : 'SuperAdmin';
-        const fallbackId = t?.distributorId || 'system-hq';
+        const type = r.item_name || '';
+        const isSuperAdminService = type.includes('空間') || type.includes('AI') || type.includes('Storage') || type.includes('Agi');
+        const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
+        const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
         
         return {
           id: r.id,
@@ -4551,23 +4580,26 @@ export async function fetchGlobalTempleData() {
       const templeStorage = (globalThis as any).db_temple_storages?.find((s: any) => s.templeId === templeId);
       let isVip = false;
       let totalGB = 100;
-      
+      let planName = '免費 5GB 空間';
       if (templeStorage) {
         totalGB = templeStorage.quotaGb;
+        planName = templeStorage.planName || `${totalGB}GB`;
       } else {
         const cloudStorage = temple?.cloudStorage;
         if (cloudStorage && cloudStorage.startsWith('SP-')) {
           const plan = db_storage_plans.find(p => p.id === cloudStorage);
           totalGB = plan ? plan.sizeGb : 100;
+          planName = plan ? plan.name : `${totalGB}GB`;
         } else {
           isVip = temple?.plan === 'Unlimited Node' || temple?.plan === 'Free' || temple?.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
           totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
+          planName = isVip ? '無限使用' : `${totalGB}GB`;
         }
       }
       const usedBytes = (globalThis as any).db_customer_media?.filter((m: any) => m.templeId === templeId).reduce((sum: number, m: any) => sum + (m.sizeBytes || 0), 0) || 0;
       const used = usedBytes / (1024 * 1024 * 1024);
 
-      return { analyticsSettings: {}, analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, raw: { apps, agiStats: {}, guests, storageInfo: { used: used, total: totalGB, isVip }, qActive } };
+      return { analyticsSettings: {}, analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, raw: { apps, agiStats: {}, guests, storageInfo: { used: used, total: totalGB, isVip, planName }, qActive } };
     } else {
       // PostgreSQL Realization
       const guestsRes = await client.query('SELECT phone, name FROM guests WHERE temple_id = $1', [templeId]);
@@ -4605,10 +4637,12 @@ export async function fetchGlobalTempleData() {
       let isVip = true;
       let totalGB = 100;
       let used = 0;
+      let planName = '免費 5GB 空間';
       try {
-        const storageRes = await client.query('SELECT allocated_bytes FROM temple_storages WHERE temple_id = $1', [templeId]);
+        const storageRes = await client.query('SELECT allocated_bytes, plan_name FROM temple_storages WHERE temple_id = $1', [templeId]);
         if ((storageRes.rowCount ?? 0) > 0) {
            totalGB = Math.round(Number(storageRes.rows[0].allocated_bytes) / (1024 * 1024 * 1024));
+           planName = storageRes.rows[0].plan_name || `${totalGB}GB`;
            isVip = false;
         } else {
           const templeRes = await client.query('SELECT plan, cloud_storage as "cloudStorage" FROM temples WHERE id = $1', [templeId]);
@@ -4618,10 +4652,12 @@ export async function fetchGlobalTempleData() {
             if (cloudStorage && cloudStorage.startsWith('SP-')) {
               const plan = db_storage_plans.find(p => p.id === cloudStorage);
               totalGB = plan ? plan.sizeGb : 100;
+              planName = plan ? plan.name : `${totalGB}GB`;
               isVip = false;
             } else {
               isVip = tData.plan === 'Unlimited Node' || tData.plan === 'Free' || tData.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
               totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
+              planName = isVip ? '無限使用' : `${totalGB}GB`;
             }
           }
         }
@@ -4636,7 +4672,7 @@ export async function fetchGlobalTempleData() {
       return { 
         analyticsSettings: {}, 
         analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, 
-        raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used, total: totalGB, isVip }, qActive } 
+        raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used, total: totalGB, isVip, planName }, qActive } 
       };
     }
   });
@@ -6784,6 +6820,17 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
       payeeId: 'system-hq',
       timestamp: new Date().toISOString()
     });
+
+    try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery(
+        `INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
+        [`BILL-AI-${Date.now()}`, templeId, 'AI 智能管家方案 - ' + plan.name, planPrice, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq'],
+        () => null
+      );
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   return { success: true };
