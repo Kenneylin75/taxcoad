@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ensurePlatformTables, db_temple_bills } from '@/app/actions';
+import { ensurePlatformTables } from '@/app/actions';
 
 export async function GET() {
   try {
