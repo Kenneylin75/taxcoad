@@ -582,15 +582,15 @@ export default function SuperAdminClient({
                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter italic">{app.templeName}</h4>
                                    <span className="bg-indigo-50 text-indigo-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Pending Review</span>
                                  </div>
-                                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">申請身份：宮廟帳戶 | 提交：{app.submittedBy || '超級業務'} | 日期：{app.timestamp?.split('T')[0]}</p>
+                                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">申請身份：超級業務員 | 提交：超級管理員 | 日期：{app.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0]}</p>
                                  <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
-                                    <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.planId || '自訂'}</span>
-                                    <span className="bg-slate-100 px-2 py-1 rounded">繳費：{app.paymentFreq === 'Yearly' ? '年繳' : '月繳'}</span>
-                                    <span className="bg-slate-100 px-2 py-1 rounded">月費：${Number(app.customMonthlyFee || 0).toLocaleString()}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.freeType === 'Trial' ? '免費試用' : app.freeType === 'Permanent' ? '永久免費' : '標準方案'}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">繳費：{app.paymentCycle === 'Yearly' ? '年繳' : '月繳'}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">{app.paymentCycle === 'Yearly' ? '年費' : '月費'}：NT$ {app.paymentCycle === 'Yearly' ? Number((app.monthlyRent || 3600) * 12 * 0.8).toLocaleString() : Number(app.monthlyRent || 0).toLocaleString()}</span>
                                  </div>
                                  <div className="flex gap-4 text-[11px] font-medium text-slate-400 mt-1">
-                                    <span>負責人：{app.owner || '未提供'}</span>
-                                    <span>電話：{app.phone || '未提供'}</span>
+                                    <span>負責人：{app.owner || app.contactName || app.name || '未提供'}</span>
+                                    <span>電話：{app.templePhone || app.phone || app.contactPhone || '未提供'}</span>
                                  </div>
                              </div>
                           </div>
@@ -2222,7 +2222,7 @@ export default function SuperAdminClient({
                                   <button 
                                     onClick={async () => {
                                       if (!adminUpgradeStoragePlanId) return alert('請選擇方案');
-                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId, 'Monthly', true);
+                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId, 'Monthly', false);
                                       const newData = await fetchTempleStorages();
                                       setTempleStorages(newData);
                                       setAdminUpgradeStoragePlanId('');

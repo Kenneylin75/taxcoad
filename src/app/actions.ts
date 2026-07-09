@@ -2110,6 +2110,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       const discount = db_config.yearlyDiscountRate || 20;
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.priceMonthly * priceFactor);
+      const temple = db_temples.find((t: any) => t.id === templeId);
 
       if (!isManualGrant) {
         const adminWallet = db_wallets.find(w => w.role === 'SuperAdmin');
@@ -2117,7 +2118,6 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           adminWallet.balance += finalAmount;
         }
 
-        const temple = db_temples.find(t => t.id === templeId);
         db_finance_records.unshift({
           id: `F-${Date.now()}`,
           type: 'INCOME',
@@ -2125,6 +2125,20 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           amount: finalAmount,
           source: `${temple?.templeName || '宮廟'}-升級空間 ${plan.sizeGb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`,
           date: new Date().toISOString().split('T')[0]
+        });
+
+        db_temple_bills.push({
+          id: `BILL-STORAGE-${Date.now()}`,
+          templeId,
+          type: 'StorageUpgrade',
+          item_name: '雲端空間擴充方案 - ' + plan.name,
+          amount: finalAmount,
+          billingDate: new Date().toISOString().substring(0, 7),
+          dueDate: new Date().toISOString().split('T')[0],
+          status: 'Unpaid',
+          payeeRole: 'SuperAdmin',
+          payeeId: 'system-hq',
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -2167,6 +2181,11 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
         await client.query(
           'INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)',
           [temple?.temple_name || '宮廟', `升級空間 ${plan.size_gb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`, finalAmount, 100, '超級管理員']
+        );
+
+        await client.query(
+          `INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
+          [`BILL-STORAGE-${Date.now()}`, templeId, '雲端空間擴充方案 - ' + plan.name, finalAmount, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq']
         );
       }
 
@@ -2482,6 +2501,29 @@ export async function generateInitialBills(newTemple: any) {
         payeeId,
         timestamp: new Date().toISOString()
       });
+    }
+
+    const storagePlanId = newTemple.cloudStorage;
+    if (storagePlanId && storagePlanId.startsWith('SP-')) {
+       const plan = (globalThis as any).db_storage_plans?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
+       if (plan) {
+         const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
+         if (storageFee > 0) {
+           billsToInsert.push({
+             id: `BILL-STORAGE-${Date.now()}`,
+             templeId: newTemple.id,
+             type: 'StorageUpgrade',
+             item_name: '雲端空間擴充方案 - ' + plan.name,
+             amount: storageFee,
+             billingDate: new Date().toISOString().substring(0, 7),
+             dueDate: billDueDate,
+             status: 'Unpaid',
+             payeeRole: 'SuperAdmin',
+             payeeId: 'system-hq',
+             timestamp: new Date().toISOString()
+           });
+         }
+       }
     }
 
     try {
@@ -3962,6 +4004,40 @@ export async function fetchFinancialOverview() {
   const pendingExpense = expenses.filter(e => e.status === 'Unpaid' || e.status === 'PendingVerification').reduce((acc, e) => acc + e.amount, 0);
 
   let payeeInfo = null;
+  const payeeSettings: Record<string, any> = {};
+  
+  try {
+    const { dbQuery } = await import('@/db/db');
+    for (const exp of expenses) {
+      if (exp.status !== 'Unpaid' && exp.status !== 'PendingVerification') continue;
+      
+      const pId = exp.payeeId || 'superadmin';
+      const pRole = exp.payeeRole || 'SuperAdmin';
+      
+      if (!payeeSettings[pId]) {
+        if (pRole === 'Distributor' && pId && pId !== 'superadmin') {
+          let dist = db_distributors.find((d: any) => d.id === pId);
+          if (!dist) {
+             const dRes = await dbQuery("SELECT * FROM distributors WHERE id = $1", [pId], () => null) as any;
+             if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
+          }
+          if (dist) {
+            let b2b = dist.b2bPayment || dist.b2b_payment;
+            if (typeof b2b === 'string') {
+              try { b2b = JSON.parse(b2b); } catch(e) {}
+            }
+            payeeSettings[pId] = b2b || null;
+          }
+        } else {
+           payeeSettings[pId] = db_config?.b2bPayment || null;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch payee b2b payment settings', e);
+  }
+
+  // Fallback for first expense (legacy support)
   const payeeId = expenses.length > 0 ? expenses[0].payeeId : null;
   const payeeRole = expenses.length > 0 ? expenses[0].payeeRole : null;
   if (payeeRole === 'Distributor' && payeeId) {
@@ -3994,6 +4070,7 @@ export async function fetchFinancialOverview() {
     pendingExpense,
     lastMonthGrowth: '+12%',
     payeeInfo,
+    payeeSettings,
     trialDaysRemaining,
     isPermanentFree
   };
@@ -4471,8 +4548,22 @@ export async function fetchGlobalTempleData() {
         if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
       });
       const temple = (globalThis as any).db_temples?.find((t: any) => t.id === templeId);
-      const isVip = temple?.plan === 'Unlimited Node' || temple?.plan === 'Free' || temple?.plan === '免費' || temple?.cloudStorage?.includes('無限') || temple?.cloudStorage === 'Free' || temple?.cloudStorage === '免費' || !temple?.cloudStorage;
-      const totalGB = isVip ? -1 : parseInt(temple?.cloudStorage) || 100;
+      const templeStorage = (globalThis as any).db_temple_storages?.find((s: any) => s.templeId === templeId);
+      let isVip = false;
+      let totalGB = 100;
+      
+      if (templeStorage) {
+        totalGB = templeStorage.quotaGb;
+      } else {
+        const cloudStorage = temple?.cloudStorage;
+        if (cloudStorage && cloudStorage.startsWith('SP-')) {
+          const plan = db_storage_plans.find(p => p.id === cloudStorage);
+          totalGB = plan ? plan.sizeGb : 100;
+        } else {
+          isVip = temple?.plan === 'Unlimited Node' || temple?.plan === 'Free' || temple?.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
+          totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
+        }
+      }
       const usedBytes = (globalThis as any).db_customer_media?.filter((m: any) => m.templeId === templeId).reduce((sum: number, m: any) => sum + (m.sizeBytes || 0), 0) || 0;
       const used = usedBytes / (1024 * 1024 * 1024);
 
@@ -4511,10 +4602,41 @@ export async function fetchGlobalTempleData() {
         return { title: evt.title, waiting, completed };
       }));
 
+      let isVip = true;
+      let totalGB = 100;
+      let used = 0;
+      try {
+        const storageRes = await client.query('SELECT allocated_bytes FROM temple_storages WHERE temple_id = $1', [templeId]);
+        if ((storageRes.rowCount ?? 0) > 0) {
+           totalGB = Math.round(Number(storageRes.rows[0].allocated_bytes) / (1024 * 1024 * 1024));
+           isVip = false;
+        } else {
+          const templeRes = await client.query('SELECT plan, cloud_storage as "cloudStorage" FROM temples WHERE id = $1', [templeId]);
+          if (templeRes.rowCount > 0) {
+            const tData = templeRes.rows[0];
+            const cloudStorage = tData.cloudStorage;
+            if (cloudStorage && cloudStorage.startsWith('SP-')) {
+              const plan = db_storage_plans.find(p => p.id === cloudStorage);
+              totalGB = plan ? plan.sizeGb : 100;
+              isVip = false;
+            } else {
+              isVip = tData.plan === 'Unlimited Node' || tData.plan === 'Free' || tData.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
+              totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
+            }
+          }
+        }
+        const mediaRes = await client.query('SELECT SUM(size_bytes) as total_size FROM customer_media WHERE temple_id = $1', [templeId]);
+        if (mediaRes.rowCount > 0 && mediaRes.rows[0].total_size) {
+           used = parseInt(mediaRes.rows[0].total_size) / (1024 * 1024 * 1024);
+        }
+      } catch (e) {
+         console.error(e);
+      }
+
       return { 
         analyticsSettings: {}, 
         analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, 
-        raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used: 0, total: 100, isVip: true }, qActive } 
+        raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used, total: totalGB, isVip }, qActive } 
       };
     }
   });
@@ -6643,6 +6765,27 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
     ai.monthlyTokenLimit = plan.tokenLimit;
     ai.isVip = false;
   }
+  
+  // Generate Bill for AI plan
+  const planPrice = plan.priceMonthly || (plan.priceYearly ? Math.round(plan.priceYearly / 12) : 0);
+  if (planPrice > 0) {
+    const gStore = globalThis as any;
+    if (!gStore.db_temple_bills) gStore.db_temple_bills = [];
+    gStore.db_temple_bills.push({
+      id: `BILL-AI-${Date.now()}`,
+      templeId,
+      type: 'AgiService',
+      item_name: 'AI 智能管家方案 - ' + plan.name,
+      amount: planPrice,
+      billingDate: new Date().toISOString().substring(0, 7),
+      dueDate: new Date().toISOString().split('T')[0],
+      status: 'Unpaid',
+      payeeRole: 'SuperAdmin',
+      payeeId: 'system-hq',
+      timestamp: new Date().toISOString()
+    });
+  }
+
   return { success: true };
 }
 

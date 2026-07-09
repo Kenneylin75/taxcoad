@@ -213,7 +213,7 @@ export default function DashboardContainer({
               </div>
               <div className="flex items-baseline gap-1 mt-1">
                 <h3 className="text-2xl font-bold text-slate-800">{storage?.isVip ? `${storage.used.toFixed(1)} GB` : storage.used.toFixed(1)}</h3>
-                <span className="text-sm font-medium text-slate-500">{storage?.isVip ? `/ 無限使用` : `/ ${storage.total} GB`}</span>
+                <span className="text-sm font-medium text-slate-500">{storage?.isVip ? `/ 無限使用` : `/ ${storage.total >= 1000 ? (storage.total/1000).toFixed(0) + ' TB' : storage.total + ' GB'}`}</span>
               </div>
               {!storage?.isVip && (
                 <div className="mt-4 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
