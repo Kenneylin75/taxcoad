@@ -4211,7 +4211,12 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
 }
 
 export async function fetchNotifications(userRole: string) {
-  return [...db_notifications];
+  let notifs = [...db_notifications];
+  if (userRole !== 'SuperAdmin') {
+    const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
+    notifs = notifs.filter(n => !adminOnlyTitles.includes(n.title));
+  }
+  return notifs;
 }
 export type StorageInfo = any;
 export async function upgradeStorage() { return { success: true }; }
