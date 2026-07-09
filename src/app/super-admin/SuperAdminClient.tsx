@@ -827,7 +827,7 @@ export default function SuperAdminClient({
                                    const percentage = Math.min(((s.usedBytes / (s.quotaGb * 1024 * 1024 * 1024)) * 100), 100);
                                    const usedGb = (s.usedBytes / (1024 * 1024 * 1024)).toFixed(2);
                                    return (
-                                      <tr key={s.id} className="hover:bg-slate-50/30 transition-all">
+                                      <tr key={s.templeId || s.id || s.templeName} className="hover:bg-slate-50/30 transition-all">
                                          <td className="px-8 py-6 text-base font-black text-slate-800 tracking-tight italic">{s.templeName}</td>
                                          <td className="px-8 py-6"><span className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-500 uppercase tracking-widest">{s.city}</span></td>
                                          <td className="px-8 py-6 font-bold text-slate-600">{s.planName}</td>
