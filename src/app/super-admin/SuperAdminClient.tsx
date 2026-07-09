@@ -249,7 +249,7 @@ export default function SuperAdminClient({
            {[
              { id: 'dashboard', label: '決策儀表板', icon: '📊' },
              { id: 'accounts', label: '帳戶管理', icon: '👤' },
-             { id: 'approvals', label: '審核中心', icon: '⚖️', count: pendingDistributors.length },
+             { id: 'approvals', label: '審核中心', icon: '⚖️', count: pendingDistributors.length + initialTemples.filter(t => t.status === 'Pending').length },
              { id: 'space', label: '雲端空間管理', icon: '☁️' },
              { id: 'ai', label: 'AI 引擎與方案管理', icon: '🤖' },
              { id: 'tools', label: '資源同步', icon: '🔄' },
