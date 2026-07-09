@@ -4466,7 +4466,7 @@ export async function fetchGlobalTempleData() {
         if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
       });
       const temple = (globalThis as any).db_temples?.find((t: any) => t.id === templeId);
-      const isVip = temple?.plan === 'Unlimited Node' || temple?.cloudStorage?.includes('無限') || !temple?.cloudStorage;
+      const isVip = temple?.plan === 'Unlimited Node' || temple?.plan === 'Free' || temple?.plan === '免費' || temple?.cloudStorage?.includes('無限') || !temple?.cloudStorage;
       const totalGB = isVip ? -1 : parseInt(temple?.cloudStorage) || 100;
       const usedBytes = (globalThis as any).db_customer_media?.filter((m: any) => m.templeId === templeId).reduce((sum: number, m: any) => sum + (m.sizeBytes || 0), 0) || 0;
       const used = usedBytes / (1024 * 1024 * 1024);

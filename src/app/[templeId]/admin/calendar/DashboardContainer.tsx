@@ -212,15 +212,17 @@ export default function DashboardContainer({
                  <button onClick={() => setShowUpgradeModal(true)} className="text-[10px] text-amber-600 hover:text-amber-700 font-black uppercase tracking-widest">升級 ↗</button>
               </div>
               <div className="flex items-baseline gap-1 mt-1">
-                <h3 className="text-2xl font-bold text-slate-800">{storage.used.toFixed(1)}</h3>
-                <span className="text-sm font-medium text-slate-500">/ {storage.total} GB</span>
+                <h3 className="text-2xl font-bold text-slate-800">{storage?.isVip ? `${storage.used.toFixed(1)} GB` : storage.used.toFixed(1)}</h3>
+                <span className="text-sm font-medium text-slate-500">{storage?.isVip ? `/ 無限使用` : `/ ${storage.total} GB`}</span>
               </div>
-              <div className="mt-4 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-amber-500 transition-all duration-1000" 
-                  style={{ width: `${(storage.used / storage.total) * 100}%` }}
-                ></div>
-              </div>
+              {!storage?.isVip && (
+                <div className="mt-4 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-amber-500 transition-all duration-1000" 
+                    style={{ width: `${(storage.used / storage.total) * 100}%` }}
+                  ></div>
+                </div>
+              )}
             </div>
           </div>
 
