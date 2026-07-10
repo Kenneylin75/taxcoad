@@ -44,6 +44,7 @@ export default function SuperSalesPage() {
 
   const [sysConfig, setSysConfig] = useState<any>(null);
   const [commissionHistory, setCommissionHistory] = useState<any>(null);
+  const [viewingBillsTemple, setViewingBillsTemple] = useState<any>(null);
 
   useEffect(() => {
     fetchSuperSalesProfile(salesId).then(setProfile);
@@ -247,6 +248,13 @@ export default function SuperSalesPage() {
                          <div className="flex-1 text-center py-3 bg-white rounded-2xl border border-slate-100">
                             <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">合約狀態</p>
                             <p className="text-sm font-black text-emerald-600 uppercase">進行中</p>
+                         </div>
+                         <div 
+                            onClick={(e) => { e.stopPropagation(); setViewingBillsTemple(item); }}
+                            className="flex-1 text-center py-3 bg-white rounded-2xl border border-slate-100 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all"
+                         >
+                            <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">支付狀況</p>
+                            <p className={`text-sm font-black uppercase ${item.paymentStatus === '待繳費' ? 'text-rose-600' : 'text-emerald-600'}`}>{item.paymentStatus || '已繳清'}</p>
                          </div>
                       </div>
                    )}

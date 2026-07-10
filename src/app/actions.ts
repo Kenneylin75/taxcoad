@@ -3112,7 +3112,12 @@ export async function fetchSuperSalesRegistry(salesId: string) {
           setupFee = t.setupFee ?? 12000;
        }
        const annualContribution = yearlyRent + setupFee;
-       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0, annualContribution });
+       
+       const bills = await fetchTempleBills(t.id);
+       const hasUnpaid = bills.some((b: any) => b.status === 'Unpaid' || b.status === 'Overdue' || b.status === '待繳費' || b.status === '未繳');
+       const paymentStatus = hasUnpaid ? '待繳費' : '已繳清';
+       
+       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
     }
   }
 
