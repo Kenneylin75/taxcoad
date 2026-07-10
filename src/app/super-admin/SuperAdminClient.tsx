@@ -3,6 +3,12 @@
 import React, { useState, useTransition, useEffect } from 'react';
 import TempleApplicationForm from '../components/TempleApplicationForm';
 import DistributorApplicationForm from '../components/DistributorApplicationForm';
+import dynamic from 'next/dynamic';
+
+const TaiwanTempleMap = dynamic(() => import('../components/TaiwanTempleMap'), { 
+  ssr: false, 
+  loading: () => <div className="w-full h-full min-h-[300px] flex items-center justify-center bg-slate-900 rounded-[40px] text-white">Loading Map...</div> 
+});
 import { 
   uploadTool, 
   deleteTool,
@@ -350,19 +356,9 @@ export default function SuperAdminClient({
                     <div className="bg-slate-900 p-12 rounded-[60px] shadow-2xl text-white relative overflow-hidden">
                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] -mr-20 -mt-20"></div>
                        <div className="relative z-10 space-y-10">
-                          <div><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 italic">Regional Mix</p><h4 className="text-3xl font-black italic tracking-tighter">全球分佈比例</h4></div>
-                          <div className="space-y-8">
-                             {analytics?.regionalDistribution.map((item: any, i: number) => (
-                               <div key={i} className="space-y-3">
-                                  <div className="flex justify-between items-end px-2">
-                                     <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">{item.region}</span>
-                                     <span className="text-lg font-black italic">{item.count}</span>
-                                  </div>
-                                  <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-                                     <div className={`h-full bg-indigo-500 rounded-full`} style={{ width: `${(item.count/initialStats.temples)*100}%` }}></div>
-                                  </div>
-                                </div>
-                             ))}
+                          <div><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 italic">Regional Mix</p><h4 className="text-3xl font-black italic tracking-tighter">全球分佈地圖</h4></div>
+                          <div className="w-full h-96 relative">
+                             {analytics?.regionalDistribution && <TaiwanTempleMap distribution={analytics.regionalDistribution} />}
                           </div>
                        </div>
                     </div>
