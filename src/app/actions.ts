@@ -7333,6 +7333,22 @@ export async function approveTempleBill(billId: string) {
     }
 }
 
+export async function toggleBillStatusSimple(billId: string, status: string) {
+  try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery("UPDATE temple_bills SET status = $1 WHERE id = $2", [status, billId]);
+      
+      const bill = db_temple_bills.find(b => b.id === billId);
+      if (bill) {
+        bill.status = status as any;
+        gStore.db_temple_bills = db_temple_bills;
+      }
+      return { success: true };
+  } catch (e) {
+      return { success: false };
+  }
+}
+
 export async function rejectTempleBill(billId: string) {
   try {
       const { dbQuery } = await import('@/db/db');

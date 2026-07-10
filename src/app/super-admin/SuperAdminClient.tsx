@@ -1356,9 +1356,22 @@ export default function SuperAdminClient({
                                   <p className="text-sm font-bold text-slate-500 mt-1">金額: NT$ {(payment.amount || 0).toLocaleString()} <span className="text-xs text-slate-400 ml-2">項目: {payment.type === 'MonthlyFee' ? '月租費' : payment.type}</span></p>
                                </div>
                                <div className="flex flex-col items-end gap-2">
-                                  <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
-                                    {payment.status === 'Paid' ? '已收款' : payment.status === 'PendingVerification' ? '待審核' : '未付款'}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                     {payment.receiptUrl && (
+                                        <button onClick={() => {window.open(payment.receiptUrl, '_blank')}} className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors shadow-sm" title="查看匯款截圖">👁️</button>
+                                     )}
+                                     <button 
+                                        onClick={async () => {
+                                           const { toggleBillStatusSimple } = await import('@/app/actions');
+                                           const newStatus = payment.status === 'Paid' ? 'Unpaid' : 'Paid';
+                                           await toggleBillStatusSimple(payment.id, newStatus);
+                                           window.location.reload();
+                                        }}
+                                        className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}
+                                     >
+                                       {payment.status === 'Paid' ? '已收款' : payment.status === 'PendingVerification' ? '待審核' : '未付款'}
+                                     </button>
+                                  </div>
                                   {payment.status === 'PendingVerification' && payment.payeeRole === 'SuperAdmin' && (
                                     <div className="flex items-center gap-3 mt-2">
                                       {payment.receiptUrl && (
