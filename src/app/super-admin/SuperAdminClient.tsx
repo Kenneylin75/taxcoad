@@ -1360,21 +1360,32 @@ export default function SuperAdminClient({
                                      <button 
                                         onClick={() => {
                                            if (payment.receiptUrl) {
-                                              window.open(payment.receiptUrl, '_blank');
+                                              if (payment.receiptUrl.startsWith('data:')) {
+                                                 const a = document.createElement('a');
+                                                 a.href = payment.receiptUrl;
+                                                 a.download = `receipt_${payment.templeName}_${payment.type}.png`;
+                                                 a.click();
+                                              } else {
+                                                 window.open(payment.receiptUrl, '_blank');
+                                              }
                                            } else {
                                               alert('該宮廟尚未上傳付款截圖');
                                            }
                                         }} 
                                         className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-sm ${payment.receiptUrl ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`} 
-                                        title={payment.receiptUrl ? "查看匯款截圖" : "尚無截圖"}
+                                        title={payment.receiptUrl ? "下載/查看匯款截圖" : "尚無截圖"}
                                      >
                                         👁️
                                      </button>
                                      <button 
                                         onClick={async () => {
-                                           const { toggleBillStatusSimple } = await import('@/app/actions');
-                                           const newStatus = payment.status === 'Paid' ? 'Unpaid' : 'Paid';
-                                           await toggleBillStatusSimple(payment.id, newStatus);
+                                           const { toggleBillStatusSimple, approveTempleBill } = await import('@/app/actions');
+                                           if (payment.status === 'Paid') {
+                                              await toggleBillStatusSimple(payment.id, 'Unpaid');
+                                           } else {
+                                              // Use approveTempleBill so commissions are calculated when switching to Paid
+                                              await approveTempleBill(payment.id);
+                                           }
                                            window.location.reload();
                                         }}
                                         className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}
@@ -1382,21 +1393,6 @@ export default function SuperAdminClient({
                                        {payment.status === 'Paid' ? '已收款' : payment.status === 'PendingVerification' ? '待審核' : '未付款'}
                                      </button>
                                   </div>
-                                  {payment.status === 'PendingVerification' && payment.payeeRole === 'SuperAdmin' && (
-                                    <div className="flex items-center gap-3 mt-2">
-                                      {payment.receiptUrl && (
-                                        <button onClick={() => {window.open(payment.receiptUrl, '_blank')}} className="text-xs font-black text-blue-600 underline">查看匯款截圖</button>
-                                      )}
-                                      <button onClick={async () => {
-                                         if(confirm('確認已收到款項？核銷後將計算營業額與獎金。')) {
-                                           const { approveTempleBill } = await import('@/app/actions');
-                                           await approveTempleBill(payment.id);
-                                           alert('核銷成功');
-                                           window.location.reload();
-                                         }
-                                      }} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-xs font-black shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition-all">確認已付款</button>
-                                    </div>
-                                  )}
                                </div>
                             </div>
                           ));
