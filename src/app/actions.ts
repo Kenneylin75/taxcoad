@@ -6923,9 +6923,18 @@ export async function fetchDataBridgeTree() {
       }));
   };
 
+  const isChildDistributor = (d: any, ss: any) => {
+    if (d.superSalesId === ss.id || d.creatorSalesId === ss.id) return true;
+    if (d.superSalesId === ss.account || d.creatorSalesId === ss.account) return true;
+    if (ss.account === 'admin400' && (d.account === 'admin410' || d.account === 'admin420' || d.name === 'admin410' || d.name === 'admin420')) return true;
+    if (ss.account === 'admin200' && (d.account === 'admin210' || d.name === 'admin210')) return true;
+    return false;
+  };
+
   const getDistributorNodes = (superSalesId: string) => {
+    const ss = superSales.find(s => s.id === superSalesId);
     return distributors
-      .filter((d: any) => d.superSalesId === superSalesId || (superSalesId && superSalesId !== 'none' && superSales.find(ss => ss.id === superSalesId)?.account === 'admin400' && (d.account === 'admin410' || d.account === 'admin420' || d.name === 'admin410' || d.name === 'admin420')))
+      .filter((d: any) => ss && isChildDistributor(d, ss))
       .map((d: any) => {
         const children = [
           ...getDistSalesNodes(d.id),
@@ -6967,8 +6976,7 @@ export async function fetchDataBridgeTree() {
 
   // 2. Orphan Distributors
   const orphanDists = distributors.filter((d: any) => 
-    (!d.superSalesId || !superSales.find((ss: any) => ss.id === d.superSalesId)) && 
-    !(d.account === 'admin410' || d.account === 'admin420' || d.name === 'admin410' || d.name === 'admin420')
+    !superSales.some((ss: any) => isChildDistributor(d, ss))
   );
   if (orphanDists.length > 0) {
     tree.push({
