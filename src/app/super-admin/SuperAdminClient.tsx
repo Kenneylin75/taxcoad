@@ -1379,17 +1379,37 @@ export default function SuperAdminClient({
                                         👁️
                                      </button>
                                      <button 
-                                        onClick={async () => {
-                                           const { toggleBillStatusSimple, approveTempleBill } = await import('@/app/actions');
-                                           if (payment.status === 'Paid') {
-                                              await toggleBillStatusSimple(payment.id, 'Unpaid');
-                                           } else {
-                                              // Use approveTempleBill so commissions are calculated when switching to Paid
-                                              await approveTempleBill(payment.id);
+                                        onClick={async (e) => {
+                                           try {
+                                              const target = e.currentTarget;
+                                              const originalText = target.innerText;
+                                              target.innerText = "處理中...";
+                                              target.disabled = true;
+
+                                              const { toggleBillStatusSimple, approveTempleBill, fetchSuperAdminFinancials } = await import('@/app/actions');
+                                              let res;
+                                              if (payment.status === 'Paid') {
+                                                 res = await toggleBillStatusSimple(payment.id, 'Unpaid');
+                                              } else {
+                                                 res = await approveTempleBill(payment.id);
+                                              }
+
+                                              if (res && res.success === false) {
+                                                 alert('操作失敗，請稍後再試！');
+                                                 target.innerText = originalText;
+                                                 target.disabled = false;
+                                                 return;
+                                              }
+
+                                              // Fetch updated data locally to avoid page reload
+                                              const updated = await fetchSuperAdminFinancials();
+                                              setFinance({ records: updated.records, summary: updated.summary, templePayments: updated.templePayments });
+                                           } catch (err) {
+                                              console.error(err);
+                                              alert('系統發生錯誤！');
                                            }
-                                           window.location.reload();
                                         }}
-                                        className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}
+                                        className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}
                                      >
                                        {payment.status === 'Paid' ? '已收款' : payment.status === 'PendingVerification' ? '待審核' : '未付款'}
                                      </button>
