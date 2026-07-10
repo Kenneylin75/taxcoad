@@ -2057,6 +2057,7 @@ export async function updateStoragePlans(plans: any[]) {
 
 export async function fetchTempleStorages() {
   return withTempleSession(null, true, async (client) => {
+    if (!client) {
       db_temples.forEach(t => {
         if (!db_temple_storages.some(s => s.templeId === t.id)) {
           const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || t.cloudStorage?.includes('無限') || t.cloudStorage === 'Free' || t.cloudStorage === '免費' || !t.cloudStorage;
