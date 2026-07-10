@@ -1359,21 +1359,22 @@ export default function SuperAdminClient({
                                   <div className="flex items-center gap-2">
                                      <button 
                                         onClick={() => {
-                                           if (payment.receiptUrl) {
-                                              if (payment.receiptUrl.startsWith('data:')) {
+                                           const actualReceiptUrl = payment.receiptUrl || payment.receipt_url;
+                                           if (actualReceiptUrl) {
+                                              if (actualReceiptUrl.startsWith('data:')) {
                                                  const a = document.createElement('a');
-                                                 a.href = payment.receiptUrl;
+                                                 a.href = actualReceiptUrl;
                                                  a.download = `receipt_${payment.templeName}_${payment.type}.png`;
                                                  a.click();
                                               } else {
-                                                 window.open(payment.receiptUrl, '_blank');
+                                                 window.open(actualReceiptUrl, '_blank');
                                               }
                                            } else {
                                               alert('該宮廟尚未上傳付款截圖');
                                            }
                                         }} 
-                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-sm ${payment.receiptUrl ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`} 
-                                        title={payment.receiptUrl ? "下載/查看匯款截圖" : "尚無截圖"}
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-sm ${(payment.receiptUrl || payment.receipt_url) ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`} 
+                                        title={(payment.receiptUrl || payment.receipt_url) ? "下載/查看匯款截圖" : "尚無截圖"}
                                      >
                                         👁️
                                      </button>
