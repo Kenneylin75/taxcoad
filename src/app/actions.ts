@@ -3115,7 +3115,13 @@ export async function fetchSuperSalesRegistry(salesId: string) {
        
        const bills = await fetchTempleBills(t.id);
        const hasUnpaid = bills.some((b: any) => b.status === 'Unpaid' || b.status === 'Overdue' || b.status === '待繳費' || b.status === '未繳');
-       const paymentStatus = hasUnpaid ? '待繳費' : '已繳清';
+       const now = new Date();
+       const m = now.getMonth() + 1;
+       const y = now.getFullYear();
+       const cycle = t.paymentCycle || 'Monthly';
+       const paymentStatus = hasUnpaid 
+          ? (cycle === 'Yearly' ? `${y}年未支付` : `${m}月未支付`)
+          : (cycle === 'Yearly' ? `${y}年已支付` : `${m}月已支付`);
        
        temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
     }

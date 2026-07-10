@@ -254,7 +254,7 @@ export default function SuperSalesPage() {
                             className="flex-1 text-center py-3 bg-white rounded-2xl border border-slate-100 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all"
                          >
                             <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">支付狀況</p>
-                            <p className={`text-sm font-black uppercase ${item.paymentStatus === '待繳費' ? 'text-rose-600' : 'text-emerald-600'}`}>{item.paymentStatus || '已繳清'}</p>
+                            <p className={`text-sm font-black uppercase ${item.paymentStatus.includes('未支付') ? 'text-rose-600' : 'text-emerald-600'}`}>{item.paymentStatus}</p>
                          </div>
                       </div>
                    )}
@@ -765,6 +765,43 @@ export default function SuperSalesPage() {
              </div>
           </div>
        )}
+        {viewingBillsTemple && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setViewingBillsTemple(null)}>
+             <div className="bg-white rounded-[32px] w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                   <div>
+                      <h3 className="text-xl font-black text-slate-900">{viewingBillsTemple.name}</h3>
+                      <p className="text-xs font-bold text-slate-400 uppercase mt-1">宮廟各項服務費用與支付紀錄</p>
+                   </div>
+                   <button onClick={() => setViewingBillsTemple(null)} className="w-10 h-10 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-full flex items-center justify-center transition-colors">✕</button>
+                </div>
+                <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                   {viewingBillsTemple.bills && viewingBillsTemple.bills.length > 0 ? (
+                      viewingBillsTemple.bills.map((bill: any, i: number) => (
+                         <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div>
+                               <p className="font-bold text-slate-900">{bill.itemName || bill.type || '系統服務費'}</p>
+                               <div className="flex gap-3 text-[10px] font-black text-slate-400 uppercase mt-1">
+                                  <span>單號: {bill.id}</span>
+                                  <span>到期: {bill.dueDate || bill.date || '無'}</span>
+                               </div>
+                            </div>
+                            <div className="text-right flex flex-col items-end gap-1">
+                               <p className="text-lg font-black text-slate-900">NT$ {(Number(bill.amount) || 0).toLocaleString()}</p>
+                               <span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${
+                                  bill.status === 'Paid' || bill.status === '已繳清' ? 'bg-emerald-100 text-emerald-700' : 
+                                  bill.status === 'Unpaid' || bill.status === '待繳費' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                               }`}>{bill.status === 'Paid' ? '已繳清' : bill.status === 'Unpaid' ? '待繳費' : bill.status}</span>
+                            </div>
+                         </div>
+                      ))
+                   ) : (
+                      <div className="py-12 text-center text-slate-400 font-bold">目前無帳單紀錄</div>
+                   )}
+                </div>
+             </div>
+          </div>
+        )}
 </div>
   );
 }
