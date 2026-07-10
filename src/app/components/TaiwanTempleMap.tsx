@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -25,7 +25,10 @@ interface MapProps {
 }
 
 export default function TaiwanTempleMap({ distribution }: MapProps) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     // 解決 Leaflet 圖標載入的預設問題（雖然用了 compatibility 但為了確保雙重保險）
     delete (L.Icon.Default.prototype as any)._getIconUrl;
     L.Icon.Default.mergeOptions({
@@ -35,9 +38,12 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
     });
   }, []);
 
+  if (!mounted) return <div style={{ minHeight: '300px' }} className="w-full h-full flex items-center justify-center text-slate-400">Loading Map...</div>;
+
   return (
     <div className="w-full h-full rounded-[40px] overflow-hidden relative z-10 isolate" style={{ minHeight: '300px' }}>
       <MapContainer
+        key={mounted ? "map-mounted" : "map-unmounted"}
         center={[23.6978, 120.9605]} // 台灣中心
         zoom={7}
         scrollWheelZoom={true}
