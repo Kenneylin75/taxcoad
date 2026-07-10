@@ -242,7 +242,7 @@ export default function SuperSalesPage() {
                       <div className="flex gap-4">
                          <div className="flex-1 text-center py-3 bg-white rounded-2xl border border-slate-100">
                             <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">年度貢獻</p>
-                            <p className="text-sm font-black text-slate-900">${(item.revenue * 12).toLocaleString()}</p>
+                            <p className="text-sm font-black text-slate-900">${(item.annualContribution ?? (item.revenue * 12)).toLocaleString()}</p>
                          </div>
                          <div className="flex-1 text-center py-3 bg-white rounded-2xl border border-slate-100">
                             <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">合約狀態</p>

@@ -3102,7 +3102,17 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   for (const t of db_temples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
     if ((creatorInfo && creatorInfo.salesName === name) || t.salesId === salesId) {
-       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0 });
+       let yearlyRent = 0;
+       let setupFee = 0;
+       if (t.freeType !== 'Permanent') {
+          const rent = Number(t.monthlyRent) || (db_config.fixedMonthlyRent || 3600);
+          const cycle = t.paymentCycle || 'Monthly';
+          const discount = db_config.yearlyDiscountRate || 20;
+          yearlyRent = cycle === 'Yearly' ? (rent * 12 * (1 - discount / 100)) : (rent * 12);
+          setupFee = t.setupFee ?? 12000;
+       }
+       const annualContribution = yearlyRent + setupFee;
+       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0, annualContribution });
     }
   }
 
