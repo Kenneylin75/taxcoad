@@ -2057,17 +2057,31 @@ export async function updateStoragePlans(plans: any[]) {
 
 export async function fetchTempleStorages() {
   return withTempleSession(null, true, async (client) => {
-    if (!client) {
       db_temples.forEach(t => {
         if (!db_temple_storages.some(s => s.templeId === t.id)) {
+          const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || t.cloudStorage?.includes('無限') || t.cloudStorage === 'Free' || t.cloudStorage === '免費' || !t.cloudStorage;
+          let qGB = 5;
+          let pName = '免費 5GB 空間';
+          if (isVip) {
+              qGB = 999999;
+              pName = '無限免費方案';
+          } else if (t.cloudStorage) {
+             if (t.cloudStorage.startsWith('SP-')) {
+                 const p = db_storage_plans.find(x => x.id === t.cloudStorage);
+                 if (p) { qGB = p.sizeGb; pName = p.name; }
+             } else {
+                 qGB = parseInt(t.cloudStorage) || 5;
+                 pName = `${qGB}GB`;
+             }
+          }
           db_temple_storages.push({
             id: `TS-${Date.now()}-${t.id}`,
             templeId: t.id,
             templeName: t.templeName,
             city: t.city || '台北市',
             usedBytes: 0,
-            quotaGb: 5,
-            planName: '免費 5GB 空間'
+            quotaGb: qGB,
+            planName: pName
           });
         }
       });
@@ -2077,9 +2091,25 @@ export async function fetchTempleStorages() {
       for (const t of templesRes.rows) {
         const check = await client.query('SELECT * FROM temple_storages WHERE temple_id = $1', [t.id]);
         if ((check.rowCount ?? 0) === 0) {
+          const cloudStorage = t.cloud_storage;
+          const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
+          let qGB = 5;
+          let pName = '免費 5GB 空間';
+          if (isVip) {
+              qGB = 999999;
+              pName = '無限免費方案';
+          } else if (cloudStorage) {
+             if (cloudStorage.startsWith('SP-')) {
+                 const p = db_storage_plans.find(x => x.id === cloudStorage);
+                 if (p) { qGB = p.sizeGb; pName = p.name; }
+             } else {
+                 qGB = parseInt(cloudStorage) || 5;
+                 pName = `${qGB}GB`;
+             }
+          }
           await client.query(
             'INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) VALUES ($1, $2, $3, $4, $5)',
-            [t.id, 0, 5368709120, '標準免費空間', t.city || '台北市']
+            [t.id, 0, qGB * 1024 * 1024 * 1024, pName, t.city || '台北市']
           );
         }
       }
@@ -3294,6 +3324,34 @@ export async function createTempleAccount(data: any) {
   
   db_temples.push(newTemple);
   gStore.db_temples = db_temples;
+  
+  // Initialize temple storage immediately to prevent overriding
+  const isVip = newTemple.plan === 'Unlimited Node' || newTemple.plan === 'Free' || newTemple.plan === '免費' || newTemple.cloudStorage?.includes('無限') || newTemple.cloudStorage === 'Free' || newTemple.cloudStorage === '免費' || !newTemple.cloudStorage;
+  let qGB = 5;
+  let pName = '免費 5GB 空間';
+  if (isVip) {
+      qGB = 999999;
+      pName = '無限免費方案';
+  } else if (newTemple.cloudStorage) {
+     if (newTemple.cloudStorage.startsWith('SP-')) {
+         const p = (globalThis as any).db_storage_plans?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
+         if (p) { qGB = p.sizeGb; pName = p.name; }
+     } else {
+         qGB = parseInt(newTemple.cloudStorage) || 5;
+         pName = `${qGB}GB`;
+     }
+  }
+  const newStorage = {
+    id: `TS-${Date.now()}-${newTemple.id}`,
+    templeId: newTemple.id,
+    templeName: newTemple.templeName,
+    city: newTemple.city || '台北市',
+    usedBytes: 0,
+    quotaGb: qGB,
+    planName: pName
+  };
+  (globalThis as any).db_temple_storages = (globalThis as any).db_temple_storages || [];
+  (globalThis as any).db_temple_storages.push(newStorage);
   
   // Create personnel account for login
   if (data.account && data.password) {
