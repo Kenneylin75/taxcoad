@@ -1357,9 +1357,19 @@ export default function SuperAdminClient({
                                </div>
                                <div className="flex flex-col items-end gap-2">
                                   <div className="flex items-center gap-2">
-                                     {payment.receiptUrl && (
-                                        <button onClick={() => {window.open(payment.receiptUrl, '_blank')}} className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors shadow-sm" title="查看匯款截圖">👁️</button>
-                                     )}
+                                     <button 
+                                        onClick={() => {
+                                           if (payment.receiptUrl) {
+                                              window.open(payment.receiptUrl, '_blank');
+                                           } else {
+                                              alert('該宮廟尚未上傳付款截圖');
+                                           }
+                                        }} 
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-sm ${payment.receiptUrl ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-slate-100 text-slate-300 hover:bg-slate-200'}`} 
+                                        title={payment.receiptUrl ? "查看匯款截圖" : "尚無截圖"}
+                                     >
+                                        👁️
+                                     </button>
                                      <button 
                                         onClick={async () => {
                                            const { toggleBillStatusSimple } = await import('@/app/actions');
