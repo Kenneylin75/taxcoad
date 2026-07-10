@@ -3341,7 +3341,8 @@ export async function createTempleAccount(data: any) {
 }
 
 
-export async function fetchAggregatedAnalytics() {
+export async function fetchAggregatedAnalytics(targetYear?: string) {
+  const currentYear = targetYear || new Date().getFullYear().toString();
   const totalTemples = db_temples.length;
   const activeTemples = db_temples.filter(t => t.status === 'Active').length;
   const totalDistributors = db_distributors.length;
@@ -3367,6 +3368,13 @@ export async function fetchAggregatedAnalytics() {
 
   const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
   
+  const growthTrend = Array.from({ length: 12 }).map((_, i) => {
+    const month = String(i + 1).padStart(2, '0');
+    const prefix = `${currentYear}-${month}`;
+    const count = db_temples.filter(t => (t.timestamp || t.createdAt || '').startsWith(prefix)).length;
+    return { date: prefix, count };
+  });
+  
   return {
     overview: {
       totalTemples,
@@ -3377,13 +3385,7 @@ export async function fetchAggregatedAnalytics() {
       systemHealth: 98
     },
     regionalDistribution,
-    growthTrend: [
-      { date: '2026-01', count: 10 },
-      { date: '2026-02', count: 25 },
-      { date: '2026-03', count: 45 },
-      { date: '2026-04', count: 80 },
-      { date: '2026-05', count: totalTemples }
-    ]
+    growthTrend
   };
 }
 

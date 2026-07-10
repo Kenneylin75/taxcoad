@@ -41,11 +41,11 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
         center={[23.6978, 120.9605]} // 台灣中心
         zoom={7}
         scrollWheelZoom={true}
-        style={{ height: '100%', width: '100%', background: '#0f172a' }} // Tailwind slate-900 色系
+        style={{ height: '100%', width: '100%', background: '#f8fafc' }} // Tailwind slate-50 色系
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
         
         {distribution.map((item, idx) => {
@@ -71,8 +71,8 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
               <Popup className="rounded-2xl">
                 <div className="font-sans text-center px-2 py-1">
                   <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">Region</div>
-                  <div className="text-xl font-black text-slate-800 mb-1">${item.region}</div>
-                  <div className="text-sm font-bold text-slate-500">活動宮廟: <span className="text-indigo-600 font-black text-lg">${item.count}</span> 間</div>
+                  <div className="text-xl font-black text-slate-800 mb-1">{item.region}</div>
+                  <div className="text-sm font-bold text-slate-500">活動宮廟: <span className="text-indigo-600 font-black text-lg">{item.count}</span> 間</div>
                 </div>
               </Popup>
             </Marker>

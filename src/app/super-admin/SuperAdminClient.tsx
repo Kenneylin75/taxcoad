@@ -83,6 +83,7 @@ export default function SuperAdminClient({
   const [bridgeSearch, setBridgeSearch] = useState('');
   const [bridgeDateFilter, setBridgeDateFilter] = useState('all');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [trendYear, setTrendYear] = useState(new Date().getFullYear().toString());
   
   const [isPending, startTransition] = useTransition();
 
@@ -127,7 +128,7 @@ export default function SuperAdminClient({
   
   // --- Data Fetching ---
   useEffect(() => {
-    fetchAggregatedAnalytics().then(setAnalytics);
+    fetchAggregatedAnalytics(trendYear).then(setAnalytics);
     fetchSystemConfig().then(c => {
        setConfig(c);
        if (c.b2bPayment) setB2bPayment(c.b2bPayment);
@@ -339,25 +340,41 @@ export default function SuperAdminClient({
                     ))}
                  </div>
 
-                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                    <div className="lg:col-span-2 bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-10">
-                       <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter px-4 underline decoration-4 decoration-indigo-500 underline-offset-8">市場擴張趨勢 Expansion Analysis</h4>
+                 <div className="grid grid-cols-1 gap-12">
+                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-10">
+                       <div className="flex items-center justify-between px-4">
+                          <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">市場擴張趨勢 Expansion Analysis</h4>
+                          <select 
+                            value={trendYear}
+                            onChange={(e) => {
+                               setTrendYear(e.target.value);
+                               fetchAggregatedAnalytics(e.target.value).then(setAnalytics);
+                            }}
+                            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500"
+                          >
+                             <option value="2026">2026 年</option>
+                             <option value="2025">2025 年</option>
+                             <option value="2024">2024 年</option>
+                          </select>
+                       </div>
                        <div className="h-80 flex items-end gap-3 px-4">
                           {analytics?.growthTrend.map((h: any, i: number) => (
                             <div key={i} className="flex-1 group relative">
                                <div className="bg-slate-50 rounded-2xl w-full h-full absolute inset-0"></div>
-                               <div className="bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-2xl w-full relative z-10 transition-all duration-1000 shadow-lg shadow-indigo-100" style={{ height: `${(h.count/100)*100}%` }}></div>
-                               <p className="text-center mt-6 text-[10px] font-black text-slate-300 uppercase tracking-widest">{h.date.split('-')[1]}月</p>
+                               <div className="bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-2xl w-full relative z-10 transition-all duration-1000 shadow-lg shadow-indigo-100" style={{ height: `${Math.max((h.count/Math.max(...analytics.growthTrend.map((t:any)=>t.count), 1))*100, 5)}%` }}></div>
+                               <p className="text-center mt-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h.date.split('-')[1]}月</p>
+                               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                                 {h.count} 間
+                               </div>
                             </div>
                           ))}
                        </div>
                     </div>
 
-                    <div className="bg-slate-900 p-12 rounded-[60px] shadow-2xl text-white relative overflow-hidden">
-                       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] -mr-20 -mt-20"></div>
+                    <div className="bg-white border border-slate-100 p-12 rounded-[60px] shadow-sm relative overflow-hidden">
                        <div className="relative z-10 space-y-10">
-                          <div><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 italic">Regional Mix</p><h4 className="text-3xl font-black italic tracking-tighter">全球分佈地圖</h4></div>
-                          <div className="w-full h-96 relative">
+                          <div><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 italic">Regional Map</p><h4 className="text-3xl font-black text-slate-900 italic tracking-tighter">全球分佈地圖</h4></div>
+                          <div className="w-full h-[600px] relative rounded-[40px] shadow-inner border border-slate-100 overflow-hidden">
                              {analytics?.regionalDistribution && <TaiwanTempleMap distribution={analytics.regionalDistribution} />}
                           </div>
                        </div>
