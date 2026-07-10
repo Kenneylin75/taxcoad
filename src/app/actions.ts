@@ -2580,7 +2580,7 @@ export async function submitFreeAccountApplication(data: any) {
   }
   const { role, paymentCycle, ...formData } = data;
   
-  const status = (role === 'distributor' || role === 'super-admin') ? 'Active' : 'Pending';
+  const status = (role === 'distributor' || role === 'super-admin' || role === 'super-sales') ? 'Active' : 'Pending';
 
   const sales = db_dist_sales.find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';
@@ -4393,7 +4393,7 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
 
 export async function fetchNotifications(userRole: string) {
   let notifs = [...db_notifications];
-  if (userRole !== 'SuperAdmin') {
+  if (userRole !== 'SuperAdmin' && userRole !== 'SuperSales') {
     const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
     notifs = notifs.filter(n => !adminOnlyTitles.includes(n.title));
   }
