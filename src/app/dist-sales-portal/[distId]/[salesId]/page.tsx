@@ -380,8 +380,8 @@ export default function DistSalesPage() {
                  <div className="flex justify-between items-start">
                      <div className="flex flex-col gap-1.5">
                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                           方案：<span className="text-emerald-600">${app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.9).toLocaleString() : (app.monthlyRent || 3600).toLocaleString()}</span>/{app.paymentCycle === 'Yearly' ? '年' : '月'} 
-                           <span className="ml-1 text-[8px] text-slate-300">(總繳: ${((app.setupFee || 12000) + (app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.9) : (app.monthlyRent || 3600))).toLocaleString()} 含開辦費)</span>
+                           方案：<span className="text-emerald-600">${app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.8).toLocaleString() : (app.monthlyRent || 3600).toLocaleString()}</span>/{app.paymentCycle === 'Yearly' ? '年' : '月'} 
+                           <span className="ml-1 text-[8px] text-slate-300">(總繳: ${((app.setupFee || 12000) + (app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.8) : (app.monthlyRent || 3600))).toLocaleString()} 含開辦費)</span>
                          </p>
                          <div className="flex items-center gap-2">
                              <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${app.paymentStatusLabel?.includes('已付') ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : app.paymentStatusLabel?.includes('免費試用') ? 'text-amber-600 bg-amber-50 border border-amber-100' : 'text-rose-600 bg-rose-50 border border-rose-100'}`}>{app.paymentStatusLabel || '狀態未知'}</span>

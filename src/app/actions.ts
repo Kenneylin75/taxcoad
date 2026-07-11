@@ -242,6 +242,25 @@ export async function loginAccount(formData: FormData) {
           person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password);
         }
 
+        // Auto-heal: If personnel not found, check if a temple has this account/password (created by sales but not yet in personnel)
+        if (!person) {
+           const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
+           const temple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
+           if (temple) {
+              person = {
+                  id: `p-${Date.now()}`,
+                  templeId: temple.id,
+                  name: temple.templeName || '宮廟管理員',
+                  account: temple.account,
+                  password: temple.password,
+                  role: 'TempleAdmin',
+                  status: temple.status
+              };
+              pData.push(person);
+              if (typeof gStore !== 'undefined') gStore.db_personnel = pData;
+           }
+        }
+
         if (person) { 
           const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
           const temple = allTemples.find((t: any) => t.id === person.templeId);
@@ -2580,7 +2599,7 @@ export async function submitFreeAccountApplication(data: any) {
   }
   const { role, paymentCycle, ...formData } = data;
   
-  const status = (role === 'distributor' || role === 'super-admin' || role === 'super-sales') ? 'Active' : 'Pending';
+  const status = (role === 'distributor' || role === 'super-admin') ? 'Active' : 'Pending';
 
   const sales = db_dist_sales.find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';
@@ -3745,14 +3764,32 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
     };
   });
 }
-export async function approveTempleByDistributor(templeId: string) { 
-  const idx = db_temples.findIndex(t => t.id === templeId);
-  if (idx > -1) {
-    db_temples[idx].status = 'Active';
+export async function approveTempleByDistributor(templeId: string) {
+  const t = db_temples.find(x => x.id === templeId);
+  if (t) {
+    t.status = 'Active';
+    const gStore = globalThis as any;
+    gStore.db_temples = db_temples;
+    await generateInitialBills(t);
+    if (t.account && t.password) {
+      const pData = (gStore.db_personnel || db_personnel);
+      if (!pData.some((p:any) => p.account === t.account)) {
+        pData.push({
+          id: `p-${Date.now()}`,
+          templeId: templeId,
+          name: t.templeName || '宮廟管理員',
+          account: t.account,
+          password: t.password,
+          role: 'TempleAdmin',
+          status: 'Active'
+        });
+        gStore.db_personnel = pData;
+      }
+    }
     revalidatePath('/distributor');
     revalidatePath('/dist-sales');
   }
-  return { success: true }; 
+  return { success: true };
 }
 export async function rejectTempleByDistributor(templeId: string) { 
   db_temples = db_temples.filter(t => t.id !== templeId);
@@ -7231,6 +7268,7 @@ export async function fetchTempleBills(templeId: string) {
   try {
     const { dbQuery } = await import('@/db/db');
     const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = $1 ORDER BY created_at DESC", [templeId], () => null) as any;
+    if (!res) throw new Error("No DB connection");
     const rows = res?.rows;
     return (rows || []).map((r: any) => ({
       id: r.id,
@@ -7273,8 +7311,12 @@ export async function uploadTempleBillReceipt(billId: string, imageUrl: string) 
 
 export async function approveTempleBill(billId: string) {
   try {
-      const { dbQuery } = await import('@/db/db');
-      const { rows } = await dbQuery("UPDATE temple_bills SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
+      let rows: any = [];
+      try {
+        const { dbQuery } = await import('@/db/db');
+        const res = await dbQuery("UPDATE temple_bills SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
+        if (res && res.rows) rows = res.rows;
+      } catch (err) {}
       
       const bill = db_temple_bills.find(b => b.id === billId);
       if (bill) {
@@ -7335,13 +7377,40 @@ export async function approveTempleBill(billId: string) {
 
 export async function toggleBillStatusSimple(billId: string, status: string) {
   try {
-      const { dbQuery } = await import('@/db/db');
-      await dbQuery("UPDATE temple_bills SET status = $1 WHERE id = $2", [status, billId]);
+      try {
+        const { dbQuery } = await import('@/db/db');
+        await dbQuery("UPDATE temple_bills SET status = $1 WHERE id = $2", [status, billId]);
+      } catch (err) {}
       
       const bill = db_temple_bills.find(b => b.id === billId);
       if (bill) {
         bill.status = status as any;
         gStore.db_temple_bills = db_temple_bills;
+        if (status === 'Unpaid' || status === 'PendingPayment') {
+            const templeId = bill.templeId;
+            if (templeId) {
+                const tIdx = (gStore.db_temples || []).findIndex((t: any) => t.id === templeId);
+                if (tIdx > -1) {
+                    gStore.db_temples[tIdx].paymentStatus = 'PendingPayment';
+                    gStore.db_temples[tIdx].status = 'Pending';
+                }
+            }
+
+            // Reverse commission if it exists
+            if ((globalThis as any).db_commissions) {
+                const commIdx = (globalThis as any).db_commissions.findIndex((c:any) => c.billId === billId);
+                if (commIdx > -1) {
+                    const comm = (globalThis as any).db_commissions[commIdx];
+                    if ((globalThis as any).db_wallets) {
+                        const w = (globalThis as any).db_wallets.find((w:any) => w.id === comm.salesId);
+                        if (w) {
+                            w.balance = Math.max(0, (w.balance || 0) - comm.amount);
+                        }
+                    }
+                    (globalThis as any).db_commissions.splice(commIdx, 1);
+                }
+            }
+        }
       }
       return { success: true };
   } catch (e) {

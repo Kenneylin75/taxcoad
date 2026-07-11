@@ -586,7 +586,7 @@ export default function SuperAdminClient({
            {activeTab === 'approvals' && (
               <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-700">
                  <div className="grid grid-cols-1 gap-8">
-                    {initialTemples.filter(t => t.status === 'Pending').map((app: any) => (
+                    {initialTemples.filter((t: any) => t.status === 'Pending' && !t.distributorId).map((app: any) => (
                        <div key={app.id} className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all">
                           <div className="flex items-center gap-10">
                              <div className="w-24 h-24 bg-slate-50 rounded-[40px] flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform">🏮</div>
@@ -1411,7 +1411,7 @@ export default function SuperAdminClient({
                                         }}
                                         className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}
                                      >
-                                       {payment.status === 'Paid' ? '已收款' : payment.status === 'PendingVerification' ? '待審核' : '未付款'}
+                                       {payment.status === 'Paid' ? '已付款' : '未付款'}
                                      </button>
                                   </div>
                                </div>

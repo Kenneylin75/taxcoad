@@ -721,7 +721,7 @@ export default function DistributorClient({
                     </div>
                     <div className="p-8 bg-blue-50/50 rounded-[40px] space-y-5 border border-blue-100/30 shadow-inner">
                        <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">合約開辦費</span><span className="text-slate-900 font-black">${app.setupFee?.toLocaleString() || '12,000'}</span></div>
-                       <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">{app.paymentCycle === 'Yearly' ? '方案年繳' : '方案月租'}</span><span className="text-blue-600 underline decoration-2 font-black">${app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.9).toLocaleString() : (app.monthlyRent?.toLocaleString() || '3,600')}</span></div>
+                       <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">{app.paymentCycle === 'Yearly' ? '方案年繳' : '方案月租'}</span><span className="text-blue-600 underline decoration-2 font-black">${app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.8).toLocaleString() : (app.monthlyRent?.toLocaleString() || '3,600')}</span></div>
                     </div>
                     <div className="flex gap-3 pt-2">
                        <button onClick={() => {setSelectedAppId(app.id); setIsRejectModalOpen(true);}} className="flex-1 py-5 bg-slate-50 text-slate-400 rounded-[28px] font-black text-[10px] uppercase tracking-widest transition-all hover:bg-rose-50 hover:text-rose-600">駁回申請</button>
@@ -1130,24 +1130,27 @@ export default function DistributorClient({
                              <p className="text-sm font-bold text-slate-500 mt-1">金額: NT$ {(payment.amount || 0).toLocaleString()} <span className="text-xs text-slate-400 ml-2">項目: {payment.type === 'MonthlyFee' ? '月租費' : payment.type}</span></p>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                             <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
-                               {payment.status === 'Paid' ? '已收款' : payment.status === 'PendingVerification' ? '待審核' : '未付款'}
-                             </span>
-                             {payment.status === 'PendingVerification' && (
-                               <div className="flex items-center gap-3">
-                                 {payment.receiptUrl && (
-                                   <button onClick={() => {setCurrentOrderId(payment.id); setCurrentReceiptImage(payment.receiptUrl); setB2bReceiptViewerOpen(true);}} className="text-xs font-black text-blue-600 underline">查看匯款截圖</button>
-                                 )}
-                                 <button onClick={async () => {
-                                    if(confirm('確認已收到款項？核銷後將計算營業額與獎金。')) {
-                                      const { approveTempleBill } = await import('@/app/actions');
-                                      await approveTempleBill(payment.id);
-                                      alert('核銷成功');
+                             <div className="flex items-center gap-3">
+                               {payment.receiptUrl && (
+                                 <button onClick={() => {setCurrentOrderId(payment.id); setCurrentReceiptImage(payment.receiptUrl); setCurrentOrderType('temple_bill'); setB2bReceiptViewerOpen(true);}} className="text-lg hover:opacity-70 transition-opacity" title="查看匯款截圖">👁️</button>
+                               )}
+                               <span 
+                                 onClick={async () => {
+                                    const newStatus = payment.status === 'Paid' ? 'Unpaid' : 'Paid';
+                                    if(confirm(newStatus === 'Paid' ? '確認已收到款項？核銷後將計算營業額與獎金。' : '確認退回未付款狀態？')) {
+                                      const { toggleBillStatusSimple, approveTempleBill } = await import('@/app/actions');
+                                      if (newStatus === 'Paid') {
+                                         await approveTempleBill(payment.id);
+                                      } else {
+                                         await toggleBillStatusSimple(payment.id, 'Unpaid');
+                                      }
                                       window.location.reload();
                                     }
-                                 }} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-xs font-black shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition-all">確認已付款</button>
-                               </div>
-                             )}
+                                 }}
+                                 className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.receiptUrl ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
+                                 {payment.status === 'Paid' ? '已付款' : '未付款'}
+                               </span>
+                             </div>
                           </div>
                        </div>
                      ))

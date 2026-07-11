@@ -48,8 +48,11 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
   const handleUploadReceipt = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setReceiptImage(url);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -400,7 +403,7 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                             <td className="px-6 py-4">
                                {exp.status === 'Paid' ? (
                                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-                                     ✓ Paid
+                                     ✓ 已付款
                                   </span>
                                ) : exp.status === 'PendingVerification' ? (
                                   <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded border border-amber-100">
@@ -408,7 +411,7 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                                   </span>
                                ) : (
                                   <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded border border-rose-100">
-                                     ! Unpaid
+                                     ! 未付款
                                   </span>
                                )}
                             </td>
