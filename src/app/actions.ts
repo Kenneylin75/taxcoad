@@ -4653,21 +4653,22 @@ export async function updateAccountPermissions(id: string, permissions: string[]
 export async function updateAccountPassword(id: string, newPass: string, role?: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      if (role === 'Temple' || id.startsWith('temple-')) {
-         const idx = db_personnel.findIndex((p: any) => p.templeId === id);
-         if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
-      } else if (role === 'Distributor') {
-         const idx = db_distributors.findIndex((p: any) => p.id === id);
-         if (idx > -1) { db_distributors[idx].password = newPass; gStore.db_distributors = db_distributors; }
-      } else if (role === 'SuperSales' || role === 'DistSales') {
-         const idx = db_dist_sales.findIndex((p: any) => p.id === id);
-         if (idx > -1) { db_dist_sales[idx].password = newPass; gStore.db_dist_sales = db_dist_sales; }
-      } else {
-         const idx = db_personnel.findIndex((p: any) => p.id.toString() === id.toString());
-         if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
-      }
+    // 永遠更新記憶體資料，以免登入時 fallback 到舊密碼
+    if (role === 'Temple' || id.startsWith('temple-')) {
+       const idx = db_personnel.findIndex((p: any) => p.templeId === id);
+       if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
+    } else if (role === 'Distributor') {
+       const idx = db_distributors.findIndex((p: any) => p.id === id);
+       if (idx > -1) { db_distributors[idx].password = newPass; gStore.db_distributors = db_distributors; }
+    } else if (role === 'SuperSales' || role === 'DistSales') {
+       const idx = db_dist_sales.findIndex((p: any) => p.id === id);
+       if (idx > -1) { db_dist_sales[idx].password = newPass; gStore.db_dist_sales = db_dist_sales; }
     } else {
+       const idx = db_personnel.findIndex((p: any) => p.id.toString() === id.toString());
+       if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
+    }
+
+    if (client) {
       if (role === 'Distributor') {
         await client.query('UPDATE distributors SET password = $1 WHERE id = $2', [newPass, id]);
       } else if (role === 'SuperSales' || role === 'DistSales') {
