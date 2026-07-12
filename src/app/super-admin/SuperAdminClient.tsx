@@ -365,19 +365,26 @@ export default function SuperAdminClient({
                              <option value="2024">2024 年</option>
                           </select>
                        </div>
-                       <div className="h-80 flex items-end gap-3 px-4">
-                          {analytics?.growthTrend.map((h: any, i: number) => (
-                            <div key={i} className="flex-1 group relative">
-                               <div className="bg-slate-50 rounded-2xl w-full h-full absolute inset-0"></div>
-                               <div className="bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-2xl w-full relative z-10 transition-all duration-1000 shadow-lg shadow-indigo-100" style={{ height: `${Math.max((h.count/Math.max(...analytics.growthTrend.map((t:any)=>t.count), 1))*100, 5)}%` }}></div>
-                               <p className="text-center mt-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h.date.split('-')[1]}月</p>
-                               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-                                 {h.count} 間
+                                              <div className="h-80 flex items-end gap-3 px-4 pb-8">
+                          {analytics?.growthTrend.map((h: any, i: number, arr: any[]) => {
+                             const maxCount = Math.max(...arr.map(t => t.count), 1);
+                             const barHeight = Math.max((h.count / maxCount) * 100, 5);
+                             return (
+                               <div key={i} className="flex-1 relative h-full flex flex-col justify-end">
+                                  <div className="bg-slate-50 rounded-2xl w-full h-full absolute inset-0"></div>
+                                  <div 
+                                    className="bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-2xl w-full relative z-10 transition-all duration-1000 shadow-lg shadow-indigo-100 group" 
+                                    style={{ height: `${barHeight}%` }}
+                                  >
+                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 whitespace-nowrap">
+                                      {h.count} 間
+                                    </div>
+                                  </div>
+                                  <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest absolute -bottom-8 left-0 w-full">{h.date.split('-')[1]}月</p>
                                </div>
-                            </div>
-                          ))}
-                       </div>
-                    </div>
+                             );
+                          })}
+                       </div></div>
 
                     <div className="bg-white border border-slate-100 p-12 rounded-[60px] shadow-sm relative overflow-hidden">
                        <div className="relative z-10 space-y-10">
