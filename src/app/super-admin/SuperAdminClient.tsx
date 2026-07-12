@@ -56,8 +56,8 @@ export default function SuperAdminClient({
   const [config, setConfig] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [finance, setFinance] = useState<any>(null);
-  const [financeMonth, setFinanceMonth] = useState('2026-07');
-  const [templePaymentMonth, setTemplePaymentMonth] = useState('2026-07');
+  const [financeMonth, setFinanceMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
+  const [templePaymentMonth, setTemplePaymentMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
   const [withdrawalProofs, setWithdrawalProofs] = useState<{[key:string]: string}>({});
   const [syncQueue, setSyncQueue] = useState<any[]>([]);
   const [pendingDistributors, setPendingDistributors] = useState<any[]>([]);
@@ -75,10 +75,6 @@ export default function SuperAdminClient({
     transfer: { bankCode: '', accountNumber: '', accountName: '' }
   });
   const [templePaymentFilter, setTemplePaymentFilter] = useState('ALL');
-  const [templePaymentMonth, setTemplePaymentMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
   const [allTempleAiUsage, setAllTempleAiUsage] = useState<any[]>([]);
   const [templeStorages, setTempleStorages] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
