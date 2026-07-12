@@ -1565,6 +1565,21 @@ export default function SuperAdminClient({
                                        {node.planName} {node.price > 0 ? (node.planName.includes('經銷') && node.price >= 160000 ? `(NT$${node.price.toLocaleString()} / ${node.durationYears || 2}年 / ${node.nodes || 100}組宮廟帳戶)` : `(NT$${node.price.toLocaleString()})`) : '(免費)'}
                                     </span>
                                  )}
+                                 {node.type === 'temple' && node.freeType !== 'Permanent' && (() => {
+                                    const now = new Date();
+                                    const start = node.billingStartDate ? new Date(node.billingStartDate) : new Date(node.joinedAt);
+                                    const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
+                                    if (diffDays > 0) {
+                                       return <span className="text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm">剩餘 {diffDays} 天試用</span>;
+                                    } else {
+                                       const month = now.getMonth() + 1;
+                                       const year = now.getFullYear();
+                                       const periodStr = node.paymentCycle === 'Yearly' ? `${year}年` : `${month}月`;
+                                       const paidStr = node.paymentStatus === 'Paid' ? '已付款' : '未付款';
+                                       const colorClass = node.paymentStatus === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
+                                       return <span className={`${colorClass} px-1.5 py-0.5 rounded border shadow-sm`}>{periodStr} {paidStr}</span>;
+                                    }
+                                 })()}
                               </div>
                            </div>
                         </div>

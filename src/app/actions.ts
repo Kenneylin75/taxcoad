@@ -7027,7 +7027,11 @@ export async function fetchDataBridgeTree() {
           expirationDate: t.expirationDate || null,
           planName: t.planName || planStr,
           price: t.freeType === 'Permanent' ? 0 : calcPrice,
-          status: t.status || 'Active'
+          status: t.status || 'Active',
+          freeType: t.freeType,
+          billingStartDate: t.billingStartDate,
+          paymentCycle: t.paymentCycle,
+          paymentStatus: t.paymentStatus
         };
       });
   };
@@ -7059,7 +7063,11 @@ export async function fetchDataBridgeTree() {
             expirationDate: t.expirationDate || null,
             planName: t.planName || planStr,
             price: t.freeType === 'Permanent' ? 0 : calcPrice,
-            status: t.status || 'Active'
+            status: t.status || 'Active',
+            freeType: t.freeType,
+            billingStartDate: t.billingStartDate,
+            paymentCycle: t.paymentCycle,
+            paymentStatus: t.paymentStatus
           };
         })
       }));
@@ -7179,7 +7187,11 @@ export async function fetchDataBridgeTree() {
             expirationDate: t.expirationDate || null,
             planName: t.planName || planStr,
             price: t.freeType === 'Permanent' ? 0 : calcPrice,
-            status: t.status || 'Active'
+            status: t.status || 'Active',
+            freeType: t.freeType,
+            billingStartDate: t.billingStartDate,
+            paymentCycle: t.paymentCycle,
+            paymentStatus: t.paymentStatus
           };
         })
       }))
