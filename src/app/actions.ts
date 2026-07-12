@@ -3513,7 +3513,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   const sales = db_dist_sales.find(s => s.id === salesId);
   const salesName = sales?.name;
   
-  const myTemples = [];
+  const myTemples: any[] = [];
   for (const t of db_temples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
     if ((creatorInfo && creatorInfo.salesName === salesName) || t.salesId === salesId) {
@@ -3524,6 +3524,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   }
   
   let totalEarned = 0;
+  let totalPending = 0;
   let totalRevenue = 0;
   const records: any[] = [];
   
@@ -3534,71 +3535,59 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   const rentY2 = rules.templeRentRates?.[1] ?? rules.rentYear2Percent ?? 12;
   const rentY3 = rules.templeRentRates?.[2] ?? rules.rentYear3PlusPercent ?? 10;
 
-  const now = new Date();
-  
   myTemples.forEach(t => {
-    // Only count if payment is Paid, or if it's legacy active without paymentStatus
-    const isPaid = t.paymentStatus === 'Paid' || (!t.paymentStatus && t.status === 'Active');
-    if (!isPaid) return;
-
-    const activeDate = new Date(t.timestamp);
-    const monthsDiff = (now.getFullYear() - activeDate.getFullYear()) * 12 + (now.getMonth() - activeDate.getMonth());
+    const bills = db_temple_bills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
     
-    // Revenue Calculation (incorporating Yearly discounts)
-    const baseSetupFee = t.setupFee || 12000;
-    const baseMonthlyRent = t.monthlyRent || 3600;
-    const isYearly = t.paymentCycle === 'Yearly';
-    const discountRate = db_config.yearlyDiscountRate || 20;
-    const currentRentValue = isYearly ? (baseMonthlyRent * 12 * (1 - discountRate / 100)) : baseMonthlyRent;
-    
-    // 1. 開辦費分潤 (只有第一個月才算)
-    if (monthsDiff === 0) {
-      const setupFeeCom = baseSetupFee * (setupRate / 100);
-      totalEarned += setupFeeCom;
-      totalRevenue += baseSetupFee;
-      records.push({
-        id: `${t.id}-setup`, 
-        templeName: t.templeName, 
-        date: t.timestamp.split('T')[0], 
-        type: '開辦費分潤', 
-        amount: setupFeeCom, 
-        phase: 'Setup',
-        calculation: `開辦費 $${baseSetupFee.toLocaleString()} * ${setupRate}%`
-      });
-    }
-
-    // 2. 月/年租費分潤 (依據年份階梯)
-    // 對於年繳，我們在首月（monthsDiff === 0）或每年週期（monthsDiff % 12 === 0）一次性發放/認列
-    // 對於月繳，每月發放
-    const shouldRecognizeRent = isYearly ? (monthsDiff % 12 === 0) : true;
-
-    if (shouldRecognizeRent) {
-      let rentPercent = rentY1;
-      let yearLabel = '第一年';
+    bills.forEach(bill => {
+      // Ignore bills that don't generate commission
+      if (!['SetupFee', 'Setup', 'MonthlyFee', 'YearlyFee'].includes(bill.type)) return;
       
-      if (monthsDiff >= 12 && monthsDiff < 24) {
-        rentPercent = rentY2;
-        yearLabel = '第二年';
-      } else if (monthsDiff >= 24) {
-        rentPercent = rentY3;
-        yearLabel = '第三年及以上';
+      const isPaid = bill.status === 'Paid';
+      let commission = 0;
+      let label = '';
+      let percent = 0;
+
+      if (bill.type === 'SetupFee' || bill.type === 'Setup') {
+        percent = setupRate;
+        commission = bill.amount * (percent / 100);
+        label = '開辦費分潤';
+      } else {
+        // Calculate years difference from temple creation to bill date
+        const activeDate = new Date(t.timestamp || bill.timestamp);
+        const billDate = new Date(bill.billingDate || bill.dueDate || bill.timestamp);
+        let monthsDiff = (billDate.getFullYear() - activeDate.getFullYear()) * 12 + (billDate.getMonth() - activeDate.getMonth());
+        if (monthsDiff < 0) monthsDiff = 0;
+
+        if (monthsDiff < 12) {
+          percent = rentY1;
+          label = `${bill.type === 'YearlyFee' ? '年繳' : '月租'}提成 (第一年)`;
+        } else if (monthsDiff < 24) {
+          percent = rentY2;
+          label = `${bill.type === 'YearlyFee' ? '年繳' : '月租'}提成 (第二年)`;
+        } else {
+          percent = rentY3;
+          label = `${bill.type === 'YearlyFee' ? '年繳' : '月租'}提成 (第三年及以上)`;
+        }
+        commission = bill.amount * (percent / 100);
       }
       
-      const rentCom = currentRentValue * (rentPercent / 100);
-      totalEarned += rentCom;
-      totalRevenue += currentRentValue;
-      
-      records.push({
-        id: `${t.id}-rent-${monthsDiff}`, 
-        templeName: t.templeName, 
-        date: new Date().toISOString().split('T')[0], 
-        type: `${isYearly ? '年繳' : '月租'}提成 (${yearLabel})`, 
-        amount: rentCom,
-        percent: rentPercent,
-        monthsDiff,
-        calculation: `${isYearly ? '年繳' : '月租'} $${currentRentValue.toLocaleString()} * ${rentPercent}%`
-      });
-    }
+      if (isPaid) {
+        totalEarned += commission;
+        totalRevenue += bill.amount;
+        records.push({
+          id: bill.id,
+          templeName: t.templeName,
+          date: bill.dueDate || bill.billingDate || bill.timestamp.split('T')[0],
+          type: label,
+          amount: commission,
+          percent,
+          phase: bill.type.includes('Setup') ? 'Setup' : 'Rent',
+          calculation: `${bill.type.includes('Setup') ? '開辦費' : (bill.type === 'YearlyFee' ? '年繳' : '月租')} $${bill.amount.toLocaleString()} * ${percent}%`
+        });
+      } else {
+        totalPending += commission;
+      }
+    });
   });
   
   // 3. 手動獎金覆寫 (Bonus Overrides)
@@ -3616,9 +3605,9 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     });
   });
   
-  const wallet = db_wallets.find(w => w.name === salesName);
   const myWithdrawals = db_withdrawals.filter(w => w.salesName === salesName);
   const pendingRequests = myWithdrawals.filter(w => w.status === 'Pending' || w.status === '審核中');
+  const calculatedTotalWithdrawn = myWithdrawals.filter(w => w.status === 'Verified' || w.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0);
   
   const revenueRecords: any[] = [];
   myTemples.forEach(t => {
@@ -3627,8 +3616,8 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
           revenueRecords.push({
              id: b.id,
              templeName: t.templeName,
-             date: b.date,
-             type: b.type === 'Setup' ? '開辦費' : '營運費',
+             date: b.date || b.dueDate || b.billingDate,
+             type: b.type === 'Setup' || b.type === 'SetupFee' ? '開辦費' : '營運費',
              amount: b.amount,
              status: b.status,
              receiptUrl: b.receiptUrl
@@ -3638,10 +3627,11 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   
   return {
     totalEarned,
+    totalPending,
     totalRevenue,
     netProfit: totalRevenue - totalEarned,
-    balance: wallet ? wallet.balance : totalEarned, 
-    totalWithdrawn: myWithdrawals.filter(w => w.status === 'Verified' || w.status === 'Approved').reduce((acc, curr) => acc + curr.amount, 0),
+    balance: totalEarned - calculatedTotalWithdrawn,
+    totalWithdrawn: calculatedTotalWithdrawn,
     records,
     revenueRecords,
     rules,
@@ -4374,30 +4364,12 @@ export async function updateServiceSettings(settings: any) {
 }
 
 export async function fetchEarningsStats(salesId: string = '超級精英業務') { 
-  return withTempleSession(null, true, async (client) => {
-    if (!client) return { balance: 0, pending: 0, totalWithdrawn: 0 };
-    
-    let salesName = salesId;
-    if (salesId.startsWith('sales-')) {
-       const sRes = await client.query('SELECT name FROM distributor_sales WHERE id = $1', [salesId]);
-       if ((sRes.rowCount ?? 0) > 0) salesName = sRes.rows[0].name;
-    }
-
-    const wRes = await client.query('SELECT balance FROM wallets WHERE name = $1', [salesName]);
-    const balance = (wRes.rowCount ?? 0) > 0 ? Number(wRes.rows[0].balance) : 0;
-    
-    const wdRes = await client.query("SELECT SUM(amount) as total FROM withdrawals WHERE sales_name = $1 AND status = 'Approved'", [salesName]);
-    const totalWithdrawn = Number(wdRes.rows[0]?.total || 0);
-
-    const pendingRes = await client.query("SELECT SUM(amount) as total FROM withdrawals WHERE sales_name = $1 AND status = 'Pending'", [salesName]);
-    const pending = Number(pendingRes.rows[0]?.total || 0);
-
-    return {
-      balance,
-      pending,
-      totalWithdrawn
-    };
-  });
+  const history = await fetchCommissionHistory(salesId, '', '');
+  return {
+    balance: history.balance,
+    pending: history.pendingRequests.reduce((acc: any, curr: any) => acc + curr.amount, 0),
+    totalWithdrawn: history.totalWithdrawn
+  };
 }
 
 export async function requestWithdrawal(salesName: string, amount: number) { 

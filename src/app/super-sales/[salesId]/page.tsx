@@ -289,7 +289,7 @@ export default function SuperSalesPage() {
                 </div>
                 <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-4">
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">待結算中獎金</p>
-                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter">${(commissionHistory?.totalEarned || 0).toLocaleString()}</h2>
+                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter">${(commissionHistory?.totalPending || 0).toLocaleString()}</h2>
                    <div className="pt-2 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                       <span className="text-[10px] font-bold text-slate-400 uppercase">依據宮廟年資精確結算</span>
