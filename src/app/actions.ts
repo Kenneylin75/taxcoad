@@ -2850,10 +2850,16 @@ export async function approveDistributorBySuperAdmin(id: string) {
     // 反查業務員實際 ID
     const actualSales = db_dist_sales.find(s => s.name === app.submittedBy);
     
+    const accountName = app.account || app.name;
+    
+    // Prevent duplicate insertion in memory
+    const existingDist = db_distributors.find(d => d.account === accountName);
+    if (existingDist) return { success: true };
+
     const newDist = {
       id: distId,
       name: app.name,
-      account: app.account || app.name,
+      account: accountName,
       password: app.password || 'pivot2026',
       planId: plan?.id || 'PLAN-A',
       planName: plan?.name || '標準代理方案',
@@ -2945,8 +2951,12 @@ export async function fetchAllAccountsForAdmin() {
   } catch (e) {}
 
   const allDistributorsMap = new Map();
-  db_distributors.forEach(d => allDistributorsMap.set(d.id, d));
-  pgDistributors.forEach(d => allDistributorsMap.set(d.id, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, phone: d.phone, email: d.email, address: d.address, contactName: d.contact_name, taxId: d.tax_id }));
+  db_distributors.forEach(d => {
+    allDistributorsMap.set(d.account, d);
+  });
+  pgDistributors.forEach(d => {
+    allDistributorsMap.set(d.account, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, phone: d.phone, email: d.email, address: d.address, contactName: d.contact_name, taxId: d.tax_id });
+  });
   
   Array.from(allDistributorsMap.values()).forEach(d => {
     accounts.push({ ...d, id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
@@ -2962,8 +2972,8 @@ export async function fetchAllAccountsForAdmin() {
   } catch (e) {}
 
   const allSalesMap = new Map();
-  db_dist_sales.forEach(s => allSalesMap.set(s.id, s));
-  pgSales.forEach(s => allSalesMap.set(s.id, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
+  db_dist_sales.forEach(s => allSalesMap.set(s.account, s));
+  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
   Array.from(allSalesMap.values()).forEach(s => {
     if (s.role === 'SuperSales') {
