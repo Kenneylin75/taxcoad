@@ -136,16 +136,24 @@ export default function AdvancedSettingsPage() {
     const plan = storagePlans.find(p => p.id === selectedPlanId);
     if (!plan) return;
 
-    const priceMonthly = plan.priceMonthly;
-    const priceYearly = Math.round(plan.priceMonthly * 12 * 0.8);
-    const finalPrice = selectedCycle === 'Monthly' ? priceMonthly : priceYearly;
-
     setIsPaying(true);
-    // 建立訂單編號: TS-[Timestamp]-temple-1-[PlanSizeGb]-[selectedCycle]
-    const orderId = `TS-${Date.now()}-temple-1-${plan.sizeGb}-${selectedCycle}`;
-    
-    // 跳轉至我們的模擬支付網關
-    window.location.href = `/api/payment-mock-gateway?orderId=${orderId}&amount=${finalPrice}&gateway=ecpay`;
+    startTransition(async () => {
+      try {
+        const { requestTempleStorageUpgrade } = await import('@/app/actions');
+        const currentTempleId = window.location.pathname.split('/')[1];
+        const res = await requestTempleStorageUpgrade(currentTempleId, plan.id, selectedCycle);
+        if (res && res.success === false) {
+           alert(res.message);
+        } else {
+           alert(`🎉 升級帳單已產生！\n請前往「帳務管理中心 => 平台支付」上傳匯款截圖。\n待系統管理員審核後即可擴充您的 ${plan.sizeGb}GB 雲端空間！`);
+           setIsUpgradeModalOpen(false);
+        }
+      } catch (e) {
+        alert('升級處理失敗，請稍後再試');
+      } finally {
+        setIsPaying(false);
+      }
+    });
   };
 
   const sections = [
@@ -776,19 +784,29 @@ export default function AdvancedSettingsPage() {
                  <button 
                     onClick={() => {
                        if (!selectedAiPlanId) return alert('請選擇方案');
-                       if ((!b2bConfig || (!b2bConfig?.thirdParty?.enabled && !b2bConfig?.linePay?.enabled && !b2bConfig?.customTransfer?.enabled))) {
-                         alert('上層機構尚未設定收款方式，請聯繫代理商或系統客服。');
-                         return;
-                       }
-                       setB2bTarget({ type: 'ai' });
-                       setSelectedB2bMethod(b2bConfig?.thirdParty?.enabled ? 'creditCard' : b2bConfig?.linePay?.enabled ? 'linePay' : 'transfer');
-                       setIsAiModalOpen(false); // Close AI plan modal
-                       setB2bModalOpen(true);
+                       setIsPaying(true);
+                       startTransition(async () => {
+                          try {
+                             const { requestAiPlanUpgrade } = await import('@/app/actions');
+                             const currentTempleId = window.location.pathname.split('/')[1];
+                             const res = await requestAiPlanUpgrade(currentTempleId, selectedAiPlanId);
+                             if (res && res.success === false) {
+                                alert(res.message);
+                             } else {
+                                alert(`🎉 升級帳單已產生！\n請前往「帳務管理中心 => 平台支付」上傳匯款截圖。\n待系統管理員審核後即可開通 AI 高級方案！`);
+                                setIsAiModalOpen(false);
+                             }
+                          } catch (e) {
+                             alert('升級處理失敗，請稍後再試');
+                          } finally {
+                             setIsPaying(false);
+                          }
+                       });
                     }}
                     disabled={isPaying || !selectedAiPlanId}
                     className="w-full py-5 bg-slate-900 text-fuchsia-400 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                  >
-                    {isPaying ? '處理金流中...' : '確認信用卡結帳並啟用'}
+                    {isPaying ? '處理中...' : '確認方案並產生帳單'}
                  </button>
                  <p className="text-center text-[9px] font-bold text-slate-400 mt-4 uppercase tracking-widest italic">付款後將立即重置 30 天訂閱期與對話次數</p>
               </div>

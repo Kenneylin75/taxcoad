@@ -2163,6 +2163,78 @@ export async function fetchTempleStorages() {
   });
 }
 
+export async function requestTempleStorageUpgrade(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly') {
+  return withTempleSession(templeId, true, async (client) => {
+    const plan = db_storage_plans.find((p: any) => p.id === planId);
+    if (!plan) return { success: false, message: '找不到選定的空間方案' };
+
+    const discount = db_config.yearlyDiscountRate || 20;
+    const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
+    const finalAmount = Math.round(plan.priceMonthly * priceFactor);
+
+    if (!client) {
+      db_temple_bills.push({
+        id: `BILL-STORAGE-${Date.now()}`,
+        templeId,
+        type: 'StorageUpgrade',
+        item_name: `雲端空間擴充方案 - ${plan.name} (${planId})`,
+        amount: finalAmount,
+        billingDate: new Date().toISOString().substring(0, 7),
+        dueDate: new Date().toISOString().split('T')[0],
+        status: 'Unpaid',
+        payeeRole: 'SuperAdmin',
+        payeeId: 'system-hq',
+        timestamp: new Date().toISOString()
+      });
+      gStore.db_temple_bills = db_temple_bills;
+    } else {
+      await client.query(`
+        INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `, [
+        `BILL-STORAGE-${Date.now()}`, templeId, 'StorageUpgrade', `雲端空間擴充方案 - ${plan.name} (${planId})`,
+        finalAmount, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
+        'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
+      ]);
+    }
+    return { success: true };
+  });
+}
+
+export async function requestAiPlanUpgrade(templeId: string, planId: string) {
+  return withTempleSession(templeId, true, async (client) => {
+    const plan = db_ai_plans.find((p: any) => p.id === planId);
+    if (!plan) return { success: false, message: '找不到選定的AI方案' };
+
+    if (!client) {
+      db_temple_bills.push({
+        id: `BILL-AI-${Date.now()}`,
+        templeId,
+        type: 'AiUpgrade',
+        item_name: `AI 生活助理 - ${plan.name} (${planId})`,
+        amount: plan.monthlyFee,
+        billingDate: new Date().toISOString().substring(0, 7),
+        dueDate: new Date().toISOString().split('T')[0],
+        status: 'Unpaid',
+        payeeRole: 'SuperAdmin',
+        payeeId: 'system-hq',
+        timestamp: new Date().toISOString()
+      });
+      gStore.db_temple_bills = db_temple_bills;
+    } else {
+      await client.query(`
+        INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `, [
+        `BILL-AI-${Date.now()}`, templeId, 'AiUpgrade', `AI 生活助理 - ${plan.name} (${planId})`,
+        plan.monthlyFee, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
+        'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
+      ]);
+    }
+    return { success: true };
+  });
+}
+
 export async function upgradeTempleStorage(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly', isManualGrant: boolean = false) {
   return withTempleSession(templeId, true, async (client) => {
     if (!client) {
@@ -7426,10 +7498,50 @@ export async function approveTempleBill(billId: string) {
             gStore.db_temples[tIdx].status = 'Active';
          }
       }
-      
 
       if (bill) {
         const temple = (globalThis as any).db_temples?.find((t:any) => t.id === bill.templeId);
+
+        // --- ADDED LOGIC FOR UPGRADES ON BILL APPROVAL ---
+        if (bill.type === 'StorageUpgrade' || bill.type === 'AiUpgrade') {
+           const match = bill.item_name.match(/\(([^)]+)\)$/);
+           const planId = match ? match[1] : null;
+
+           const adminWallet = (globalThis as any).db_wallets?.find((w:any) => w.role === 'SuperAdmin');
+           if (adminWallet) {
+              adminWallet.balance += bill.amount;
+           }
+           
+           (globalThis as any).db_finance_records?.unshift({
+              id: `F-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+              type: 'INCOME',
+              category: bill.type === 'StorageUpgrade' ? 'SPACE_UPGRADE' : 'AI_UPGRADE',
+              amount: bill.amount,
+              source: `${temple?.templeName || '宮廟'}-${bill.type === 'StorageUpgrade' ? '雲端空間升級' : 'AI方案升級'} (後台審核)`,
+              date: new Date().toISOString().split('T')[0]
+           });
+
+           if (bill.type === 'StorageUpgrade' && planId) {
+              await upgradeTempleStorage(bill.templeId, planId, 'Monthly', true);
+           } else if (bill.type === 'AiUpgrade' && planId) {
+              let usage = db_temple_ai_usage.find(u => u.templeId === bill.templeId);
+              const thirtyDaysLater = new Date();
+              thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+              
+              if (usage) {
+                 usage.planId = planId;
+                 usage.expiryDate = thirtyDaysLater.toISOString();
+                 usage.usedCount = 0;
+                 usage.enabled = true;
+              } else {
+                 usage = { templeId: bill.templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
+                 db_temple_ai_usage.push(usage);
+              }
+              gStore.db_temple_ai_usage = db_temple_ai_usage;
+           }
+        }
+        // --- END ADDED LOGIC ---
+
         if (temple && temple.salesId) {
           const sId = temple.salesId;
           const salesPerson = (globalThis as any).db_dist_sales?.find((s:any) => s.id === sId);

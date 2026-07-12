@@ -127,15 +127,14 @@ export default function DashboardContainer({
 
   const handleUpgrade = async (plan: any) => {
     try {
-      const res = await upgradeTempleStorage(templeId, plan.id, 'Monthly');
+      const { requestTempleStorageUpgrade } = await import('@/app/actions');
+      const res = await requestTempleStorageUpgrade(templeId, plan.id, 'Monthly');
       if (res && res.success === false) {
          alert(res.message);
          return;
       }
-      setStorage(prev => ({ ...prev, total: prev.total + plan.sizeGb }));
       setShowUpgradeModal(false);
-      alert(`🎉 升級成功！付款 NT$ ${plan.priceMonthly} 已安全支付給超級管理員。
-系統已自動為您擴充 ${plan.sizeGb}GB 雲端空間！`);
+      alert(`🎉 升級帳單已產生！\n請前往「帳務管理中心 => 平台支付」上傳匯款截圖。\n待系統管理員審核後即可擴充您的 ${plan.sizeGb}GB 雲端空間！`);
     } catch (e) {
       console.error(e);
       alert('升級處理失敗，請稍後再試');
