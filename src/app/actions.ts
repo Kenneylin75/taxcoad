@@ -4471,7 +4471,7 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
 
 export async function fetchNotifications(userRole: string) {
   let notifs = [...db_notifications];
-  if (userRole !== 'SuperAdmin' && userRole !== 'SuperSales') {
+  if (userRole !== 'SuperAdmin') {
     const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
     notifs = notifs.filter(n => !adminOnlyTitles.includes(n.title));
   }
