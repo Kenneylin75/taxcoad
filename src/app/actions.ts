@@ -4441,11 +4441,23 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
   return { success: true };
 }
 
-export async function fetchNotifications(userRole: string) {
+export async function fetchNotifications(userRole: string, userName?: string) {
   let notifs = [...db_notifications];
   if (userRole !== 'SuperAdmin') {
-    const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
-    notifs = notifs.filter(n => !adminOnlyTitles.includes(n.title));
+    notifs = notifs.filter(n => {
+      if (n.targetUser) return n.targetUser === userName;
+      
+      const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
+      if (adminOnlyTitles.includes(n.title)) {
+        return userName ? n.content.includes(userName) : false;
+      }
+      
+      if (n.title === '手動獎金撥發通知') {
+        return userName ? n.content.includes(userName) : false;
+      }
+      
+      return true;
+    });
   }
   return notifs;
 }

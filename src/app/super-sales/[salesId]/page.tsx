@@ -47,10 +47,14 @@ export default function SuperSalesPage() {
   const [viewingBillsTemple, setViewingBillsTemple] = useState<any>(null);
 
   useEffect(() => {
-    fetchSuperSalesProfile(salesId).then(setProfile);
+    fetchSuperSalesProfile(salesId).then(p => {
+       setProfile(p);
+       if (p && p.name) {
+          fetchNotifications("SuperSales", p.name).then(setNotifications);
+       }
+    });
     fetchSuperSalesRegistry(salesId).then(setRegistry);
     fetchSalesTools().then(setTools);
-    fetchNotifications("SuperSales").then(setNotifications);
     fetchEarningsStats(salesId).then(setEarnings);
     fetchSystemConfig().then(setSysConfig);
     fetchCommissionHistory(salesId, "2026", "05").then(setCommissionHistory);
