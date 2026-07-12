@@ -4039,7 +4039,7 @@ export async function fetchFinancialOverview() {
       if (trialMonths > 0) {
         const createdDate = new Date(temple.timestamp || temple.created_at || Date.now());
         const endFreeDate = new Date(createdDate);
-        endFreeDate.setMonth(endFreeDate.getMonth() + trialMonths);
+        endFreeDate.setDate(endFreeDate.getDate() + (trialMonths * 30));
         const now = new Date();
         if (now < endFreeDate) {
           trialDaysRemaining = Math.ceil((endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -6403,7 +6403,7 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
     paymentStatusLabel = '永久免費';
   } else if (trialMonths > 0) {
     const endFreeDate = new Date(createdDate);
-    endFreeDate.setMonth(endFreeDate.getMonth() + trialMonths);
+    endFreeDate.setDate(endFreeDate.getDate() + (trialMonths * 30));
     if (now < endFreeDate) {
       trialDaysRemaining = Math.ceil((endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       paymentStatusLabel = `免費試用中 (剩 ${trialDaysRemaining} 天)`;
