@@ -75,6 +75,10 @@ export default function SuperAdminClient({
     transfer: { bankCode: '', accountNumber: '', accountName: '' }
   });
   const [templePaymentFilter, setTemplePaymentFilter] = useState('ALL');
+  const [templePaymentMonth, setTemplePaymentMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [allTempleAiUsage, setAllTempleAiUsage] = useState<any[]>([]);
   const [templeStorages, setTempleStorages] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
@@ -1932,7 +1936,15 @@ export default function SuperAdminClient({
                  {/* 宮廟繳費狀態模組 */}
                  <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
                     <div className="flex justify-between items-center">
-                       <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">宮廟營運繳費狀態 (Temple Payments)</h4>
+                       <div className="flex items-center gap-4">
+                          <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">宮廟營運繳費狀態 (Temple Payments)</h4>
+                          <input 
+                             type="month" 
+                             value={templePaymentMonth}
+                             onChange={e => setTemplePaymentMonth(e.target.value)}
+                             className="bg-slate-50 text-slate-900 border-none font-black rounded-full px-6 py-2 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                       </div>
                        <select 
                            value={templePaymentFilter} 
                            onChange={e => setTemplePaymentFilter(e.target.value)}
@@ -1942,6 +1954,7 @@ export default function SuperAdminClient({
                            <option value="Paid">已付款 (Paid)</option>
                            <option value="Unpaid">未付款 (Unpaid)</option>
                            <option value="VIP">免費/VIP</option>
+                           <option value="NoBill">尚未產生 (No Bill)</option>
                        </select>
                     </div>
                     <table className="w-full text-left border-collapse">
@@ -1955,36 +1968,61 @@ export default function SuperAdminClient({
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                           {finance?.templePayments?.filter((tp: any) => templePaymentFilter === 'ALL' || tp.status === templePaymentFilter).map((tp: any, i: number) => (
-                              <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                                 <td className="px-6 py-4 text-sm font-black text-slate-800 italic">{tp.name}</td>
-                                 <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{tp.paymentCycle}</td>
-                                 <td className="px-6 py-4 text-sm font-black text-slate-900">${(tp.rentAmount !== undefined ? tp.rentAmount : (tp.paymentCycle === 'Yearly' ? tp.monthlyRent * 12 : tp.monthlyRent)).toLocaleString()}</td>
-                                 <td className="px-6 py-4 text-xs font-bold text-slate-400">{tp.billingStartDate ? tp.billingStartDate.split('T')[0] : 'N/A'}</td>
-                                 <td className="px-6 py-4">
-                                    {tp.freeType !== 'Permanent' && (() => {
-                                        const now = new Date();
-                                        const start = tp.billingStartDate ? new Date(tp.billingStartDate) : new Date(tp.joinedAt || Date.now());
-                                        const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
-                                        if (diffDays > 0) {
-                                           return <span className="px-3 py-1 bg-amber-50 text-amber-500 rounded text-[10px] font-black uppercase tracking-widest border border-amber-200">剩餘 {diffDays} 天試用</span>;
-                                        } else {
-                                           return (
-                                              <>
-                                                {tp.status === 'Paid' && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-100">已付款</span>}
-                                                {tp.status === 'Unpaid' && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-[10px] font-black uppercase tracking-widest border border-rose-100">未付款 (${tp.unpaidAmount.toLocaleString()})</span>}
-                                                {tp.status === 'PendingVerification' && <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded text-[10px] font-black uppercase tracking-widest border border-amber-100">審核中</span>}
-                                              </>
-                                           );
-                                        }
-                                    })()}
-                                    {tp.status === 'VIP' && <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 rounded text-[10px] font-black uppercase tracking-widest border border-fuchsia-100">VIP/終身免繳</span>}
-                                 </td>
-                              </tr>
-                           ))}
-                           {(!finance?.templePayments || finance.templePayments.filter((tp: any) => templePaymentFilter === 'ALL' || tp.status === templePaymentFilter).length === 0) && (
-                              <tr><td colSpan={5} className="px-6 py-8 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest italic">目前沒有符合的宮廟資料</td></tr>
-                           )}
+                           {(() => {
+                              const processedPayments = finance?.templePayments?.map((tp: any) => {
+                                 if (tp.freeType === 'Permanent' || tp.status === 'VIP') return { ...tp, displayStatus: 'VIP', displayUnpaid: 0 };
+                                 
+                                 const targetBills = tp.bills?.filter((b: any) => {
+                                    const bMonth = b.bill_month || b.billingDate || b.billing_date || (b.created_at ? b.created_at.split('T')[0].substring(0, 7) : '') || (b.timestamp ? b.timestamp.split('T')[0].substring(0, 7) : '');
+                                    if (tp.paymentCycle === 'Yearly') {
+                                       return bMonth.startsWith(templePaymentMonth.split('-')[0]);
+                                    }
+                                    return bMonth === templePaymentMonth;
+                                 });
+
+                                 let displayStatus = tp.status;
+                                 let displayUnpaid = tp.unpaidAmount;
+                                 
+                                 // Check trial first
+                                 const now = new Date();
+                                 const start = tp.billingStartDate ? new Date(tp.billingStartDate) : new Date(tp.joinedAt || Date.now());
+                                 const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
+                                 
+                                 if (diffDays > 0) {
+                                    displayStatus = 'Trial';
+                                 } else if (!targetBills || targetBills.length === 0) {
+                                    displayStatus = 'NoBill';
+                                    displayUnpaid = 0;
+                                 } else {
+                                    const unpaidBills = targetBills.filter((b: any) => b.status === 'Unpaid' || b.status === 'PendingVerification');
+                                    displayStatus = unpaidBills.some((b: any) => b.status === 'PendingVerification') ? 'PendingVerification' : (unpaidBills.length > 0 ? 'Unpaid' : 'Paid');
+                                    displayUnpaid = unpaidBills.reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0);
+                                 }
+                                 
+                                 return { ...tp, displayStatus, displayUnpaid, diffDays };
+                              }).filter((tp: any) => templePaymentFilter === 'ALL' || tp.displayStatus === templePaymentFilter);
+
+                              if (!processedPayments || processedPayments.length === 0) {
+                                 return <tr><td colSpan={5} className="px-6 py-8 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest italic">目前沒有符合的宮廟資料</td></tr>;
+                              }
+
+                              return processedPayments.map((tp: any, i: number) => (
+                                 <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                                    <td className="px-6 py-4 text-sm font-black text-slate-800 italic">{tp.name}</td>
+                                    <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{tp.paymentCycle}</td>
+                                    <td className="px-6 py-4 text-sm font-black text-slate-900">${(tp.rentAmount !== undefined ? tp.rentAmount : (tp.paymentCycle === 'Yearly' ? tp.monthlyRent * 12 : tp.monthlyRent)).toLocaleString()}</td>
+                                    <td className="px-6 py-4 text-xs font-bold text-slate-400">{tp.billingStartDate ? tp.billingStartDate.split('T')[0] : 'N/A'}</td>
+                                    <td className="px-6 py-4">
+                                       {tp.displayStatus === 'Trial' && <span className="px-3 py-1 bg-amber-50 text-amber-500 rounded text-[10px] font-black uppercase tracking-widest border border-amber-200">剩餘 {tp.diffDays} 天試用</span>}
+                                       {tp.displayStatus === 'Paid' && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-100">已付款</span>}
+                                       {tp.displayStatus === 'Unpaid' && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-[10px] font-black uppercase tracking-widest border border-rose-100">未付款 (${tp.displayUnpaid.toLocaleString()})</span>}
+                                       {tp.displayStatus === 'PendingVerification' && <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded text-[10px] font-black uppercase tracking-widest border border-amber-100">審核中</span>}
+                                       {tp.displayStatus === 'NoBill' && <span className="px-3 py-1 bg-slate-100 text-slate-400 rounded text-[10px] font-black uppercase tracking-widest border border-slate-200">尚未產生</span>}
+                                       {tp.displayStatus === 'VIP' && <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 rounded text-[10px] font-black uppercase tracking-widest border border-fuchsia-100">VIP/終身免繳</span>}
+                                    </td>
+                                 </tr>
+                              ));
+                           })()}
                         </tbody>
                     </table>
                  </div>
