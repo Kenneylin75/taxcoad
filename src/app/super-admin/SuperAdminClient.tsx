@@ -1981,19 +1981,13 @@ export default function SuperAdminClient({
                                  
                                  const now = new Date();
                                  const start = tp.billingStartDate ? new Date(tp.billingStartDate) : new Date(tp.joinedAt || now);
-                                 const joined = new Date(tp.joinedAt || now);
                                  
                                  const [selYear, selMonth] = templePaymentMonth.split('-');
-                                 const endOfSelectedMonth = new Date(Number(selYear), Number(selMonth), 0, 23, 59, 59);
                                  const startOfSelectedMonth = new Date(Number(selYear), Number(selMonth) - 1, 1);
                                  
                                  const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
                                  
-                                 if (joined > endOfSelectedMonth) {
-                                    // 該月份時，這間宮廟還沒註冊
-                                    displayStatus = 'NoBill';
-                                    displayUnpaid = 0;
-                                 } else if (!targetBills || targetBills.length === 0) {
+                                 if (!targetBills || targetBills.length === 0) {
                                     if (diffDays > 0 && start >= startOfSelectedMonth) {
                                        displayStatus = 'Trial';
                                     } else {
@@ -2007,7 +2001,7 @@ export default function SuperAdminClient({
                                  }
                                  
                                  return { ...tp, displayStatus, displayUnpaid, diffDays };
-                              }).filter((tp: any) => templePaymentFilter === 'ALL' || tp.displayStatus === templePaymentFilter);
+                              }).filter((tp: any) => tp !== null && (templePaymentFilter === 'ALL' || tp.displayStatus === templePaymentFilter));
 
                               if (!processedPayments || processedPayments.length === 0) {
                                  return <tr><td colSpan={5} className="px-6 py-8 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest italic">目前沒有符合的宮廟資料</td></tr>;
