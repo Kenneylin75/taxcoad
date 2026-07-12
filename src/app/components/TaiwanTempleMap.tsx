@@ -43,7 +43,6 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
   return (
     <div className="w-full h-full rounded-[40px] overflow-hidden relative z-10 isolate" style={{ minHeight: '300px' }}>
       <MapContainer
-        key={mounted ? "map-mounted" : "map-unmounted"}
         center={[23.6978, 120.9605]} // 台灣中心
         zoom={7}
         scrollWheelZoom={true}

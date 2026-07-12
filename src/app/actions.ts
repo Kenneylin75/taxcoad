@@ -4655,7 +4655,13 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
          if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
       }
     } else {
-      await client.query('UPDATE personnel SET password = $1 WHERE id = $2 OR temple_id = $2', [newPass, id]);
+      if (role === 'Distributor') {
+        await client.query('UPDATE distributors SET password = $1 WHERE id = $2', [newPass, id]);
+      } else if (role === 'SuperSales' || role === 'DistSales') {
+        await client.query('UPDATE dist_sales SET password = $1 WHERE id = $2', [newPass, id]);
+      } else {
+        await client.query('UPDATE personnel SET password = $1 WHERE id = $2 OR temple_id = $2', [newPass, id]);
+      }
     }
     return { success: true };
   });
