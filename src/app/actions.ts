@@ -2606,8 +2606,11 @@ export async function generateInitialBills(newTemple: any) {
 }
 
 export async function submitFreeAccountApplication(data: any) { 
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  const account = data.account || data.adminAccount;
+  const password = data.password || data.adminPassword;
+
+  if (account && await checkAccountExists(account)) {
+    return { success: false, error: '帳號已被註冊，請更換' };
   }
   const { role, paymentCycle, ...formData } = data;
   
@@ -2622,6 +2625,8 @@ export async function submitFreeAccountApplication(data: any) {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
       templeNo,
       ...formData,
+      account,
+      password,
       paymentCycle: paymentCycle || 'Monthly',
       monthlyRent: data.freeType === 'Permanent' ? 0 : (db_config.fixedMonthlyRent || 3600),
       trialMonths: data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0,
@@ -2648,14 +2653,14 @@ export async function submitFreeAccountApplication(data: any) {
 
 
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
-  if (status === 'Active' && data.account && data.password) {
+  if (status === 'Active' && account && password) {
     const pData = (gStore.db_personnel || db_personnel);
     pData.push({
       id: `p-${Date.now()}`,
       templeId: newTemple.id,
       name: data.templeName || '宮廟管理員',
-      account: data.account,
-      password: data.password, // In real app, hash this
+      account: account,
+      password: password, // In real app, hash this
       role: 'TempleAdmin',
       status: 'Active'
     });
