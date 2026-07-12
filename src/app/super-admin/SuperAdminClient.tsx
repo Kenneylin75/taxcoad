@@ -1979,15 +1979,26 @@ export default function SuperAdminClient({
                                  let displayStatus = tp.status;
                                  let displayUnpaid = tp.unpaidAmount;
                                  
-                                 // Check trial first
                                  const now = new Date();
-                                 const start = tp.billingStartDate ? new Date(tp.billingStartDate) : new Date(tp.joinedAt || Date.now());
+                                 const start = tp.billingStartDate ? new Date(tp.billingStartDate) : new Date(tp.joinedAt || now);
+                                 const joined = new Date(tp.joinedAt || now);
+                                 
+                                 const [selYear, selMonth] = templePaymentMonth.split('-');
+                                 const endOfSelectedMonth = new Date(Number(selYear), Number(selMonth), 0, 23, 59, 59);
+                                 const startOfSelectedMonth = new Date(Number(selYear), Number(selMonth) - 1, 1);
+                                 
                                  const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
                                  
-                                 if (diffDays > 0) {
-                                    displayStatus = 'Trial';
-                                 } else if (!targetBills || targetBills.length === 0) {
+                                 if (joined > endOfSelectedMonth) {
+                                    // 該月份時，這間宮廟還沒註冊
                                     displayStatus = 'NoBill';
+                                    displayUnpaid = 0;
+                                 } else if (!targetBills || targetBills.length === 0) {
+                                    if (diffDays > 0 && start >= startOfSelectedMonth) {
+                                       displayStatus = 'Trial';
+                                    } else {
+                                       displayStatus = 'NoBill';
+                                    }
                                     displayUnpaid = 0;
                                  } else {
                                     const unpaidBills = targetBills.filter((b: any) => b.status === 'Unpaid' || b.status === 'PendingVerification');
