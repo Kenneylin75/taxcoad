@@ -6575,12 +6575,6 @@ export async function fetchDistributorSalesPerformance(distId: string) {
 }
 
 export async function fetchSuperAdminFinancials() {
-  const records = db_finance_records;
-  
-  const totalRevenue = records.filter(r => r.type === 'INCOME').reduce((s, r) => s + r.amount, 0);
-  const totalCommission = db_bonuses.reduce((s, b) => s + b.amount, 0);
-  const netProfit = totalRevenue - totalCommission;
-
   // 取得宮廟與帳單狀態
   const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
   let templeBills: any[] = typeof gStore !== 'undefined' ? (gStore.db_temple_bills || db_temple_bills) : db_temple_bills;
@@ -6590,6 +6584,36 @@ export async function fetchSuperAdminFinancials() {
     const rows = res?.rows;
     if (rows) templeBills = rows;
   } catch(e) {}
+
+  const records: any[] = [];
+  templeBills.filter(b => b.status === 'Paid').forEach(b => {
+      const bDate = b.created_at || b.timestamp;
+      const t = allTemples.find((temple: any) => temple.id === (b.temple_id || b.templeId));
+      records.push({
+         id: b.id,
+         date: bDate instanceof Date ? bDate.toISOString().split('T')[0] : (bDate ? String(bDate).split('T')[0] : new Date().toISOString().split('T')[0]),
+         type: 'INCOME',
+         amount: Number(b.amount || 0),
+         category: (b.item_name === 'SetupFee' || b.type === 'Setup') ? 'AUTH_FEE' : 'SYSTEM_FEE',
+         description: `${t?.templeName || '未知宮廟'} - ${b.item_name === 'SetupFee' || b.type === 'Setup' ? '開辦費' : '系統費用'}`
+      });
+  });
+
+  db_withdrawals.filter(w => w.status === 'Approved' || w.status === 'Verified').forEach(w => {
+      const wDate = w.timestamp || w.created_at;
+      records.push({
+         id: w.id,
+         date: wDate instanceof Date ? wDate.toISOString().split('T')[0] : (wDate ? String(wDate).split('T')[0] : new Date().toISOString().split('T')[0]),
+         type: 'EXPENSE',
+         amount: Number(w.amount || 0),
+         category: 'COMMISSION',
+         description: `業務提領 - ${w.salesName}`
+      });
+  });
+
+  const totalRevenue = records.filter(r => r.type === 'INCOME').reduce((s, r) => s + r.amount, 0);
+  const totalCommission = records.filter(r => r.type === 'EXPENSE').reduce((s, r) => s + r.amount, 0);
+  const netProfit = totalRevenue - totalCommission;
 
   const templePayments = allTemples.filter((t: any) => !t.distributorId).map((t: any) => {
     const bills = templeBills.filter(b => b.temple_id === t.id || b.templeId === t.id);
