@@ -1334,7 +1334,7 @@ export default function SuperAdminClient({
                                    <div className="flex justify-between pt-2"><span className="text-[11px] font-black text-emerald-400 uppercase">當月淨利</span><span className="text-3xl font-black italic text-white">${dynNetProfit.toLocaleString()}</span></div>
                                 </div>
                              </div>
-                             <button className="w-full mt-8 py-6 bg-emerald-600 text-white rounded-[30px] font-black text-[11px] uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-500 active:scale-95 transition-all">核發本月分潤 💳</button>
+
                           </div>
                        </div>
                     </div>
