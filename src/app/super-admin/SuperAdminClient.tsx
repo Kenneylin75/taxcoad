@@ -44,6 +44,7 @@ import {
   grantTempleStorageVip,
   purchaseAiPlanByAdmin
 } from '../actions';
+import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar } from 'recharts';
 
 export default function SuperAdminClient({ 
   initialStats, initialAccounts, initialPlans, initialMedia, initialTemples, initialWithdrawals
