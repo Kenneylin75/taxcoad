@@ -6616,7 +6616,7 @@ export async function fetchSuperAdminFinancials() {
   const totalCommission = records.filter(r => r.type === 'EXPENSE').reduce((s, r) => s + r.amount, 0);
   const netProfit = totalRevenue - totalCommission;
 
-  const templePayments = allTemples.filter((t: any) => !t.distributorId).map((t: any) => {
+  const templePayments = allTemples.filter((t: any) => !t.distributorId && t.status !== 'Inactive').map((t: any) => {
     const bills = templeBills.filter(b => b.temple_id === t.id || b.templeId === t.id);
     const unpaidBills = bills.filter(b => b.status === 'Unpaid' || b.status === 'PendingVerification');
     const hasUnpaid = unpaidBills.length > 0;
