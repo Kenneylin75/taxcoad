@@ -56,6 +56,8 @@ export default function SuperAdminClient({
   const [logs, setLogs] = useState<any[]>([]);
   const [finance, setFinance] = useState<any>(null);
   const [financeMonth, setFinanceMonth] = useState('2026-07');
+  const [templePaymentMonth, setTemplePaymentMonth] = useState('2026-07');
+  const [withdrawalProofs, setWithdrawalProofs] = useState<{[key:string]: string}>({});
   const [syncQueue, setSyncQueue] = useState<any[]>([]);
   const [pendingDistributors, setPendingDistributors] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>(initialWithdrawals || []);
@@ -1266,37 +1268,41 @@ export default function SuperAdminClient({
                     <div className="lg:col-span-2 bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-10">
                        <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">交易明細 ({financeMonth})</h4>
                        
-                       <div className="space-y-4">
-                          {filteredRecords.length > 0 ? filteredRecords.map((r: any, i: number) => {
-                             const isTemple = r.type === 'INCOME' && r.category !== 'AUTH_FEE';
-                             const isDist = r.type === 'INCOME' && r.category === 'AUTH_FEE';
-                             const isExpense = r.type === 'EXPENSE';
+                       <div className="space-y-4 h-[400px]">
+                          {(() => {
+                             const daysInMonth = new Date(parseInt(financeMonth.split('-')[0]), parseInt(financeMonth.split('-')[1]), 0).getDate();
+                             const chartData = Array.from({length: daysInMonth}, (_, i) => {
+                                const dayStr = String(i + 1).padStart(2, '0');
+                                const dateStr = `${financeMonth}-${dayStr}`;
+                                const dayRecords = filteredRecords.filter((r: any) => r.date === dateStr);
+                                const income = dayRecords.filter((r: any) => r.type === 'INCOME').reduce((s: number, r: any) => s + r.amount, 0);
+                                return { name: dayStr, 收益: income };
+                             });
+
+                             if (filteredRecords.length === 0) {
+                                return (
+                                   <div className="py-16 text-center opacity-50 flex flex-col items-center justify-center h-full">
+                                      <div className="text-4xl mb-4">📭</div>
+                                      <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{financeMonth} 沒有任何交易紀錄</p>
+                                   </div>
+                                );
+                             }
 
                              return (
-                             <div key={i} className="flex justify-between items-center bg-slate-50/50 p-6 rounded-[30px] border border-slate-100 hover:shadow-md hover:bg-white transition-all group">
-                                <div className="flex items-center gap-6">
-                                   <div className={`w-14 h-14 rounded-2xl ${isTemple ? 'bg-indigo-50 text-indigo-600' : isDist ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center text-xl font-black shadow-inner italic`}>{isExpense ? '-' : '+'}</div>
-                                   <div>
-                                      <p className="text-base font-black text-slate-900 group-hover:text-emerald-600 transition-colors">{r.source}</p>
-                                      <div className="flex gap-2 items-center mt-1">
-                                         {isTemple && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md text-[9px] font-black uppercase">宮廟端</span>}
-                                         {isDist && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[9px] font-black uppercase">經銷端</span>}
-                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{r.category} | {r.date}</p>
-                                      </div>
-                                   </div>
-                                </div>
-                                <div className="text-right">
-                                   <p className={`text-2xl font-black italic ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>${r.amount.toLocaleString()}</p>
-                                   <p className="text-[9px] font-black text-slate-300 uppercase mt-1">TX-{Math.floor(Math.random()*90000)}</p>
-                                </div>
-                             </div>
-                             )
-                          }) : (
-                             <div className="py-16 text-center opacity-50">
-                                <div className="text-4xl mb-4">📭</div>
-                                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{financeMonth} 沒有任何交易紀錄</p>
-                             </div>
-                          )}
+                                <ResponsiveContainer width="100%" height="100%">
+                                   <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                                      <RechartsTooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                      <Bar dataKey="收益" fill="#10b981" radius={[8, 8, 0, 0]} maxBarSize={40}>
+                                         {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.收益 > 0 ? '#10b981' : '#cbd5e1'} />
+                                         ))}
+                                      </Bar>
+                                   </BarChart>
+                                </ResponsiveContainer>
+                             );
+                          })()}
                        </div>
                     </div>
                     
@@ -1326,26 +1332,119 @@ export default function SuperAdminClient({
                     </div>
                  </div>
 
-                 {/* 錢包對帳模組 */}
-                 <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
-                    <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">分佈式錢包結算帳戶 (Wallets Ledger)</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                       {wallets.map((w, idx) => (
-                          <div key={idx} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-center hover:shadow-md hover:bg-indigo-50 transition-all group">
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-indigo-500">{w.role === 'SuperAdmin' ? '系統總部' : w.role === 'Distributor' ? '經銷代理' : w.role === 'SuperSales' ? '超級業務' : '經銷業務'} ({w.name})</p>
-                             <p className="text-2xl font-black text-slate-900 italic group-hover:text-indigo-600">${w.balance.toLocaleString()}</p>
-                          </div>
-                       ))}
+                 {/* 超級業務員提領審核 */}
+                 <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 mt-12">
+                    <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">超級業務員提領審核 (Super Sales Withdrawals)</h4>
+                    <div className="space-y-4">
+                       {(() => {
+                          const wList = finance?.superSalesWithdrawals || [];
+                          if (wList.length === 0) {
+                            return <p className="text-center text-sm font-bold text-slate-400 py-10">目前沒有提領申請</p>;
+                          }
+
+                          return wList.map((w: any) => (
+                            <div key={w.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                               <div className="flex-1">
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date}</p>
+                                  <p className="text-lg font-black text-slate-900">{w.salesName}</p>
+                                  <p className="text-sm font-bold text-slate-500 mt-1">申請提領金額: <span className="text-rose-500 text-xl font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span></p>
+                               </div>
+                               
+                               {w.status === 'Approved' ? (
+                                  <div className="flex flex-col items-end gap-2">
+                                     <span className="px-4 py-2 bg-emerald-100 text-emerald-600 rounded-full text-xs font-black uppercase tracking-widest">已匯款</span>
+                                     {w.receiptUrl && (
+                                        <button 
+                                           onClick={() => window.open(w.receiptUrl, '_blank')}
+                                           className="text-[10px] text-blue-500 underline font-bold"
+                                        >
+                                           查看匯款截圖
+                                        </button>
+                                     )}
+                                  </div>
+                               ) : (
+                                  <div className="flex flex-col items-end gap-4 w-full md:w-auto">
+                                     <input 
+                                        type="file" 
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                           const file = e.target.files?.[0];
+                                           if(file) {
+                                              const reader = new FileReader();
+                                              reader.onload = (ev) => {
+                                                 setWithdrawalProofs(prev => ({ ...prev, [w.id]: ev.target?.result as string }));
+                                              };
+                                              reader.readAsDataURL(file);
+                                           }
+                                        }}
+                                        className="text-xs w-full max-w-[200px] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                                     />
+                                     <button 
+                                        onClick={async (e) => {
+                                           const proof = withdrawalProofs[w.id];
+                                           if (!proof) {
+                                              alert('請先上傳匯款圖片');
+                                              return;
+                                           }
+                                           try {
+                                              const target = e.currentTarget;
+                                              const originalText = target.innerText;
+                                              target.innerText = "處理中...";
+                                              target.disabled = true;
+
+                                              const { approveSuperSalesWithdrawal, fetchSuperAdminFinancials } = await import('@/app/actions');
+                                              const res = await approveSuperSalesWithdrawal(w.id, proof);
+
+                                              if (res && res.success === false) {
+                                                 alert('操作失敗: ' + res.error);
+                                                 target.innerText = originalText;
+                                                 target.disabled = false;
+                                                 return;
+                                              }
+
+                                              alert('匯款確認成功！');
+                                              const updated = await fetchSuperAdminFinancials();
+                                              setFinance({ records: updated.records, summary: updated.summary, templePayments: updated.templePayments, superSalesWithdrawals: updated.superSalesWithdrawals });
+                                           } catch (err) {
+                                              console.error(err);
+                                              alert('系統發生錯誤！');
+                                           }
+                                        }}
+                                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest rounded-full cursor-pointer transition-colors shadow-md disabled:opacity-50"
+                                     >
+                                        已匯款
+                                     </button>
+                                  </div>
+                               )}
+                            </div>
+                          ));
+                       })()}
                     </div>
                  </div>
 
                  {/* 宮廟付款狀態 */}
-                 <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
-                    <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-amber-500 underline-offset-8">宮廟付款審核 (Temple Payments)</h4>
+                 <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 mt-12">
+                    <div className="flex justify-between items-center">
+                       <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-amber-500 underline-offset-8">宮廟付款審核 (Temple Payments)</h4>
+                       <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-full border border-slate-200 shadow-sm">
+                          <span className="text-[11px] font-black text-slate-400 pl-4 uppercase tracking-widest">篩選月份</span>
+                          <select 
+                            value={templePaymentMonth}
+                            onChange={(e) => setTemplePaymentMonth(e.target.value)}
+                            className="bg-white text-slate-900 border-none font-black rounded-full px-6 py-2 text-sm focus:ring-2 focus:ring-amber-500 cursor-pointer outline-none transition-all shadow-sm"
+                          >
+                            <option value="2026-07">2026 年 7 月</option>
+                            <option value="2026-06">2026 年 6 月</option>
+                            <option value="2026-05">2026 年 5 月</option>
+                            <option value="2026-04">2026 年 4 月</option>
+                            <option value="2026-03">2026 年 3 月</option>
+                          </select>
+                       </div>
+                    </div>
                     <div className="space-y-4">
                        {(() => {
                           const currentPayments = (finance?.templePayments || []).flatMap((t: any) => 
-                            (t.bills || []).filter((b: any) => b.billingDate === financeMonth || b.dueDate?.startsWith(financeMonth)).map((b: any) => ({
+                            (t.bills || []).filter((b: any) => b.billingDate === templePaymentMonth || b.dueDate?.startsWith(templePaymentMonth)).map((b: any) => ({
                               ...b, templeName: t.name, creatorRole: t.creatorRole
                             }))
                           );
@@ -1407,9 +1506,8 @@ export default function SuperAdminClient({
                                                  return;
                                               }
 
-                                              // Fetch updated data locally to avoid page reload
                                               const updated = await fetchSuperAdminFinancials();
-                                              setFinance({ records: updated.records, summary: updated.summary, templePayments: updated.templePayments });
+                                              setFinance({ records: updated.records, summary: updated.summary, templePayments: updated.templePayments, superSalesWithdrawals: updated.superSalesWithdrawals });
                                            } catch (err) {
                                               console.error(err);
                                               alert('系統發生錯誤！');
@@ -1429,7 +1527,6 @@ export default function SuperAdminClient({
               </div>
               );
            })()}
-
            {/* --- 6. DATA BRIDGE --- */}
            {activeTab === 'bridge' && (() => {
               const todayStr = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });

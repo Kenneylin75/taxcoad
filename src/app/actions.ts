@@ -4372,6 +4372,35 @@ export async function fetchEarningsStats(salesId: string = '超級精英業務')
   };
 }
 
+export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptUrl: string) {
+  try {
+    const withdrawal = db_withdrawals.find(w => w.id === withdrawalId);
+    if (!withdrawal) return { success: false, error: 'Withdrawal not found' };
+
+    try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery("UPDATE withdrawals SET status = 'Approved', receipt_url = $1 WHERE id = $2", [receiptUrl, withdrawalId]);
+    } catch (e) {}
+
+    withdrawal.status = 'Approved';
+    withdrawal.receiptUrl = receiptUrl;
+
+    db_notifications.unshift({
+      id: `N-WITHDRAW-APPROVED-${Date.now()}`,
+      title: '提領獎金已匯款',
+      content: `您的提領申請 $${withdrawal.amount.toLocaleString()} 已經匯款，請查看匯款截圖。`,
+      date: new Date().toISOString().split('T')[0],
+      isRead: false,
+      targetUser: withdrawal.salesName,
+      imageUrl: receiptUrl
+    });
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: String(e) };
+  }
+}
+
 export async function requestWithdrawal(salesName: string, amount: number) { 
   return withTempleSession(null, true, async (client) => {
     if (!client) return { success: false, error: '資料庫連線失敗' };
@@ -6589,6 +6618,8 @@ export async function fetchSuperAdminFinancials() {
     };
   });
 
+  const superSalesWithdrawals = db_withdrawals.filter(w => w.salesName && db_dist_sales.some(s => s.name === w.salesName && s.role === 'SuperSales'));
+
   return {
     records: records.slice().reverse(),
     summary: {
@@ -6597,7 +6628,8 @@ export async function fetchSuperAdminFinancials() {
       netProfit
     },
     wallets: db_wallets,
-    templePayments
+    templePayments,
+    superSalesWithdrawals
   };
 }
 
