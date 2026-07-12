@@ -2586,7 +2586,12 @@ export async function updateSystemConfig(data: any) {
 export async function fetchFreeApplications(distId?: string) { 
   let list = db_temples;
   if (distId) {
-     list = list.filter(t => t.distributorId === distId);
+     list = list.filter(t => {
+        if (t.distributorId !== distId) return false;
+        const sales = db_dist_sales.find(s => s.id === t.salesId);
+        if (sales && sales.role === 'SuperSales') return false;
+        return true;
+     });
   }
   return list.map(t => {
      const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
@@ -3082,7 +3087,12 @@ export async function deleteTool(toolId: string) {
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
 export async function fetchDistributorCapacity(distId?: string) { 
-  const used = distId ? db_temples.filter(t => t.distributorId === distId).length : db_temples.length;
+  const used = distId ? db_temples.filter(t => {
+     if (t.distributorId !== distId) return false;
+     const sales = db_dist_sales.find(s => s.id === t.salesId);
+     if (sales && sales.role === 'SuperSales') return false;
+     return true;
+  }).length : db_temples.length;
   
   let totalNodes = 100;
   let planName = '企業旗艦方案 (2年期 / 100 帳戶)';
@@ -3785,7 +3795,12 @@ export async function fetchDistributorTeam(distributorId: string) {
   return Array.from(salesMap.values());
 }
 export async function fetchDistributorTemples(distributorId: string) {
-  const temples = db_temples.filter(t => t.distributorId === distributorId);
+  const temples = db_temples.filter(t => {
+     if (t.distributorId !== distributorId) return false;
+     const sales = db_dist_sales.find(s => s.id === t.salesId);
+     if (sales && sales.role === 'SuperSales') return false;
+     return true;
+  });
   const discountRate = db_config.yearlyDiscountRate || 20;
   return temples.map(t => {
      const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
@@ -3800,13 +3815,18 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
   return withTempleSession(null, true, async (client) => {
     let myTemples = [];
     if (!client) {
-      myTemples = db_temples.filter(t => t.distributorId === distributorId && t.status === 'Active');
+      myTemples = db_temples.filter(t => {
+         if (t.distributorId !== distributorId || t.status !== 'Active') return false;
+         const sales = db_dist_sales.find(s => s.id === t.salesId);
+         if (sales && sales.role === 'SuperSales') return false;
+         return true;
+      });
     } else {
       const query = `
         SELECT t.* 
         FROM temples t
         JOIN distributor_sales ds ON t.sales_id = ds.id
-        WHERE ds.distributor_id = $1 AND t.status = 'Active'
+        WHERE ds.distributor_id = $1 AND t.status = 'Active' AND ds.role != 'SuperSales'
       `;
       const res = await client.query(query, [distributorId]);
       myTemples = res.rows;
