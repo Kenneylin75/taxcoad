@@ -57,7 +57,11 @@ export default function DistributorApplicationForm({ role, submittedBy, onSucces
 
       if (role === 'super-admin') {
         const { createDistributorAccount } = await import('../actions');
-        await createDistributorAccount(data);
+        const res = await createDistributorAccount(data);
+        if (res && res.success === false) {
+           alert(res.error || '此帳號已被註冊，不可使用，請更換！');
+           return;
+        }
       } else {
         const { submitDistributorApplication } = await import('../actions');
         await submitDistributorApplication(data);

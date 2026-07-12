@@ -345,11 +345,20 @@ export async function loginAccount(formData: FormData) {
 export async function checkAccountExists(account: string) {
   if (!account) return false;
   const searchAccount = account.toLowerCase();
-  const pData = (gStore.db_personnel || db_personnel);
   
   if (account === "PIVOTADMIN01") return true;
-  if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount)) return true;
-    if (pData.some((p: any) => (p.account || "").toLowerCase() === searchAccount)) return true;
+  
+  const pData = (gStore.db_personnel || db_personnel || []);
+  if (pData.some((p: any) => (p.account || "").toLowerCase() === searchAccount)) return true;
+  
+  const distData = (gStore.db_distributors || db_distributors || []);
+  if (distData.some((d: any) => (d.account || "").toLowerCase() === searchAccount)) return true;
+
+  const salesData = (gStore.db_dist_sales || db_dist_sales || []);
+  if (salesData.some((s: any) => (s.account || "").toLowerCase() === searchAccount)) return true;
+
+  const adminData = (gStore.db_admins || db_admins || []);
+  if (adminData.some((a: any) => (a.account || "").toLowerCase() === searchAccount)) return true;
   
   try {
     const resDist = await dbQuery("SELECT id FROM distributors WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
@@ -1989,6 +1998,9 @@ export async function downloadAdminLogsCsv() {
 }
 
 export async function createAdminAccount(data: any) {
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被註冊，請更換' };
+  }
   const newAdmin = { id: `adm-${Date.now()}`, ...data, role: 'SuperAdmin' };
   db_admins.push(newAdmin);
   await logAdminAction('CREATE_ADMIN', data.name);
@@ -3332,6 +3344,9 @@ export async function createDistributorAccount(data: any) {
 }
 
 export async function createTempleAccount(data: any) {
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被註冊，請更換' };
+  }
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
   const creatorRole = reqRole;
@@ -4522,6 +4537,11 @@ export async function createPersonnel(formData: FormData) {
   return withTempleSession(templeId, false, async (client) => {
     const name = formData.get('name') as string;
     const account = formData.get('account') as string;
+    
+    if (account && await checkAccountExists(account)) {
+      return { success: false, error: '帳號已被註冊，請更換' };
+    }
+
     const phone = formData.get('phone') as string;
     const password = formData.get('password') as string;
     const role = formData.get('role') as string;

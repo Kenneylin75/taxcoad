@@ -177,10 +177,16 @@ export default function SuperAdminClient({
     const data: any = Object.fromEntries(fd.entries());
     
     startTransition(async () => {
-      if (accountType === 'SuperSales') await createSuperSalesAccount(data);
-      else if (accountType === 'Distributor') await createDistributorAccount(data);
-      else if (accountType === 'Temple') await createTempleAccount(data);
-      else if (accountType === 'Admin') await createAdminAccount(data);
+      let res: any;
+      if (accountType === 'SuperSales') res = await createSuperSalesAccount(data);
+      else if (accountType === 'Distributor') res = await createDistributorAccount(data);
+      else if (accountType === 'Temple') res = await createTempleAccount(data);
+      else if (accountType === 'Admin') res = await createAdminAccount(data);
+      
+      if (res && res.success === false) {
+          alert(res.error || '此帳號已被註冊，不可使用，請更換！');
+          return;
+      }
       
       setIsAccountModalOpen(false);
       alert(`${accountType} 帳戶已部署開設並同步全球網域指令 🌐`);

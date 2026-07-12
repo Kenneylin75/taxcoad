@@ -97,7 +97,11 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
-      await createPersonnel(formData);
+      const res: any = await createPersonnel(formData);
+      if (res && res.success === false) {
+        alert(res.error || '此帳號已被註冊，不可使用，請更換！');
+        return;
+      }
       setShowAdd(false);
       router.refresh();
     });
