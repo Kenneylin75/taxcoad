@@ -6583,15 +6583,25 @@ export async function fetchSuperAdminFinancials() {
     const unpaidBills = bills.filter(b => b.status === 'Unpaid' || b.status === 'PendingVerification');
     const hasUnpaid = unpaidBills.length > 0;
     const isPending = unpaidBills.some(b => b.status === 'PendingVerification');
+
+    const isYearly = t.paymentCycle === 'Yearly';
+    const discountRate = db_config.yearlyDiscountRate || 20;
+    const discountMultiplier = 1 - discountRate / 100;
+    const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 3600);
+    const rentAmount = t.freeType === 'Permanent' ? 0 : calcPrice;
+
     return {
       id: t.id,
       name: t.templeName || t.name,
-      monthlyRent: t.monthlyRent || 0,
+      monthlyRent: t.monthlyRent || 3600,
+      rentAmount: rentAmount,
       paymentCycle: t.paymentCycle || 'Monthly',
       status: t.freeType === 'Permanent' ? 'VIP' : (isPending ? 'PendingVerification' : (hasUnpaid ? 'Unpaid' : 'Paid')),
       unpaidAmount: unpaidBills.reduce((s, b) => s + Number(b.amount), 0),
       bills: bills,
-      billingStartDate: t.billingStartDate
+      billingStartDate: t.billingStartDate,
+      freeType: t.freeType,
+      joinedAt: t.timestamp || t.created_at || new Date().toISOString()
     };
   });
 

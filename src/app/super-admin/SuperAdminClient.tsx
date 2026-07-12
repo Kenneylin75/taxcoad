@@ -1854,12 +1854,26 @@ export default function SuperAdminClient({
                               <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                                  <td className="px-6 py-4 text-sm font-black text-slate-800 italic">{tp.name}</td>
                                  <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{tp.paymentCycle}</td>
-                                 <td className="px-6 py-4 text-sm font-black text-slate-900">${tp.monthlyRent.toLocaleString()}</td>
+                                 <td className="px-6 py-4 text-sm font-black text-slate-900">${(tp.rentAmount !== undefined ? tp.rentAmount : (tp.paymentCycle === 'Yearly' ? tp.monthlyRent * 12 : tp.monthlyRent)).toLocaleString()}</td>
                                  <td className="px-6 py-4 text-xs font-bold text-slate-400">{tp.billingStartDate ? tp.billingStartDate.split('T')[0] : 'N/A'}</td>
                                  <td className="px-6 py-4">
-                                    {tp.status === 'Paid' && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black uppercase tracking-widest">已付款</span>}
-                                    {tp.status === 'Unpaid' && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-[10px] font-black uppercase tracking-widest">未付款 (${tp.unpaidAmount.toLocaleString()})</span>}
-                                    {tp.status === 'VIP' && <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 rounded text-[10px] font-black uppercase tracking-widest">VIP/終身免繳</span>}
+                                    {tp.freeType !== 'Permanent' && (() => {
+                                        const now = new Date();
+                                        const start = tp.billingStartDate ? new Date(tp.billingStartDate) : new Date(tp.joinedAt || Date.now());
+                                        const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
+                                        if (diffDays > 0) {
+                                           return <span className="px-3 py-1 bg-amber-50 text-amber-500 rounded text-[10px] font-black uppercase tracking-widest border border-amber-200">剩餘 {diffDays} 天試用</span>;
+                                        } else {
+                                           return (
+                                              <>
+                                                {tp.status === 'Paid' && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-100">已付款</span>}
+                                                {tp.status === 'Unpaid' && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-[10px] font-black uppercase tracking-widest border border-rose-100">未付款 (${tp.unpaidAmount.toLocaleString()})</span>}
+                                                {tp.status === 'PendingVerification' && <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded text-[10px] font-black uppercase tracking-widest border border-amber-100">審核中</span>}
+                                              </>
+                                           );
+                                        }
+                                    })()}
+                                    {tp.status === 'VIP' && <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 rounded text-[10px] font-black uppercase tracking-widest border border-fuchsia-100">VIP/終身免繳</span>}
                                  </td>
                               </tr>
                            ))}
