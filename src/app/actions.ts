@@ -3563,6 +3563,8 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
   const regionCounts: Record<string, number> = {};
   const majorRegions = ['台北', '新北', '桃園', '台中', '台南', '高雄', '花蓮', '台東', '宜蘭'];
   db_temples.forEach(t => {
+    if (t.status === 'Inactive') return; // 排除已停權的宮廟
+    
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
     
     // 如果找不到有效地區，用名稱產生一個穩定的隨機地區作為展示
