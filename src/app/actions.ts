@@ -1684,13 +1684,24 @@ export async function fetchGuestLampRecords(p: any) {
       `, [normPhone, templeId]);
       
       return res.rows.map(r => {
-        const start = new Date(r.created_at);
-        const exp = new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000));
+        let startStr = '';
+        let expStr = '';
+        try {
+          const start = r.created_at ? new Date(r.created_at) : new Date();
+          if (isNaN(start.getTime())) throw new Error();
+          const exp = new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000));
+          startStr = start.toISOString().split('T')[0];
+          expStr = exp.toISOString().split('T')[0];
+        } catch {
+          startStr = new Date().toISOString().split('T')[0];
+          expStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        }
         return {
           id: r.id, templeId: r.temple_id, guestName: r.guest_name, phone: r.phone,
           categoryName: r.lamp_type, price: r.amount, status: r.status,
-          startDate: start.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0],
-          paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status, createdAt: r.created_at
+          startDate: startStr, expiryDate: expStr,
+          paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status, createdAt: r.created_at,
+          paymentProofUrl: r.payment_proof_url || null
         };
       });
     }
