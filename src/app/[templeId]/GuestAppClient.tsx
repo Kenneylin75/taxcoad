@@ -1348,7 +1348,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     </div>
                   )}
 
-                  {(record.paymentProofUrl || record.paymentRef || ((record.status === 'Unpaid' || record.status === 'Pending' || record.paymentStatus === 'PENDING_REVIEW') && record.type !== '排隊' && record.paymentMethod !== 'Cash')) && (
+                  {(record.paymentProofUrl || record.paymentRef || ((record.paymentStatus === 'Unpaid' || record.paymentStatus === 'Pending' || record.paymentStatus === 'PENDING_REVIEW') && record.type !== '排隊' && record.paymentMethod !== 'Cash')) && (
                     <div className="space-y-2 pt-2 mt-2 border-t border-slate-100">
                       {record.paymentRef && (
                          <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-black tracking-widest w-full justify-center">
@@ -1363,7 +1363,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       )}
                       
                       {/* Show upload button if unpaid/pending */}
-                      {(record.status === 'Unpaid' || record.status === 'Pending' || record.paymentStatus === 'PENDING_REVIEW') && record.type !== '排隊' && record.paymentMethod !== 'Cash' && (
+                      {(record.paymentStatus === 'Unpaid' || record.paymentStatus === 'Pending' || record.paymentStatus === 'PENDING_REVIEW') && record.type !== '排隊' && record.paymentMethod !== 'Cash' && (
                         <button onClick={() => setViewPaymentInfo({ method: (record.paymentMethod as any) || 'transfer', recordId: record.id.toString(), recordType: record.type === '預約' ? 'Appointment' : record.type === '活動' ? 'EventRegistration' : 'LampRecord' })} className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black tracking-widest flex items-center justify-center gap-2 transition-colors">
                           <span>⌛</span> 查看付款資訊與上傳截圖
                         </button>
