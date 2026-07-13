@@ -129,6 +129,7 @@ type ViewState = 'home' | 'booking' | 'events' | 'queue' | 'space' | 'records' |
 
 export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { templeId: string, forceLogin?: boolean, templeInfo?: any }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const themeColors: any = {
     amber: { primary: '#B91C1C', secondary: '#D97706', light: '#FEF2F2', border: '#fca5a5' }, // Traditional Red/Gold
