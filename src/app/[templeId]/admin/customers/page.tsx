@@ -146,18 +146,6 @@ function DeepFileCenterContent() {
   // 1. 統合紀錄日誌
   const unifiedLogs = useMemo(() => {
     const logs: any[] = [];
-    history.activities?.forEach(act => {
-       const isMeritAct = act.content.includes('功德');
-       logs.push({ 
-         type: act.type, 
-         date: act.timestamp.split(' ')[0], 
-         time: act.timestamp.split(' ')[1] || '---', 
-         title: isMeritAct ? `✨ ${act.content}` : '自動日誌', 
-         desc: isMeritAct ? '案卷已同步至管理系統' : act.content, 
-         icon: isMeritAct ? '✨' : '⚡', 
-         color: isMeritAct ? 'amber' : 'indigo' 
-       });
-    });
     history.appointments.forEach(app => {
       logs.push({ type: 'APPOINTMENT', date: app.date || app.time.split('T')[0], time: app.time.includes('T') ? app.time.split('T')[1] : (app.time || '00:00'), title: `預約：${app.service}`, desc: `狀態：${app.status} | 負責人：${app.staff}`, icon: '📅', color: 'blue', paymentRef: app.paymentRef, paymentProofUrl: app.paymentProofUrl });
     });
