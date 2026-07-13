@@ -7,7 +7,7 @@ export default function AdminSlotsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // 批次排班狀態
-  const [year, setYear] = useState("2026");
+  const [year, setYear] = useState(new Date().getFullYear().toString());
   const [startMonth, setStartMonth] = useState(1);
   const [endMonth, setEndMonth] = useState(12);
   const [weekdays, setWeekdays] = useState<number[]>([]); // 0=Sun, 1=Mon...
@@ -307,10 +307,15 @@ export default function AdminSlotsPage() {
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-3">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">年份</label>
-                     <select value={year} onChange={(e)=>setYear(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-black focus:border-indigo-600 outline-none transition-all shadow-sm">
-                        <option value="2026">2026</option>
-                        <option value="2027">2027</option>
-                     </select>
+                     <input 
+                        type="number" 
+                        value={year} 
+                        onChange={(e)=>setYear(e.target.value)} 
+                        className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-black focus:border-indigo-600 outline-none transition-all shadow-sm"
+                        min="2024"
+                        max="2100"
+                        required
+                     />
                   </div>
                   <div className="space-y-3">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">月份區間</label>
