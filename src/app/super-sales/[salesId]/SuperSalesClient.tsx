@@ -228,14 +228,14 @@ export default function SuperSalesClient({
                              </div>
                           </div>
                           <div className="text-right">
-                             {w.status === 'Approved' ? (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-black uppercase">已匯款</span>
+                             {w.status === 'Approved' || w.status === 'Paid' || w.status === 'Verified' ? (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-black uppercase">已付款</span>
                              ) : (
                                 <span className="text-[10px] bg-amber-100 text-amber-700 px-4 py-2 rounded-full font-black uppercase">處理中</span>
                              )}
                           </div>
                        </div>
-                       {w.status === 'Approved' && w.receiptUrl && (
+                       {(w.status === 'Approved' || w.status === 'Paid' || w.status === 'Verified') && w.receiptUrl && (
                           <button onClick={() => setViewingReceiptUrl(w.receiptUrl)} className="w-full py-4 bg-slate-50 text-slate-600 rounded-[24px] text-[10px] font-black tracking-widest hover:bg-slate-100 transition-all uppercase">
                              🖼️ 查看匯款憑證 (VIEW RECEIPT)
                           </button>

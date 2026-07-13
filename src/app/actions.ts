@@ -6613,7 +6613,7 @@ export async function fetchDistributorFinancials(distId: string) {
   }
 }
 
-export async function fetchDistributorSalesPerformance(distId: string) {
+export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
   const sales = db_dist_sales.filter(s => s.distributorId === distId);
   try {
     const { dbQuery } = await import('@/db/db');
@@ -6627,7 +6627,16 @@ export async function fetchDistributorSalesPerformance(distId: string) {
       if (templeIds.length > 0) {
         const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
         const rows = res?.rows;
-        const bills = rows && rows.length > 0 ? rows : db_temple_bills.filter(b => templeIds.includes(b.templeId) && b.status === 'Paid');
+        let bills = rows && rows.length > 0 ? rows : db_temple_bills.filter(b => templeIds.includes(b.templeId) && b.status === 'Paid');
+        
+        if (yearMonth) {
+          bills = bills.filter((b: any) => {
+            const date = b.created_at instanceof Date ? b.created_at.toISOString().substring(0, 7) : 
+                         (b.created_at ? String(b.created_at).substring(0,7) : (b.date ? String(b.date).substring(0,7) : ''));
+            return date === yearMonth;
+          });
+        }
+
         totalSales = bills.reduce((sum: number, b: any) => sum + b.amount, 0);
         commission = bills.reduce((sum: number, b: any) => {
           const isSetup = b.item_name === 'SetupFee' || b.item_name === 'Setup';

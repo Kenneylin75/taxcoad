@@ -38,6 +38,16 @@ export default function DistributorClient({
   // --- Financial Sub-Tab State ---
   const [financialTab, setFinancialTab] = useState<'payments' | 'performance' | 'bonuses'>('payments');
   const [expandedTempleId, setExpandedTempleId] = useState<string | null>(null);
+  const [monthFilter, setMonthFilter] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+  const [teamPerformance, setTeamPerformance] = useState(initialTeam);
+
+  React.useEffect(() => {
+    if (activeTab === 'financials' && initialProfile?.id) {
+      import('@/app/actions').then(m => m.fetchDistributorSalesPerformance(initialProfile.id, monthFilter)).then(res => {
+        if (res) setTeamPerformance(res);
+      });
+    }
+  }, [monthFilter, activeTab, initialProfile?.id]);
 
   // --- Calendar & Period State ---
   const [currentYear, setCurrentYear] = useState(2026);
@@ -319,7 +329,7 @@ export default function DistributorClient({
 
     try {
       await uploadReceiptAndApproveBonus(id, receiptBase64);
-      setBonusRequests((prev: any[]) => prev.map((r: any) => r.id === id ? { ...r, status: "Verified", receiptUrl: receiptBase64 } : r));
+      setBonusRequests((prev: any[]) => prev.map((r: any) => r.id === id ? { ...r, status: "Paid", receiptUrl: receiptBase64 } : r));
       addLog("獎金撥款核銷", `單號: ${id} (${request.sales})`);
       alert(`✅ 已完成單號 ${id} 的撥款核銷`);
       setUploadingBonusId(null);
@@ -344,11 +354,19 @@ export default function DistributorClient({
   const groupedPayments = useMemo(() => {
     const groups: Record<string, typeof paymentRecords> = {};
     paymentRecords.forEach((p: any) => {
-      if (!groups[p.region]) groups[p.region] = [];
-      groups[p.region].push(p);
+      const hasPaidInMonth = p.history.some((h: any) => h.status === 'Paid' && h.month === monthFilter);
+      if (!hasPaidInMonth) return;
+      
+      const filteredP = {
+        ...p,
+        history: p.history.filter((h: any) => h.month === monthFilter && h.status === 'Paid')
+      };
+
+      if (!groups[filteredP.region]) groups[filteredP.region] = [];
+      groups[filteredP.region].push(filteredP);
     });
     return groups;
-  }, [paymentRecords]);
+  }, [paymentRecords, monthFilter]);
 
   const TAIWAN_CITIES = [
     '基隆市','臺北市','新北市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣',
@@ -798,13 +816,25 @@ export default function DistributorClient({
                      </div>
                   </div>
                </section>
-               <div className="flex bg-white/60 backdrop-blur-md p-1.5 rounded-[30px] border border-white shadow-xl">
+               <div className="flex bg-white/60 backdrop-blur-md p-1.5 rounded-[30px] border border-white shadow-xl mb-4">
                   {[{ id: 'payments', label: '宮廟金流', icon: '🏛️' }, { id: 'performance', label: '業務績效', icon: '👥' }, { id: 'bonuses', label: '獎金核銷', icon: '💰' }].map(tab => (
                     <button key={tab.id} onClick={() => setFinancialTab(tab.id as any)} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-[22px] transition-all duration-500 ${financialTab === tab.id ? 'bg-slate-950 text-white shadow-2xl scale-[1.02]' : 'text-slate-400 hover:bg-slate-100/50'}`}>
                        <span className="text-lg">{tab.icon}</span><span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
                     </button>
                   ))}
                </div>
+
+               {(financialTab === 'payments' || financialTab === 'performance') && (
+                 <div className="flex justify-end mb-6">
+                    <input 
+                      type="month" 
+                      value={monthFilter} 
+                      onChange={(e) => setMonthFilter(e.target.value)}
+                      className="bg-white/80 backdrop-blur-md border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                 </div>
+               )}
+
                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                   {financialTab === 'payments' && (
                     <div className="space-y-10">
@@ -841,7 +871,7 @@ export default function DistributorClient({
                   )}
                   {financialTab === 'performance' && (
                     <div className="space-y-4">
-                       {initialTeam.map((s: any, idx: number) => (
+                       {teamPerformance.map((s: any, idx: number) => (
                           <div key={s.id} className="bg-white/60 backdrop-blur-xl p-7 rounded-[40px] border border-white shadow-xl space-y-6 group hover:bg-white transition-all duration-500">
                               <div className="flex justify-between items-center">
                                  <div className="flex items-center gap-4">
@@ -893,7 +923,12 @@ export default function DistributorClient({
                                 </div>
                                 <div className="text-right">
                                    {b.status === 'Verified' || b.status === 'Paid' ? (
-                                      <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-100 px-5 py-2.5 rounded-full shadow-inner"><span className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">已完成核銷紀錄</span></div>
+                                       <div className="flex items-center gap-2 justify-end">
+                                          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-100 px-5 py-2.5 rounded-full shadow-inner"><span className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">已完成核銷紀錄</span></div>
+                                          {b.receiptUrl && (
+                                             <button onClick={(e) => { e.stopPropagation(); setCurrentOrderId(b.id); setCurrentReceiptImage(b.receiptUrl); setCurrentOrderType('saas'); setB2bReceiptViewerOpen(true); }} className="text-xl hover:scale-110 transition-transform hover:opacity-80" title="查看匯款憑證">👁️</button>
+                                          )}
+                                       </div>
                                    ) : (
                                       <button onClick={() => setUploadingBonusId(b.id)} className="text-[9px] font-black text-white bg-slate-950 px-7 py-3.5 rounded-full uppercase tracking-[0.2em] shadow-2xl hover:bg-blue-600 hover:-translate-y-1 transition-all active:translate-y-0">點選核銷 📝</button>
                                    )}
