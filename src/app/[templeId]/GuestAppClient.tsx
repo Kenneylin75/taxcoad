@@ -1483,7 +1483,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                      await uploadPaymentProof(viewPaymentInfo.recordId, viewPaymentInfo.recordType, base64Url, guestUser.phone);
                      alert('✅ 匯款截圖已成功上傳！廟方將盡快為您對帳。');
                      setViewPaymentInfo(null);
-                     loadGuestData(guestUser.phone);
+                     refreshAllData(guestUser.phone);
                      setIsLoading(false);
                    };
                    reader.readAsDataURL(file);
