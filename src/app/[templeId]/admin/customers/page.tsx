@@ -159,7 +159,7 @@ function DeepFileCenterContent() {
        });
     });
     history.appointments.forEach(app => {
-      logs.push({ type: 'APPOINTMENT', date: app.date || app.time.split('T')[0], time: app.time.includes('T') ? app.time.split('T')[1] : (app.time || '00:00'), title: `預約：${app.service}`, desc: `狀態：${app.status} | 負責人：${app.staff}`, icon: '📅', color: 'blue' });
+      logs.push({ type: 'APPOINTMENT', date: app.date || app.time.split('T')[0], time: app.time.includes('T') ? app.time.split('T')[1] : (app.time || '00:00'), title: `預約：${app.service}`, desc: `狀態：${app.status} | 負責人：${app.staff}`, icon: '📅', color: 'blue', paymentRef: app.paymentRef, paymentProofUrl: app.paymentProofUrl });
     });
     history.records.forEach(rec => {
       const isMerit = rec.serviceType.includes('功德');
@@ -171,7 +171,13 @@ function DeepFileCenterContent() {
       logs.push({ type: 'RECORD', date: rec.date, time: '---', title: title, desc: detailDesc, icon: isMerit ? '✨' : '📜', color: isMerit ? 'amber' : 'emerald' });
     });
     history.lampRecords?.forEach(lamp => {
-      logs.push({ type: 'LAMP', date: lamp.startDate, time: '---', title: `安奉燈位：${lamp.categoryName}`, desc: `狀態：${lamp.status} | 圓滿日：${lamp.expiryDate}`, icon: '🏮', color: 'amber' });
+      logs.push({ type: 'LAMP', date: lamp.startDate, time: '---', title: `安奉燈位：${lamp.categoryName}`, desc: `狀態：${lamp.status} | 圓滿日：${lamp.expiryDate}`, icon: '🏮', color: 'amber', paymentRef: lamp.paymentRef, paymentProofUrl: lamp.paymentProofUrl });
+    });
+    history.eventRegistrations?.forEach(evt => {
+      logs.push({ type: 'EVENT', date: evt.timestamp?.split('T')[0] || evt.timestamp, time: '---', title: `活動：${evt.title}`, desc: `狀態：${evt.status || '成功'}`, icon: '🎉', color: 'indigo', paymentRef: evt.paymentRef, paymentProofUrl: evt.paymentProofUrl });
+    });
+    history.queueTickets?.forEach(qt => {
+      logs.push({ type: 'QUEUE', date: qt.date || qt.scannedAt, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
     });
     history.files.forEach(file => {
       logs.push({ type: 'MEDIA', date: file.folder, time: '---', title: `媒體歸檔：${file.type === 'photo' ? '照片' : '影片'}`, desc: `來源：${file.uploadedBy}`, icon: '🎬', color: 'indigo' });
@@ -499,14 +505,9 @@ function DeepFileCenterContent() {
                                   </div>
                                   <div className="flex justify-between items-end">
                                      <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p><p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p></div>
-                                     <div className="flex gap-2">
-                                     {lamp.status !== 'Cancelled' && (lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
+                                     <div className="flex gap-4 items-center">
+                                     {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
                                         <>
-                                        {lamp.paymentProofUrl && (
-                                          <button onClick={() => setPreviewFile({ type: 'photo', url: lamp.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
-                                            <span>📸</span> 查看截圖
-                                          </button>
-                                        )}
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
@@ -599,6 +600,20 @@ function DeepFileCenterContent() {
                               <div className="flex items-center gap-4 mb-3"><span className="text-[10px] font-black text-slate-400 font-mono tracking-widest">{log.date} {log.time}</span><span className="text-[9px] font-black text-white px-3 py-1 rounded-full uppercase tracking-[0.2em] shadow-sm" style={{ backgroundColor: log.color === 'blue' ? '#3b82f6' : log.color === 'emerald' ? '#10b981' : log.color === 'amber' ? '#f59e0b' : log.color === 'indigo' ? '#6366f1' : '#cbd5e1' }}>{log.type}</span></div>
                               <h4 className="text-xl font-black text-slate-900">{log.title === '自動日誌' ? '📔 系統連動日誌' : log.title}</h4>
                               <p className="text-sm font-bold text-slate-500 leading-relaxed mt-2">{log.desc}</p>
+                              {(log.paymentRef || log.paymentProofUrl) && (
+                                <div className="flex gap-2 items-center flex-wrap mt-3">
+                                  {log.paymentRef && (
+                                    <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
+                                      <span>💳</span> 後五碼: {log.paymentRef}
+                                    </span>
+                                  )}
+                                  {log.paymentProofUrl && (
+                                    <button onClick={() => setPreviewFile({ type: 'photo', url: log.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                      <span>📸</span> 查看截圖
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                            </div>
                         )) : (
                           <div className="p-20 text-center opacity-20 font-black uppercase tracking-widest text-sm">尚無任何歷史活動</div>
@@ -739,32 +754,41 @@ function DeepFileCenterContent() {
                                  <h4 className="text-base font-bold text-slate-900">{evt.title}</h4>
                                  <p className="text-sm text-slate-500 mt-1">結緣金：{evt.price > 0 ? `$${evt.price}` : '隨喜'}</p>
                               </div>
-                              <div className="flex gap-4 items-center">
-                                 {(evt.paymentStatus === 'Pending' || evt.paymentStatus === 'Unpaid' || evt.paymentStatus === 'PENDING_REVIEW') && (
-                                    <>
-                                    {evt.paymentProofUrl && (
-                                      <button onClick={() => setPreviewFile({ type: 'photo', url: evt.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
-                                        <span>📸</span> 查看截圖
-                                      </button>
-                                    )}
-                                    <button 
-                                      onClick={async () => {
-                                        if (confirm('確定要標記已收款？')) {
-                                          await import('@/app/actions').then(m => m.confirmPayment(evt.id, 'Event'));
-                                          if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                        }
-                                      }}
-                                      className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
-                                    >
-                                      ✅ 標記已收款
-                                    </button>
-                                   </>
-                                 )}
-                                 {evt.paymentStatus === 'Paid' && (
-                                    <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>
-                                 )}
-                              </div>
-                           </div>
+                               <div className="flex flex-col items-end gap-2">
+                                  <div className="flex gap-4 items-center">
+                                     {(evt.paymentStatus === 'Pending' || evt.paymentStatus === 'Unpaid' || evt.paymentStatus === 'PENDING_REVIEW') && (
+                                        <button 
+                                          onClick={async () => {
+                                            if (confirm('確定要標記已收款？')) {
+                                              await import('@/app/actions').then(m => m.confirmPayment(evt.id, 'Event'));
+                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                            }
+                                          }}
+                                          className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
+                                        >
+                                          ✅ 標記已收款
+                                        </button>
+                                     )}
+                                     {evt.paymentStatus === 'Paid' && (
+                                        <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>
+                                     )}
+                                  </div>
+                                  {(evt.paymentRef || evt.paymentProofUrl) && (
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                      {evt.paymentRef && (
+                                        <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
+                                          <span>💳</span> 後五碼: {evt.paymentRef}
+                                        </span>
+                                      )}
+                                      {evt.paymentProofUrl && (
+                                        <button onClick={() => setPreviewFile({ type: 'photo', url: evt.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                          <span>📸</span> 查看截圖
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                               </div>
+                            </div>
                         )) : (
                           <div className="p-10 text-center opacity-40 font-bold text-sm">無活動紀錄</div>
                         )}
@@ -782,25 +806,41 @@ function DeepFileCenterContent() {
                                  <h4 className="text-base font-bold text-slate-900">{tix.eventTitle}</h4>
                                  <p className="text-sm text-slate-500 mt-1">號碼牌：<span className="font-mono font-bold text-indigo-600 text-lg">{tix.assignedNumber}</span></p>
                               </div>
-                              <div className="flex gap-4 items-center">
-                                 {(tix.paymentStatus === 'Pending' || tix.paymentStatus === 'Unpaid') && (
-                                    <button 
-                                      onClick={async () => {
-                                        if (confirm('確定要標記已收款？')) {
-                                          await import('@/app/actions').then(m => m.confirmPayment(tix.id, 'Queue'));
-                                          if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                        }
-                                      }}
-                                      className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
-                                    >
-                                      ✅ 標記已收款
-                                    </button>
-                                 )}
-                                 {tix.paymentStatus === 'Paid' && (
-                                    <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>
-                                 )}
-                              </div>
-                           </div>
+                               <div className="flex flex-col items-end gap-2">
+                                  <div className="flex gap-4 items-center">
+                                     {(tix.paymentStatus === 'Pending' || tix.paymentStatus === 'Unpaid') && (
+                                        <button 
+                                          onClick={async () => {
+                                            if (confirm('確定要標記已收款？')) {
+                                              await import('@/app/actions').then(m => m.confirmPayment(tix.id, 'Queue'));
+                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                            }
+                                          }}
+                                          className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors px-3 py-2 bg-red-50 rounded-lg border border-red-100"
+                                        >
+                                          ✅ 標記已收款
+                                        </button>
+                                     )}
+                                     {tix.paymentStatus === 'Paid' && (
+                                        <span className="text-sm font-medium text-emerald-600">✓ 已結帳</span>
+                                     )}
+                                  </div>
+                                  {(tix.paymentRef || tix.paymentProofUrl) && (
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                      {tix.paymentRef && (
+                                        <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
+                                          <span>💳</span> 後五碼: {tix.paymentRef}
+                                        </span>
+                                      )}
+                                      {tix.paymentProofUrl && (
+                                        <button onClick={() => setPreviewFile({ type: 'photo', url: tix.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                          <span>📸</span> 查看截圖
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                               </div>
+                            </div>
                         )) : (
                           <div className="p-10 text-center opacity-40 font-bold text-sm">無排隊紀錄</div>
                         )}
