@@ -390,12 +390,18 @@ export default function SuperSalesPage() {
                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex justify-between items-center">
                       <div>
                          <p className="text-[10px] font-black text-slate-400 uppercase">指定撥款帳戶</p>
-                         <p className="text-sm font-black text-slate-900">國泰世華 (013) • **** 8901</p>
+                         {profile?.bankInfo ? (
+                             <p className="text-sm font-black text-slate-900">{profile.bankInfo.bankName} {profile.bankInfo.bankCode ? `(${profile.bankInfo.bankCode})` : ''} • {profile.bankInfo.accountNumber}</p>
+                         ) : (
+                             <p className="text-sm font-black text-rose-500">尚未設定銀行帳戶，無法提款</p>
+                         )}
                       </div>
-                      <span className="text-[10px] font-black text-indigo-600 bg-white px-3 py-1 rounded-full border border-indigo-100 shadow-sm">Verified</span>
+                      {profile?.bankInfo && (
+                         <span className="text-[10px] font-black text-indigo-600 bg-white px-3 py-1 rounded-full border border-indigo-100 shadow-sm">Verified</span>
+                      )}
                    </div>
 
-                   <button type="submit" disabled={isWithdrawing} className="w-full py-7 bg-slate-900 text-white rounded-[32px] font-black text-sm uppercase tracking-[0.3em] shadow-xl hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-50">
+                   <button type="submit" disabled={isWithdrawing || !profile?.bankInfo} className="w-full py-7 bg-slate-900 text-white rounded-[32px] font-black text-sm uppercase tracking-[0.3em] shadow-xl hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-50">
                       {isWithdrawing ? '處理中...' : '確認提交提領申請 📤'}
                    </button>
                 </form>

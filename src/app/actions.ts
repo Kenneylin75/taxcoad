@@ -1233,8 +1233,11 @@ export async function fetchLampCategories() {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) return (gStore.db_lamp_categories || db_lamp_categories).filter((x: any) => !x.templeId || x.templeId === templeId);
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_categories (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), name VARCHAR(255), price INTEGER, description TEXT, color VARCHAR(50), is_active BOOLEAN DEFAULT true, type VARCHAR(50))`);
+    await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS duration_days INTEGER DEFAULT 365`);
+    await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS total_slots INTEGER DEFAULT 500`);
+    await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS precautions TEXT`);
     const res = await client.query('SELECT * FROM lamp_categories WHERE temple_id = $1', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, description: r.description, color: r.color, isActive: r.is_active, type: r.type }));
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, description: r.description, durationDays: r.duration_days, totalSlots: r.total_slots, precautions: r.precautions, color: r.color, isActive: r.is_active, type: r.type }));
   });
 }
 let db_lamp_records: any[] = initGlobal("db_lamp_records", []);
@@ -1852,6 +1855,9 @@ export async function ensurePlatformTables() {
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS b2b_payment_config JSONB;`);
     await dbQuery(`ALTER TABLE temple_bills ADD COLUMN IF NOT EXISTS payee_role VARCHAR(50);`);
     await dbQuery(`ALTER TABLE temple_bills ADD COLUMN IF NOT EXISTS payee_id VARCHAR(100);`);
+    await dbQuery(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;`);
+    await dbQuery(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;`);
+    await dbQuery(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;`);
   } catch(e) {}
 
   await dbQuery(`
@@ -3901,9 +3907,10 @@ export async function approveTempleByDistributor(templeId: string) {
     await generateInitialBills(t);
     if (t.account && t.password) {
       const pData = (gStore.db_personnel || db_personnel);
+      const newPersonId = `p-${Date.now()}`;
       if (!pData.some((p:any) => p.account === t.account)) {
         pData.push({
-          id: `p-${Date.now()}`,
+          id: newPersonId,
           templeId: templeId,
           name: t.templeName || '宮廟管理員',
           account: t.account,
@@ -3912,6 +3919,20 @@ export async function approveTempleByDistributor(templeId: string) {
           status: 'Active'
         });
         gStore.db_personnel = pData;
+        
+        // Ensure insertion into PostgreSQL
+        try {
+          const { dbQuery } = await import('@/db/db');
+          await dbQuery(
+            `INSERT INTO personnel (id, temple_id, name, account, password, role, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (id, temple_id) DO NOTHING`,
+            [newPersonId, templeId, t.templeName || '宮廟管理員', t.account, t.password, 'TempleAdmin', 'Active'],
+            () => null
+          );
+        } catch (e) {
+          console.error("Failed to insert personnel into postgres during distributor approval:", e);
+        }
       }
     }
     revalidatePath('/distributor');
@@ -4401,7 +4422,19 @@ export async function fetchSuperSalesBonuses(salesName: string) {
 
 export async function fetchAllWithdrawals() {
   return withTempleSession(null, true, async (client) => {
-    if (!client) return [];
+    if (!client) {
+      if (!(globalThis as any).db_withdrawals) return [];
+      const allWithdrawals = (globalThis as any).db_withdrawals.map((r: any) => ({
+        id: r.id,
+        salesName: r.salesName || r.sales_name,
+        amount: r.amount,
+        status: r.status,
+        receiptUrl: r.receiptUrl || r.receipt_url,
+        date: r.date,
+        role: r.role
+      }));
+      return allWithdrawals.filter((w: any) => w.role !== 'DistSales' && w.role !== 'DistributorSales');
+    }
 
     const query = `
       SELECT w.*, wal.role as wallet_role 
@@ -4521,7 +4554,28 @@ export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptU
 
 export async function requestWithdrawal(salesName: string, amount: number) { 
   return withTempleSession(null, true, async (client) => {
-    if (!client) return { success: false, error: '資料庫連線失敗' };
+    if (!client) {
+      if (!(globalThis as any).db_wallets) (globalThis as any).db_wallets = [];
+      const w = (globalThis as any).db_wallets.find((w: any) => w.name === salesName);
+      if (!w) return { success: false, error: '找不到該錢包帳戶' };
+      if (amount > w.balance) return { success: false, error: '餘額不足' };
+      
+      w.balance -= amount;
+      
+      const wdId = `WD-${Date.now()}`;
+      if (!(globalThis as any).db_withdrawals) (globalThis as any).db_withdrawals = [];
+      (globalThis as any).db_withdrawals.push({
+        id: wdId,
+        salesName: salesName,
+        amount: amount,
+        status: 'Pending',
+        date: new Date().toISOString().split('T')[0],
+        role: w.role
+      });
+      
+      revalidatePath('/super-admin');
+      return { success: true };
+    }
     
     const wRes = await client.query('SELECT balance FROM wallets WHERE name = $1', [salesName]);
     if ((wRes.rowCount ?? 0) === 0) return { success: false, error: '找不到該錢包帳戶' };
@@ -4771,19 +4825,50 @@ export async function updateAccountPermissions(id: string, permissions: string[]
 export async function updateAccountPassword(id: string, newPass: string, role?: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
+    const gStore = globalThis as any;
     // 永遠更新記憶體資料，以免登入時 fallback 到舊密碼
     if (role === 'Temple' || id.startsWith('temple-')) {
-       const idx = db_personnel.findIndex((p: any) => p.templeId === id);
-       if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
+       let pData = (gStore.db_personnel || db_personnel);
+       const idx = pData.findIndex((p: any) => p.templeId === id);
+       if (idx > -1) { 
+         pData[idx].password = newPass; 
+         gStore.db_personnel = pData; 
+       } else {
+         const tData = (gStore.db_temples || db_temples);
+         const temple = tData.find((t: any) => t.id === id);
+         if (temple) {
+           pData.push({
+             id: `p-${Date.now()}`,
+             templeId: id,
+             name: temple.templeName || '宮廟管理員',
+             account: temple.account || `admin-${id.slice(-4)}`,
+             password: newPass,
+             role: 'TempleAdmin',
+             status: 'Active'
+           });
+           gStore.db_personnel = pData;
+         }
+       }
+       
+       // 同步更新 db_temples 以便 Auto-heal 登入機制生效
+       const tData = (gStore.db_temples || db_temples);
+       const tIdx = tData.findIndex((t: any) => t.id === id);
+       if (tIdx > -1) {
+         tData[tIdx].password = newPass;
+         gStore.db_temples = tData;
+       }
     } else if (role === 'Distributor') {
-       const idx = db_distributors.findIndex((p: any) => p.id === id);
-       if (idx > -1) { db_distributors[idx].password = newPass; gStore.db_distributors = db_distributors; }
+       let dData = (gStore.db_distributors || db_distributors);
+       const idx = dData.findIndex((p: any) => p.id === id);
+       if (idx > -1) { dData[idx].password = newPass; gStore.db_distributors = dData; }
     } else if (role === 'SuperSales' || role === 'DistSales') {
-       const idx = db_dist_sales.findIndex((p: any) => p.id === id);
-       if (idx > -1) { db_dist_sales[idx].password = newPass; gStore.db_dist_sales = db_dist_sales; }
+       let sData = (gStore.db_dist_sales || db_dist_sales);
+       const idx = sData.findIndex((p: any) => p.id === id);
+       if (idx > -1) { sData[idx].password = newPass; gStore.db_dist_sales = sData; }
     } else {
-       const idx = db_personnel.findIndex((p: any) => p.id.toString() === id.toString());
-       if (idx > -1) { db_personnel[idx].password = newPass; gStore.db_personnel = db_personnel; }
+       let pData = (gStore.db_personnel || db_personnel);
+       const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
+       if (idx > -1) { pData[idx].password = newPass; gStore.db_personnel = pData; }
     }
 
     if (client) {
@@ -4792,7 +4877,22 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
       } else if (role === 'SuperSales' || role === 'DistSales') {
         await client.query('UPDATE dist_sales SET password = $1 WHERE id = $2', [newPass, id]);
       } else {
-        await client.query('UPDATE personnel SET password = $1 WHERE id = $2 OR temple_id = $2', [newPass, id]);
+        const res = await client.query('UPDATE personnel SET password = $1 WHERE id = $2 OR temple_id = $2 RETURNING id', [newPass, id]);
+        // Auto-heal PostgreSQL insertion
+        if (res.rowCount === 0 && (role === 'Temple' || id.startsWith('temple-'))) {
+           const tData = (gStore.db_temples || db_temples);
+           const temple = tData.find((t: any) => t.id === id);
+           const account = temple?.account || `admin-${id.slice(-4)}`;
+           const name = temple?.templeName || '宮廟管理員';
+           try {
+             await client.query(
+               `INSERT INTO personnel (id, temple_id, name, account, password, role, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (id, temple_id) DO NOTHING`,
+               [`p-${Date.now()}`, id, name, account, newPass, 'TempleAdmin', 'Active']
+             );
+           } catch(e) { console.error('Failed to auto-insert personnel', e); }
+        }
       }
     }
     return { success: true };
@@ -5236,8 +5336,8 @@ export async function fetchGuestHistory(p: string) {
           uploadedAt: r.uploaded_at instanceof Date ? r.uploaded_at.toISOString().replace('T', ' ').slice(0, 19) : r.uploaded_at
         }));
       }
-      const appsRes = await client.query('SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount FROM appointments WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-      const lampsRes = await client.query('SELECT id, temple_id as "templeId", guest_name as "guestName", phone, lamp_type as "lampType", amount, status, created_at as "createdAt", payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus" FROM lamp_records WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const appsRes = await client.query('SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount, payment_proof_url as "paymentProofUrl" FROM appointments WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const lampsRes = await client.query('SELECT id, temple_id as "templeId", guest_name as "guestName", phone, lamp_type as "lampType", amount, status, created_at as "createdAt", payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", payment_proof_url as "paymentProofUrl" FROM lamp_records WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
       const queueRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", event_title as "eventTitle", phone, guest_name as "guestName", status, assigned_number as "assignedNumber", actual_order as "actualOrder", payment_status as "paymentStatus", created_at as "createdAt" FROM queue_tickets WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
       const eventsRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", title, phone, guest_name as "guestName", price, payment_status as "paymentStatus", actual_price as "actualPrice", timestamp as "createdAt" FROM event_registrations WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
 
@@ -5460,13 +5560,13 @@ export async function saveLampCategory(data: any) {
     } else {
       if (id) {
         await client.query(
-          'UPDATE lamp_categories SET name = $1, description = $2, duration_days = $3, total_slots = $4, price = $5 WHERE id = $6 AND temple_id = $7',
-          [data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, id, templeId]
+          'UPDATE lamp_categories SET name = $1, description = $2, duration_days = $3, total_slots = $4, price = $5, precautions = $8 WHERE id = $6 AND temple_id = $7',
+          [data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, id, templeId, data.precautions || '']
         );
       } else {
         await client.query(
-          'INSERT INTO lamp_categories (id, temple_id, name, description, duration_days, total_slots, price) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [`cat-${Date.now()}`, templeId, data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0]
+          'INSERT INTO lamp_categories (id, temple_id, name, description, duration_days, total_slots, price, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          [`cat-${Date.now()}`, templeId, data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, data.precautions || '']
         );
       }
     }

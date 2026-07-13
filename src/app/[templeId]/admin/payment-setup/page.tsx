@@ -112,11 +112,11 @@ export default function PaymentSetupPage() {
            <div className={`space-y-4 transition-opacity duration-300 \${config.linePay.enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
               <div>
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Channel ID</label>
-                 <input type="text" value={config.linePay.channelId} onChange={e => setConfig({...config, linePay: {...config.linePay, channelId: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-emerald-500 transition-colors" placeholder="輸入 LINE Pay Channel ID" />
+                 <input type="text" value={config.linePay.channelId || ''} onChange={e => setConfig({...config, linePay: {...config.linePay, channelId: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-emerald-500 transition-colors" placeholder="輸入 LINE Pay Channel ID" />
               </div>
               <div>
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Channel Secret</label>
-                 <input type="password" value={config.linePay.channelSecret} onChange={e => setConfig({...config, linePay: {...config.linePay, channelSecret: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-emerald-500 transition-colors" placeholder="••••••••••••••••" />
+                 <input type="password" value={config.linePay.channelSecret || ''} onChange={e => setConfig({...config, linePay: {...config.linePay, channelSecret: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-emerald-500 transition-colors" placeholder="••••••••••••••••" />
               </div>
               {renderModuleSelector('linePay', 'emerald', 'emerald')}
            </div>
@@ -142,24 +142,24 @@ export default function PaymentSetupPage() {
               <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">供應商 Provider</label>
-                    <select value={config.thirdParty.provider} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, provider: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors">
+                    <select value={config.thirdParty.provider || 'ECPay'} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, provider: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors">
                        <option value="ECPay">綠界科技 (ECPay)</option>
                        <option value="NewebPay">藍新科技 (NewebPay)</option>
                     </select>
                  </div>
                  <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">商店代號 Merchant ID</label>
-                    <input type="text" value={config.thirdParty.merchantId} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, merchantId: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="Merchant ID" />
+                    <input type="text" value={config.thirdParty.merchantId || ''} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, merchantId: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="Merchant ID" />
                  </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">HashKey</label>
-                    <input type="password" value={config.thirdParty.hashKey} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, hashKey: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••••••" />
+                    <input type="password" value={config.thirdParty.hashKey || ''} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, hashKey: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••••••" />
                  </div>
                  <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">HashIV</label>
-                    <input type="password" value={config.thirdParty.hashIV} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, hashIV: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••••••" />
+                    <input type="password" value={config.thirdParty.hashIV || ''} onChange={e => setConfig({...config, thirdParty: {...config.thirdParty, hashIV: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••••••" />
                  </div>
               </div>
               {renderModuleSelector('thirdParty', 'indigo', 'indigo')}
@@ -186,20 +186,20 @@ export default function PaymentSetupPage() {
               <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">銀行代碼 Bank Code</label>
-                    <input type="text" value={config.customTransfer.bankCode} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, bankCode: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors" placeholder="如: 008" />
+                    <input type="text" value={config.customTransfer.bankCode || ''} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, bankCode: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors" placeholder="如: 008" />
                  </div>
                  <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">銀行名稱 Bank Name</label>
-                    <input type="text" value={config.customTransfer.bankName} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, bankName: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors" placeholder="華南商業銀行" />
+                    <input type="text" value={config.customTransfer.bankName || ''} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, bankName: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors" placeholder="華南商業銀行" />
                  </div>
               </div>
               <div>
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">收款戶名 Account Name</label>
-                 <input type="text" value={config.customTransfer.accountName} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, accountName: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors" placeholder="財團法人○○宮" />
+                 <input type="text" value={config.customTransfer.accountName || ''} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, accountName: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors" placeholder="財團法人○○宮" />
               </div>
               <div>
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">收款帳號 Account Number</label>
-                 <input type="text" value={config.customTransfer.accountNo} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, accountNo: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xl font-black font-serif tracking-[0.2em] focus:outline-none focus:border-amber-500 transition-colors" placeholder="1234-5678-9012" />
+                 <input type="text" value={config.customTransfer.accountNo || ''} onChange={e => setConfig({...config, customTransfer: {...config.customTransfer, accountNo: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xl font-black font-serif tracking-[0.2em] focus:outline-none focus:border-amber-500 transition-colors" placeholder="1234-5678-9012" />
               </div>
               {renderModuleSelector('customTransfer', 'amber', 'amber')}
            </div>
@@ -270,7 +270,7 @@ export default function PaymentSetupPage() {
               
               <div>
                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">備註說明 Instructions</label>
-                 <input type="text" value={config.customQR.description} onChange={e => setConfig({...config, customQR: {...config.customQR, description: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-pink-500 transition-colors" placeholder="請掃描 QR Code 後，輸入正確金額並備註報名者姓名" />
+                 <input type="text" value={config.customQR.description || ''} onChange={e => setConfig({...config, customQR: {...config.customQR, description: e.target.value}})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-pink-500 transition-colors" placeholder="請掃描 QR Code 後，輸入正確金額並備註報名者姓名" />
               </div>
               {renderModuleSelector('customQR', 'pink', 'pink')}
            </div>

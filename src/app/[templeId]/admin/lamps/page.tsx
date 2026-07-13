@@ -599,7 +599,17 @@ function LampManagementContent() {
                              />
                           </div>
 
-                          <div className="flex gap-4 pt-4">
+                          <div className="space-y-4 bg-white p-8 rounded-[40px] shadow-sm border-2 border-slate-100">
+                              <label className="text-[10px] font-black text-slate-500 ml-2 uppercase tracking-widest block mb-2">6. 注意事項 (Precautions)</label>
+                              <textarea 
+                                 value={editingCategory.precautions || ''} 
+                                 onChange={e => setEditingCategory({...editingCategory, precautions: e.target.value})} 
+                                 className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-indigo-600 focus:bg-white transition-all custom-scrollbar placeholder:text-slate-300 min-h-[80px] resize-y" 
+                                 placeholder="點燈後將於三日內為您上燈，並寄送電子通知。" 
+                              />
+                           </div>
+
+                           <div className="flex gap-4 pt-4">
                              <button onClick={async () => { if (!editingCategory.id) return; if(confirm("確定要刪除此燈種嗎？")) { const res = await deleteLampCategory(editingCategory.id); if (!res.success) { alert(res.error); } else { await loadData(); setEditingCategory(null); } } }} className="px-10 py-6 bg-rose-50 text-rose-500 rounded-[30px] font-black text-xs uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all">刪除</button>
                              <button onClick={async () => { if (!editingCategory.name) return; await saveLampCategory(editingCategory); await loadData(); setEditingCategory(null); alert("✅ 服務配置已成功儲存"); }} className="flex-1 py-6 bg-slate-900 text-white rounded-[35px] font-black text-sm uppercase tracking-[0.5em] shadow-2xl hover:bg-indigo-600 transition-all hover:scale-[1.02] active:scale-[0.98]">保 存 配置 ✨</button>
                           </div>

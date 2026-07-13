@@ -2363,7 +2363,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   <div className="bg-amber-50 p-3 rounded-xl flex gap-3 items-start border border-amber-100">
                     <span className="text-amber-600 text-sm">💡</span>
                     <div>
-                      <p className="text-[10px] font-bold text-amber-700 uppercase">辦理須知</p>
+                      <p className="text-[10px] font-bold text-amber-700 uppercase">注意事項</p>
                       <p className="text-xs text-amber-800 mt-0.5">{item.precautions}</p>
                     </div>
                   </div>

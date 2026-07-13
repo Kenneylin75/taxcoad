@@ -668,39 +668,44 @@ function DeepFileCenterContent() {
                                         </button>
                                       )}
                                       
-                                      {(event.paymentStatus === 'Pending' || event.paymentStatus === 'Unpaid' || event.paymentStatus === 'PENDING_REVIEW') && (
-                                        <>
+                                      <div className="flex gap-2 items-center flex-wrap justify-end mt-2">
+                                        {event.paymentRef && (
+                                          <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
+                                            <span>💳</span> 後五碼: {event.paymentRef}
+                                          </span>
+                                        )}
                                         {event.paymentProofUrl && (
                                           <button onClick={() => setPreviewFile({ type: 'photo', url: event.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
                                             <span>📸</span> 查看截圖
                                           </button>
                                         )}
-                                        <button 
-                                          onClick={async () => {
-                                            if (confirm('確定要標記已收款？')) {
-                                              await import('@/app/actions').then(m => m.confirmPayment(event.id.toString(), 'Appointment'));
-                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                            }
-                                          }}
-                                          className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors ml-4 px-3 py-1 bg-red-50 rounded-lg border border-red-100"
-                                        >
-                                          ✅ 標記已收款
-                                        </button>
-                                        </>
-                                      )}
-                                      {event.paymentStatus === 'Paid' && (
-                                        <button 
-                                          onClick={async () => {
-                                            if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
-                                              await import('@/app/actions').then(m => m.revertPayment(event.id.toString(), 'Appointment'));
-                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                            }
-                                          }}
-                                          className="text-sm font-medium text-emerald-600 ml-4 hover:text-rose-600 hover:line-through transition-colors"
-                                        >
-                                          ✓ 已結帳
-                                        </button>
-                                      )}
+                                        {(event.paymentStatus === 'Pending' || event.paymentStatus === 'Unpaid' || event.paymentStatus === 'PENDING_REVIEW') && (
+                                          <button 
+                                            onClick={async () => {
+                                              if (confirm('確定要標記已收款？')) {
+                                                await import('@/app/actions').then(m => m.confirmPayment(event.id.toString(), 'Appointment'));
+                                                if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                              }
+                                            }}
+                                            className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors ml-2 px-3 py-1 bg-red-50 rounded-lg border border-red-100"
+                                          >
+                                            ✅ 標記已收款
+                                          </button>
+                                        )}
+                                        {event.paymentStatus === 'Paid' && (
+                                          <button 
+                                            onClick={async () => {
+                                              if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
+                                                await import('@/app/actions').then(m => m.revertPayment(event.id.toString(), 'Appointment'));
+                                                if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                              }
+                                            }}
+                                            className="text-sm font-medium text-emerald-600 ml-2 hover:text-rose-600 hover:line-through transition-colors"
+                                          >
+                                            ✓ 已結帳
+                                          </button>
+                                        )}
+                                      </div>
                                       {event.status !== 'Cancelled' && (
                                         <button 
                                           onClick={async () => {

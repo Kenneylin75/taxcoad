@@ -16,6 +16,7 @@ export default function AdminSlotsPage() {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // 單筆編輯狀態
   const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
@@ -112,8 +113,8 @@ export default function AdminSlotsPage() {
     }
   };
 
-  // 🛡️ 深度優化分組邏輯：確保所有日期都被完整歸類且不遺漏
-  const groupedSlots = useMemo(() => {
+  // 🛡️ 深度優化分組邏輯：確保所有日期都被完整歸類且不遺漏，並支援排序與分頁
+  const groupedSlotsArray = useMemo(() => {
     const groups: Record<string, any> = {};
     
     // 遍歷所有從 Server 抓回來的時段
@@ -127,12 +128,14 @@ export default function AdminSlotsPage() {
       
       if (!groups[key]) {
         groups[key] = {
+          key,
           staff: staffName,
           time: slotTime,
           description: slotDesc,
           notice: slot.notice,
           penalty_rule: slot.penalty_rule,
           dates: [], // 準備存放該群組下的所有日期
+          maxId: 0, // 紀錄該群組中最新的 ID，用於排序
         };
       }
       
@@ -140,16 +143,33 @@ export default function AdminSlotsPage() {
       const isExist = groups[key].dates.some((d: any) => d.date === slot.date || d.id === slot.id);
       if (!isExist) {
         groups[key].dates.push({ id: slot.id, date: slot.date });
+        // 解析 slot.id，若是數字則取大者，若是字串(如 SL-12345)則嘗試解析數字或單純使用字串比對
+        // 在 Postgres 中 SERIAL PRIMARY KEY 通常會回傳數字或字串型的數字
+        const numericId = parseInt(slot.id, 10) || 0;
+        if (numericId > groups[key].maxId) {
+          groups[key].maxId = numericId;
+        }
       }
     });
     
     // 依照日期先後順序排序各組內的班次
-    Object.keys(groups).forEach(k => {
-      groups[k].dates.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const groupsArray = Object.values(groups);
+    groupsArray.forEach(group => {
+      group.dates.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
     });
     
-    return groups;
+    // 降冪排序，最新開設（id最大）的排在最前面
+    groupsArray.sort((a, b) => b.maxId - a.maxId);
+    
+    return groupsArray;
   }, [slots]);
+
+  const ITEMS_PER_PAGE = 5;
+  const totalPages = Math.ceil(groupedSlotsArray.length / ITEMS_PER_PAGE) || 1;
+  const currentGroups = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return groupedSlotsArray.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [groupedSlotsArray, currentPage]);
 
   const handleRemoveSlot = async (id: number) => {
     if(confirm("確定要取消此日時段嗎？")) {
@@ -380,18 +400,19 @@ export default function AdminSlotsPage() {
          {/* Deployed Clusters */}
          <div className="lg:col-span-7 space-y-8">
             <div className="flex items-center justify-between px-6">
-               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">在線排班清單 ({Object.keys(groupedSlots).length} GROUPS)</h3>
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">在線排班清單 ({groupedSlotsArray.length} GROUPS)</h3>
             </div>
 
             <div className="space-y-6">
-              {Object.keys(groupedSlots).length === 0 && !isLoading && (
+              {groupedSlotsArray.length === 0 && !isLoading && (
                 <div className="py-24 text-center bg-white border-4 border-dashed border-slate-100 rounded-[50px] flex flex-col items-center gap-4">
                    <div className="text-6xl grayscale opacity-20">📭</div>
                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">目前系統中暫無已發布的排班資料</p>
                 </div>
               )}
               
-              {Object.entries(groupedSlots).map(([key, group]: [string, any]) => {
+              {currentGroups.map((group: any) => {
+                 const key = group.key;
                  const isExpanded = expandedGroup === key;
                  return (
                     <div key={key} className={`bg-white rounded-[50px] border-2 transition-all duration-500 overflow-hidden ${isExpanded ? 'border-indigo-600 shadow-2xl' : 'border-slate-50 shadow-sm hover:shadow-xl hover:border-slate-200'}`}>
@@ -468,6 +489,29 @@ export default function AdminSlotsPage() {
                     </div>
                  )
               })}
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 py-8">
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-6 py-3 rounded-full bg-white border-2 border-slate-100 font-bold text-xs text-slate-600 disabled:opacity-50 hover:border-indigo-600 transition-all shadow-sm"
+                  >
+                    上一頁
+                  </button>
+                  <span className="text-xs font-black text-slate-400 tracking-widest">
+                    PAGE {currentPage} OF {totalPages}
+                  </span>
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-6 py-3 rounded-full bg-white border-2 border-slate-100 font-bold text-xs text-slate-600 disabled:opacity-50 hover:border-indigo-600 transition-all shadow-sm"
+                  >
+                    下一頁
+                  </button>
+                </div>
+              )}
             </div>
          </div>
       </div>
