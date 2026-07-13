@@ -66,11 +66,11 @@ export default function DistSalesPage() {
   const [locationFilter, setLocationFilter] = useState("");
   
   // Financial Filtering
-  const [commYear, setCommYear] = useState("2026");
+  const [commYear, setCommYear] = useState(new Date().getFullYear().toString());
   const [commMonth, setCommMonth] = useState("05");
 
   // Calendar Dynamic States
-  const [calYear, setCalYear] = useState(2026);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(5); // 1-indexed
   const [selectedDay, setSelectedDay] = useState<number | null>(5); // Default to highlighted day
 
@@ -395,14 +395,15 @@ export default function DistSalesPage() {
        <div className="bg-white rounded-[40px] p-6 shadow-sm border border-slate-100">
           <div className="flex justify-between items-center mb-8 px-2">
              <div className="flex gap-2">
-                <select 
-                  value={calYear} 
-                  onChange={e => {setCalYear(parseInt(e.target.value)); setSelectedDay(null);}} 
-                  className="bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-black outline-none border-none hover:bg-emerald-50 transition-colors cursor-pointer"
-                >
-                   <option value={2026}>2026年</option>
-                   <option value={2027}>2027年</option>
-                </select>
+                 <input 
+                   type="number"
+                   value={calYear} 
+                   onChange={e => {setCalYear(parseInt(e.target.value) || new Date().getFullYear()); setSelectedDay(null);}} 
+                   className="bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-black outline-none border-none hover:bg-emerald-50 transition-colors cursor-pointer w-24"
+                   min="2020"
+                   max="2100"
+                   required
+                 />
                 <select 
                   value={calMonth} 
                   onChange={e => {setCalMonth(parseInt(e.target.value)); setSelectedDay(null);}} 
@@ -555,10 +556,15 @@ export default function DistSalesPage() {
        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex gap-4">
           <div className="flex-1 space-y-1">
              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">查詢年份</p>
-             <select value={commYear} onChange={e => setCommYear(e.target.value)} className="w-full bg-slate-50 rounded-xl px-4 py-3 text-xs font-black outline-none hover:bg-emerald-50 transition-colors">
-                <option value="2026">2026年</option>
-                <option value="2025">2025年</option>
-             </select>
+             <input 
+                type="number"
+                value={commYear} 
+                onChange={e => setCommYear(e.target.value)} 
+                className="w-full bg-slate-50 rounded-xl px-4 py-3 text-xs font-black outline-none hover:bg-emerald-50 transition-colors"
+                min="2020"
+                max="2100"
+                required
+             />
           </div>
           <div className="flex-1 space-y-1">
              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">查詢月份</p>
