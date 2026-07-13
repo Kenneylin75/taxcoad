@@ -3561,19 +3561,26 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
   
   const monthlyRevenue = db_temple_bills.filter(b => b.status === 'Paid').reduce((sum, b) => sum + Number(b.amount || 0), 0);
   const regionCounts: Record<string, number> = {};
-  const majorRegions = ['台北', '新北', '桃園', '台中', '台南', '高雄', '花蓮', '台東', '宜蘭'];
+  const majorRegions = [
+    '基隆', '台北', '新北', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', 
+    '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'
+  ];
   db_temples.forEach(t => {
-    if (t.status === 'Inactive') return; // 排除已停權的宮廟
+    // 排除已停權或非 Active 的宮廟
+    if (t.status === 'Inactive' || t.status === 'Suspended' || t.status === 'Disabled') return;
     
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
     
+    // 確保只抓前兩個字來比對（例如：基隆市 -> 基隆）
+    const shortRegion = region.substring(0, 2);
+    
     // 如果找不到有效地區，用名稱產生一個穩定的隨機地區作為展示
-    if (!majorRegions.some(r => region.includes(r))) {
+    if (!majorRegions.some(r => shortRegion.includes(r))) {
        const name = t.templeName || t.name || '未知';
        const hash = name.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
        region = majorRegions[hash % majorRegions.length];
     } else {
-       region = majorRegions.find(r => region.includes(r)) || '其他';
+       region = majorRegions.find(r => shortRegion.includes(r)) || '其他';
     }
     
     regionCounts[region] = (regionCounts[region] || 0) + 1;
