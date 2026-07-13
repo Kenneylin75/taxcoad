@@ -1432,7 +1432,7 @@ export async function fetchGuestAppointments(p: any) {
     }
     const normPhone = normalizePhone(p);
     const res = await client.query(`
-      SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount
+      SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount, payment_proof_url as "paymentProofUrl"
       FROM appointments 
       WHERE REPLACE(phone, '-', '') = $1 AND temple_id = $2
       ORDER BY date DESC, time DESC
@@ -4194,10 +4194,10 @@ export async function fetchFinancialOverview() {
     if (pgCheck && pgCheck.rows) {
       usedPgForRevenue = true;
       const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
-        dbQuery("SELECT * FROM appointments WHERE temple_id = $1 AND payment_status = 'Paid'", [templeId], () => null) as any,
-        dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND amount > 0 AND payment_status != 'Pending'", [templeId], () => null) as any,
-        dbQuery("SELECT * FROM event_registrations WHERE temple_id = $1 AND payment_status = 'Paid'", [templeId], () => null) as any,
-        dbQuery("SELECT * FROM queue_tickets WHERE temple_id = $1 AND payment_status = 'Paid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM appointments WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND amount > 0 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM event_registrations WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM queue_tickets WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM deep_records WHERE temple_id = $1 AND (id LIKE 'MERIT-%' OR service_type LIKE '%功德%')", [templeId], () => null) as any
       ]);
       
@@ -4306,7 +4306,7 @@ export async function fetchFinancialOverview() {
     });
 
     const myEvents = db_events.filter(e => e.templeId === templeId).map(e => e.id);
-    db_event_registrations.filter(r => myEvents.includes(r.eventId) && r.paymentStatus === 'Paid').forEach(r => {
+    db_event_registrations.filter(r => myEvents.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.title,
@@ -4315,13 +4315,13 @@ export async function fetchFinancialOverview() {
         timestamp: r.timestamp || new Date().toISOString(),
         guestName: r.guestName || r.phone,
         paymentMethod: '現金/臨櫃',
-        status: 'Paid'
+        status: r.paymentStatus
       });
       totalRevenue += (r.actualPrice || r.price);
     });
 
     const myServices = db_services.filter(s => s.templeId === templeId).map(s => s.id);
-    db_appointments.filter(a => myServices.includes(a.serviceId) && a.paymentStatus === 'Paid').forEach(a => {
+    db_appointments.filter(a => myServices.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
       revenue.push({
         id: a.id,
         title: a.service,
@@ -5443,8 +5443,8 @@ export async function fetchGuestHistory(p: string) {
       }
       const appsRes = await client.query('SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount, payment_proof_url as "paymentProofUrl" FROM appointments WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
       const lampsRes = await client.query('SELECT id, temple_id as "templeId", guest_name as "guestName", phone, lamp_type as "lampType", amount, status, created_at as "createdAt", payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", payment_proof_url as "paymentProofUrl" FROM lamp_records WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-      const queueRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", event_title as "eventTitle", phone, guest_name as "guestName", status, assigned_number as "assignedNumber", actual_order as "actualOrder", payment_status as "paymentStatus", created_at as "createdAt" FROM queue_tickets WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-      const eventsRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", title, phone, guest_name as "guestName", price, payment_status as "paymentStatus", actual_price as "actualPrice", timestamp as "createdAt", payment_proof_url as "paymentProofUrl" FROM event_registrations WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const queueRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", event_title as "eventTitle", phone, guest_name as "guestName", status, assigned_number as "assignedNumber", actual_order as "actualOrder", payment_status as "paymentStatus", payment_ref as "paymentRef", payment_proof_url as "paymentProofUrl", created_at as "createdAt" FROM queue_tickets WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
+      const eventsRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", title, phone, guest_name as "guestName", price, payment_status as "paymentStatus", actual_price as "actualPrice", payment_ref as "paymentRef", timestamp as "createdAt", payment_proof_url as "paymentProofUrl" FROM event_registrations WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
 
       return {
         appointments: appsRes.rows,

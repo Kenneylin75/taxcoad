@@ -145,9 +145,10 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
   const [activeView, setActiveView] = useState<ViewState>('home');
   const [bookingStatus, setBookingStatus] = useState<"idle" | "booking" | "success">("idle");
-  const [paymentIntent, setPaymentIntent] = useState<{ amount: number, module: 'Booking' | 'Lamp' | 'Event' | 'Queue', onPaid: (method: string, ref: string) => void } | null>(null);
+  const [paymentIntent, setPaymentIntent] = useState<{ amount: number, module: 'Booking' | 'Lamp' | 'Event' | 'Queue', onPaid: (method: string, ref: string, proofFile: File | null) => void } | null>(null);
   const [paymentSubView, setPaymentSubView] = useState<'methods' | 'transfer' | 'customQR'>('methods');
   const [paymentRefInput, setPaymentRefInput] = useState('');
+  const [checkoutProofFile, setCheckoutProofFile] = useState<File | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [customAmount, setCustomAmount] = useState<number>(100);
@@ -277,13 +278,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
     }
   }, [gregorianDate]);
 
-  const initiatePayment = async (amount: number, module: any, onPaid: (method: string, ref?: string) => Promise<void>) => {
+  const initiatePayment = async (amount: number, module: any, onPaid: (method: string, ref?: string, proofFile?: File | null) => Promise<void>) => {
     if (amount === 0) {
       // 若金額為 0，直接當作免付款成功
       await onPaid('Free');
       setIsDetailModalOpen(false);
     } else {
-      setPaymentIntent({ amount, module, onPaid });
+      setPaymentIntent({ amount, module, onPaid: (method, ref, proofFile) => onPaid(method, ref, proofFile || null) });
     }
   };
 
@@ -1612,13 +1613,21 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   <input type="text" maxLength={5} placeholder="例如: 12345" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/50"
                      value={paymentRefInput} onChange={e => setPaymentRefInput(e.target.value)} />
                </div>
+               <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">上傳匯款截圖 (可選)</label>
+                  <input type="file" accept="image/*" onChange={e => {
+                     const file = e.target.files?.[0];
+                     if(file) setCheckoutProofFile(file);
+                  }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 focus:ring-2 focus:ring-emerald-500/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+               </div>
                <div className="flex gap-2">
                   <button onClick={() => setPaymentSubView('methods')} className="py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors">返回</button>
                   <button onClick={async () => {
-                    await paymentIntent.onPaid('transfer', paymentRefInput || '無');
+                    await paymentIntent.onPaid('transfer', paymentRefInput || '無', checkoutProofFile);
                     setPaymentIntent(null);
                     setPaymentSubView('methods');
                     setPaymentRefInput('');
+                    setCheckoutProofFile(null);
                     setIsDetailModalOpen(false);
                   }} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-black text-xs hover:bg-emerald-600 shadow-md transition-colors">我已完成匯款</button>
                </div>
@@ -1638,13 +1647,21 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   <input type="text" placeholder="以便工作人員核對" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-pink-500/50"
                      value={paymentRefInput} onChange={e => setPaymentRefInput(e.target.value)} />
                </div>
+               <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">上傳匯款截圖 (可選)</label>
+                  <input type="file" accept="image/*" onChange={e => {
+                     const file = e.target.files?.[0];
+                     if(file) setCheckoutProofFile(file);
+                  }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 focus:ring-2 focus:ring-pink-500/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" />
+               </div>
                <div className="flex gap-2">
                   <button onClick={() => setPaymentSubView('methods')} className="py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors">返回</button>
                   <button onClick={async () => {
-                    await paymentIntent.onPaid('customQR', paymentRefInput || '無');
+                    await paymentIntent.onPaid('customQR', paymentRefInput || '無', checkoutProofFile);
                     setPaymentIntent(null);
                     setPaymentSubView('methods');
                     setPaymentRefInput('');
+                    setCheckoutProofFile(null);
                     setIsDetailModalOpen(false);
                   }} className="flex-1 py-3 bg-pink-500 text-white rounded-xl font-black text-xs hover:bg-pink-600 shadow-md transition-colors">付款完成</button>
                </div>
@@ -2183,12 +2200,17 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                              precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
                              description: `活動內容：${evt.description || evt.content || '詳細內容請洽宮廟'}\n日期：${evt.date}`,
                              onConfirm: isRegistered ? undefined : async () => {
-                               initiatePayment(evt.price || 0, 'Event', async (method: string) => {
-                                 const res = await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price || 0, method);
+                               initiatePayment(evt.price || 0, 'Event', async (method: string, ref?: string, proofFile?: File | null) => {
+                                 const res = await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price || 0, method, ref);
                                  if (res && res.success !== false) {
                                    if (method === 'ecpay' || method === 'linepay') {
                                      handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), evt.price || 0);
                                      return;
+                                   }
+                                   if (res.id && proofFile) {
+                                     const previewUrl = URL.createObjectURL(proofFile);
+                                     const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                                     await uploadPaymentProof(res.id.toString(), 'EventRegistration', previewUrl, guestUser.phone);
                                    }
                                    setSuccessInfo({ title: '報名成功', message: method === 'Cash' ? '您已成功報名法會活動，請於當日現場完成繳費報到。' : method === 'Free' ? '報名成功！隨喜功德，平安喜樂。' : '您已成功報名法會活動與付款。' });
                                    refreshAllData(guestUser.phone);
@@ -2321,9 +2343,15 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
                       <button 
                         onClick={async () => {
-                          initiatePayment(0, 'Queue', async (method: string) => {
+                          initiatePayment(0, 'Queue', async (method: string, ref?: string, proofFile?: File | null) => {
                             const res = await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
                             if (res && res.success !== false) {
+                              const recordId = res.ticket?.id || res.id;
+                              if (recordId && proofFile) {
+                                const previewUrl = URL.createObjectURL(proofFile);
+                                const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                                await uploadPaymentProof(recordId.toString(), 'Appointment', previewUrl, guestUser.phone);
+                              }
                               setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
                               refreshAllData(guestUser.phone);
                             } else {
@@ -2395,7 +2423,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       description: `服務內容：${item.description || '祈福保平安'}`,
                       onConfirm: async () => {
                         const amt = item.price ?? 0;
-                        initiatePayment(amt, 'Lamp', async (method: string, ref?: string) => {
+                        initiatePayment(amt, 'Lamp', async (method: string, ref?: string, proofFile?: File | null) => {
                           const fd = new FormData();
                           fd.append('phone', guestUser.phone);
                           fd.append('guestName', guestUser.name);
@@ -2409,6 +2437,11 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             if (method === 'ecpay' || method === 'linepay') {
                               handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), amt);
                               return;
+                            }
+                            if (res.id && proofFile) {
+                              const previewUrl = URL.createObjectURL(proofFile);
+                              const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                              await uploadPaymentProof(res.id.toString(), 'LampRecord', previewUrl, guestUser.phone);
                             }
                             setSuccessInfo({
                               title: '辦理成功',

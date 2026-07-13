@@ -347,9 +347,15 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                            <span className="text-xs font-bold text-slate-400 font-mono">{rev.timestamp}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                           <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-                              ✓ Validated
-                           </span>
+                           {rev.status === 'PENDING_REVIEW' ? (
+                             <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                               ⌛ 待審核
+                             </span>
+                           ) : (
+                             <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                               ✓ Validated
+                             </span>
+                           )}
                         </td>
                       </tr>
                     ))}

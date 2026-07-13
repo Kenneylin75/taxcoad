@@ -168,7 +168,9 @@ function DeepFileCenterContent() {
       logs.push({ type: 'QUEUE', date: qt.date || qt.scannedAt, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
     });
     history.files.forEach(file => {
-      logs.push({ type: 'MEDIA', date: file.folder, time: '---', title: `媒體歸檔：${file.type === 'photo' ? '照片' : '影片'}`, desc: `來源：${file.uploadedBy}`, icon: '🎬', color: 'indigo' });
+      if (file.folder !== 'Payment_Proofs' && file.folder !== '對帳審核') {
+        logs.push({ type: 'MEDIA', date: file.folder, time: '---', title: `媒體歸檔：${file.type === 'photo' ? '照片' : '影片'}`, desc: `來源：${file.uploadedBy}`, icon: '🎬', color: 'indigo' });
+      }
     });
     return logs.sort((a, b) => new Date(`${b.date} ${a.time === '---' ? '00:00' : a.time}`).getTime() - new Date(`${a.date} ${a.time === '---' ? '00:00' : a.time}`).getTime());
   }, [history]);
@@ -523,6 +525,20 @@ function DeepFileCenterContent() {
                                            >
                                               (恢復未付款)
                                            </button>
+                                        </div>
+                                     )}
+                                     {(lamp.paymentRef || lamp.paymentProofUrl) && (
+                                        <div className="flex gap-2 items-center flex-wrap ml-4">
+                                          {lamp.paymentRef && (
+                                            <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
+                                              <span>💳</span> 後五碼: {lamp.paymentRef}
+                                            </span>
+                                          )}
+                                          {lamp.paymentProofUrl && (
+                                            <button onClick={() => setPreviewFile({ type: 'photo', url: lamp.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                              <span>📸</span> 查看截圖
+                                            </button>
+                                          )}
                                         </div>
                                      )}
                                      {lamp.status !== 'Cancelled' && (
