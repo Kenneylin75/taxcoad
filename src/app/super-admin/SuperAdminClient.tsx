@@ -964,7 +964,7 @@ export default function SuperAdminClient({
                              </div>
                           </div>
                           <div className="p-10 space-y-4">
-                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category} • {tool.uploadedAt || '2026/05/19'}</p>
+                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category} • {tool.uploadedAt || new Date().toISOString().split('T')[0].replace(/-/g, '/')}</p>
                              <h5 className="text-xl font-black text-slate-900 tracking-tight italic">{tool.title}</h5>
                              <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                 <span className="text-[10px] font-black text-emerald-500 uppercase italic">Synced All Nodes</span>
@@ -2339,7 +2339,7 @@ export default function SuperAdminClient({
                         <button type="button" onClick={()=>setUploadMode('contract')} className={`flex-1 py-5 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all ${uploadMode === 'contract' ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-400'}`}>電子合約</button>
                     </div>
                     <div className="space-y-6">
-                        <input name="title" type="text" placeholder="資源標題 (例如：2026合約演示)" className="w-full bg-slate-50 rounded-[30px] p-7 text-sm font-black outline-none border border-slate-100" required />
+                        <input name="title" type="text" placeholder={`資源標題 (例如：${new Date().getFullYear()}合約演示)`} className="w-full bg-slate-50 rounded-[30px] p-7 text-sm font-black outline-none border border-slate-100" required />
                         <input name="category" type="text" placeholder="類別 (例如：系統說明)" className="w-full bg-slate-50 rounded-[30px] p-7 text-sm font-black outline-none border border-slate-100" required />
                         <label 
                             onDragOver={(e) => e.preventDefault()}

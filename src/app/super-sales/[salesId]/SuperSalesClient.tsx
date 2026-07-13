@@ -254,7 +254,7 @@ export default function SuperSalesClient({
                 <div className="bg-slate-200 aspect-video rounded-[60px] border-8 border-white flex flex-col items-center justify-center space-y-4 shadow-xl relative overflow-hidden group">
                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80')] opacity-40 bg-cover bg-center group-hover:scale-110 transition-all duration-1000"></div>
                    <button className="w-20 h-20 bg-white text-indigo-600 rounded-full flex items-center justify-center text-3xl shadow-2xl relative z-10 active:scale-90 transition-all">▶</button>
-                   <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest relative z-10 px-4 py-2 bg-white/80 rounded-full">點擊播放 2026 產品全功能演示</p>
+                   <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest relative z-10 px-4 py-2 bg-white/80 rounded-full">點擊播放 {new Date().getFullYear()} 產品全功能演示</p>
                 </div>
              </div>
 

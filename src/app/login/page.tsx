@@ -82,7 +82,7 @@ export default function LoginPage() {
 
          <div className="mt-12 text-center">
             <p className="text-[9px] text-slate-300 font-bold uppercase tracking-[0.3em]">
-               © 2026 Pivot Core Technology.
+               © {new Date().getFullYear()} Pivot Core Technology.
             </p>
          </div>
 

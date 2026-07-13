@@ -50,7 +50,7 @@ export default function DistributorClient({
   }, [monthFilter, activeTab, initialProfile?.id]);
 
   // --- Calendar & Period State ---
-  const [currentYear, setCurrentYear] = useState(2026);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(5);
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedDay, setSelectedDay] = useState(12);

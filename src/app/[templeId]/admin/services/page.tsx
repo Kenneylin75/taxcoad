@@ -248,7 +248,7 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
                            <h1 className="text-3xl font-black text-center mb-6" style={{ fontFamily: '"Microsoft JhengHei", sans-serif', borderBottom: '2px solid #000', paddingBottom: '15px' }}>{editingTemplate.templeName}</h1>
                            <div className="flex justify-between items-center mb-6 text-sm">
                               <span className="font-bold">服務：光明燈祈福</span>
-                              <span>列印日期：2026/06/02</span>
+                              <span>列印日期：{new Date().toISOString().split('T')[0].replace(/-/g, '/')}</span>
                            </div>
                            <div className="space-y-4 flex-1 text-sm">
                               <div className="border-b border-dashed border-slate-300 pb-2"><strong>信眾姓名：</strong> 林某某</div>

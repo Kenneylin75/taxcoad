@@ -186,7 +186,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   // Multi-step Booking States
   const [selectedService, setSelectedService] = useState<any>(null);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('2026-05-01');
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    try {
+      return new Date().toISOString().split('T')[0];
+    } catch {
+      return '2025-01-01';
+    }
+  });
   const [bookingStep, setBookingStep] = useState<1 | 2 | 3>(1);
   const [recordsTab, setRecordsTab] = useState('全部');
   const [availableStaffList, setAvailableStaffList] = useState<any[]>([]);
@@ -1470,16 +1476,19 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                  if (!file || !guestUser?.phone) return;
                  setIsLoading(true);
                  try {
-                   // 產生一個預覽用的 URL 或實際準備上傳
-                   const previewUrl = URL.createObjectURL(file);
-                   const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                   await uploadPaymentProof(viewPaymentInfo.recordId, viewPaymentInfo.recordType, previewUrl, guestUser.phone);
-                   alert('✅ 匯款截圖已成功上傳！廟方將盡快為您對帳。');
-                   setViewPaymentInfo(null);
-                   refreshAllData(guestUser.phone);
+                   const reader = new FileReader();
+                   reader.onloadend = async () => {
+                     const base64Url = reader.result as string;
+                     const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                     await uploadPaymentProof(viewPaymentInfo.recordId, viewPaymentInfo.recordType, base64Url, guestUser.phone);
+                     alert('✅ 匯款截圖已成功上傳！廟方將盡快為您對帳。');
+                     setViewPaymentInfo(null);
+                     loadGuestData(guestUser.phone);
+                     setIsLoading(false);
+                   };
+                   reader.readAsDataURL(file);
                  } catch (err) {
                    alert('⚠️ 上傳失敗，請重試');
-                 } finally {
                    setIsLoading(false);
                  }
                }}

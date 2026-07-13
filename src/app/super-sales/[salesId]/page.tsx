@@ -57,7 +57,8 @@ export default function SuperSalesPage() {
     fetchSalesTools().then(setTools);
     fetchEarningsStats(salesId).then(setEarnings);
     fetchSystemConfig().then(setSysConfig);
-    fetchCommissionHistory(salesId, "2026", "05").then(setCommissionHistory);
+    const d = new Date();
+    fetchCommissionHistory(salesId, d.getFullYear().toString(), String(d.getMonth() + 1).padStart(2, '0')).then(setCommissionHistory);
   }, [salesId, activeTab]); 
 
   if (submitted) {
@@ -475,7 +476,7 @@ export default function SuperSalesPage() {
                            </div>
                         </div>
                         <div className="p-8 space-y-3">
-                           <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category || '未分類'} • {tool.uploadedAt || '2026/05/19'}</p>
+                           <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category || '未分類'} • {tool.uploadedAt || new Date().toISOString().split('T')[0].replace(/-/g, '/')}</p>
                            <h5 className="text-lg font-black text-slate-900 tracking-tight leading-tight">{tool.title}</h5>
                            <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
                               <span className="text-[9px] font-black text-slate-400 uppercase">HQ SYNCED</span>
