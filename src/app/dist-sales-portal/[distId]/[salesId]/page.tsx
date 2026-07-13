@@ -687,14 +687,14 @@ export default function DistSalesPage() {
          </div>
        )}
 
-       {commission?.withdrawals?.filter((w: any) => w.status === 'Verified' || w.status === 'Approved').length > 0 && (
+       {commission?.withdrawals?.filter((w: any) => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').length > 0 && (
          <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
                <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
                已核准提領紀錄
             </h3>
             <div className="space-y-4">
-               {commission.withdrawals.filter((w: any) => w.status === 'Verified' || w.status === 'Approved').map((req: any) => (
+               {commission.withdrawals.filter((w: any) => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').map((req: any) => (
                   <div key={req.id} className="bg-emerald-50 p-6 rounded-[32px] shadow-sm border border-emerald-100 flex justify-between items-center">
                      <div className="flex items-center gap-5">
                         <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-sm">✅</div>
@@ -703,7 +703,7 @@ export default function DistSalesPage() {
                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{req.date} | {req.status}</p>
                            {req.receiptUrl && (
                                <button onClick={() => setViewingReceiptUrl(req.receiptUrl)} className="mt-2 px-4 py-2 bg-white text-emerald-600 rounded-[12px] text-[10px] font-black tracking-widest hover:bg-emerald-100 transition-all shadow-sm">
-                                  🖼️ 查看匯款憑證
+                                  👁️ 查看匯款憑證
                                </button>
                            )}
                         </div>
