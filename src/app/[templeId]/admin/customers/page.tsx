@@ -665,36 +665,51 @@ function DeepFileCenterContent() {
                                       <h4 className="text-base font-medium text-slate-900">{event.service}</h4>
                                       <p className="text-sm text-slate-500 mt-1">負責：{event.staff}</p>
                                     </div>
-                                    <div className="flex flex-col gap-3 items-end">
-                                      <div className="flex gap-3">
-                                        {!hasRecord ? (<button onClick={() => handleOpenForm(event)} className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">✍️ 表單 ➔</button>) : (<button onClick={() => { const rec = history.records.find(r => r.eventId === event.id.toString()); setViewingRecord(rec || null); }} className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">👁️ 檢視表單</button>)}
+                                    <div className="flex flex-col gap-2 items-end">
+                                      {/* Action Row */}
+                                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                                        {!hasRecord ? (<button onClick={() => handleOpenForm(event)} className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">✍️ 填寫表單</button>) : (<button onClick={() => { const rec = history.records.find(r => r.eventId === event.id.toString()); setViewingRecord(rec || null); }} className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">👁️ 檢視表單</button>)}
+                                        {event.status === 'Arrived' ? (
+                                          <span className="px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-lg flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> 已到場
+                                          </span>
+                                        ) : (
+                                          <button 
+                                            onClick={async () => {
+                                              if (confirm(`確定標記已抵達現場？`)) {
+                                                await import('@/app/actions').then(m => m.markAppointmentAsArrived(event.id));
+                                                if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                              }
+                                            }}
+                                            className="px-3 py-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                                          >
+                                            ✅ 標記到場
+                                          </button>
+                                        )}
+                                        {event.status !== 'Cancelled' && (
+                                          <button 
+                                            onClick={async () => {
+                                              if (confirm('確定要取消這個預約嗎？這將同步取消信眾端的預約。')) {
+                                                await import('@/app/actions').then(m => m.cancelAppointment(Number(event.id)));
+                                                if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                              }
+                                            }}
+                                            className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors"
+                                          >
+                                            ❌ 取消預約
+                                          </button>
+                                        )}
                                       </div>
-                                      {event.status === 'Arrived' ? (
-                                        <span className="text-sm font-medium text-emerald-600 flex items-center gap-2 ml-4">
-                                          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> 已到場
-                                        </span>
-                                      ) : (
-                                        <button 
-                                          onClick={async () => {
-                                            if (confirm(`確定標記已抵達現場？`)) {
-                                              await import('@/app/actions').then(m => m.markAppointmentAsArrived(event.id));
-                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                            }
-                                          }}
-                                          className="text-sm font-medium text-amber-600 hover:text-amber-800 transition-colors ml-4"
-                                        >
-                                          ✅ 標記為已到場
-                                        </button>
-                                      )}
                                       
-                                      <div className="flex gap-2 items-center flex-wrap justify-end mt-2">
+                                      {/* Payment Row */}
+                                      <div className="flex items-center gap-2 flex-wrap justify-end">
                                         {event.paymentRef && (
-                                          <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
+                                          <span className="px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg flex items-center gap-1 border border-indigo-100">
                                             <span>💳</span> 後五碼: {event.paymentRef}
                                           </span>
                                         )}
                                         {event.paymentProofUrl && (
-                                          <button onClick={() => setPreviewFile({ type: 'photo', url: event.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
+                                          <button onClick={() => setPreviewFile({ type: 'photo', url: event.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="px-3 py-1.5 text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors bg-amber-50 hover:bg-amber-100 rounded-lg flex items-center gap-1 border border-amber-100">
                                             <span>📸</span> 查看截圖
                                           </button>
                                         )}
@@ -706,7 +721,7 @@ function DeepFileCenterContent() {
                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
                                               }
                                             }}
-                                            className="text-sm font-bold text-red-600 hover:text-red-800 transition-colors ml-2 px-3 py-1 bg-red-50 rounded-lg border border-red-100"
+                                            className="px-3 py-1.5 text-xs font-bold text-red-600 hover:text-red-800 transition-colors bg-red-50 hover:bg-red-100 rounded-lg border border-red-100"
                                           >
                                             ✅ 標記已收款
                                           </button>
@@ -719,25 +734,12 @@ function DeepFileCenterContent() {
                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
                                               }
                                             }}
-                                            className="text-sm font-medium text-emerald-600 ml-2 hover:text-rose-600 hover:line-through transition-colors"
+                                            className="px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-rose-600 hover:line-through rounded-lg transition-colors border border-emerald-100"
                                           >
                                             ✓ 已結帳
                                           </button>
                                         )}
                                       </div>
-                                      {event.status !== 'Cancelled' && (
-                                        <button 
-                                          onClick={async () => {
-                                            if (confirm('確定要取消這個預約嗎？這將同步取消信眾端的預約。')) {
-                                              await import('@/app/actions').then(m => m.cancelAppointment(Number(event.id)));
-                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                            }
-                                          }}
-                                          className="text-sm font-bold text-slate-400 hover:text-rose-600 transition-colors ml-4"
-                                        >
-                                          ❌ 取消預約
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                 </div>
