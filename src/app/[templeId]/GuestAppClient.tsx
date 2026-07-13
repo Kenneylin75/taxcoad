@@ -277,7 +277,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
     }
   }, [gregorianDate]);
 
-  const initiatePayment = async (amount: number, module: any, onPaid: (method: string) => Promise<void>) => {
+  const initiatePayment = async (amount: number, module: any, onPaid: (method: string, ref?: string) => Promise<void>) => {
     if (amount === 0) {
       // 若金額為 0，直接當作免付款成功
       await onPaid('Free');
@@ -2007,8 +2007,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：${slot.description || selectedService?.precautions || '無'}`,
                             onConfirm: async () => {
                               const amount = slot.price || selectedService?.price || 0;
-                              initiatePayment(amount, 'Booking', async (method: string) => {
-                                const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, method, undefined, amount);
+                              initiatePayment(amount, 'Booking', async (method: string, ref?: string) => {
+                                const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, method, ref, amount);
                                 
                                 if (res.success) {
                                   if (method === 'ecpay' || method === 'linepay') {
@@ -2380,7 +2380,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       description: `服務內容：${item.description || '祈福保平安'}`,
                       onConfirm: async () => {
                         const amt = item.price ?? 0;
-                        initiatePayment(amt, 'Lamp', async (method: string) => {
+                        initiatePayment(amt, 'Lamp', async (method: string, ref?: string) => {
                           const fd = new FormData();
                           fd.append('phone', guestUser.phone);
                           fd.append('guestName', guestUser.name);
@@ -2388,6 +2388,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                           fd.append('categoryName', item.name);
                           fd.append('price', amt.toString());
                           fd.append('paymentMethod', method);
+                          if (ref) fd.append('paymentRef', ref);
                           const res = await createLightingOrder(fd);
                           if (res && res.success !== false) {
                             if (method === 'ecpay' || method === 'linepay') {
