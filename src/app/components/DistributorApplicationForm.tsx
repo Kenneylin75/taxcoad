@@ -146,7 +146,7 @@ export default function DistributorApplicationForm({ role, submittedBy, onSucces
              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest italic">04. 銀行基本資料 (Bank Info)</p>
           </div>
           <div className="space-y-2">
-             <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">解付銀行名稱</label>
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">支付銀行名稱</label>
              <input name="bankName" type="text" placeholder="例如：中國信託" className="w-full bg-slate-50 rounded-2xl p-6 text-sm font-bold border border-slate-100 focus:bg-white focus:border-indigo-400 outline-none transition-all" />
           </div>
           <div className="space-y-2">

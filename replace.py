@@ -1,19 +1,13 @@
 import os
 
-path = 'src/app/distributor/DistributorClient.tsx'
+path = 'src/app/dist-sales-portal/[distId]/[salesId]/page.tsx'
 with open(path, 'r', encoding='utf-8') as f:
-    lines = f.readlines()
+    content = f.read()
 
-new_content = """                                       <div className="flex items-center gap-2 justify-end">
-                                          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-100 px-5 py-2.5 rounded-full shadow-inner"><span className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">已完成核銷紀錄</span></div>
-                                          {b.receiptUrl && (
-                                             <button onClick={(e) => { e.stopPropagation(); setCurrentOrderId(b.id); setCurrentReceiptImage(b.receiptUrl); setCurrentOrderType('saas'); setB2bReceiptViewerOpen(true); }} className="text-xl hover:scale-110 transition-transform hover:opacity-80" title="查看匯款憑證">👁️</button>
-                                          )}
-                                       </div>\n"""
-
-lines[925] = new_content
+content = content.replace("w.status === 'Verified' || w.status === 'Approved'", "w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid'")
+content = content.replace("🖼️ 查看匯款憑證", "👁️ 查看匯款憑證")
 
 with open(path, 'w', encoding='utf-8') as f:
-    f.writelines(lines)
+    f.write(content)
 
-print("Line replaced successfully!")
+print("Updated dist-sales-portal successfully!")

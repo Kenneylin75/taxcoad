@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { updateTempleBasicInfo } from '@/app/actions';
+import { updateTempleBasicInfo, fetchTemplePaymentTarget } from '@/app/actions';
 
 export default function ActivationPage() {
   const params = useParams();
@@ -13,6 +13,13 @@ export default function ActivationPage() {
     date: new Date().toISOString().split('T')[0],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bankInfo, setBankInfo] = useState({ bankCode: '808', bankName: '玉山銀行', accountNo: '1234-5678-9012', accountName: '星宇科技服務有限公司' });
+
+  React.useEffect(() => {
+     fetchTemplePaymentTarget(templeId).then(info => {
+        if (info) setBankInfo(info);
+     });
+  }, [templeId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,11 +57,11 @@ export default function ActivationPage() {
             <h3 className="text-sm font-black text-slate-900 mb-2">匯款資訊</h3>
             <div className="grid grid-cols-2 gap-4 text-sm font-bold">
               <div className="text-slate-500">銀行代碼</div>
-              <div className="text-slate-900 text-right">808 玉山銀行</div>
+              <div className="text-slate-900 text-right">{bankInfo.bankCode} {bankInfo.bankName}</div>
               <div className="text-slate-500">收款帳號</div>
-              <div className="text-slate-900 text-right">1234-5678-9012</div>
+              <div className="text-slate-900 text-right">{bankInfo.accountNo}</div>
               <div className="text-slate-500">戶名</div>
-              <div className="text-slate-900 text-right">星宇科技服務有限公司</div>
+              <div className="text-slate-900 text-right">{bankInfo.accountName}</div>
             </div>
           </div>
 

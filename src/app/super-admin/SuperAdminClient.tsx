@@ -1653,8 +1653,8 @@ export default function SuperAdminClient({
                                  <span className={`text-sm font-black ${isMatch ? 'text-slate-900' : 'text-slate-700'}`}>{node.name}</span>
                                  <span className={`px-2 py-0.5 text-[10px] font-black rounded-md border ${colors[node.type]}`}>{badges[node.type]}</span>
                                  {node.status && (
-                                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${node.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                       {node.status === 'Active' ? '生效中' : node.status}
+                                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${node.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : node.status === 'UnderReview' ? 'bg-amber-50 text-amber-600' : node.status === 'PendingPayment' ? 'bg-purple-50 text-purple-600' : 'bg-rose-50 text-rose-600'}`}>
+                                       {node.status === 'Active' ? '生效中' : node.status === 'UnderReview' ? '待核款' : node.status === 'PendingPayment' ? '待付開辦費' : node.status === 'Inactive' ? '已停用' : node.status}
                                     </span>
                                  )}
                               </div>

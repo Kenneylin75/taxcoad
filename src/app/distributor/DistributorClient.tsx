@@ -129,7 +129,7 @@ export default function DistributorClient({
     setupRate: 20, rentYear1Rate: 15, rentYear2Rate: 10, rentYear3PlusRate: 5
   });
 
-  const [b2bPayment, setB2bPayment] = useState<any>({
+  const [b2bPayment, setB2bPayment] = useState<any>(initialProfile?.b2bPayment || {
       linePay: { enabled: false, channelId: '', channelSecret: '' },
       thirdParty: { enabled: false, provider: 'ECPay', merchantId: '', hashKey: '', hashIV: '' },
       customTransfer: { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '' },
@@ -1029,7 +1029,7 @@ export default function DistributorClient({
                   <div className="space-y-5 relative z-10">
                      <div className="bg-white/40 p-6 rounded-[35px] border border-white/60 space-y-4">
                         <div className="flex justify-between items-center">
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">解付銀行</p>
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">支付銀行</p>
                            <p className="text-sm font-black text-slate-900">{initialProfile?.bankInfo?.bankCode ? `(${initialProfile.bankInfo.bankCode}) ` : ''}{initialProfile?.bankInfo?.bankName || '未設定'}</p>
                         </div>
                         <div className="flex justify-between items-center pt-4 border-t border-white/40">
@@ -1118,12 +1118,22 @@ export default function DistributorClient({
                           <input type="checkbox" checked={b2bPayment.customTransfer?.enabled} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, enabled: e.target.checked}})} className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" />
                        </div>
                        {b2bPayment.customTransfer?.enabled && (
-                          <div className="grid grid-cols-2 gap-4 mt-4">
-                             <input type="text" placeholder="銀行代碼" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.bankCode} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankCode: e.target.value}})} />
-                             <input type="text" placeholder="銀行名稱" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.bankName} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankName: e.target.value}})} />
-                             <input type="text" placeholder="戶名" className="col-span-2 bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.accountName} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountName: e.target.value}})} />
-                             <input type="text" placeholder="帳號" className="col-span-2 bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.accountNo} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountNo: e.target.value}})} />
-                          </div>
+                          <>
+                            <div className="mt-4 flex items-center gap-2 px-2">
+                               <input type="checkbox" id="sameAsProfile" className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" onChange={(e) => {
+                                  if (e.target.checked && initialProfile?.bankInfo) {
+                                     setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankCode: initialProfile.bankInfo.bankCode || '', bankName: initialProfile.bankInfo.bankName || '', accountName: initialProfile.bankInfo.accountName || '', accountNo: initialProfile.bankInfo.accountNumber || ''}});
+                                  }
+                               }} />
+                               <label htmlFor="sameAsProfile" className="text-xs font-bold text-slate-500 cursor-pointer">同為資料裡面的銀行付款帳號</label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-2">
+                               <input type="text" placeholder="銀行代碼" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.bankCode} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankCode: e.target.value}})} />
+                               <input type="text" placeholder="銀行名稱" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.bankName} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, bankName: e.target.value}})} />
+                               <input type="text" placeholder="戶名" className="col-span-2 bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.accountName} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountName: e.target.value}})} />
+                               <input type="text" placeholder="帳號" className="col-span-2 bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.customTransfer.accountNo} onChange={e=>setB2bPayment({...b2bPayment, customTransfer: {...b2bPayment.customTransfer, accountNo: e.target.value}})} />
+                            </div>
+                          </>
                        )}
                     </div>
                     
@@ -1552,7 +1562,7 @@ export default function DistributorClient({
                      <h4 className="text-lg font-black text-slate-900 tracking-tight mb-4">銀行帳戶資訊</h4>
                      <div className="space-y-4">
                         <div className="space-y-2">
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">解付銀行名稱</p>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">支付銀行名稱</p>
                            <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.bankName} onChange={e=>setEditProfileForm({...editProfileForm, bankName: e.target.value})} />
                         </div>
                         <div className="space-y-2">

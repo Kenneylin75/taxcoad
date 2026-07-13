@@ -1849,6 +1849,7 @@ export async function ensurePlatformTables() {
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS bank_code VARCHAR(50);`);
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS bank_account VARCHAR(100);`);
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);`);
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS b2b_payment_config JSONB;`);
     await dbQuery(`ALTER TABLE temple_bills ADD COLUMN IF NOT EXISTS payee_role VARCHAR(50);`);
     await dbQuery(`ALTER TABLE temple_bills ADD COLUMN IF NOT EXISTS payee_id VARCHAR(100);`);
   } catch(e) {}
@@ -3566,24 +3567,15 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
     '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'
   ];
   db_temples.forEach(t => {
-    // 排除已停權或非 Active 的宮廟
-    if (t.status === 'Inactive' || t.status === 'Suspended' || t.status === 'Disabled') return;
+    if (t.status !== 'Active') return;
     
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
-    
-    // 確保只抓前兩個字來比對（例如：基隆市 -> 基隆）
     const shortRegion = region.substring(0, 2);
     
-    // 如果找不到有效地區，用名稱產生一個穩定的隨機地區作為展示
-    if (!majorRegions.some(r => shortRegion.includes(r))) {
-       const name = t.templeName || t.name || '未知';
-       const hash = name.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-       region = majorRegions[hash % majorRegions.length];
-    } else {
-       region = majorRegions.find(r => shortRegion.includes(r)) || '其他';
+    const matchedRegion = majorRegions.find(r => shortRegion.includes(r));
+    if (matchedRegion) {
+       regionCounts[matchedRegion] = (regionCounts[matchedRegion] || 0) + 1;
     }
-    
-    regionCounts[region] = (regionCounts[region] || 0) + 1;
   });
 
   const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
@@ -4814,7 +4806,9 @@ export async function fetchDistributorProfile(distId?: string) {
     const res = await dbQuery('SELECT * FROM distributors WHERE id = $1', [distId], () => null) as any;
     if (res && res.rowCount > 0) {
       const r = res.rows[0];
-      return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || '', accountName: r.name || '', accountNumber: r.bank_account || '', bankCode: r.bank_code || '' } };
+      let b2bPayment = undefined;
+      try { if (r.b2b_payment_config) b2bPayment = typeof r.b2b_payment_config === 'string' ? JSON.parse(r.b2b_payment_config) : r.b2b_payment_config; } catch(e){}
+      return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || '', accountName: r.name || '', accountNumber: r.bank_account || '', bankCode: r.bank_code || '' }, b2bPayment };
     }
   } catch (e) {}
   
@@ -7452,6 +7446,12 @@ export async function updateDistributorProfile(distId: string, data: any) {
 }
 
 export async function updateDistributorPaymentConfig(distId: string, paymentConfig: any) {
+  try {
+    const { dbQuery } = await import('@/db/db');
+    await dbQuery('UPDATE distributors SET b2b_payment_config = $1 WHERE id = $2', [JSON.stringify(paymentConfig), distId]);
+  } catch (e) {
+    console.error('Failed to update b2b_payment_config in DB', e);
+  }
   const dist = db_distributors.find(d => d.id === distId);
   if (dist) {
     dist.b2bPayment = paymentConfig;
@@ -7849,4 +7849,40 @@ export async function bindCustomerLine(templeId: string, phone: string, lineUser
     await client.query(`UPDATE customers SET line_user_id = $1 WHERE phone = $2 AND temple_id = $3`, [lineUserId, normPhone, templeId]);
     return { success: true };
   });
+}
+
+export async function fetchTemplePaymentTarget(templeId: string) {
+  const t = await getTempleBasicInfo(templeId);
+  if (!t) return null;
+  
+  const config = await fetchSystemConfig();
+  let targetBank = {
+     bankCode: config.b2bPayment?.customTransfer?.bankCode || '808',
+     bankName: config.b2bPayment?.customTransfer?.bankName || '玉山銀行',
+     accountNo: config.b2bPayment?.customTransfer?.accountNo || '808-1234-5678-901',
+     accountName: config.b2bPayment?.customTransfer?.accountName || '天宇科技服務有限公司'
+  };
+  
+  const distId = t.distributorId;
+  if (distId) {
+     const dist = await fetchDistributorProfile(distId);
+     if (dist) {
+        if (dist.b2bPayment?.customTransfer?.enabled) {
+           targetBank = {
+              bankCode: dist.b2bPayment.customTransfer.bankCode || '',
+              bankName: dist.b2bPayment.customTransfer.bankName || '',
+              accountNo: dist.b2bPayment.customTransfer.accountNo || '',
+              accountName: dist.b2bPayment.customTransfer.accountName || ''
+           };
+        } else if (dist.bankInfo?.bankCode || dist.bankInfo?.accountNumber) {
+           targetBank = {
+              bankCode: dist.bankInfo.bankCode || '',
+              bankName: dist.bankInfo.bankName || '',
+              accountNo: dist.bankInfo.accountNumber || '',
+              accountName: dist.bankInfo.accountName || dist.name
+           };
+        }
+     }
+  }
+  return targetBank;
 }

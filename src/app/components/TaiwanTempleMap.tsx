@@ -36,12 +36,10 @@ interface MapProps {
 }
 
 export default function TaiwanTempleMap({ distribution }: MapProps) {
-  const [mapId, setMapId] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // 解決 React 18 嚴格模式下 Leaflet MapContainer 雙重掛載導致的 appendChild 錯誤
-    // 透過在每次 useEffect 觸發時給予全新的 mapId，強制 MapContainer 徹底重新渲染
-    setMapId(Math.random().toString());
+    setIsMounted(true);
     
     // 解決 Leaflet 圖標載入的預設問題
     delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -52,12 +50,11 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
     });
   }, []);
 
-  if (!mapId) return <div style={{ minHeight: '300px' }} className="w-full h-full flex items-center justify-center text-slate-400">Loading Map...</div>;
+  if (!isMounted) return <div style={{ minHeight: '300px' }} className="w-full h-full flex items-center justify-center text-slate-400">Loading Map...</div>;
 
   return (
     <div className="w-full h-full rounded-[40px] overflow-hidden relative z-10 isolate" style={{ minHeight: '300px' }}>
       <MapContainer
-        key={mapId}
         center={[23.6978, 120.9605]} // 台灣中心
         zoom={7}
         scrollWheelZoom={true}
