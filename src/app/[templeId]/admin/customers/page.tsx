@@ -1,14 +1,14 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { 
-  fetchGuests, 
-  fetchForms, 
-  fetchGuestHistory, 
-  saveDeepRecord, 
-  uploadCustomerMedia, 
+import {
+  fetchGuests,
+  fetchForms,
+  fetchGuestHistory,
+  saveDeepRecord,
+  uploadCustomerMedia,
   fetchAllFilesByDate,
   fetchServiceDefinitions,
   fetchPrintTemplates,
@@ -20,7 +20,18 @@ import {
   GuestFile,
   ServiceDefinition,
   GuestRecord,
-  LampCategory
+  LampCategory,
+  confirmPayment,
+  revertPayment,
+  activateLampRecord,
+  deactivateLampRecord,
+  cancelServiceRecord,
+  markAppointmentAsArrived,
+  cancelAppointment,
+  deleteGuestFile,
+  updateDeepRecord,
+  completeMeritPayment,
+  renewLampRecord
 } from '@/app/actions';
 import { Solar } from 'lunar-javascript';
 
@@ -217,7 +228,7 @@ function DeepFileCenterContent() {
   const handleSaveRecord = async (values: any) => {
     if (!selectedGuest || !activeForm) return;
     setIsSaving(true);
-    const { saveDeepRecord, updateDeepRecord } = await import('@/app/actions');
+    
     
     if (activeForm.recordId) {
       await updateDeepRecord(activeForm.recordId, selectedGuest.phone, '管理人員', values);
@@ -248,7 +259,7 @@ function DeepFileCenterContent() {
       '支付方式': paymentMethod + (paymentMethod === '匯款' ? ` (末五碼: ${lastFive})` : '') 
     };
 
-    const { completeMeritPayment } = await import('@/app/actions');
+    
     await completeMeritPayment(selectedGuest.phone, 'MERIT-' + Date.now(), Number(meritAmount), meritService);
 
     await saveDeepRecord(selectedGuest.phone, 'MERIT-' + Date.now(), `功德錄入：${meritService}`, '管理中心', meritValues);
@@ -490,68 +501,70 @@ function DeepFileCenterContent() {
                                      </div>
                                      <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase border-2 ${lamp.status === 'Cancelled' ? 'bg-slate-100 text-slate-400 border-slate-200' : isExpired ? 'bg-rose-50 text-rose-600 border-rose-100' : lamp.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{lamp.status === 'Cancelled' ? '已取消' : isExpired ? '已屆期' : lamp.status === 'Pending' ? '等待安奉' : '安奉中'}</span>
                                   </div>
-                                  <div className="bg-slate-50 p-8 rounded-3xl mb-8 flex justify-center items-center">
-                                     <div className="text-center"><p className="text-[9px] font-black text-slate-300 uppercase mb-1">安奉結緣金</p><p className="text-xl font-black text-slate-900">NT$ {lamp.price.toLocaleString()}</p></div>
-                                  </div>
-                                  <div className="flex justify-between items-end">
-                                     <div className="space-y-1"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p><p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p></div>
-                                     <div className="flex gap-4 items-center">
-                                     {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
-                                        <>
-                                        <button 
-                                          onClick={async () => {
-                                            if (confirm('確定要標記已收款？')) {
-                                              await import('@/app/actions').then(m => m.confirmPayment(lamp.id, 'Lamp'));
-                                              if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                            }
-                                          }}
-                                          className="text-xs font-bold text-slate-400 hover:text-emerald-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-emerald-50"
-                                        >
-                                          標記已結帳 ✓
-                                        </button>
-                                        </>
-                                     )}
-                                     {lamp.status !== 'Cancelled' && lamp.paymentStatus === 'Paid' && (
-                                        <div className="flex items-center gap-2">
-                                           <span className="text-xs font-medium text-emerald-600 px-4 py-2">✓ 已結帳</span>
-                                           <button 
-                                              onClick={async () => {
-                                                if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
-                                                  await import('@/app/actions').then(m => m.revertPayment(lamp.id, 'Lamp'));
-                                                  if (selectedGuest) await loadHistory(selectedGuest.phone);
-                                                }
-                                              }}
-                                              className="text-xs font-medium text-emerald-600 hover:text-rose-600 hover:line-through transition-colors"
-                                           >
-                                              (恢復未付款)
-                                           </button>
+                                  <div className="flex flex-col gap-4 mt-2">
+                                     <div className="flex flex-wrap justify-between items-center gap-4 pb-4 border-b border-slate-100/50">
+                                        <div className="space-y-1">
+                                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p>
+                                           <p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p>
                                         </div>
-                                     )}
-                                     {(lamp.paymentRef || lamp.paymentProofUrl) && (
-                                        <div className="flex gap-2 items-center flex-wrap ml-4">
-                                          {lamp.paymentRef && (
-                                            <span className="text-[10px] font-bold text-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-lg flex items-center gap-1">
-                                              <span>💳</span> 後五碼: {lamp.paymentRef}
-                                            </span>
-                                          )}
-                                          {lamp.paymentProofUrl && (
-                                            <button onClick={() => setPreviewFile({ type: 'photo', url: lamp.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-1.5 bg-amber-50 rounded-lg hover:bg-amber-100 flex items-center gap-1">
-                                              <span>📸</span> 查看截圖
-                                            </button>
-                                          )}
+                                        <div className="flex gap-3 flex-wrap items-center">
+                                           {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
+                                              <button 
+                                                onClick={async () => {
+                                                  if (confirm('確定要標記已收款？')) {
+                                                    await confirmPayment(lamp.id, 'Lamp');
+                                                    if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                                  }
+                                                }}
+                                                className="text-xs font-bold text-slate-400 hover:text-emerald-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-emerald-50"
+                                              >
+                                                標記已結帳 ✓
+                                              </button>
+                                           )}
+                                           {lamp.status !== 'Cancelled' && lamp.paymentStatus === 'Paid' && (
+                                              <div className="flex items-center gap-2">
+                                                 <span className="text-xs font-medium text-emerald-600 px-4 py-2 bg-emerald-50 rounded-xl">✓ 已結帳</span>
+                                                 <button 
+                                                    onClick={async () => {
+                                                      if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
+                                                        await revertPayment(lamp.id, 'Lamp');
+                                                        if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                                      }
+                                                    }}
+                                                    className="text-[10px] font-medium text-emerald-600 hover:text-rose-600 hover:underline transition-colors px-2"
+                                                 >
+                                                    (恢復未付款)
+                                                 </button>
+                                              </div>
+                                           )}
+                                           {(lamp.paymentRef || lamp.paymentProofUrl) && (
+                                              <div className="flex gap-2 items-center flex-wrap">
+                                                {lamp.paymentRef && (
+                                                  <span className="text-[10px] font-bold text-indigo-600 px-3 py-2 bg-indigo-50 rounded-xl flex items-center gap-1">
+                                                    <span>💳</span> 後五碼: {lamp.paymentRef}
+                                                  </span>
+                                                )}
+                                                {lamp.paymentProofUrl && (
+                                                  <button onClick={() => setPreviewFile({ type: 'photo', url: lamp.paymentProofUrl, name: '匯款截圖', folder: '對帳審核', uploadedBy: 'Guest' })} className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors px-3 py-2 bg-amber-50 rounded-xl hover:bg-amber-100 flex items-center gap-1">
+                                                    <span>📸</span> 查看截圖
+                                                  </button>
+                                                )}
+                                              </div>
+                                           )}
                                         </div>
-                                     )}
+                                     </div>
+                                     
                                      {lamp.status !== 'Cancelled' && (
-                                        <>
+                                        <div className="flex flex-wrap justify-end gap-3 items-center">
                                            {lamp.status === 'Pending' ? (
                                               <button 
                                                 onClick={async () => {
                                                   if (confirm('確定要啟動安奉嗎？這將標記該點燈為服務中。')) {
-                                                    await import('@/app/actions').then(m => m.activateLampRecord(lamp.id));
+                                                    await activateLampRecord(lamp.id);
                                                     if (selectedGuest) await loadHistory(selectedGuest.phone);
                                                   }
                                                 }}
-                                                className="text-xs font-bold text-slate-400 hover:text-amber-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-amber-50"
+                                                className="text-xs font-bold text-slate-400 hover:text-amber-600 transition-colors px-5 py-2.5 bg-slate-50 rounded-xl hover:bg-amber-50"
                                               >
                                                 啟動安奉
                                               </button>
@@ -559,11 +572,11 @@ function DeepFileCenterContent() {
                                               <button 
                                                 onClick={async () => {
                                                   if (confirm('確定要暫停安奉嗎？')) {
-                                                    await import('@/app/actions').then(m => m.deactivateLampRecord(lamp.id));
+                                                    await deactivateLampRecord(lamp.id);
                                                     if (selectedGuest) await loadHistory(selectedGuest.phone);
                                                   }
                                                 }}
-                                                className="text-xs font-bold text-slate-400 hover:text-amber-600 transition-colors px-4 py-2 bg-slate-50 rounded-xl hover:bg-amber-50"
+                                                className="text-xs font-bold text-slate-400 hover:text-amber-600 transition-colors px-5 py-2.5 bg-slate-50 rounded-xl hover:bg-amber-50"
                                               >
                                                 暫停安奉
                                               </button>
@@ -571,7 +584,7 @@ function DeepFileCenterContent() {
                                            <button 
                                              onClick={async () => {
                                                if (confirm('確定要取消這個點燈項目嗎？這將同步取消信眾端的點燈。')) {
-                                                 await import('@/app/actions').then(m => m.cancelServiceRecord(lamp.id, '點燈'));
+                                                 await cancelServiceRecord(lamp.id, '點燈');
                                                  if (selectedGuest) await loadHistory(selectedGuest.phone);
                                                }
                                              }}
@@ -579,12 +592,11 @@ function DeepFileCenterContent() {
                                            >
                                              取消點燈 ✕
                                            </button>
-                                           <button onClick={async () => { if (confirm(`確定續點 ${lamp.categoryName}？`)) { const { renewLampRecord } = await import('@/app/actions'); await renewLampRecord(lamp.id, 365); await loadHistory(selectedGuest.phone); alert("🏮 續點成功！"); } }} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl">快速續點 ➔</button>
-                                        </>
+                                           <button onClick={async () => { if (confirm(`確定續點 ${lamp.categoryName}？`)) {  await renewLampRecord(lamp.id, 365); await loadHistory(selectedGuest.phone); alert("🏮 續點成功！"); } }} className="bg-slate-900 text-white px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-md">快速續點 ➔</button>
+                                         </div>
                                      )}
                                      </div>
                                   </div>
-                               </div>
                              );
                            })
                         ) : (
@@ -677,7 +689,7 @@ function DeepFileCenterContent() {
                                           <button 
                                             onClick={async () => {
                                               if (confirm(`確定標記已抵達現場？`)) {
-                                                await import('@/app/actions').then(m => m.markAppointmentAsArrived(event.id));
+                                                await markAppointmentAsArrived(event.id);
                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
                                               }
                                             }}
@@ -690,7 +702,7 @@ function DeepFileCenterContent() {
                                           <button 
                                             onClick={async () => {
                                               if (confirm('確定要取消這個預約嗎？這將同步取消信眾端的預約。')) {
-                                                await import('@/app/actions').then(m => m.cancelAppointment(Number(event.id)));
+                                                await cancelAppointment(Number(event.id));
                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
                                               }
                                             }}
@@ -717,7 +729,7 @@ function DeepFileCenterContent() {
                                           <button 
                                             onClick={async () => {
                                               if (confirm('確定要標記已收款？')) {
-                                                await import('@/app/actions').then(m => m.confirmPayment(event.id.toString(), 'Appointment'));
+                                                await confirmPayment(event.id.toString(), 'Appointment');
                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
                                               }
                                             }}
@@ -730,7 +742,7 @@ function DeepFileCenterContent() {
                                           <button 
                                             onClick={async () => {
                                               if (confirm('確定要取消已收款狀態（回到未付款）嗎？')) {
-                                                await import('@/app/actions').then(m => m.revertPayment(event.id.toString(), 'Appointment'));
+                                                await revertPayment(event.id.toString(), 'Appointment');
                                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
                                               }
                                             }}
@@ -766,7 +778,7 @@ function DeepFileCenterContent() {
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
-                                              await import('@/app/actions').then(m => m.confirmPayment(evt.id, 'Event'));
+                                              await confirmPayment(evt.id, 'Event');
                                               if (selectedGuest) await loadHistory(selectedGuest.phone);
                                             }
                                           }}
@@ -818,7 +830,7 @@ function DeepFileCenterContent() {
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
-                                              await import('@/app/actions').then(m => m.confirmPayment(tix.id, 'Queue'));
+                                              await confirmPayment(tix.id, 'Queue');
                                               if (selectedGuest) await loadHistory(selectedGuest.phone);
                                             }
                                           }}
@@ -893,7 +905,7 @@ function DeepFileCenterContent() {
                                           onClick={async (e) => {
                                             e.stopPropagation();
                                             if(confirm('確定要刪除這個媒體檔案嗎？')) {
-                                               await import('@/app/actions').then(m => m.deleteGuestFile(file.id));
+                                               await deleteGuestFile(file.id);
                                                if (selectedGuest) await loadHistory(selectedGuest.phone);
                                             }
                                           }}

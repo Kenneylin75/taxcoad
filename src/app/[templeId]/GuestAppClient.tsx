@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -298,6 +298,12 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
     const returnUrl = encodeURIComponent(window.location.href);
     window.location.href = `/mock-gateway?orderId=${orderId}&amount=${amount}&method=${method}&returnUrl=${returnUrl}`;
   };
+  const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 
   const handleCancelRecord = async (recordId: string, type: string) => {
@@ -1197,6 +1203,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   };
 
   const renderAllRecords = () => {
+    const sanitizeUrl = (url?: string | null) => url?.startsWith('blob:') ? null : url;
     const allRecords = [
       ...guestAppointments.map(a => ({ ...a, type: '預約', icon: '📅', color: 'text-indigo-600', bg: 'bg-indigo-50', time: `${a.date} ${a.time}`, rawTime: `${a.date}T${a.time}` })),
       ...guestRegistrations.map(r => {
@@ -1207,7 +1214,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       ...guestLamps.map(l => {
         const remaining = Math.ceil((new Date(l.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
         return { 
-          ...l, 
+          ...l,
+          paymentProofUrl: sanitizeUrl(l.paymentProofUrl),
           type: '點燈', 
           icon: '🕯️', 
           color: 'text-amber-600', 
@@ -2215,7 +2223,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                                      return;
                                    }
                                    if (res.id && proofFile) {
-                                     const previewUrl = URL.createObjectURL(proofFile);
+                                     const previewUrl = await fileToBase64(proofFile);
                                      const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
                                      await uploadPaymentProof(res.id.toString(), 'EventRegistration', previewUrl, guestUser.phone);
                                    }
@@ -2355,7 +2363,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             if (res && res.success !== false) {
                               const recordId = res.ticket?.id || res.id;
                               if (recordId && proofFile) {
-                                const previewUrl = URL.createObjectURL(proofFile);
+                                const previewUrl = await fileToBase64(proofFile);
                                 const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
                                 await uploadPaymentProof(recordId.toString(), 'Appointment', previewUrl, guestUser.phone);
                               }
@@ -2446,7 +2454,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                               return;
                             }
                             if (res.id && proofFile) {
-                              const previewUrl = URL.createObjectURL(proofFile);
+                              const previewUrl = await fileToBase64(proofFile);
                               const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
                               await uploadPaymentProof(res.id.toString(), 'LampRecord', previewUrl, guestUser.phone);
                             }
