@@ -1027,7 +1027,6 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
             <span className="text-sm mt-1">+ 上傳新的{activeFileTab === 'photo' ? '照片' : activeFileTab === 'video' ? '影音' : '檔案'}</span>
           </label>
         </div>
-        </div>
       </div>
     </div>
   );
