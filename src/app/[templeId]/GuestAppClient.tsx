@@ -1027,9 +1027,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
             <span className="text-sm mt-1">+ 上傳新的{activeFileTab === 'photo' ? '照片' : activeFileTab === 'video' ? '影音' : '檔案'}</span>
           </label>
         </div>
+        </div>
       </div>
-      {renderPreviewModal()}
-      {renderRecordPreviewModal()}
     </div>
   );
 
@@ -1362,8 +1361,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                         </button>
                       )}
                       
-                      {/* Show upload button if unpaid/pending */}
-                      {(record.paymentStatus === 'Unpaid' || record.paymentStatus === 'Pending' || record.paymentStatus === 'PENDING_REVIEW') && record.type !== '排隊' && record.paymentMethod !== 'Cash' && (
+                      {/* Show upload button if unpaid/pending and no proof uploaded yet */}
+                      {!record.paymentProofUrl && (record.paymentStatus === 'Unpaid' || record.paymentStatus === 'Pending' || record.paymentStatus === 'PENDING_REVIEW') && record.type !== '排隊' && record.paymentMethod !== 'Cash' && (
                         <button onClick={() => setViewPaymentInfo({ method: (record.paymentMethod as any) || 'transfer', recordId: record.id.toString(), recordType: record.type === '預約' ? 'Appointment' : record.type === '活動' ? 'EventRegistration' : 'LampRecord' })} className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-black tracking-widest flex items-center justify-center gap-2 transition-colors">
                           <span>⌛</span> 查看付款資訊與上傳截圖
                         </button>
@@ -2562,6 +2561,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       {renderDetailModal()}
       {renderPaymentInfoModal()}
       {renderPaymentModal()}
+      {renderPreviewModal()}
+      {renderRecordPreviewModal()}
       {successInfo && renderActionSuccess()}
       
       {/* Native Bottom Tab Bar */}
