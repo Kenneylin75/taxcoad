@@ -4187,81 +4187,186 @@ export async function fetchFinancialOverview() {
     }
   }
 
-  db_lamp_records.filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
-    revenue.push({
-      id: r.id,
-      title: r.categoryName,
-      source: 'Lamp',
-      amount: r.price,
-      timestamp: r.createdAt || r.date,
-      guestName: r.guestName || r.phone,
-      paymentMethod: '現金/臨櫃',
-      status: 'Paid'
-    });
-    totalRevenue += r.price;
-  });
-
-  const myEvents = db_events.filter(e => e.templeId === templeId).map(e => e.id);
-  db_event_registrations.filter(r => myEvents.includes(r.eventId) && r.paymentStatus === 'Paid').forEach(r => {
-    revenue.push({
-      id: r.id,
-      title: r.title,
-      source: 'Event',
-      amount: r.actualPrice || r.price,
-      timestamp: r.timestamp || new Date().toISOString(),
-      guestName: r.guestName || r.phone,
-      paymentMethod: '現金/臨櫃',
-      status: 'Paid'
-    });
-    totalRevenue += (r.actualPrice || r.price);
-  });
-
-  const myServices = db_services.filter(s => s.templeId === templeId).map(s => s.id);
-  db_appointments.filter(a => myServices.includes(a.serviceId) && a.paymentStatus === 'Paid').forEach(a => {
-    revenue.push({
-      id: a.id,
-      title: a.service,
-      source: 'Appointment',
-      amount: a.amount || 0,
-      timestamp: a.date,
-      guestName: a.guestName || a.phone,
-      paymentMethod: a.paymentMethod || '現金/臨櫃',
-      status: 'Paid'
-    });
-    totalRevenue += (a.amount || 0);
-  });
-
-  db_deep_records.filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType.includes('功德'))).forEach(r => {
-    let amt = 0;
-    if (r.values && r.values['金額']) {
-      amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
+  let usedPgForRevenue = false;
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const pgCheck = await dbQuery("SELECT 1", [], () => null) as any;
+    if (pgCheck && pgCheck.rows) {
+      usedPgForRevenue = true;
+      const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
+        dbQuery("SELECT * FROM appointments WHERE temple_id = $1 AND payment_status = 'Paid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND amount > 0 AND payment_status != 'Pending'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM event_registrations WHERE temple_id = $1 AND payment_status = 'Paid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM queue_tickets WHERE temple_id = $1 AND payment_status = 'Paid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM deep_records WHERE temple_id = $1 AND (id LIKE 'MERIT-%' OR service_type LIKE '%功德%')", [templeId], () => null) as any
+      ]);
+      
+      if (appRes?.rows) {
+        appRes.rows.forEach((a: any) => {
+          revenue.push({
+            id: a.id,
+            title: a.service,
+            source: 'Appointment',
+            amount: Number(a.amount) || 0,
+            timestamp: a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date),
+            guestName: a.guest_name || a.phone,
+            paymentMethod: a.payment_method || '現金/臨櫃',
+            status: 'Paid'
+          });
+          totalRevenue += (Number(a.amount) || 0);
+        });
+      }
+      if (lampRes?.rows) {
+        lampRes.rows.forEach((r: any) => {
+          revenue.push({
+            id: r.id,
+            title: r.lamp_type || r.categoryName,
+            source: 'Lamp',
+            amount: Number(r.amount || r.price) || 0,
+            timestamp: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : String(r.created_at),
+            guestName: r.guest_name || r.phone,
+            paymentMethod: r.payment_method || '現金/臨櫃',
+            status: 'Paid'
+          });
+          totalRevenue += (Number(r.amount || r.price) || 0);
+        });
+      }
+      if (evRes?.rows) {
+        evRes.rows.forEach((r: any) => {
+          revenue.push({
+            id: r.id,
+            title: r.event_title || r.title,
+            source: 'Event',
+            amount: Number(r.actual_price || r.amount || r.price) || 0,
+            timestamp: r.timestamp || (r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at || new Date().toISOString())),
+            guestName: r.guest_name || r.phone,
+            paymentMethod: r.payment_method || '現金/臨櫃',
+            status: 'Paid'
+          });
+          totalRevenue += (Number(r.actual_price || r.amount || r.price) || 0);
+        });
+      }
+      if (qtRes?.rows) {
+        qtRes.rows.forEach((t: any) => {
+          revenue.push({
+            id: t.id,
+            title: '現場排隊服務',
+            source: 'Queue',
+            amount: Number(t.price || 0) || 0,
+            timestamp: t.scanned_at || (t.created_at instanceof Date ? t.created_at.toISOString().split('T')[0] : String(t.created_at)),
+            guestName: t.phone || '現場信眾',
+            paymentMethod: '現金/臨櫃',
+            status: 'Paid'
+          });
+          totalRevenue += (Number(t.price || 0) || 0);
+        });
+      }
+      if (deepRes?.rows) {
+        deepRes.rows.forEach((r: any) => {
+          let amt = 0;
+          let pMethod = '現金/臨櫃';
+          let payer = r.phone || '信眾';
+          try {
+            const vals = typeof r.values === 'string' ? JSON.parse(r.values) : r.values;
+            if (vals && vals['金額']) amt = Number(String(vals['金額']).replace(/[^0-9]/g, ''));
+            if (vals && vals['支付方式']) pMethod = vals['支付方式'];
+            if (vals && vals['付款人']) payer = vals['付款人'];
+          } catch(e) {}
+          revenue.push({
+            id: r.id,
+            title: r.service_type,
+            source: 'Merit',
+            amount: amt,
+            timestamp: r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date),
+            guestName: payer,
+            paymentMethod: pMethod,
+            status: 'Paid'
+          });
+          totalRevenue += amt;
+        });
+      }
     }
-    revenue.push({
-      id: r.id,
-      title: r.serviceType,
-      source: 'Merit',
-      amount: amt,
-      timestamp: r.date,
-      guestName: r.guestName || (r.values && r.values['付款人']) || r.phone || '信眾',
-      paymentMethod: (r.values && r.values['支付方式']) || '現金/臨櫃',
-      status: 'Paid'
-    });
-    totalRevenue += amt;
-  });
+  } catch(e) {
+    console.error('PG fetch for revenue failed', e);
+  }
 
-  db_queue_tickets.filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
-    revenue.push({
-      id: t.id,
-      title: '現場排隊服務',
-      source: 'Queue',
-      amount: t.price || 0,
-      timestamp: t.scannedAt || t.date || new Date().toISOString().split('T')[0],
-      guestName: t.phone || '現場信眾',
-      paymentMethod: '現金/臨櫃',
-      status: 'Paid'
+  if (!usedPgForRevenue) {
+    db_lamp_records.filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
+      revenue.push({
+        id: r.id,
+        title: r.categoryName,
+        source: 'Lamp',
+        amount: r.price,
+        timestamp: r.createdAt || r.date,
+        guestName: r.guestName || r.phone,
+        paymentMethod: '現金/臨櫃',
+        status: 'Paid'
+      });
+      totalRevenue += r.price;
     });
-    totalRevenue += (t.price || 0);
-  });
+
+    const myEvents = db_events.filter(e => e.templeId === templeId).map(e => e.id);
+    db_event_registrations.filter(r => myEvents.includes(r.eventId) && r.paymentStatus === 'Paid').forEach(r => {
+      revenue.push({
+        id: r.id,
+        title: r.title,
+        source: 'Event',
+        amount: r.actualPrice || r.price,
+        timestamp: r.timestamp || new Date().toISOString(),
+        guestName: r.guestName || r.phone,
+        paymentMethod: '現金/臨櫃',
+        status: 'Paid'
+      });
+      totalRevenue += (r.actualPrice || r.price);
+    });
+
+    const myServices = db_services.filter(s => s.templeId === templeId).map(s => s.id);
+    db_appointments.filter(a => myServices.includes(a.serviceId) && a.paymentStatus === 'Paid').forEach(a => {
+      revenue.push({
+        id: a.id,
+        title: a.service,
+        source: 'Appointment',
+        amount: a.amount || 0,
+        timestamp: a.date,
+        guestName: a.guestName || a.phone,
+        paymentMethod: a.paymentMethod || '現金/臨櫃',
+        status: 'Paid'
+      });
+      totalRevenue += (a.amount || 0);
+    });
+
+    db_deep_records.filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType.includes('功德'))).forEach(r => {
+      let amt = 0;
+      if (r.values && r.values['金額']) {
+        amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
+      }
+      revenue.push({
+        id: r.id,
+        title: r.serviceType,
+        source: 'Merit',
+        amount: amt,
+        timestamp: r.date,
+        guestName: r.guestName || (r.values && r.values['付款人']) || r.phone || '信眾',
+        paymentMethod: (r.values && r.values['支付方式']) || '現金/臨櫃',
+        status: 'Paid'
+      });
+      totalRevenue += amt;
+    });
+
+    db_queue_tickets.filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
+      revenue.push({
+        id: t.id,
+        title: '現場排隊服務',
+        source: 'Queue',
+        amount: t.price || 0,
+        timestamp: t.scannedAt || t.date || new Date().toISOString().split('T')[0],
+        guestName: t.phone || '現場信眾',
+        paymentMethod: '現金/臨櫃',
+        status: 'Paid'
+      });
+      totalRevenue += (t.price || 0);
+    });
+  }
 
   revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
