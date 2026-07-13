@@ -353,18 +353,18 @@ export default function SuperAdminClient({
                     <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-10">
                        <div className="flex items-center justify-between px-4">
                           <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">市場擴張趨勢 Expansion Analysis</h4>
-                          <select 
+                          <input 
+                            type="number"
                             value={trendYear}
                             onChange={(e) => {
                                setTrendYear(e.target.value);
                                fetchAggregatedAnalytics(e.target.value).then(setAnalytics);
                             }}
-                            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500"
-                          >
-                             <option value="2026">2026 年</option>
-                             <option value="2025">2025 年</option>
-                             <option value="2024">2024 年</option>
-                          </select>
+                            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500 w-32"
+                            min="2020"
+                            max="2100"
+                            required
+                          />
                        </div>
                                               <div className="h-80 flex items-end gap-3 px-4 pb-8">
                           {analytics?.growthTrend.map((h: any, i: number, arr: any[]) => {
