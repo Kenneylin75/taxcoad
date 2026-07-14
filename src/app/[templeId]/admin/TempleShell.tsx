@@ -5,36 +5,43 @@ import { usePathname, useParams } from 'next/navigation';
 import { AppRole, logoutAccount } from '@/app/actions';
 import AdminBell from './AdminBell';
 
-export default function TempleShell({ children, currentRole, currentUser, templeId }: { children: React.ReactNode, currentRole: AppRole, currentUser: { name: string, avatar: string }, templeId: string }) {
+export default function TempleShell({ children, currentRole, currentUser, templeId }: { children: React.ReactNode, currentRole: AppRole, currentUser: { name: string, avatar: string, permissions?: string[] }, templeId: string }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
 
+  if (pathname.includes('/admin/login')) {
+    return <>{children}</>;
+  }
+
   const basePath = `/${templeId}/admin`;
+
+  const perms = currentUser.permissions || [];
+  const hasPerm = (id: string) => perms.includes('all') || perms.includes(id);
 
   const navigation = [
     { name: '營運主控台', href: basePath, icon: '📊', show: true },
     
     { category: '服務核心業務', show: true, items: [
-      { name: '信眾檔案', href: `${basePath}/customers`, icon: '📜', show: true },
-      { name: '預約日曆', href: `${basePath}/calendar`, icon: '📅', show: true },
-      { name: '現場排隊', href: `${basePath}/queue`, icon: '🎫', show: true },
-      { name: '點燈管理', href: `${basePath}/lamps`, icon: '🏮', show: true },
-      { name: '法會管理', href: `${basePath}/events`, icon: '🕉️', show: true },
+      { name: '信眾檔案', href: `${basePath}/customers`, icon: '📜', show: hasPerm('customers') },
+      { name: '預約日曆', href: `${basePath}/calendar`, icon: '📅', show: hasPerm('calendar') },
+      { name: '現場排隊', href: `${basePath}/queue`, icon: '🎫', show: hasPerm('queue') },
+      { name: '點燈管理', href: `${basePath}/lamps`, icon: '🏮', show: hasPerm('lamps') },
+      { name: '法會管理', href: `${basePath}/events`, icon: '🕉️', show: hasPerm('events') },
     ]},
 
-    { category: '服務系統設定', show: ['TempleAdmin', 'SuperAdmin'].includes(currentRole), items: [
-      { name: '服務項目', href: `${basePath}/services`, icon: '⛩️', show: true },
-      { name: '預約時段', href: `${basePath}/slots`, icon: '⏰', show: true },
-      { name: '信眾通知', href: `${basePath}/notifications`, icon: '📢', show: true },
-      { name: 'LINE 設定', href: `${basePath}/line-setup`, icon: '💬', show: true },
-      { name: '人員管理', href: `${basePath}/personnel`, icon: '👥', show: true },
-      { name: '帳務管理', href: `${basePath}/billing`, icon: '💳', show: true },
-      { name: '金流收款', href: `${basePath}/payment-setup`, icon: '💰', show: true },
-      { name: '數據分析', href: `${basePath}/analytics`, icon: '📈', show: true },
-      { name: 'AI 監控', href: `${basePath}/ai-chat`, icon: '🤖', show: true },
-      { name: '進階設定', href: `${basePath}/settings`, icon: '⚙️', show: true },
-      { name: '品牌與外觀', href: `${basePath}/appearance`, icon: '🎨', show: true },
-      { name: '系統日誌', href: `${basePath}/audit`, icon: '📜', show: true },
+    { category: '服務系統設定', show: true, items: [
+      { name: '服務項目', href: `${basePath}/services`, icon: '⛩️', show: hasPerm('services') },
+      { name: '預約時段', href: `${basePath}/slots`, icon: '⏰', show: hasPerm('slots') },
+      { name: '信眾通知', href: `${basePath}/notifications`, icon: '📢', show: hasPerm('settings') || hasPerm('all') },
+      { name: 'LINE 設定', href: `${basePath}/line-setup`, icon: '💬', show: hasPerm('settings') || hasPerm('all') },
+      { name: '人員管理', href: `${basePath}/personnel`, icon: '👥', show: ['TempleAdmin', 'SuperAdmin'].includes(currentRole) || hasPerm('personnel') },
+      { name: '帳務管理', href: `${basePath}/billing`, icon: '💳', show: hasPerm('billing') },
+      { name: '金流收款', href: `${basePath}/payment-setup`, icon: '💰', show: ['TempleAdmin', 'SuperAdmin'].includes(currentRole) },
+      { name: '數據分析', href: `${basePath}/analytics`, icon: '📈', show: hasPerm('analytics') },
+      { name: 'AI 監控', href: `${basePath}/ai-chat`, icon: '🤖', show: hasPerm('settings') || hasPerm('all') },
+      { name: '進階設定', href: `${basePath}/settings`, icon: '⚙️', show: hasPerm('settings') },
+      { name: '品牌與外觀', href: `${basePath}/appearance`, icon: '🎨', show: hasPerm('settings') || hasPerm('all') },
+      { name: '系統日誌', href: `${basePath}/audit`, icon: '📜', show: ['TempleAdmin', 'SuperAdmin'].includes(currentRole) },
     ]},
 
     { category: '系統預覽', show: true, items: [

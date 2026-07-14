@@ -7,7 +7,7 @@ export default async function SuperAdminLayout({ children }: { children: React.R
   const currentRole = await getCurrentRole();
   const currentUser = await getCurrentUser();
 
-  if (!currentRole || (currentRole as string) !== 'SuperAdmin') {
+  if (!currentRole || !currentUser || (currentRole as string) !== 'SuperAdmin') {
      redirect('/login');
   }
   

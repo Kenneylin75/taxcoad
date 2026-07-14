@@ -9,15 +9,20 @@ export default async function TempleLayout({ children, params }: { children: Rea
   const currentUser = await getCurrentUser();
   const resolvedParams = await params;
   const templeId = resolvedParams.templeId;
+  const headersList = await headers();
+  const pathname = headersList.get('x-invoke-path') || headersList.get('next-url') || '';
+  const isLoginPage = pathname.includes('/admin/login');
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   // Basic security check for Temple module
-  if (!currentRole || !['TempleAdmin', 'Staff', 'Service', 'SuperAdmin'].includes(currentRole)) {
+  if (!currentRole || !currentUser || !['TempleAdmin', 'Staff', 'Service', 'SuperAdmin'].includes(currentRole)) {
      redirect('/login');
   }
 
   const templeInfo = await getTempleBasicInfo(templeId);
-  const headersList = await headers();
-  const pathname = headersList.get('x-invoke-path') || '';
 
   const bills = await fetchTempleBills(templeId);
   const hasUnpaid = bills?.some((e: any) => e.status === 'Unpaid');

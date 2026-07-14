@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { AppRole, createPersonnel, deletePersonnel } from '@/app/actions';
 
 interface Account {
@@ -27,6 +27,10 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
   const [editingPermissionsAccount, setEditingPermissionsAccount] = useState<Account | null>(null);
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
+  const params = useParams();
+  const templeId = params?.templeId as string;
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   // New state for Role Selection Cards
   const [selectedRole, setSelectedRole] = useState<string>('Staff');
@@ -42,6 +46,7 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
     { id: 'events', name: '活動服務管理', icon: '🧧' },
     { id: 'settings', name: '系統核心設定', icon: '⚙️' },
     { id: 'billing', name: '帳務管理中心', icon: '💳' },
+    { id: 'personnel', name: '人員管理模組', icon: '👥' },
   ];
 
   const handleOpenPermissions = (acc: Account) => {
@@ -133,6 +138,31 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
         </button>
       </div>
 
+      {/* Dedicated Login Link Panel */}
+      <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+        <div className="flex items-center gap-4 z-10">
+           <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-600 text-2xl">🔗</div>
+           <div>
+              <h3 className="text-slate-800 font-bold text-sm">宮廟專屬後台登入連結</h3>
+              <p className="text-slate-500 text-xs mt-1">一般行政人員或服務師傅必須透過此連結登入</p>
+              <div className="mt-2 text-indigo-600 font-mono text-xs bg-white px-3 py-1 rounded border border-indigo-100 inline-block min-h-[26px]">
+                {mounted ? `${window.location.origin}/${templeId}/admin/login` : `/${templeId}/admin/login`}
+              </div>
+           </div>
+        </div>
+        <button 
+          onClick={() => {
+            const url = mounted ? `${window.location.origin}/${templeId}/admin/login` : '';
+            navigator.clipboard.writeText(url);
+            alert('✅ 登入連結已複製！請將此連結提供給您的行政人員與師傅。');
+          }}
+          className="bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all z-10 whitespace-nowrap"
+        >
+          一鍵複製連結
+        </button>
+      </div>
+
       {/* Stats Quick View */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -202,7 +232,7 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
                            </div>
                         </td>
                         <td className="px-6 py-4 text-right">
-                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                           <div className="flex items-center justify-end gap-2 transition-all">
                               <button 
                                 onClick={() => handleOpenPermissions(acc)}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-md text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-700 transition-all border border-slate-200"

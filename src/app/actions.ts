@@ -134,11 +134,59 @@ export async function getCurrentRole(): Promise<AppRole> {
 }
 
 export async function getCurrentUser() {
+  const { cookies } = await import('next/headers');
+  const cookieStore = await cookies();
+  const account = cookieStore.get('admin_account')?.value;
+  const role = cookieStore.get('admin_role')?.value;
+  const templeId = cookieStore.get('templeId')?.value;
+
+  if (!account) return null;
+
+  if (account === 'PIVOTADMIN01') {
+    return {
+      id: "super-1",
+      name: "PIVOT 總裁",
+      role: "SuperAdmin",
+      avatar: "https://ui-avatars.com/api/?name=PIVOT&background=0F172A&color=fff",
+      permissions: ['all']
+    };
+  }
+
+  let permissions = ['all'];
+  let name = account;
+  let id = "admin-1";
+
+  if (templeId) {
+    let person: any = null;
+    try {
+      const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND temple_id = $2", [account.toLowerCase(), templeId], () => null) as any;
+      if (resPerson && resPerson.rowCount > 0) {
+        person = resPerson.rows[0];
+      }
+    } catch(e) {}
+    
+    if (!person) {
+      const pData = (gStore.db_personnel || db_personnel);
+      person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === account.toLowerCase()) && p.templeId === templeId);
+    }
+    
+    if (person) {
+      name = person.name;
+      id = person.id || person.temple_id;
+      if (person.permissions && Array.isArray(person.permissions)) {
+        permissions = person.permissions;
+      } else {
+        permissions = role === 'TempleAdmin' ? ['all'] : [];
+      }
+    }
+  }
+
   return { 
-    id: "admin-1", 
-    name: "系統管理員", 
-    role: "TempleAdmin", 
-    avatar: "https://ui-avatars.com/api/?name=Admin&background=0F172A&color=fff" 
+    id, 
+    name, 
+    role: role || "TempleAdmin", 
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F172A&color=fff`,
+    permissions
   };
 }
 
@@ -156,7 +204,7 @@ export async function logoutAccount() {
   return { success: true };
 }
 
-export async function loginAccount(formData: FormData) {
+export async function loginAccount(formData: FormData, targetTempleId?: string) {
   const account = (formData.get("account") as string || "").trim();
   const password = (formData.get("password") as string || "").trim();
 
@@ -173,105 +221,136 @@ export async function loginAccount(formData: FormData) {
   const searchAccount = account.toLowerCase();
   const pData = (gStore.db_personnel || db_personnel);
 
-  if (account === "PIVOTADMIN01" && password === "PIVOTADMIN01") {
-    success = true;
-    redirectPath = "/super-admin";
-    loggedInName = "超級總裁";
-    assignedRole = "SuperAdmin";
-  } else if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount && a.password === password)) {
-    success = true;
-    redirectPath = "/super-admin";
-    assignedRole = "SuperAdmin";
-  } else {
-    // 首先嘗試從 PostgreSQL 獲取經銷商
-    let distributor = null;
+  if (targetTempleId) {
+    let person = null;
     try {
-      const resDist = await dbQuery("SELECT * FROM distributors WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
-      if (resDist && resDist.rowCount > 0) {
-        distributor = resDist.rows[0];
+      const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2 AND temple_id = $3", [searchAccount, password, targetTempleId], () => null) as any;
+      if (resPerson && resPerson.rowCount > 0) {
+        person = resPerson.rows[0];
+        person.templeId = person.temple_id;
       }
-    } catch (e) {}
-    
-    if (!distributor) {
-      const allDistributors = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
-      distributor = allDistributors.find((d: any) => (d.account || '').toLowerCase() === searchAccount && d.password === password);
+    } catch(e) {}
+
+    if (!person) {
+      person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password && p.templeId === targetTempleId);
     }
 
-    if (distributor) {
-      if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
-      else {
-        success = true;
-        redirectPath = `/distributor/${distributor.id}`;
-        assignedRole = "Distributor";
+    if (person) {
+      const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
+      const temple = allTemples.find((t: any) => t.id === person.templeId);
+      if (temple && temple.status === "Inactive") {
+         return { success: false, error: "該宮廟已被停權，無法登入" };
       }
+      success = true; 
+      redirectPath = `/${person.templeId}/admin`; 
+      loggedInName = person.name;
+      assignedRole = "TempleAdmin"; 
     } else {
-      // 首先嘗試從 PostgreSQL 獲取業務員
-      let salesPerson = null;
+      return { success: false, error: "無效的帳號或密碼" };
+    }
+  } else {
+    if (account === "PIVOTADMIN01" && password === "PIVOTADMIN01") {
+      success = true;
+      redirectPath = "/super-admin";
+      loggedInName = "超級總裁";
+      assignedRole = "SuperAdmin";
+    } else if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount && a.password === password)) {
+      success = true;
+      redirectPath = "/super-admin";
+      assignedRole = "SuperAdmin";
+    } else {
+      // 首先嘗試從 PostgreSQL 獲取經銷商
+      let distributor = null;
       try {
-        const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
-        if (resSales && resSales.rowCount > 0) {
-          salesPerson = resSales.rows[0];
-          // 為了兼容前後端屬性命名
-          salesPerson.distributorId = salesPerson.distributor_id;
+        const resDist = await dbQuery("SELECT * FROM distributors WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+        if (resDist && resDist.rowCount > 0) {
+          distributor = resDist.rows[0];
         }
       } catch (e) {}
-
-      if (!salesPerson) {
-        const allSales = typeof gStore !== 'undefined' ? (gStore.db_dist_sales || db_dist_sales) : db_dist_sales;
-        salesPerson = allSales.find((s: any) => (s.account || '').toLowerCase() === searchAccount && s.password === password);
+      
+      if (!distributor) {
+        const allDistributors = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
+        distributor = allDistributors.find((d: any) => (d.account || '').toLowerCase() === searchAccount && d.password === password);
       }
 
-      if (salesPerson) {
-        if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
+      if (distributor) {
+        if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
         else {
           success = true;
-          redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/dist-sales-portal/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
-          assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
+          redirectPath = `/distributor/${distributor.id}`;
+          assignedRole = "Distributor";
         }
       } else {
-        let person = null;
+        // 首先嘗試從 PostgreSQL 獲取業務員
+        let salesPerson = null;
         try {
-          const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
-          if (resPerson && resPerson.rowCount > 0) {
-            person = resPerson.rows[0];
-            person.templeId = person.temple_id;
+          const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+          if (resSales && resSales.rowCount > 0) {
+            salesPerson = resSales.rows[0];
+            // 為了兼容前後端屬性命名
+            salesPerson.distributorId = salesPerson.distributor_id;
           }
-        } catch(e) {}
+        } catch (e) {}
 
-        if (!person) {
-          person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password);
+        if (!salesPerson) {
+          const allSales = typeof gStore !== 'undefined' ? (gStore.db_dist_sales || db_dist_sales) : db_dist_sales;
+          salesPerson = allSales.find((s: any) => (s.account || '').toLowerCase() === searchAccount && s.password === password);
         }
 
-        // Auto-heal: If personnel not found, check if a temple has this account/password (created by sales but not yet in personnel)
-        if (!person) {
-           const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
-           const temple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
-           if (temple) {
-              person = {
-                  id: `p-${Date.now()}`,
-                  templeId: temple.id,
-                  name: temple.templeName || '宮廟管理員',
-                  account: temple.account,
-                  password: temple.password,
-                  role: 'TempleAdmin',
-                  status: temple.status
-              };
-              pData.push(person);
-              if (typeof gStore !== 'undefined') gStore.db_personnel = pData;
-           }
-        }
-
-        if (person) { 
-          const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
-          const temple = allTemples.find((t: any) => t.id === person.templeId);
-          if (temple && temple.status === "Inactive") {
-             loginStatus = "Inactive";
-          } else {
-             success = true; 
-             redirectPath = `/${person.templeId}/admin`; 
-             loggedInName = person.name;
-             assignedRole = "TempleAdmin"; 
+        if (salesPerson) {
+          if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
+          else {
+            success = true;
+            redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/dist-sales-portal/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
+            assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
           }
+        } else {
+          let person = null;
+          try {
+            const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+            if (resPerson && resPerson.rowCount > 0) {
+              person = resPerson.rows[0];
+              person.templeId = person.temple_id;
+            }
+          } catch(e) {}
+
+          if (!person) {
+            person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password);
+          }
+
+          // Auto-heal: If personnel not found, check if a temple has this account/password (created by sales but not yet in personnel)
+          if (!person) {
+             const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
+             const temple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
+             if (temple) {
+                person = {
+                    id: `p-${Date.now()}`,
+                    templeId: temple.id,
+                    name: temple.templeName || '宮廟管理員',
+                    account: temple.account,
+                    password: temple.password,
+                    role: 'TempleAdmin',
+                    status: temple.status
+                };
+                pData.push(person);
+                if (typeof gStore !== 'undefined') gStore.db_personnel = pData;
+             }
+          }
+
+          if (person) { 
+            if (person.role !== 'TempleAdmin') {
+              return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
+            }
+            const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
+            const temple = allTemples.find((t: any) => t.id === person.templeId);
+            if (temple && temple.status === "Inactive") {
+               loginStatus = "Inactive";
+            } else {
+               success = true; 
+               redirectPath = `/${person.templeId}/admin`; 
+               loggedInName = person.name;
+               assignedRole = "TempleAdmin"; 
+            }
         } else {
           // 最後嘗試尋找宮廟主帳號
           let mainTemple = null;
@@ -301,6 +380,7 @@ export async function loginAccount(formData: FormData) {
         }
       }
     }
+  }
   }
 
   if (loginStatus === "Inactive") {
