@@ -1632,24 +1632,27 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
     
     const pStatus = paymentMethod === 'Cash' || !paymentMethod ? (pr > 0 ? 'Pending' : 'Unpaid') : 'Paid';
 
+    let newId = '';
     if (!client) {
       const ev = db_events.find(e => e.id === id && (!e.templeId || e.templeId === templeId));
       if (!ev) return { success: false };
       ev.enrolled += 1;
-      db_event_registrations.push({ id: `REG-${Date.now()}`, eventId: id, templeId, title: ev.title, phone, guestName: n, price: pr, paymentStatus: pStatus, actualPrice: pr > 0 ? pr : 0, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      newId = `REG-${Date.now()}`;
+      db_event_registrations.push({ id: newId, eventId: id, templeId, title: ev.title, phone, guestName: n, price: pr, paymentStatus: pStatus, actualPrice: pr > 0 ? pr : 0, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] });
     } else {
       const evRes = await client.query('SELECT title, enrolled, capacity FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
       if (evRes.rowCount === 0) return { success: false };
       const ev = evRes.rows[0];
       if (ev.capacity > 0 && ev.enrolled >= ev.capacity) return { success: false, message: '名額已滿' };
       
+      newId = `REG-${Date.now()}`;
       await client.query('UPDATE events SET enrolled = enrolled + 1 WHERE id = $1 AND temple_id = $2', [id, templeId]);
       await client.query('INSERT INTO event_registrations (id, event_id, temple_id, title, phone, guest_name, price, payment_status, actual_price, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-        [`REG-${Date.now()}`, id, templeId, ev.title, phone, n, pr, pStatus, pr > 0 ? pr : 0, new Date().toISOString().replace('T', ' ').split('.')[0]]
+        [newId, id, templeId, ev.title, phone, n, pr, pStatus, pr > 0 ? pr : 0, new Date().toISOString().replace('T', ' ').split('.')[0]]
       );
     }
     await revalidateTemple();
-    return { success: true };
+    return { success: true, id: newId };
   });
 }
 export async function fetchGuestRegistrations(p: any) {
@@ -5717,9 +5720,12 @@ export async function createLampRecord(data: any) {
       if(!cat) return { success: false, error: '未找到燈種類別' };
       const today = new Date();
       const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
-      const newRecord = { id: `LMP-${Date.now()}`, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Pending', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid'), createdAt: new Date().toISOString() };
+      const newId = `LMP-${Date.now()}`;
+      const newRecord = { id: newId, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Pending', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid'), createdAt: new Date().toISOString() };
       db_lamp_records.push(newRecord);
       if (typeof db_activities !== 'undefined') db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
+      await revalidateTemple();
+      return { success: true, id: newId };
     } else {
       const catRes = await client.query('SELECT name, price FROM lamp_categories WHERE id = $1 AND temple_id = $2', [categoryId, templeId]);
       if (catRes.rowCount === 0) return { success: false, error: '未找到燈種類別' };
@@ -5729,9 +5735,9 @@ export async function createLampRecord(data: any) {
       await client.query('INSERT INTO lamp_records (id, temple_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
         [newId, templeId, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
       );
+      await revalidateTemple();
+      return { success: true, id: newId };
     }
-    await revalidateTemple();
-    return { success: true };
   });
 }
 export async function checkLampNotifications() { return { hasNotification: false }; }

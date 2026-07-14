@@ -2103,13 +2103,19 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             description: `預約時間：${selectedDate} ${slot.time}\n服務人員：${slot.staff}\n地點：${selectedService?.location || '本宮大殿'}\n\n注意事項：${slot.description || selectedService?.precautions || '無'}`,
                             onConfirm: async () => {
                               const amount = slot.price || selectedService?.price || 0;
-                              initiatePayment(amount, 'Booking', async (method: string, ref?: string) => {
+                              initiatePayment(amount, 'Booking', async (method: string, ref?: string, proofFile?: File | null) => {
                                 const res = await bookAppointment(slot.id, guestUser.name, guestUser.phone, method, ref, amount);
                                 
                                 if (res.success) {
                                   if (method === 'ecpay' || method === 'linepay') {
                                     handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), amount);
                                     return;
+                                  }
+
+                                  if (res.id && proofFile) {
+                                    const previewUrl = await fileToBase64(proofFile);
+                                    const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                                    await uploadPaymentProof(res.id.toString(), 'Appointment', previewUrl, guestUser.phone);
                                   }
 
                                   setSuccessInfo({
