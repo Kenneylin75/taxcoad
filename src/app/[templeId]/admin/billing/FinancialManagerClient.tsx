@@ -8,7 +8,8 @@ import {
   initiatePayment, uploadTempleBillReceipt, approveTempleBill, 
   FreeAccountApplication, 
   approveFreeAccount, 
-  rejectFreeAccount 
+  rejectFreeAccount,
+  updateRevenueRemark
 } from '@/app/actions';
 
 interface FinancialOverview {
@@ -40,6 +41,21 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
   const [currentPayingBill, setCurrentPayingBill] = useState<ExpenseEntry | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'linepay' | 'ecpay'>('linepay');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+
+  const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
+  const [editingRemarkText, setEditingRemarkText] = useState('');
+
+  const handleSaveRemark = (revId: string, source: string) => {
+    startTransition(async () => {
+      const res = await updateRevenueRemark(revId, source, editingRemarkText);
+      if (res.success) {
+        setEditingRemarkId(null);
+        window.location.reload();
+      } else {
+        alert(res.message || '儲存失敗');
+      }
+    });
+  };
 
   React.useEffect(() => {
     // Intentionally left empty to prevent auto-popup of payment modal on page load.
@@ -311,13 +327,15 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">支付方式</th>
                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">核定金額</th>
                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">入帳時間</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">付款帳戶(末五碼)</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">備註</th>
                          <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">狀態</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
                      {filteredRevenue.length === 0 ? (
                        <tr>
-                         <td colSpan={5} className="px-6 py-12 text-center text-xs font-bold text-slate-400 bg-slate-50/20">
+                         <td colSpan={7} className="px-6 py-12 text-center text-xs font-bold text-slate-400 bg-slate-50/20">
                            本月份尚無收入紀錄
                          </td>
                        </tr>
@@ -345,6 +363,32 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                         </td>
                         <td className="px-6 py-4">
                            <span className="text-xs font-bold text-slate-400 font-mono">{rev.timestamp}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                           <span className="text-xs font-bold text-slate-500 font-mono">{rev.paymentRef ? rev.paymentRef.slice(-5) : '無'}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                           {editingRemarkId === rev.id ? (
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="text" 
+                                  value={editingRemarkText}
+                                  onChange={(e) => setEditingRemarkText(e.target.value)}
+                                  className="border border-slate-300 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:border-amber-500 font-bold text-slate-700 bg-white"
+                                  autoFocus
+                                />
+                                <button onClick={() => handleSaveRemark(rev.id, rev.source)} className="text-emerald-600 hover:scale-110 transition-transform">✅</button>
+                                <button onClick={() => setEditingRemarkId(null)} className="text-rose-400 hover:scale-110 transition-transform">❌</button>
+                              </div>
+                           ) : (
+                              <div 
+                                className="flex items-center gap-2 cursor-pointer group hover:bg-amber-50 px-2 py-1 rounded transition-colors w-fit"
+                                onClick={() => { setEditingRemarkId(rev.id); setEditingRemarkText(rev.remarks || ''); }}
+                              >
+                                <span className={`text-xs font-bold ${rev.remarks ? 'text-slate-700' : 'text-slate-300'}`}>{rev.remarks || '點擊新增備註'}</span>
+                                <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
+                              </div>
+                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
                            {rev.status === 'PENDING_REVIEW' ? (

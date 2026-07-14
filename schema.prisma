@@ -299,6 +299,8 @@ model DeepRecord {
   category  String?
   content   String?
   date      String?
+  paymentRef String?
+  remarks    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -423,6 +425,7 @@ model Appointment {
   paymentStatus   String   @default("Pending")
   paymentRef      String?
   paymentProofUrl String?
+  remarks         String?
   status          String   @default("Pending")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -465,6 +468,7 @@ model LampRecord {
   paymentMethod   String?
   paymentStatus   String   @default("Pending")
   paymentProofUrl String?
+  remarks         String?
   expiryDate      String?
   status          String   @default("Pending")
   createdAt       DateTime @default(now())
@@ -510,6 +514,8 @@ model EventRegistration {
   paymentMethod    String?
   paymentStatus    String   @default("Pending")
   paymentProofUrl  String?
+  paymentRef       String?
+  remarks          String?
   registrationData Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -549,6 +555,8 @@ model QueueTicket {
   guestName   String?
   phone       String?
   displayNum  String?
+  paymentRef  String?
+  remarks     String?
   actualOrder Int      @default(0)
   status      String   @default("Queuing")
   createdAt   DateTime @default(now())

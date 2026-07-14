@@ -4263,6 +4263,19 @@ export async function fetchFinancialOverview() {
     const pgCheck = await dbQuery("SELECT 1", [], () => null) as any;
     if (pgCheck && pgCheck.rows) {
       usedPgForRevenue = true;
+      try {
+        await Promise.all([
+          dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+          dbQuery("ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
+          dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+          dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
+          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null)
+        ]);
+      } catch (e) {}
+
       const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
         dbQuery("SELECT * FROM appointments WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND amount > 0 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
@@ -4281,7 +4294,9 @@ export async function fetchFinancialOverview() {
             timestamp: a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date),
             guestName: a.guest_name || a.phone,
             paymentMethod: a.payment_method || '現金/臨櫃',
-            status: 'Paid'
+            status: 'Paid',
+            paymentRef: a.payment_ref,
+            remarks: a.remarks
           });
           totalRevenue += (Number(a.amount) || 0);
         });
@@ -4296,7 +4311,9 @@ export async function fetchFinancialOverview() {
             timestamp: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : String(r.created_at),
             guestName: r.guest_name || r.phone,
             paymentMethod: r.payment_method || '現金/臨櫃',
-            status: 'Paid'
+            status: 'Paid',
+            paymentRef: r.payment_ref,
+            remarks: r.remarks
           });
           totalRevenue += (Number(r.amount || r.price) || 0);
         });
@@ -4311,7 +4328,9 @@ export async function fetchFinancialOverview() {
             timestamp: r.timestamp || (r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at || new Date().toISOString())),
             guestName: r.guest_name || r.phone,
             paymentMethod: r.payment_method || '現金/臨櫃',
-            status: 'Paid'
+            status: 'Paid',
+            paymentRef: r.payment_ref,
+            remarks: r.remarks
           });
           totalRevenue += (Number(r.actual_price || r.amount || r.price) || 0);
         });
@@ -4326,7 +4345,9 @@ export async function fetchFinancialOverview() {
             timestamp: t.scanned_at || (t.created_at instanceof Date ? t.created_at.toISOString().split('T')[0] : String(t.created_at)),
             guestName: t.phone || '現場信眾',
             paymentMethod: '現金/臨櫃',
-            status: 'Paid'
+            status: 'Paid',
+            paymentRef: t.payment_ref,
+            remarks: t.remarks
           });
           totalRevenue += (Number(t.price || 0) || 0);
         });
@@ -4350,7 +4371,9 @@ export async function fetchFinancialOverview() {
             timestamp: r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date),
             guestName: payer,
             paymentMethod: pMethod,
-            status: 'Paid'
+            status: 'Paid',
+            paymentRef: r.payment_ref,
+            remarks: r.remarks
           });
           totalRevenue += amt;
         });
@@ -4370,7 +4393,9 @@ export async function fetchFinancialOverview() {
         timestamp: r.createdAt || r.date,
         guestName: r.guestName || r.phone,
         paymentMethod: '現金/臨櫃',
-        status: 'Paid'
+        status: 'Paid',
+        paymentRef: r.paymentRef,
+        remarks: r.remarks
       });
       totalRevenue += r.price;
     });
@@ -4385,7 +4410,9 @@ export async function fetchFinancialOverview() {
         timestamp: r.timestamp || new Date().toISOString(),
         guestName: r.guestName || r.phone,
         paymentMethod: '現金/臨櫃',
-        status: r.paymentStatus
+        status: r.paymentStatus,
+        paymentRef: r.paymentRef,
+        remarks: r.remarks
       });
       totalRevenue += (r.actualPrice || r.price);
     });
@@ -4400,7 +4427,9 @@ export async function fetchFinancialOverview() {
         timestamp: a.date,
         guestName: a.guestName || a.phone,
         paymentMethod: a.paymentMethod || '現金/臨櫃',
-        status: 'Paid'
+        status: 'Paid',
+        paymentRef: a.paymentRef,
+        remarks: a.remarks
       });
       totalRevenue += (a.amount || 0);
     });
@@ -4418,7 +4447,9 @@ export async function fetchFinancialOverview() {
         timestamp: r.date,
         guestName: r.guestName || (r.values && r.values['付款人']) || r.phone || '信眾',
         paymentMethod: (r.values && r.values['支付方式']) || '現金/臨櫃',
-        status: 'Paid'
+        status: 'Paid',
+        paymentRef: r.paymentRef,
+        remarks: r.remarks
       });
       totalRevenue += amt;
     });
@@ -4432,7 +4463,9 @@ export async function fetchFinancialOverview() {
         timestamp: t.scannedAt || t.date || new Date().toISOString().split('T')[0],
         guestName: t.phone || '現場信眾',
         paymentMethod: '現金/臨櫃',
-        status: 'Paid'
+        status: 'Paid',
+        paymentRef: t.paymentRef,
+        remarks: t.remarks
       });
       totalRevenue += (t.price || 0);
     });
@@ -8181,3 +8214,44 @@ export async function fetchTemplePaymentTarget(templeId: string) {
   }
   return targetBank;
 }
+
+export async function updateRevenueRemark(id: string, source: string, remark: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, true, async (client) => {
+    let tableName = '';
+    if (source === 'Appointment') tableName = 'appointments';
+    else if (source === 'Lamp') tableName = 'lamp_records';
+    else if (source === 'Event') tableName = 'event_registrations';
+    else if (source === 'Queue') tableName = 'queue_tickets';
+    else if (source === 'Merit') tableName = 'deep_records';
+    else return { success: false, message: '不明的來源類型' };
+
+    try {
+      if (client) {
+        await client.query(`UPDATE ${tableName} SET remarks = $1 WHERE id = $2 AND temple_id = $3`, [remark, id, templeId]);
+      } else {
+        // Fallback to in-memory
+        if (source === 'Appointment') {
+          const rec = db_appointments.find(a => a.id === id);
+          if (rec) rec.remarks = remark;
+        } else if (source === 'Lamp') {
+          const rec = db_lamp_records.find(a => a.id === id);
+          if (rec) rec.remarks = remark;
+        } else if (source === 'Event') {
+          const rec = db_event_registrations.find(a => a.id === id);
+          if (rec) rec.remarks = remark;
+        } else if (source === 'Queue') {
+          const rec = db_queue_tickets.find(a => a.id === id);
+          if (rec) rec.remarks = remark;
+        } else if (source === 'Merit') {
+          const rec = db_deep_records.find(a => a.id === id);
+          if (rec) rec.remarks = remark;
+        }
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  });
+}
+
