@@ -374,6 +374,7 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                                   type="text" 
                                   value={editingRemarkText}
                                   onChange={(e) => setEditingRemarkText(e.target.value)}
+                                  maxLength={25}
                                   className="border border-slate-300 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:border-amber-500 font-bold text-slate-700 bg-white"
                                   autoFocus
                                 />
@@ -385,7 +386,9 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
                                 className="flex items-center gap-2 cursor-pointer group hover:bg-amber-50 px-2 py-1 rounded transition-colors w-fit"
                                 onClick={() => { setEditingRemarkId(rev.id); setEditingRemarkText(rev.remarks || ''); }}
                               >
-                                <span className={`text-xs font-bold ${rev.remarks ? 'text-slate-700' : 'text-slate-300'}`}>{rev.remarks || '點擊新增備註'}</span>
+                                <span className={`text-xs font-bold ${rev.remarks ? 'text-slate-700' : 'text-slate-300'} truncate max-w-[200px]`} title={rev.remarks}>
+                                  {rev.remarks ? (rev.remarks.length > 25 ? rev.remarks.slice(0, 25) + '...' : rev.remarks) : '點擊新增備註'}
+                                </span>
                                 <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
                               </div>
                            )}
