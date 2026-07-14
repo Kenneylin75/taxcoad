@@ -1,231 +1,699 @@
 // =====================================================================
-// 全方位雲端宮廟管理系統 - Prisma 資料庫綱要 (Developer Handoff 版)
+// 全方位雲端宮廟管理系統 - Prisma 資料庫綱要 (Expanded Full Schema)
 // =====================================================================
-// 給接手工程師：
-// 1. 本檔案由系統目前的 In-Memory 架構自動逆向生成。
-// 2. 請安裝 Prisma: `npm i prisma -D` & `npm i @prisma/client`
-// 3. 執行 `npx prisma db push` 或 `npx prisma migrate dev` 即可產生資料庫。
-// 4. 將 `actions.ts` 內所有的陣列 (Array) 操作替換為 `prisma.model.create/findMany` 等。
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  // 建議商轉使用 postgresql，若使用 mysql 請自行更改 provider
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // ---------------------------------------------------------------------
-// 核心系統 (System Core)
+// SaaS Core (租戶與經銷商)
 // ---------------------------------------------------------------------
 
-/// 宮廟主體 (多租戶 Multi-tenant 核心)
-model Temple {
+model PricePlan {
+  id           String   @id @default(cuid())
+  name         String
+  monthlyPrice Int      @default(0)
+  annualPrice  Int      @default(0)
+  features     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  temples      Temple[]
+}
+
+model Distributor {
+  id           String   @id @default(cuid())
+  name         String
+  status       String   @default("Active")
+  contactName  String?
+  contactPhone String?
+  email        String?
+  account      String?
+  password     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sales   DistributorSales[]
+  temples Temple[]
+}
+
+model DistributorSales {
+  id            String   @id @default(cuid())
+  distributorId String?
+  name          String
+  phone         String?
+  status        String   @default("Active")
+  role          String?
+  account       String?
+  password      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  distributor Distributor? @relation(fields: [distributorId], references: [id])
+  commissions Commission[]
+  visits      SalesVisit[]
+}
+
+model Commission {
+  id        String   @id @default(cuid())
+  salesId   String?
+  amount    Int      @default(0)
+  status    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales DistributorSales? @relation(fields: [salesId], references: [id])
+}
+
+model SalesVisit {
+  id         String   @id @default(cuid())
+  salesId    String?
+  templeName String?
+  content    String?
+  date       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sales DistributorSales? @relation(fields: [salesId], references: [id])
+}
+
+model DistributorApplication {
   id          String   @id @default(cuid())
+  name        String?
+  contactInfo String?
+  status      String   @default("Pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SuperSalesOverride {
+  id           String   @id @default(cuid())
+  ruleName     String?
+  overrideData Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// 核心系統 (Temple Core)
+// ---------------------------------------------------------------------
+
+model Temple {
+  id            String   @id @default(cuid())
+  name          String
+  account       String?
+  password      String?
+  region        String?
+  city          String?
+  address       String?
+  phone         String?
+  status        String   @default("Active")
+  distributorId String?
+  salesId       String?
+  planId        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  distributor Distributor? @relation(fields: [distributorId], references: [id])
+  plan        PricePlan?   @relation(fields: [planId], references: [id])
+
+  users               User[]
+  guests              Guest[]
+  appointments        Appointment[]
+  events              Event[]
+  lampCategories      LampCategory[]
+  lampRecords         LampRecord[]
+  queueEvents         QueueEvent[]
+  adminNotifs         AdminNotification[]
+  services            Service[]
+  serviceSettings     ServiceSetting[]
+  printTemplates      PrintTemplate[]
+  forms               Form[]
+  paymentConfigs      TemplePaymentConfig[]
+  slots               Slot[]
+  templeBills         TempleBill[]
+  templeStorages      TempleStorage[]
+  aiUsages            TempleAiUsage[]
+  syncQueues          SyncQueue[]
+  financeRecords      FinanceRecord[]
+  templeNotifications TempleNotification[]
+}
+
+model TempleApplication {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  status    String   @default("Pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TempleBill {
+  id        String   @id @default(cuid())
+  templeId  String
+  type      String?
+  itemName  String?
+  amount    Int      @default(0)
+  status    String   @default("Unpaid")
+  dueDate   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model StoragePlan {
+  id            String   @id @default(cuid())
+  name          String
+  capacityBytes BigInt   @default(0)
+  price         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TempleStorage {
+  id        String   @id @default(cuid())
+  templeId  String
+  usedBytes BigInt   @default(0)
+  planId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 系統人員 (Users & Admins)
+// ---------------------------------------------------------------------
+
+model User {
+  id          String   @id @default(cuid())
+  username    String?  @unique
+  account     String?
+  password    String?
   name        String
-  region      String?
-  status      String   @default("Active") // 'Active', 'Pending', 'Suspended'
-  distributor String?  // 綁定之經銷商ID
+  role        String
+  templeId    String?
+  phone       String?
+  status      String   @default("Active")
+  permissions Json?
+  avatar      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users       User[]
-  guests      Guest[]
-  appointments Appointment[]
-  events      Event[]
-  lampCategories LampCategory[]
-  queueEvents QueueEvent[]
-  adminNotifs AdminNotification[]
+  temple Temple? @relation(fields: [templeId], references: [id])
 }
 
-/// 系統人員 (宮廟管理員 / 經銷商 / 超級管理員)
-model User {
-  id          String   @id @default(cuid())
-  username    String   @unique
-  password    String   // 請務必在商轉前加入 bcrypt 雜湊
-  name        String
-  role        String   // 'SuperAdmin', 'DistAdmin', 'TempleAdmin', 'Staff'
-  templeId    String?
-  permissions String[] // ['events', 'lamps', 'queue', 'appointments'] 等
-  createdAt   DateTime @default(now())
+model Admin {
+  id        String   @id @default(cuid())
+  name      String
+  account   String?
+  password  String?
+  role      String?
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
-  temple      Temple?  @relation(fields: [templeId], references: [id])
+model AdminLog {
+  id          String   @id @default(cuid())
+  adminId     String?
+  adminName   String?
+  action      String?
+  target      String?
+  details     String?
+  timestamp   String?
+  performedBy String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String?
+  details     String?
+  timestamp   String?
+  performedBy String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------
 // 信眾管理 (CRM)
 // ---------------------------------------------------------------------
 
-/// 信眾資料 (Guest)
 model Guest {
   id            String   @id @default(cuid())
-  phone         String   // 手機號碼為主要識別 (建議加上 Unique 限制，但需考慮跨宮廟)
+  templeId      String?
+  phone         String   @unique
   name          String
-  gender        String?  // 'M', 'F', 'O'
-  birthday      String?  // YYYY-MM-DD
-  birthHour     String?  // 出生時辰 (如: 子時)
+  gender        String?
+  birthday      String?
+  lunarBirthday String?
+  birthHour     String?
   address       String?
   avatar        String?
-  lineId        String?  // 綁定之 LINE OA ID
+  lineId        String?
   email         String?
+  password      String?
   status        String   @default("Active")
-  templeId      String?
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  temple        Temple?  @relation(fields: [templeId], references: [id])
-  appointments  Appointment[]
-  lampRecords   LampRecord[]
-  eventRegs     EventRegistration[]
-  queueTickets  QueueTicket[]
-  adminNotifs   AdminNotification[]
+  temple       Temple?             @relation(fields: [templeId], references: [id])
+  appointments Appointment[]
+  lampRecords  LampRecord[]
+  eventRegs    EventRegistration[]
+  queueTickets QueueTicket[]
+  adminNotifs  AdminNotification[]
+  guestFiles   GuestFile[]
+}
+
+model GuestFile {
+  id        String   @id @default(cuid())
+  guestId   String?
+  fileUrl   String?
+  fileName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guest Guest? @relation(fields: [guestId], references: [id])
+}
+
+model DeepRecord {
+  id        String   @id @default(cuid())
+  phone     String?
+  category  String?
+  content   String?
+  date      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  phone     String?
+  type      String?
+  content   String?
+  timestamp String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------
-// 預約與服務 (Appointments)
+// 服務設定與表單 (Services & Forms)
 // ---------------------------------------------------------------------
 
-/// 預約紀錄 (Appointment)
-model Appointment {
-  id            String   @id @default(cuid())
-  templeId      String
-  guestId       String
-  service       String   // 服務項目名稱 (如: 安太歲、收驚)
-  date          String   // 預約日期 YYYY-MM-DD
-  time          String   // 預約時段 HH:mm
-  staff         String?  // 負責法師/專員
-  amount        Int      @default(0) // 結緣金/功德金
-  paymentMethod String?  // 'Cash', 'LinePayApi', 'ECPay'
-  paymentStatus String   @default("Pending") // 'Pending', 'Paid', 'Failed', 'Refunded'
-  paymentRef    String?  // 交易序號
-  paymentProofUrl String? // 信眾上傳的匯款截圖
-  status        String   @default("Pending") // 'Pending', 'Confirmed', 'Completed', 'Cancelled'
-  createdAt     DateTime @default(now())
+model Service {
+  id                    String   @id @default(cuid())
+  templeId              String
+  name                  String
+  price                 Int      @default(0)
+  duration              String?
+  description           String?
+  status                String   @default("Active")
+  assignedStaff         Json?
+  color                 String?
+  linkedFormId          String?
+  linkedPrintTemplateId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  temple        Temple   @relation(fields: [templeId], references: [id])
-  guest         Guest    @relation(fields: [guestId], references: [id])
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model ServiceSetting {
+  id          String   @id @default(cuid())
+  templeId    String
+  pushConfigs Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model PrintTemplate {
+  id               String   @id @default(cuid())
+  templeId         String
+  name             String
+  templeName       String?
+  watermarkUrl     String?
+  watermarkOpacity Float?
+  borderStyle      String?
+  content          Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model Form {
+  id        String   @id @default(cuid())
+  templeId  String
+  name      String
+  fields    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model TemplePaymentConfig {
+  id                   String   @id @default(cuid())
+  templeId             String
+  ecpayHashKey         String?
+  ecpayHashIv          String?
+  ecpayMerchantId      String?
+  linepayChannelId     String?
+  linepayChannelSecret String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+// ---------------------------------------------------------------------
+// 預約與排程 (Appointments & Slots)
+// ---------------------------------------------------------------------
+
+model Slot {
+  id             String   @id @default(cuid())
+  templeId       String
+  date           String?
+  time           String?
+  staff          String?
+  description    String?
+  location       String?
+  boundServiceId String?
+  price          Int      @default(0)
+  status         String   @default("Available")
+  guestName      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model Appointment {
+  id              String   @id @default(cuid())
+  templeId        String
+  guestId         String?
+  guestName       String?
+  phone           String?
+  service         String?
+  serviceId       String?
+  date            String?
+  time            String?
+  staff           String?
+  amount          Int      @default(0)
+  paymentMethod   String?
+  paymentStatus   String   @default("Pending")
+  paymentRef      String?
+  paymentProofUrl String?
+  status          String   @default("Pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+  guest  Guest? @relation(fields: [guestId], references: [id])
 }
 
 // ---------------------------------------------------------------------
 // 點燈系統 (Lamp Lighting)
 // ---------------------------------------------------------------------
 
-/// 點燈類別 (如: 光明燈、安太歲)
 model LampCategory {
-  id          String   @id @default(cuid())
-  templeId    String
-  name        String
-  description String?
-  price       Int      @default(0)
-  totalSlots  Int      @default(500)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  templeId     String
+  name         String
+  description  String?
+  price        Int      @default(0)
+  durationDays Int      @default(365)
+  totalSlots   Int      @default(500)
+  precautions  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  temple      Temple   @relation(fields: [templeId], references: [id])
-  records     LampRecord[]
+  temple  Temple       @relation(fields: [templeId], references: [id])
+  records LampRecord[]
 }
 
-/// 點燈紀錄 (燈位)
 model LampRecord {
-  id            String   @id @default(cuid())
-  templeId      String
-  categoryId    String
-  guestId       String
-  applicantName String   // 點燈者姓名 (可能與 guestName 不同，如幫家人點)
-  applicantBirth String? // 農曆/國曆生日
-  actualPrice   Int      @default(0)
-  paymentMethod String?
-  paymentStatus String   @default("Pending")
-  paymentProofUrl String? // 信眾上傳的匯款截圖
-  status        String   @default("Pending") // 'Pending', 'Active', 'Expired'
-  createdAt     DateTime @default(now())
+  id              String   @id @default(cuid())
+  templeId        String
+  categoryId      String?
+  categoryName    String?
+  guestId         String?
+  guestName       String?
+  phone           String?
+  applicantName   String?
+  applicantBirth  String?
+  actualPrice     Int      @default(0)
+  paymentMethod   String?
+  paymentStatus   String   @default("Pending")
+  paymentProofUrl String?
+  expiryDate      String?
+  status          String   @default("Pending")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  temple        Temple       @relation(fields: [templeId], references: [id])
-  category      LampCategory @relation(fields: [categoryId], references: [id])
-  guest         Guest        @relation(fields: [guestId], references: [id])
+  temple   Temple        @relation(fields: [templeId], references: [id])
+  category LampCategory? @relation(fields: [categoryId], references: [id])
+  guest    Guest?        @relation(fields: [guestId], references: [id])
 }
 
 // ---------------------------------------------------------------------
 // 法會活動 (Events)
 // ---------------------------------------------------------------------
 
-/// 法會與活動主體
 model Event {
   id          String   @id @default(cuid())
   templeId    String
   title       String
-  date        String   // YYYY-MM-DD
+  date        String?
   location    String?
-  imageUrl    String?  // 活動宣傳圖片
-  price       Int      @default(0) // 預設費用
-  capacity    Int      @default(0) // 0 表示無上限
-  status      String   @default("Draft") // 'Draft', 'Active', 'Completed'
+  description String?
+  imageUrl    String?
+  bannerUrl   String?
+  price       Int      @default(0)
+  capacity    Int      @default(0)
+  fields      Json?
+  status      String   @default("Draft")
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  temple      Temple   @relation(fields: [templeId], references: [id])
+  temple        Temple              @relation(fields: [templeId], references: [id])
   registrations EventRegistration[]
 }
 
-/// 法會報名紀錄
 model EventRegistration {
-  id            String   @id @default(cuid())
-  eventId       String
-  guestId       String
-  actualPrice   Int      @default(0)
-  paymentMethod String?
-  paymentStatus String   @default("Pending")
-  paymentProofUrl String? // 信眾上傳的匯款截圖
-  createdAt     DateTime @default(now())
+  id               String   @id @default(cuid())
+  templeId         String?
+  eventId          String?
+  guestId          String?
+  guestName        String?
+  phone            String?
+  actualPrice      Int      @default(0)
+  paymentMethod    String?
+  paymentStatus    String   @default("Pending")
+  paymentProofUrl  String?
+  registrationData Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  event         Event    @relation(fields: [eventId], references: [id])
-  guest         Guest    @relation(fields: [guestId], references: [id])
+  event Event? @relation(fields: [eventId], references: [id])
+  guest Guest? @relation(fields: [guestId], references: [id])
 }
 
 // ---------------------------------------------------------------------
 // 現場排隊 (Queue System)
 // ---------------------------------------------------------------------
 
-/// 排隊/叫號活動 (如: 今日問事、點燈櫃台)
 model QueueEvent {
   id          String   @id @default(cuid())
   templeId    String
   title       String
-  status      String   @default("Draft") // 'Draft', 'Active', 'Completed'
+  date        String?
+  startTime   String?
+  endTime     String?
+  location    String?
+  serviceType String?
+  price       Int      @default(0)
+  maxCapacity Int      @default(0)
+  status      String   @default("Draft")
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  temple      Temple   @relation(fields: [templeId], references: [id])
-  tickets     QueueTicket[]
+  temple  Temple        @relation(fields: [templeId], references: [id])
+  tickets QueueTicket[]
 }
 
-/// 號碼牌 (Queue Ticket)
 model QueueTicket {
   id          String   @id @default(cuid())
-  eventId     String
-  guestId     String
-  displayNum  String   // 顯示用號碼 (如: A001)
-  actualOrder Int      // 實際排序邏輯用
-  status      String   @default("Queuing") // 'Queuing', 'Calling', 'Completed', 'Cancelled'
+  templeId    String?
+  eventId     String?
+  guestId     String?
+  guestName   String?
+  phone       String?
+  displayNum  String?
+  actualOrder Int      @default(0)
+  status      String   @default("Queuing")
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  queueEvent  QueueEvent @relation(fields: [eventId], references: [id])
-  guest       Guest      @relation(fields: [guestId], references: [id])
+  queueEvent QueueEvent? @relation(fields: [eventId], references: [id])
+  guest      Guest?      @relation(fields: [guestId], references: [id])
 }
 
 // ---------------------------------------------------------------------
-// 系統通知 (Admin Notifications)
+// 其他模組 (AI, Finance, Notifications, etc.)
 // ---------------------------------------------------------------------
 
-/// 廟方後台通知 (左上角鈴鐺)
-model AdminNotification {
-  id          String   @id @default(cuid())
-  templeId    String
-  guestId     String?  // 若是信眾觸發的事件，可綁定
-  category    String   // 'GENERAL' (一般), 'PENDING_REVIEW' (待確認), 'IMPORTANT' (重要)
-  message     String   // 通知文字
-  isRead      Boolean  @default(false)
-  linkPath    String?  // 點擊後跳轉的路徑
-  createdAt   DateTime @default(now())
+model AiPlan {
+  id        String   @id @default(cuid())
+  name      String
+  price     Int      @default(0)
+  features  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
-  temple      Temple   @relation(fields: [templeId], references: [id])
-  guest       Guest?   @relation(fields: [guestId], references: [id])
+model AiApiModel {
+  id        String   @id @default(cuid())
+  name      String
+  provider  String?
+  version   String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TempleAiUsage {
+  id         String   @id @default(cuid())
+  templeId   String
+  tokensUsed Int      @default(0)
+  queryCount Int      @default(0)
+  month      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+}
+
+model SyncQueue {
+  id        String   @id @default(cuid())
+  templeId  String?
+  action    String?
+  status    String?
+  payload   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  temple Temple? @relation(fields: [templeId], references: [id])
+}
+
+model FinanceRecord {
+  id          String   @id @default(cuid())
+  templeId    String?
+  type        String?
+  category    String?
+  amount      Int      @default(0)
+  date        String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  temple Temple? @relation(fields: [templeId], references: [id])
+}
+
+model Tool {
+  id          String   @id @default(cuid())
+  name        String?
+  description String?
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  ownerId   String?
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bonus {
+  id        String   @id @default(cuid())
+  targetId  String?
+  amount    Int      @default(0)
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Withdrawal {
+  id        String   @id @default(cuid())
+  userId    String?
+  amount    Int      @default(0)
+  status    String   @default("Pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  content   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminNotification {
+  id        String   @id @default(cuid())
+  templeId  String
+  guestId   String?
+  category  String
+  message   String
+  isRead    Boolean  @default(false)
+  linkPath  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  temple Temple @relation(fields: [templeId], references: [id])
+  guest  Guest? @relation(fields: [guestId], references: [id])
+}
+
+model TempleNotification {
+  id        String   @id @default(cuid())
+  templeId  String?
+  content   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  temple Temple? @relation(fields: [templeId], references: [id])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  account   String?
+  token     String?
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

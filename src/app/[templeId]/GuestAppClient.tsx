@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -6,6 +6,7 @@ import { Solar } from 'lunar-javascript';
 import { 
   GuestSettings, ServiceSettings, GuestFile, GuestRecord 
 } from "@/app/shared-types";
+import liff from '@line/liff';
 import { 
   bookAppointment, 
   cancelAppointment,
@@ -15,6 +16,8 @@ import {
   fetchEvents, 
   getGuestUser, 
   guestLogin, 
+  checkPhoneStatus,
+  liffAutoLogin,
   checkGuestProfile,
   fetchGuestSettings, 
   askAgiAssistant, 
@@ -211,6 +214,10 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   const [showLoginWall, setShowLoginWall] = useState(true);
   const [loginPhone, setLoginPhone] = useState("");
   const [loginName, setLoginName] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [phoneStatus, setPhoneStatus] = useState<"IDLE" | "NEW" | "NO_PASSWORD" | "HAS_PASSWORD">("IDLE");
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
+  const [isLiffLoading, setIsLiffLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [bindLineId, setBindLineId] = useState("");
@@ -348,17 +355,44 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
   useEffect(() => {
     const init = async () => {
-      // 🔍 Auto-capture LINE ID & Phone from LINE@ hyperlink search query parameters
+      // 🔍 LIFF Auto Login & Capture LINE ID
+      try {
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID || "YOUR_LIFF_ID";
+        if (liffId !== "YOUR_LIFF_ID") {
+          await liff.init({ liffId });
+          if (liff.isLoggedIn()) {
+            const profile = await liff.getProfile();
+            setBindLineId(profile.userId);
+            const autoLoginRes = await liffAutoLogin(profile.userId);
+            if (autoLoginRes.success && autoLoginRes.guest) {
+              const user = autoLoginRes.guest;
+              setGuestUser(user);
+              setProfileName(user.name || "");
+              setGregorianDate(user.birthday || "");
+              setProfileEmail(user.email || "");
+              setProfilePassword(user.password || "");
+              setProfileAddress(user.address || "");
+              setProfileBirthHour(user.birthHour || "");
+              setShowLoginWall(false);
+              refreshAllData(user.phone);
+              setIsLiffLoading(false);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("LIFF Init Error or not in LINE:", err);
+      }
+      setIsLiffLoading(false);
+
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
         const urlLineId = params.get("lineId") || params.get("line_id");
         if (urlLineId) {
-          console.log("Auto-captured LINE ID from URL:", urlLineId);
           setBindLineId(urlLineId);
         }
         const urlPhone = params.get("phone") || params.get("mobile");
         if (urlPhone) {
-          console.log("Auto-captured Phone from URL:", urlPhone);
           setLoginPhone(urlPhone);
         }
       }
@@ -456,21 +490,43 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
     setGuestRecords(records);
   };
 
+  const handlePhoneNext = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!loginPhone || !/^09\d{8}$/.test(loginPhone)) {
+      alert('請輸入有效的手機號碼 (10位數，09開頭)');
+      return;
+    }
+    setIsCheckingPhone(true);
+    try {
+      const res = await checkPhoneStatus(loginPhone);
+      setPhoneStatus(res.status as any);
+      if (res.name) setLoginName(res.name);
+    } catch (err) {
+      alert("連線發生錯誤，請稍後再試");
+    }
+    setIsCheckingPhone(false);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginPhone) return;
-    if (!/^09\d{8}$/.test(loginPhone)) {
-      alert('請輸入有效的手機號碼 (10位數，09開頭)');
+    if (phoneStatus === "IDLE") return;
+    if (phoneStatus === "NEW" && !loginName) {
+      alert("首次註冊請填寫您的真實姓名");
+      return;
+    }
+    if (!loginPassword) {
+      alert("請輸入密碼");
       return;
     }
     setIsLoggingIn(true);
     
     // 正常登入流程
-    const res = await guestLogin(loginPhone, loginName);
+    const res = await guestLogin(loginPhone, loginPassword, loginName);
     if (res.success) {
       const user = res.fullGuest || { 
         phone: loginPhone, 
         name: res.guestName, 
+        password: loginPassword,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(res.guestName)}&background=B91C1C&color=fff` 
       };
 
@@ -2497,43 +2553,100 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
           </div>
           
           <div className="app-card p-8 space-y-8 bg-white border-2 border-red-950/20 shadow-xl rounded-[35px] overflow-hidden">
+            {isLiffLoading ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-amber-600 rounded-full animate-spin mb-4"></div>
+                <p className="text-slate-600 font-bold tracking-widest text-sm">LINE 安全連線中...</p>
+              </div>
+            ) : (
               <div className="space-y-6">
                 <div className="text-center space-y-1">
                   <h3 className="text-xl font-black text-gray-900">信眾登入</h3>
                   <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Enter the Path of Peace</p>
                 </div>
                 
-                <form onSubmit={handleLogin} className="space-y-6">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-2">真實姓名 (舊信眾免填)</label>
-                    <input 
-                      type="text" 
-                      value={loginName} 
-                      onChange={(e) => setLoginName(e.target.value)} 
-                      className="app-input mb-4" 
-                      placeholder="首次登入請輸入姓名" 
-                    />
-                    <label className="block text-xs font-bold text-gray-500 mb-2">手機號碼</label>
-                    <input 
-                      type="tel" 
-                      value={loginPhone} 
-                      onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
-                      className="app-input" 
-                      placeholder="0912345678" 
-                      pattern="^09\d{8}$" minLength={10} maxLength={10}
-                      required 
-                    />
-                  </div>
-                  <button 
-                    type="submit" 
-                    disabled={isLoggingIn}
-                    className="btn-primary w-full py-4 flex items-center justify-center gap-2"
-                  >
-                    {isLoggingIn ? '開啟中...' : '開啟平安之門'}
-                    <span className="text-lg">➔</span>
-                  </button>
-                </form>
+                {phoneStatus === "IDLE" ? (
+                  <form onSubmit={handlePhoneNext} className="space-y-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-2">手機號碼</label>
+                      <input 
+                        type="tel" 
+                        value={loginPhone} 
+                        onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                        className="app-input" 
+                        placeholder="0912345678" 
+                        pattern="^09\d{8}$" minLength={10} maxLength={10}
+                        required 
+                      />
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={isCheckingPhone}
+                      className="btn-primary w-full py-4 flex items-center justify-center gap-2"
+                    >
+                      {isCheckingPhone ? '驗證中...' : '下一步'}
+                      <span className="text-lg">➔</span>
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleLogin} className="space-y-6">
+                    {phoneStatus === "NEW" && (
+                      <div>
+                        <div className="mb-4 bg-blue-50 text-blue-700 p-3 rounded-xl text-xs font-bold">歡迎新信眾！請設定您的姓名與密碼進行註冊。</div>
+                        <label className="block text-xs font-bold text-gray-500 mb-2">真實姓名</label>
+                        <input 
+                          type="text" 
+                          value={loginName} 
+                          onChange={(e) => setLoginName(e.target.value)} 
+                          className="app-input mb-4" 
+                          placeholder="請輸入姓名" 
+                          required 
+                        />
+                      </div>
+                    )}
+                    
+                    {phoneStatus === "NO_PASSWORD" && (
+                      <div className="mb-4 bg-amber-50 text-amber-700 p-3 rounded-xl text-xs font-bold">
+                        歡迎您, {loginName}！<br/>系統升級安全機制，請設定您的專屬密碼完成啟用。
+                      </div>
+                    )}
+
+                    {phoneStatus === "HAS_PASSWORD" && (
+                      <div className="mb-4 text-gray-700 text-sm font-bold text-center">
+                        歡迎回來, {loginName}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-2">{phoneStatus === "HAS_PASSWORD" ? "請輸入密碼" : "請設定密碼"}</label>
+                      <input 
+                        type="password" 
+                        value={loginPassword} 
+                        onChange={(e) => setLoginPassword(e.target.value)} 
+                        className="app-input" 
+                        placeholder="請輸入密碼" 
+                        required 
+                      />
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={isLoggingIn}
+                      className="btn-primary w-full py-4 flex items-center justify-center gap-2"
+                    >
+                      {isLoggingIn ? '開啟中...' : (phoneStatus === "HAS_PASSWORD" ? '登入' : '設定並登入')}
+                      <span className="text-lg">➔</span>
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { setPhoneStatus("IDLE"); setLoginPassword(""); setLoginName(""); }}
+                      className="w-full py-3 text-xs font-bold text-gray-400 hover:text-gray-600 tracking-widest text-center"
+                    >
+                      返回重填手機號碼
+                    </button>
+                  </form>
+                )}
               </div>
+            )}
           </div>
         </div>
       </div>

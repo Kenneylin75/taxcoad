@@ -1275,7 +1275,55 @@ export async function getGuestUser() {
   });
 }
 
-export async function guestLogin(phone: string, inputName?: string) {
+export async function checkPhoneStatus(phone: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    const normLogin = normalizePhone(phone);
+    let existing: any = null;
+
+    if (!client) {
+      existing = (gStore.db_guests || db_guests).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
+    } else {
+      const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
+      if ((res.rowCount ?? 0) > 0) {
+        const r = res.rows[0];
+        existing = {
+          templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
+        };
+      }
+    }
+
+    if (!existing) return { status: 'NEW' };
+    if (!existing.password) return { status: 'NO_PASSWORD', name: existing.name };
+    return { status: 'HAS_PASSWORD', name: existing.name };
+  });
+}
+
+export async function liffAutoLogin(lineId: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    let existing: any = null;
+    if (!client) {
+      existing = (gStore.db_guests || db_guests).find((g: any) => g.lineId === lineId && g.templeId === templeId);
+    } else {
+      const res = await client.query('SELECT * FROM guests WHERE line_id = $1 AND temple_id = $2', [lineId, templeId]);
+      if ((res.rowCount ?? 0) > 0) {
+        const r = res.rows[0];
+        existing = {
+          templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
+        };
+      }
+    }
+    if (existing) {
+      const store = await cookies();
+      store.set(`guestPhone_${templeId}`, existing.phone, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
+      return { success: true, guest: existing };
+    }
+    return { success: false };
+  });
+}
+
+export async function guestLogin(phone: string, password?: string, inputName?: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     const normLogin = normalizePhone(phone);
@@ -1305,23 +1353,30 @@ export async function guestLogin(phone: string, inputName?: string) {
       if ((res.rowCount ?? 0) > 0) {
         const r = res.rows[0];
         existing = {
-          templeId: r.temple_id,
-          phone: r.phone,
-          name: r.name,
-          email: r.email,
-          password: r.password,
-          address: r.address,
-          birthday: r.birthday,
-          lunarBirthday: r.lunar_birthday,
-          birthHour: r.birth_hour,
-          lineId: r.line_id,
-          status: r.status
+          templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
         };
       }
     }
 
-    if (!existing && !inputName) {
-      return { success: false, error: "首次登入請務必填寫您的真實姓名" };
+    if (existing) {
+      if (existing.password && existing.password !== password) {
+        return { success: false, error: "密碼錯誤，請重新輸入" };
+      }
+      if (!existing.password && password) {
+        // 首次綁定密碼
+        existing.password = password;
+        if (!client) {
+          const idx = (gStore.db_guests || db_guests).findIndex((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
+          if (idx > -1) {
+            if (gStore.db_guests) gStore.db_guests[idx].password = password;
+            else db_guests[idx].password = password;
+          }
+        } else {
+          await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [password, normLogin, templeId]);
+        }
+      }
+    } else if (!inputName || !password) {
+      return { success: false, error: "首次登入請務必填寫真實姓名與密碼" };
     }
 
     const guestName = existing ? existing.name : inputName;
@@ -1329,6 +1384,7 @@ export async function guestLogin(phone: string, inputName?: string) {
       templeId,
       phone,
       name: guestName,
+      password,
       status: 'Active',
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName)}&background=B91C1C&color=fff`
     };
@@ -1340,10 +1396,10 @@ export async function guestLogin(phone: string, inputName?: string) {
         db_guests = gStore.db_guests;
       } else {
         await client.query(`
-          INSERT INTO guests (temple_id, phone, name, status)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO guests (temple_id, phone, name, password, status)
+          VALUES ($1, $2, $3, $4, $5)
           ON CONFLICT (temple_id, phone) DO NOTHING
-        `, [templeId, phone, guestName, 'Active']);
+        `, [templeId, phone, guestName, password, 'Active']);
       }
     }
 
@@ -5570,7 +5626,24 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
 }
 export async function fetchAllFilesByDate() { return []; }
 export async function setFilePrivacy() { return { success: true }; }
-export async function updateGuestPassword() { return { success: true }; }
+export async function updateGuestPassword(phone: string, newPassword: string) {
+  const templeId = await getDynamicTempleId();
+  return withTempleSession(templeId, false, async (client) => {
+    const normPhone = normalizePhone(phone);
+    if (!client) {
+      const idx = (gStore.db_guests || db_guests).findIndex((g: any) => normalizePhone(g.phone) === normPhone && g.templeId === templeId);
+      if (idx > -1) {
+        if (gStore.db_guests) gStore.db_guests[idx].password = newPassword;
+        else db_guests[idx].password = newPassword;
+      } else {
+        return { success: false, error: "找不到該信眾" };
+      }
+    } else {
+      await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [newPassword, normPhone, templeId]);
+    }
+    return { success: true };
+  });
+}
 
 // --- 點燈管理 (Lamps) 相關 mock 函式與型別 ---
 export type LampRecord = any;

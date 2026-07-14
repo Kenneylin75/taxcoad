@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@line/liff": "^2.29.1",
+    "@prisma/client": "^6.19.0",
     "@supabase/supabase-js": "^2.103.3",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "prisma": "^6.19.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
