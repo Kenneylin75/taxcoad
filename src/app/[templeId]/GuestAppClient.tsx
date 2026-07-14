@@ -1284,7 +1284,14 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
           status: l.paymentStatus === 'Unpaid' ? 'Unpaid' : (l.status === 'Active' ? '生效中' : (l.status === 'Pending' ? 'WaitingLamp' : l.status))
         };
       })
-    ].sort((a, b) => b.rawTime?.localeCompare(a.rawTime || '') || 0);
+    ].sort((a, b) => {
+      const getTime = (r: any) => {
+        const s = (r.createdAt || r.timestamp || r.rawTime || '').replace(' ', 'T').split('~')[0];
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+      };
+      return getTime(b) - getTime(a);
+    });
 
     const filtered = recordsTab === '全部' ? allRecords : allRecords.filter(r => r.type === recordsTab);
 
