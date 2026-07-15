@@ -2726,16 +2726,36 @@ export async function updateSystemConfig(data: any) {
 
 // --- 經銷業務 (Dist-Sales) ---
 export async function fetchFreeApplications(distId?: string) { 
-  let list = db_temples;
+  let list = [...db_temples];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const res = await dbQuery("SELECT * FROM temples ORDER BY created_at DESC", [], () => null) as any;
+    if (res && res.rows && res.rows.length > 0) {
+      list = res.rows.map((r: any) => ({
+        ...r,
+        id: r.id,
+        templeName: r.temple_name,
+        city: r.city,
+        status: r.status,
+        salesId: r.sales_id,
+        distributorId: r.distributor_id,
+        setupFee: r.setup_fee,
+        monthlyRent: r.monthly_rent,
+        paymentCycle: r.payment_cycle,
+        createdAt: r.created_at
+      }));
+    }
+  } catch (e) {}
+
   if (distId) {
-     list = list.filter(t => {
+     list = list.filter((t: any) => {
         if (t.distributorId !== distId) return false;
         const sales = db_dist_sales.find(s => s.id === t.salesId);
         if (sales && sales.role === 'SuperSales') return false;
         return true;
      });
   }
-  return list.map(t => {
+  return list.map((t: any) => {
      const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
      return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining };
   });
@@ -3081,8 +3101,25 @@ export async function fetchAllAccountsForAdmin() {
   
   accounts.push({ id: 'ADMIN', name: '總部最高系統管理員', role: 'SuperAdmin', account: 'PIVOTADMIN01', status: 'Active' });
   
+  // 從 PostgreSQL 撈取系統管理員
+  let pgAdmins: any[] = [];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resAdmins = await dbQuery("SELECT * FROM personnel WHERE role = 'Admin'", [], () => null) as any;
+    if (resAdmins && resAdmins.rows) {
+      pgAdmins = resAdmins.rows;
+    }
+  } catch (e) {}
+
+  const allAdminsMap = new Map();
   db_personnel.forEach(p => {
-    if (p.role === 'Admin') accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
+    if (p.role === 'Admin') allAdminsMap.set(p.account, p);
+  });
+  pgAdmins.forEach(p => {
+    allAdminsMap.set(p.account, { ...p, name: p.name, account: p.account, status: p.status || 'Active' });
+  });
+  Array.from(allAdminsMap.values()).forEach(p => {
+    accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
   });
 
   // 從 PostgreSQL 取出所有的經銷商
