@@ -2848,7 +2848,7 @@ export async function submitFreeAccountApplication(data: any) {
   }
   const { role, paymentCycle, ...formData } = data;
   
-  const status = (role === 'distributor' || role === 'super-admin') ? 'Active' : 'Pending';
+  const status = (role === 'distributor' || role === 'super-admin' || role === 'dist-sales') ? 'Active' : 'Pending';
 
   const sales = db_dist_sales.find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';

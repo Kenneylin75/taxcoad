@@ -299,11 +299,13 @@ export default function DistributorClient({
     e.preventDefault();
     startTransition(async () => {
       try {
+        const distId = initialProfile?.id || 'dist-hq';
+        const prefix = distId.slice(-2).toLowerCase();
         await addSalesMember({
-          distributorId: initialProfile?.id || 'dist-hq',
+          distributorId: distId,
           name: newSalesForm.name,
           phone: newSalesForm.phone,
-          account: newSalesForm.account,
+          account: `${prefix}${newSalesForm.account}`,
           password: newSalesForm.password,
           setupFeePercent: newSalesForm.setupRate,
           rentYear1Percent: newSalesForm.rentYear1Rate,
@@ -1394,7 +1396,12 @@ export default function DistributorClient({
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">系統帳號 ID</p>
-                           <input type="text" placeholder="自定義登入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.account} onChange={e=>setNewSalesForm({...newSalesForm, account:e.target.value})} required />
+                           <div className="relative flex items-center">
+                              <span className="absolute left-6 text-sm font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                                 {(initialProfile?.id || 'hq').slice(-2).toLowerCase()}
+                              </span>
+                              <input type="text" placeholder="自定義登入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 pl-[70px] text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.account} onChange={e=>setNewSalesForm({...newSalesForm, account:e.target.value})} required />
+                           </div>
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">安全密碼 Password</p>
