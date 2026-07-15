@@ -4021,59 +4021,77 @@ export async function fetchDistributorTeam(distributorId: string) {
   return Array.from(salesMap.values());
 }
 export async function fetchDistributorTemples(distributorId: string) {
-  const temples = db_temples.filter(t => {
-     if (t.distributorId !== distributorId) return false;
-     const sales = db_dist_sales.find(s => s.id === t.salesId);
-     if (sales && sales.role === 'SuperSales') return false;
-     return true;
-  });
-  const discountRate = db_config.yearlyDiscountRate || 20;
-  return temples.map(t => {
-     const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
-     return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
-  });
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const query = `
+      SELECT t.* 
+      FROM temples t
+      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
+      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
+        AND (ds.role IS NULL OR ds.role != 'SuperSales')
+    `;
+    const res = await dbQuery(query, [distributorId], () => null) as any;
+    let temples = res && res.rows ? res.rows : [];
+    
+    // Fallback to memory
+    if (temples.length === 0) {
+      temples = db_temples.filter(t => {
+         if (t.distributorId !== distributorId) return false;
+         const sales = db_dist_sales.find(s => s.id === t.salesId);
+         if (sales && sales.role === 'SuperSales') return false;
+         return true;
+      });
+    }
+    
+    const discountRate = (globalThis as any).db_config?.yearlyDiscountRate || 20;
+    return temples.map((t: any) => {
+       const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
+       return { ...t, templeName: t.temple_name || t.name, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
+    });
+  } catch(e) {
+    return [];
+  }
 }
 export async function fetchDistributorVisits(distributorId: string) {
   const teamIds = db_dist_sales.filter(s => s.distributorId === distributorId).map(s => s.name);
   return db_sales_visits.filter(v => teamIds.includes(v.salesName));
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
-  return withTempleSession(null, true, async (client) => {
-    let myTemples = [];
-    if (!client) {
-      myTemples = db_temples.filter(t => {
-         if (t.distributorId !== distributorId || t.status !== 'Active') return false;
-         const sales = db_dist_sales.find(s => s.id === t.salesId);
-         if (sales && sales.role === 'SuperSales') return false;
-         return true;
-      });
-    } else {
-      const query = `
-        SELECT t.* 
-        FROM temples t
-        JOIN distributor_sales ds ON t.sales_id = ds.id
-        WHERE ds.distributor_id = $1 AND t.status = 'Active' AND ds.role != 'SuperSales'
-      `;
-      const res = await client.query(query, [distributorId]);
-      myTemples = res.rows;
-    }
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const query = `
+      SELECT t.* 
+      FROM temples t
+      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
+      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
+        AND t.status = 'Active' 
+        AND (ds.role IS NULL OR ds.role != 'SuperSales')
+    `;
+    const res = await dbQuery(query, [distributorId], () => null) as any;
+    const myTemples = res?.rows || [];
     
     let totalRevenue = 0;
     let totalCommissionPayout = 0;
     
     const now = new Date();
+    const templeIds = myTemples.map((t: any) => t.id);
+
+    let bills: any[] = [];
+    if (templeIds.length > 0) {
+      const bRes = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
+      bills = bRes?.rows || [];
+    }
 
     myTemples.forEach((t: any) => {
-      // Find bills for this temple that are paid
-      const bills = db_temple_bills.filter(b => b.templeId === t.id && b.status === 'Paid');
+      const tBills = bills.filter((b: any) => b.temple_id === t.id);
       
       const rules = { setupFeePercent: 20, rentYear1Percent: 15, rentYear2Percent: 10, rentYear3PlusPercent: 5 };
       const activeDate = new Date(t.timestamp || t.created_at || new Date());
       const monthsDiff = (now.getFullYear() - activeDate.getFullYear()) * 12 + (now.getMonth() - activeDate.getMonth());
 
-      bills.forEach(b => {
+      tBills.forEach((b: any) => {
          totalRevenue += b.amount;
-         if (b.type === 'Setup') {
+         if (b.type === 'Setup' || b.item_name === 'SetupFee') {
             totalCommissionPayout += b.amount * (rules.setupFeePercent / 100);
          } else {
             let rentPercent = rules.rentYear1Percent;
@@ -4087,10 +4105,11 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
     return {
       totalRevenue,
       totalCommissionPayout,
-      netProfit: totalRevenue - totalCommissionPayout,
-      activeTemplesCount: myTemples.length
+      totalTemples: myTemples.length
     };
-  });
+  } catch(e) {
+    return { totalRevenue: 0, totalCommissionPayout: 0, totalTemples: 0 };
+  }
 }
 export async function approveTempleByDistributor(templeId: string) {
   const t = db_temples.find(x => x.id === templeId);
@@ -5254,11 +5273,12 @@ export async function fetchDistributorProfile(distId?: string) {
 export async function fetchDistributorCommissionSummary(distId: string, year: string, month: string) { 
   const id = distId || 'dist-1';
   const summary = await fetchDistributorFinanceSummary(id);
+  const netProfit = summary.totalCommissionPayout || 0;
   return {
-    totalRevenue: summary.totalRevenue,
-    netProfit: summary.netProfit,
-    balance: summary.netProfit * 0.8, // 模擬部分已結算
-    totalWithdrawn: summary.netProfit * 0.2,
+    totalRevenue: summary.totalRevenue || 0,
+    netProfit: netProfit,
+    balance: netProfit * 0.8, // 模擬已請款與未請款
+    totalWithdrawn: netProfit * 0.2,
     rules: {
       baseRate: '20%',
       bonusThreshold: '50 Nodes',
@@ -7028,78 +7048,82 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
   return { paymentStatusLabel, contractEndDate, trialDaysRemaining };
 }
 export async function fetchDistributorFinancials(distId: string) {
-  const temples = db_temples.filter(t => t.distributorId === distId);
-  const templeIds = temples.map(t => t.id);
-
   try {
     const { dbQuery } = await import('@/db/db');
-    const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) ORDER BY created_at DESC", [templeIds], () => null) as any;
-    const rows = res?.rows;
-    const bills = (rows && rows.length > 0) ? rows : db_temple_bills.filter(b => templeIds.includes(b.templeId));
-    const paymentRecords = temples.map(t => {
-      const tBills = bills.filter((b: any) => (b.temple_id === t.id || b.templeId === t.id));
+    const templesQuery = `
+      SELECT t.* 
+      FROM temples t
+      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
+      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
+        AND (ds.role IS NULL OR ds.role != 'SuperSales')
+    `;
+    const templesRes = await dbQuery(templesQuery, [distId], () => null) as any;
+    const temples = templesRes?.rows || [];
+    const templeIds = temples.map((t: any) => t.id);
+
+    let bills: any[] = [];
+    if (templeIds.length > 0) {
+      const billsRes = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) ORDER BY created_at DESC", [templeIds], () => null) as any;
+      bills = billsRes?.rows || [];
+    }
+    
+    const paymentRecords = temples.map((t: any) => {
+      const tBills = bills.filter((b: any) => b.temple_id === t.id);
       const lastBill = tBills[0];
       return {
         id: t.id,
-        temple: t.templeName || '未知宮廟',
-        region: t.city || '未知區域',
-        amount: lastBill ? lastBill.amount : (t.monthlyRent || 0),
-        date: lastBill ? (lastBill.created_at instanceof Date ? lastBill.created_at.toISOString().split('T')[0] : lastBill.created_at) : (t.timestamp ? t.timestamp.split('T')[0] : '未知'),
+        temple: t.temple_name || t.name || '未知宮廟',
+        region: t.city || '未知縣市',
+        amount: lastBill ? lastBill.amount : (t.monthly_rent || t.monthlyRent || 0),
+        date: lastBill ? (lastBill.created_at instanceof Date ? lastBill.created_at.toISOString().split('T')[0] : lastBill.created_at) : (t.timestamp || t.created_at || '未知'),
         status: lastBill ? lastBill.status : 'Paid',
         type: lastBill ? lastBill.item_name : 'Monthly',
         templeStatus: t.status, 
-        paymentStatusLabel: enrichTempleWithFinancialStatus(t, lastBill).paymentStatusLabel,
-        contractEndDate: enrichTempleWithFinancialStatus(t, lastBill).contractEndDate,
-        trialDaysRemaining: enrichTempleWithFinancialStatus(t, lastBill).trialDaysRemaining,
-        history: tBills.map((b: any) => ({
-          month: b.created_at instanceof Date ? b.created_at.toISOString().substring(0, 7) : 
-                 (b.created_at ? String(b.created_at).substring(0,7) : (b.date ? String(b.date).substring(0,7) : '未知')),
-          amount: b.amount,
-          type: b.item_name === 'SetupFee' || b.type === 'Setup' ? 'Setup' : 'Monthly',
-          status: b.status,
-          receiptUrl: b.receipt_url || b.receiptUrl,
-          id: b.id
-        }))
       };
-    }).filter(p => p.history.length > 0 || p.amount > 0);
+    });
 
-    const sales = db_dist_sales.filter(s => s.distributorId === distId);
-    const salesIds = sales.map(s => s.id);
-    const { rows: bonusRows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = ANY($1::varchar[]) ORDER BY timestamp DESC", [salesIds], () => null) as any;
+    const salesRes = await dbQuery("SELECT id, name FROM distributor_sales WHERE distributor_id = $1", [distId], () => null) as any;
+    const salesIds = (salesRes?.rows || []).map((s: any) => s.id);
     
-    const bonusRequests = (bonusRows || []).map((r: any) => ({
-      id: r.id,
-      salesId: r.sales_id,
-      salesName: r.sales_name,
-      distributorId: r.distributor_id,
-      amount: r.amount,
-      date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
-      status: r.status,
-      receiptUrl: r.receipt_url,
-      method: r.method
-    }));
+    let bonusRequests: any[] = [];
+    if (salesIds.length > 0) {
+      const bonusRes = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = ANY($1::varchar[]) ORDER BY timestamp DESC", [salesIds], () => null) as any;
+      bonusRequests = (bonusRes?.rows || []).map((r: any) => ({
+        id: r.id,
+        salesId: r.sales_id,
+        salesName: r.sales_name,
+        distributorId: r.distributor_id,
+        amount: r.amount,
+        date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
+        status: r.status,
+        receiptUrl: r.receipt_url,
+        method: r.method
+      }));
+    }
 
     return { paymentRecords, bonusRequests };
-  } catch(e) {
+  } catch (e) {
     return { paymentRecords: [], bonusRequests: [] };
   }
 }
 
 export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
-  const sales = db_dist_sales.filter(s => s.distributorId === distId);
   try {
     const { dbQuery } = await import('@/db/db');
-    return await Promise.all(sales.map(async s => {
-      const temples = db_temples.filter(t => t.salesId === s.id);
-      const templeIds = temples.map(t => t.id);
+    const salesRes = await dbQuery("SELECT * FROM distributor_sales WHERE distributor_id = $1", [distId], () => null) as any;
+    const sales = salesRes?.rows || [];
+
+    return await Promise.all(sales.map(async (s: any) => {
+      const templesRes = await dbQuery("SELECT * FROM temples WHERE sales_id = $1", [s.id], () => null) as any;
+      const temples = templesRes?.rows || [];
+      const templeIds = temples.map((t: any) => t.id);
       
       let totalSales = 0;
       let commission = 0;
 
       if (templeIds.length > 0) {
-        const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
-        const rows = res?.rows;
-        let bills = rows && rows.length > 0 ? rows : db_temple_bills.filter(b => templeIds.includes(b.templeId) && b.status === 'Paid');
+        const billsRes = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
+        let bills = billsRes?.rows || [];
         
         if (yearMonth) {
           bills = bills.filter((b: any) => {
@@ -7112,58 +7136,42 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
         totalSales = bills.reduce((sum: number, b: any) => sum + b.amount, 0);
         commission = bills.reduce((sum: number, b: any) => {
           const isSetup = b.item_name === 'SetupFee' || b.item_name === 'Setup';
-          const rate = isSetup ? (s.commissionRules?.setupFeePercent || 20) : (s.commissionRules?.rentYear1Percent || 15);
+          let sRules: any = {};
+          if (typeof s.commission_rules === 'string') {
+             try { sRules = JSON.parse(s.commission_rules); } catch(e){}
+          } else if (s.commission_rules) {
+             sRules = s.commission_rules;
+          }
+          const rate = isSetup ? (sRules.setupFeePercent || 20) : (sRules.rentYear1Percent || 15);
           return sum + (b.amount * rate / 100);
         }, 0);
       }
 
-      // Compute withdrawals
-      const myWithdrawals = db_withdrawals.filter(w => w.salesName === s.name && (w.status === 'Approved' || w.status === 'Verified'));
+      const wRes = await dbQuery("SELECT * FROM distributor_withdrawals WHERE sales_name = $1 AND (status = 'Approved' OR status = 'Verified')", [s.name], () => null) as any;
+      const myWithdrawals = wRes?.rows || [];
       const totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
 
-      // Compute unconverted visits
-      const salesVisits = db_visits.filter(v => v.salesName === s.name);
-      const convertedTempleNames = temples.map(t => t.templeName);
-      const uniqueVisitedTemples = [...new Set(salesVisits.map(v => v.templeName))];
-      const unconvertedVisitsCount = uniqueVisitedTemples.filter(name => !convertedTempleNames.includes(name)).length;
+      const vRes = await dbQuery("SELECT * FROM sales_visits WHERE sales_name = $1", [s.name], () => null) as any;
+      const salesVisits = vRes?.rows || [];
+      const convertedTempleNames = temples.map((t: any) => t.temple_name || t.name);
+      const uniqueVisitedTemples = [...new Set(salesVisits.map((v: any) => v.temple_name))];
+      const unconvertedVisitsCount = uniqueVisitedTemples.filter((name: any) => !convertedTempleNames.includes(name)).length;
 
       return {
         id: s.id,
         name: s.name,
         account: s.account,
-        activeTemples: temples.filter(t => t.status === 'Active').length,
+        activeTemples: temples.filter((t: any) => t.status === 'Active').length,
         totalTemplesCount: temples.length,
         totalSales,
         commission,
         totalWithdrawn,
         unconvertedVisitsCount,
-        joinDate: s.createdAt ? s.createdAt.split('T')[0] : '未知'
+        recentVisitsCount: salesVisits.length
       };
     }));
-  } catch(e) {
-    return sales.map(s => {
-      const temples = db_temples.filter(t => t.salesId === s.id);
-      const salesVisits = db_visits.filter(v => v.salesName === s.name);
-      const convertedTempleNames = temples.map(t => t.templeName);
-      const uniqueVisitedTemples = [...new Set(salesVisits.map(v => v.templeName))];
-      const unconvertedVisitsCount = uniqueVisitedTemples.filter(name => !convertedTempleNames.includes(name)).length;
-      
-      const myWithdrawals = db_withdrawals.filter(w => w.salesName === s.name && (w.status === 'Approved' || w.status === 'Verified'));
-      const totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
-      
-      return {
-        id: s.id,
-        name: s.name,
-        account: s.account,
-        activeTemples: temples.filter(t => t.status === 'Active').length,
-        totalTemplesCount: temples.length,
-        totalSales: 0,
-        commission: 0,
-        totalWithdrawn,
-        unconvertedVisitsCount,
-        joinDate: s.createdAt ? s.createdAt.split('T')[0] : '未知'
-      };
-    });
+  } catch (e) {
+    return [];
   }
 }
 
@@ -7562,16 +7570,41 @@ export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: 
 export async function fetchSaasOrders() { return (globalThis as any).db_saas_orders || []; }
 
 export async function fetchDistributorTempleBills(distributorId: string) {
-  const bills = db_temple_bills.filter(b => b.payeeId === distributorId || b.payeeRole === 'SuperAdmin'); 
-  // We'll filter strictly by distributorId later, for now filter by payeeId
-  const myBills = db_temple_bills.filter(b => b.payeeId === distributorId);
-  return myBills.map(b => {
-    const t = (gStore.db_temples || db_temples).find((temple: any) => temple.id === b.templeId);
-    return {
-      ...b,
-      templeName: t ? (t.templeName || t.name) : '未知宮廟'
-    };
-  });
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const templesQuery = `
+      SELECT t.id, t.name, t.temple_name 
+      FROM temples t
+      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
+      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
+        AND (ds.role IS NULL OR ds.role != 'SuperSales')
+    `;
+    const templesRes = await dbQuery(templesQuery, [distributorId], () => null) as any;
+    const temples = templesRes?.rows || [];
+    const templeIds = temples.map((t: any) => t.id);
+
+    if (templeIds.length === 0) return [];
+
+    const billsQuery = `
+      SELECT * FROM temple_bills 
+      WHERE temple_id = ANY($1::varchar[]) OR payee_id = $2
+      ORDER BY created_at DESC
+    `;
+    const billsRes = await dbQuery(billsQuery, [templeIds, distributorId], () => null) as any;
+    const bills = billsRes?.rows || [];
+
+    return bills.map((b: any) => {
+      const t = temples.find((temple: any) => temple.id === b.temple_id);
+      return {
+        ...b,
+        templeId: b.temple_id,
+        payeeId: b.payee_id,
+        templeName: t ? (t.temple_name || t.name) : '未知宮廟'
+      };
+    });
+  } catch (e) {
+    return [];
+  }
 }
 export async function logDistributorAction(...args: any[]) {
   const gStore = globalThis as any;
