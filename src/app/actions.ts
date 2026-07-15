@@ -3162,7 +3162,19 @@ export async function fetchAllAccountsForAdmin() {
 
 
 export async function fetchSuperSalesAccounts() {
-  return db_dist_sales.filter(s => s.role === 'SuperSales').map(ss => ({
+  let pgSales: any[] = [];
+  try {
+    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    if (resSales && resSales.rows) {
+      pgSales = resSales.rows;
+    }
+  } catch (e) {}
+  
+  const allSalesMap = new Map();
+  db_dist_sales.forEach(s => allSalesMap.set(s.account, s));
+  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
+
+  return Array.from(allSalesMap.values()).filter((s: any) => s.role === 'SuperSales').map(ss => ({
     ...ss,
     rates: db_super_sales_overrides[ss.name] || db_config.defaultSuperSalesRates
   }));
@@ -7598,9 +7610,36 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
 export async function fetchDataBridgeTree() {
   const superSales = await fetchSuperSalesAccounts();
   const gStore = globalThis as any;
-  const distributors = gStore.db_distributors || [];
-  const distSales = gStore.db_dist_sales || [];
-  const temples = gStore.db_temples || [];
+  
+  let pgDistributors: any[] = [];
+  try {
+    const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
+    if (resDist && resDist.rows) pgDistributors = resDist.rows;
+  } catch (e) {}
+  const allDistributorsMap = new Map();
+  (gStore.db_distributors || []).forEach((d: any) => allDistributorsMap.set(d.account, d));
+  pgDistributors.forEach(d => allDistributorsMap.set(d.account, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, superSalesId: d.super_sales_id || d.creator_sales_id }));
+  const distributors = Array.from(allDistributorsMap.values());
+
+  let pgSales: any[] = [];
+  try {
+    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    if (resSales && resSales.rows) pgSales = resSales.rows;
+  } catch (e) {}
+  const allSalesMap = new Map();
+  (gStore.db_dist_sales || []).forEach((s: any) => allSalesMap.set(s.account, s));
+  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
+  const distSales = Array.from(allSalesMap.values());
+
+  let pgTemples: any[] = [];
+  try {
+    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    if (resTemples && resTemples.rows) pgTemples = resTemples.rows;
+  } catch (e) {}
+  const allTemplesMap = new Map();
+  (gStore.db_temples || []).forEach((t: any) => allTemplesMap.set(t.id, t));
+  pgTemples.forEach(t => allTemplesMap.set(t.id, { ...t, distributorId: t.distributor_id, salesId: t.sales_id, superSalesId: t.super_sales_id, templeName: t.temple_name || t.name }));
+  const temples = Array.from(allTemplesMap.values());
 
   const tree: any[] = [];
 
