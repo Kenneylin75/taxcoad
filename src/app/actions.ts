@@ -284,7 +284,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
         // 首先嘗試從 PostgreSQL 獲取業務員
         let salesPerson = null;
         try {
-          const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+          const resSales = await dbQuery("SELECT * FROM dist_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
           if (resSales && resSales.rowCount > 0) {
             salesPerson = resSales.rows[0];
             // 為了兼容前後端屬性命名
@@ -2011,6 +2011,12 @@ export async function ensurePlatformTables() {
     );
   `);
   try {
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS plan_id VARCHAR(50);`);
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS plan_name VARCHAR(255);`);
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS price INTEGER;`);
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS quota INTEGER;`);
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS joined_at VARCHAR(50);`);
+    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS expiration_date VARCHAR(50);`);
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS creator_sales_id VARCHAR(50);`);
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS phone VARCHAR(50);`);
     await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS email VARCHAR(255);`);
@@ -3267,6 +3273,17 @@ export async function createDistributorSales(distId: string, data: any) {
   
   db_dist_sales.push(newSales);
   gStore.db_dist_sales = db_dist_sales;
+
+  await ensurePlatformTables();
+  try {
+    const { dbQuery } = await import('@/db/db');
+    await dbQuery(`
+      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
+    `, [newSales.id, distId, name, account, password, 'DistSales', 'Active', newSales.joinedAt]);
+  } catch(e) {}
+
   return { success: true, data: newSales };
 }
 export async function deleteTool(toolId: string) {
@@ -3529,6 +3546,16 @@ export async function createSuperSalesAccount(data: any) {
   db_super_sales_overrides[data.name] = commissionRates;
   gStore.db_dist_sales = db_dist_sales;
 
+  await ensurePlatformTables();
+  try {
+    const { dbQuery } = await import('@/db/db');
+    await dbQuery(`
+      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
+    `, [id, null, data.name, safeAccount, (data.password || '').trim(), 'SuperSales', 'Active', newAccount.joinedAt]);
+  } catch(e) {}
+
   revalidatePath('/super-admin');
   return { success: true, id };
 }
@@ -3711,7 +3738,27 @@ export async function createTempleAccount(data: any) {
     gStore.db_personnel = pData;
   }
 
-  
+  await ensurePlatformTables();
+  try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery(`
+        INSERT INTO temples (id, temple_name, city, status, sales_id, setup_fee, monthly_rent, payment_cycle)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [id, newTemple.templeName, newTemple.city || '台北市', 'Active', newTemple.salesId, 0, newTemple.monthlyRent, newTemple.paymentCycle]);
+      
+      await dbQuery(`
+        INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [id, 0, newStorage.quotaGb * 1024 * 1024 * 1024, newStorage.planName, '台北市']);
+      
+      if (data.account && data.password) {
+        await dbQuery(`
+          INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `, [`p-${Date.now()}`, id, data.name || '宮廟管理員', 'TempleAdmin', data.account, data.account, data.password, 'Active']);
+      }
+  } catch(e) {}
+
     // Deduct quota if Distributor/Sales
     const { cookies } = require("next/headers");
     const cookieStore = await cookies();
