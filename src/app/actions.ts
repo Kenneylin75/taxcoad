@@ -7003,6 +7003,11 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
   if (idx > -1) {
     db_temples[idx] = { ...db_temples[idx], ...data };
     gStore.db_temples = db_temples;
+    try {
+      const { dbQuery } = await import('@/db/db');
+      const updated = db_temples[idx];
+      await dbQuery('UPDATE temples SET temple_name = $1, city = $2 WHERE id = $3', [updated.templeName || updated.name, updated.city || '台北市', tId]);
+    } catch(e) {}
     return { success: true };
   }
   return { success: false, message: 'Temple not found' };
@@ -7291,6 +7296,10 @@ export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
     if (typeof gStore !== 'undefined') {
       gStore.db_distributors = db_distributors;
     }
+    try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery('UPDATE distributors SET bank_code = $1, bank_account = $2, bank_name = $3 WHERE id = $4', [bankInfo.bankCode || '', bankInfo.accountNumber || '', bankInfo.bankName || '', distId]);
+    } catch(e) {}
     return true;
   }
   return false;
@@ -7361,34 +7370,40 @@ export async function updateAccountStatus(id: string, role: string, status: 'Act
     const temple = db_temples.find(t => t.id === id);
     if (temple) temple.status = status;
     gStore.db_temples = db_temples;
+    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   } else if (role === 'Distributor') {
     const dist = db_distributors.find(d => d.id === id);
     if (dist) dist.status = status;
     gStore.db_distributors = db_distributors;
+    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE distributors SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   } else if (role === 'SuperSales' || role === 'DistSales') {
     const sales = db_dist_sales.find(s => s.id === id);
     if (sales) sales.status = status;
     gStore.db_dist_sales = db_dist_sales;
+    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE dist_sales SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   }
   return { success: true };
 }
 
 export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
-  templeIds.forEach(tId => {
+  for (const tId of templeIds) {
     const temple = db_temples.find(t => t.id === tId);
     if (temple) {
       if (targetRole === 'HQ') {
         temple.distributorId = null;
         temple.salesId = null;
+        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET sales_id = null WHERE id = $1', [tId]); } catch(e){}
       } else if (targetRole === 'Distributor') {
         temple.distributorId = targetId;
         temple.salesId = null;
+        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET sales_id = null WHERE id = $1', [tId]); } catch(e){}
       } else if (targetRole === 'SuperSales') {
         temple.distributorId = null;
         temple.salesId = targetId;
+        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET sales_id = $1 WHERE id = $2', [targetId, tId]); } catch(e){}
       }
     }
-  });
+  }
   gStore.db_temples = db_temples;
   
   const targetName = targetRole === 'HQ' ? '系統總部 HQ' : targetId;
