@@ -3084,8 +3084,22 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
 }
 
 export async function fetchSalesPerformance(salesName: string) { 
-  const sales = db_dist_sales.find(s => s.name === salesName);
-  const myTemples = db_temples.filter(t => t.salesId === sales?.id);
+  let listTemples = [...db_temples];
+  let listSales = [...db_dist_sales];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    if (resTemples && resTemples.rows) {
+      listTemples = resTemples.rows.map((r: any) => ({ ...r, status: r.status, salesId: r.sales_id }));
+    }
+    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    if (resSales && resSales.rows) {
+      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, name: r.name, id: r.id }));
+    }
+  } catch(e) {}
+
+  const sales = listSales.find(s => s.name === salesName);
+  const myTemples = listTemples.filter(t => t.salesId === sales?.id);
   return {
     total: myTemples.length,
     approved: myTemples.filter(t => t.status === 'Active').length
@@ -8487,9 +8501,18 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
   const sales = db_dist_sales.find(s => s.id === salesId);
   if (sales) {
     sales.bankAccount = bankInfo;
-    return { success: true };
   }
-  return { success: false, error: 'Sales not found' };
+  
+  try {
+    const { dbQuery } = await import('@/db/db');
+    await dbQuery(
+      "UPDATE distributor_sales SET bank_code = $1, bank_name = $2, bank_account = $3 WHERE id = $4",
+      [bankInfo.bankCode || '', bankInfo.bankName || '', bankInfo.accountNumber || bankInfo.accountNo || '', salesId]
+    );
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: 'Database update failed' };
+  }
 }
 
 export async function getLineConfig(templeId: string) {
