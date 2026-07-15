@@ -3390,9 +3390,19 @@ export async function submitDistributorApplication(data: any) {
 }
 
 export async function fetchSuperSalesProfile(salesId: string) {
-  const salesPerson = db_dist_sales.find(s => s.id === salesId) || db_dist_sales[0];
-  const name = salesPerson.name || '超級精英業務';
-  const commissionRates = salesPerson.commissionRules || db_super_sales_overrides[name] || db_config.defaultSuperSalesRates;
+  let listSales = [...db_dist_sales];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE id = $1", [salesId], () => null) as any;
+    if (resSales && resSales.rows && resSales.rows.length > 0) {
+       const r = resSales.rows[0];
+       listSales = [{ ...r, role: r.role, bankInfo: { bankCode: r.bank_code, accountNumber: r.bank_account, bankName: r.bank_name } }];
+    }
+  } catch(e) {}
+  
+  const salesPerson = listSales.find(s => s.id === salesId) || listSales[0] || db_dist_sales[0];
+  const name = salesPerson?.name || '超級精英業務';
+  const commissionRates = salesPerson?.commissionRules || db_super_sales_overrides[name] || db_config.defaultSuperSalesRates;
   return {
     name: name,
     rank: '超級精英業務',
@@ -3430,11 +3440,48 @@ export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: 
 }
 
 export async function fetchSuperSalesRegistry(salesId: string) {
-  const sales = db_dist_sales.find(s => s.id === salesId);
+  let listTemples = [...db_temples];
+  let listDistributors = [...db_distributors];
+  let listSales = [...db_dist_sales];
+
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    if (resTemples && resTemples.rows) {
+      listTemples = resTemples.rows.map((r: any) => ({
+        ...r,
+        status: r.status,
+        templeName: r.temple_name,
+        salesId: r.sales_id,
+        distributorId: r.distributor_id,
+        monthlyRent: r.monthly_rent,
+        setupFee: r.setup_fee,
+        paymentCycle: r.payment_cycle,
+        timestamp: r.created_at
+      }));
+    }
+
+    const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
+    if (resDist && resDist.rows) {
+      listDistributors = resDist.rows.map((r: any) => ({
+        ...r,
+        creatorSalesId: r.creator_sales_id,
+        salesId: r.creator_sales_id,
+        planId: r.plan_id
+      }));
+    }
+
+    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    if (resSales && resSales.rows) {
+      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
+    }
+  } catch (e) {}
+
+  const sales = listSales.find(s => s.id === salesId);
   const name = sales?.name;
   
   const temples = [];
-  for (const t of db_temples) {
+  for (const t of listTemples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
     if ((creatorInfo && creatorInfo.salesName === name) || t.salesId === salesId) {
        let yearlyRent = 0;
@@ -3462,9 +3509,9 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     }
   }
 
-  const distributors = db_distributors.filter(d => d.creatorSalesId === salesId || d.salesId === salesId).map(d => {
-    const distTemples = db_temples.filter(t => t.distributorId === d.id);
-    const distSales = db_dist_sales.filter(s => s.distributorId === d.id);
+  const distributors = listDistributors.filter(d => d.creatorSalesId === salesId || d.salesId === salesId).map(d => {
+    const distTemples = listTemples.filter(t => t.distributorId === d.id);
+    const distSales = listSales.filter(s => s.distributorId === d.id);
     const totalIncome = distTemples.reduce((acc, t) => acc + (Number(t.monthlyRent) || 0) * 12, 0);
     const commissionExpense = Math.floor(totalIncome * 0.2); // 假設佣金支出佔 20%
     const netRevenue = totalIncome - commissionExpense;
@@ -3839,11 +3886,49 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
 
 
 export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
-  const sales = db_dist_sales.find(s => s.id === salesId);
+  let listTemples = [...db_temples];
+  let listSales = [...db_dist_sales];
+  let listBills = [...db_temple_bills];
+  let listWithdrawals = [...((globalThis as any).db_withdrawals || [])];
+
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    if (resTemples && resTemples.rows) {
+      listTemples = resTemples.rows.map((r: any) => ({
+        ...r,
+        status: r.status,
+        templeName: r.temple_name,
+        salesId: r.sales_id,
+        distributorId: r.distributor_id,
+        monthlyRent: r.monthly_rent,
+        setupFee: r.setup_fee,
+        paymentCycle: r.payment_cycle,
+        timestamp: r.created_at
+      }));
+    }
+
+    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    if (resSales && resSales.rows) {
+      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
+    }
+
+    const resBills = await dbQuery("SELECT * FROM temple_bills", [], () => null) as any;
+    if (resBills && resBills.rows) {
+      listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
+    }
+
+    const resWD = await dbQuery("SELECT * FROM withdrawals", [], () => null) as any;
+    if (resWD && resWD.rows) {
+      listWithdrawals = resWD.rows.map((r: any) => ({ ...r, salesName: r.sales_name, status: r.status, amount: r.amount }));
+    }
+  } catch (e) {}
+
+  const sales = listSales.find(s => s.id === salesId);
   const salesName = sales?.name;
   
   const myTemples: any[] = [];
-  for (const t of db_temples) {
+  for (const t of listTemples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
     if ((creatorInfo && creatorInfo.salesName === salesName) || t.salesId === salesId) {
       if (t.status === 'Active') {
@@ -3865,7 +3950,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   const rentY3 = rules.templeRentRates?.[2] ?? rules.rentYear3PlusPercent ?? 10;
 
   myTemples.forEach(t => {
-    const bills = db_temple_bills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
+    const bills = listBills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
     
     bills.forEach(bill => {
       // Ignore bills that don't generate commission
@@ -3955,7 +4040,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   
   const revenueRecords: any[] = [];
   myTemples.forEach(t => {
-      const bills = db_temple_bills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
+      const bills = listBills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
       bills.forEach(b => {
           revenueRecords.push({
              id: b.id,
@@ -5034,6 +5119,22 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
 
 export async function fetchNotifications(userRole: string, userName?: string) {
   let notifs = [...db_notifications];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resNotifs = await dbQuery("SELECT * FROM notifications ORDER BY date DESC", [], () => null) as any;
+    if (resNotifs && resNotifs.rows) {
+      notifs = resNotifs.rows.map((r: any) => ({
+        ...r,
+        id: r.id,
+        title: r.title,
+        content: r.content,
+        date: r.date,
+        isRead: r.is_read,
+        targetUser: r.target_user
+      }));
+    }
+  } catch (e) {}
+
   if (userRole !== 'SuperAdmin') {
     notifs = notifs.filter(n => {
       if (n.targetUser) return n.targetUser === userName;
