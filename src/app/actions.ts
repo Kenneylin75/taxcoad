@@ -337,6 +337,34 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
              }
           }
 
+          // Auto-heal for PostgreSQL: If temple was approved but personnel missing
+          if (!person) {
+             try {
+               const resApp = await dbQuery("SELECT * FROM temple_applications WHERE contact_phone = $1 AND status = 'Approved'", [searchAccount], () => null) as any;
+               if (resApp && resApp.rowCount > 0) {
+                  const app = resApp.rows[0];
+                  if (password === app.contact_phone) {
+                     const resTemple2 = await dbQuery("SELECT * FROM temples WHERE temple_name = $1", [app.temple_name], () => null) as any;
+                     if (resTemple2 && resTemple2.rowCount > 0) {
+                         const templeId = resTemple2.rows[0].id;
+                         await dbQuery("INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                            [`p-${Date.now()}`, templeId, app.contact_person || '管理員', 'TempleAdmin', app.contact_phone, app.contact_phone, app.contact_phone, 'Active'], () => null);
+                         
+                         person = {
+                            id: `p-${Date.now()}`,
+                            templeId: templeId,
+                            name: app.contact_person || '管理員',
+                            account: app.contact_phone,
+                            password: app.contact_phone,
+                            role: 'TempleAdmin',
+                            status: 'Active'
+                         };
+                     }
+                  }
+               }
+             } catch(e) {}
+          }
+
           if (person) { 
             if (person.role !== 'TempleAdmin') {
               return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
@@ -352,20 +380,10 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
                assignedRole = "TempleAdmin"; 
             }
         } else {
-          // 最後嘗試尋找宮廟主帳號
+          // 最後嘗試從記憶體尋找宮廟主帳號 (PG 已無 account 欄位)
           let mainTemple = null;
-          try {
-            const resTemple = await dbQuery("SELECT * FROM temples WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
-            if (resTemple && resTemple.rowCount > 0) {
-              mainTemple = resTemple.rows[0];
-              mainTemple.templeName = mainTemple.temple_name;
-            }
-          } catch(e) {}
-
-          if (!mainTemple) {
-            const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
-            mainTemple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
-          }
+          const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
+          mainTemple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
           
           if (mainTemple) {
             if (mainTemple.status === "Inactive") {
@@ -6478,6 +6496,12 @@ export async function approveTempleApplication(appId: string) {
         INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
         VALUES ($1, $2, $3, $4, $5)
       `, [newTempleId, 0, 5368709120, '標準免費空間', '台北市']);
+
+      // 建立宮廟預設主管理員帳號
+      await client.query(`
+        INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [`p-${Date.now()}`, newTempleId, app.contact_person || '管理員', 'TempleAdmin', app.contact_phone || 'admin', app.contact_phone || '0000', app.contact_phone || 'admin', 'Active']);
     }
     await revalidateTemple();
     return { success: true };
@@ -7941,9 +7965,43 @@ export async function fetchSuperSalesWithdrawals(salesId: string) {
 }
 
 export async function fetchSalesProfileById(salesId: string) {
-  const sales = db_dist_sales.find(s => s.id === salesId);
-  const dist = db_distributors.find(d => d.id === sales?.distributorId);
-  return { name: sales?.name || '未知', parentDistributor: dist?.name || '未指派', account: sales?.account };
+  try {
+    const { dbQuery } = await import('@/db/db');
+    let name = '未知';
+    let parentDistributor = '未指派';
+    let account = '';
+    let distributorId = '';
+
+    const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE id = $1", [salesId], () => null) as any;
+    if (resSales && resSales.rowCount > 0) {
+      name = resSales.rows[0].name;
+      account = resSales.rows[0].account;
+      distributorId = resSales.rows[0].distributor_id;
+    } else {
+      const sales = db_dist_sales.find(s => s.id === salesId);
+      if (sales) {
+        name = sales.name;
+        account = sales.account;
+        distributorId = sales.distributorId;
+      }
+    }
+
+    if (distributorId) {
+      const resDist = await dbQuery("SELECT * FROM distributors WHERE id = $1", [distributorId], () => null) as any;
+      if (resDist && resDist.rowCount > 0) {
+        parentDistributor = resDist.rows[0].name;
+      } else {
+        const dist = db_distributors.find(d => d.id === distributorId);
+        if (dist) parentDistributor = dist.name;
+      }
+    }
+
+    return { name, parentDistributor, account };
+  } catch(e) {
+    const sales = db_dist_sales.find(s => s.id === salesId);
+    const dist = db_distributors.find(d => d.id === sales?.distributorId);
+    return { name: sales?.name || '未知', parentDistributor: dist?.name || '未指派', account: sales?.account };
+  }
 }
 
 export async function fetchTempleBills(templeId: string) {
