@@ -3301,12 +3301,30 @@ export async function deleteTool(toolId: string) {
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
 export async function fetchDistributorCapacity(distId?: string) { 
-  const used = distId ? db_temples.filter(t => {
+  let listTemples = [...db_temples];
+  let listSales = [...db_dist_sales];
+
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    if (resTemples && resTemples.rows) {
+      listTemples = resTemples.rows.map((r: any) => ({
+        ...r, distributorId: r.distributor_id, salesId: r.sales_id
+      }));
+    }
+
+    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    if (resSales && resSales.rows) {
+      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
+    }
+  } catch (e) {}
+
+  const used = distId ? listTemples.filter(t => {
      if (t.distributorId !== distId) return false;
-     const sales = db_dist_sales.find(s => s.id === t.salesId);
+     const sales = listSales.find(s => s.id === t.salesId);
      if (sales && sales.role === 'SuperSales') return false;
      return true;
-  }).length : db_temples.length;
+  }).length : listTemples.length;
   
   let totalNodes = 100;
   let planName = '企業旗艦方案 (2年期 / 100 帳戶)';
@@ -4177,7 +4195,15 @@ export async function fetchDistributorTemples(distributorId: string) {
   }
 }
 export async function fetchDistributorVisits(distributorId: string) {
-  const teamIds = db_dist_sales.filter(s => s.distributorId === distributorId).map(s => s.name);
+  let listSales = [...db_dist_sales];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE distributor_id = $1", [distributorId], () => null) as any;
+    if (resSales && resSales.rows) {
+      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
+    }
+  } catch(e) {}
+  const teamIds = listSales.filter(s => s.distributorId === distributorId).map(s => s.name);
   return db_sales_visits.filter(v => teamIds.includes(v.salesName));
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
@@ -7663,7 +7689,24 @@ export async function deactivateLampRecord(recordId: string) {
   });
 }
 
-export async function fetchDistributorLogs(distributorId: string) { return (globalThis as any).db_admin_logs?.filter((l: any) => l.target && l.target.includes(distributorId)) || []; }
+export async function fetchDistributorLogs(distributorId: string) { 
+  let logs = (globalThis as any).db_admin_logs || [];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const res = await dbQuery("SELECT * FROM admin_logs ORDER BY timestamp DESC", [], () => null) as any;
+    if (res && res.rows && res.rows.length > 0) {
+      logs = res.rows.map((r: any) => ({
+        id: r.id,
+        action: r.action,
+        adminId: r.admin_id,
+        details: r.details,
+        timestamp: r.timestamp,
+        target: r.target
+      }));
+    }
+  } catch (e) {}
+  return logs.filter((l: any) => l.target && l.target.includes(distributorId)); 
+}
 export async function requestBonus(salesId: string, distributorId: string, amount: number, method: string = 'Bank Transfer', salesName: string = '') {
   try {
     const { dbQuery } = await import('@/db/db');
