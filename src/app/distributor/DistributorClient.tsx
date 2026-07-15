@@ -301,7 +301,7 @@ export default function DistributorClient({
       try {
         const distId = initialProfile?.id || 'dist-hq';
         const prefix = distId.slice(-2).toLowerCase();
-        await addSalesMember({
+        const res = await addSalesMember({
           distributorId: distId,
           name: newSalesForm.name,
           phone: newSalesForm.phone,
@@ -312,6 +312,10 @@ export default function DistributorClient({
           rentYear2Percent: newSalesForm.rentYear2Rate,
           rentYear3PlusPercent: newSalesForm.rentYear3PlusRate
         });
+        if (res && res.success === false) {
+           alert(res.error || '帳號已被使用，請更換其他帳號');
+           return;
+        }
         addLog("新增業務", `${newSalesForm.name} (${newSalesForm.phone})`);
         setIsAddSalesModalOpen(false);
         window.location.reload();

@@ -64,7 +64,11 @@ export default function DistributorApplicationForm({ role, submittedBy, onSucces
         }
       } else {
         const { submitDistributorApplication } = await import('../actions');
-        await submitDistributorApplication(data);
+        const res = await submitDistributorApplication(data);
+        if (res && res.success === false) {
+           alert(res.error || '帳號已被註冊，請更換');
+           return;
+        }
       }
       onSuccess();
     } catch (err) {

@@ -66,13 +66,18 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
     setLoading(true);
     try {
       const { submitFreeAccountApplication } = await import('../actions');
-      await submitFreeAccountApplication({
+      const res = await submitFreeAccountApplication({
         ...form,
         role,
         submittedBy,
         distributorId,
         paymentCycle
       });
+      if (res && res.success === false) {
+         alert(res.error || '帳號已被註冊，請更換');
+         setLoading(false);
+         return;
+      }
       onSuccess();
     } catch (err) {
       console.error(err);

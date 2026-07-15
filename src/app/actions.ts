@@ -3295,6 +3295,9 @@ export async function fetchDistributorCapacity(distId?: string) {
 
 // --- Super Sales Logic ---
 export async function submitDistributorApplication(data: any) {
+  if (data.account && await checkAccountExists((data.account || '').trim())) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const expirationDate = new Date();
   expirationDate.setFullYear(expirationDate.getFullYear() + (Number(data.years) || 2));
 
@@ -3928,6 +3931,9 @@ export async function fetchRentPlans() {
 
 // --- 經銷商 (Distributor) 相關功能 ---
 export async function addSalesMember(data: any) { 
+  if (data.account && await checkAccountExists(data.account)) {
+    return { success: false, error: '帳號已被使用，請更換其他帳號' };
+  }
   const id = 'sales-' + Math.random().toString(36).substring(2, 10).toUpperCase();
   const newSales = { 
     id: id, 
