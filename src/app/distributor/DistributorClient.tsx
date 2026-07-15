@@ -301,6 +301,12 @@ export default function DistributorClient({
       try {
         const distId = initialProfile?.id || 'dist-hq';
         const prefix = distId.slice(-2).toLowerCase();
+        
+        let finalAccount = newSalesForm.account.toLowerCase();
+        if (!finalAccount.startsWith(prefix)) {
+          finalAccount = `${prefix}${finalAccount}`;
+        }
+        
         const res = await addSalesMember({
           distributorId: distId,
           name: newSalesForm.name,

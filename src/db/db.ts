@@ -121,12 +121,12 @@ export async function dbQuery<T>(
   if (!pool) return fallback();
   
   try {
-    const res = await pool.query(sql, params).catch(err => {
-      console.warn("⚠️ [PostgreSQL Query 失敗] 自動退回 Fallback:", err ? err.message : "未知錯誤");
-      return null;
-    });
-    if (!res) return fallback();
-    return res.rows as unknown as T;
+      const res = await pool.query(sql, params).catch(err => {
+        console.warn("⚠️ [PostgreSQL Query 失敗] 退回 Fallback:", err ? err.message : "未知錯誤");
+        return null;
+      });
+      if (!res) return fallback();
+      return res as unknown as T;
   } catch (err) {
     return fallback();
   }
