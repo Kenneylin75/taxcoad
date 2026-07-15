@@ -992,22 +992,7 @@ export async function fetchServiceDefinitions() {
       await client.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0');
       const res = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
       if (res.rowCount === 0) {
-        // Seed default services
-        const DEFAULT_SERVICES = [
-          { id: '1', name: '光明燈祈福', price: 600, duration: '30 min', description: '消災解厄，前途光明', assignedStaff: ['1', '2'], color: '#f59e0b' },
-          { id: '2', name: '文昌開運', price: 800, duration: '45 min', description: '金榜題名，智慧大開', assignedStaff: ['3'], color: '#3b82f6' },
-          { id: '3', name: '太歲安奉', price: 1000, duration: '20 min', description: '歲歲平安，諸事順遂', assignedStaff: ['1'], color: '#ef4444' },
-          { id: '4', name: '問事服務', price: 0, duration: '20 min', description: '指點迷津，解惑人生', assignedStaff: ['1', '2'], color: '#8b5cf6' },
-          { id: '5', name: '例行祈福', price: 0, duration: '30 min', description: '日常平安祈福', assignedStaff: ['1'], color: '#10b981' }
-        ];
-        for (const s of DEFAULT_SERVICES) {
-          await client.query(
-            'INSERT INTO services (id, temple_id, name, price, duration, description, color, assigned_staff) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-            [s.id, templeId, s.name, s.price, s.duration, s.description, s.color, s.assignedStaff]
-          );
-        }
-        const retryRes = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
-        return retryRes.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
+        return [];
       }
       return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
     }
@@ -1134,14 +1119,7 @@ export async function fetchPersonnel() {
     if (!client) {
       const myPersonnel = (gStore.db_personnel || db_personnel).filter((p: any) => p.templeId === templeId);
       if (myPersonnel.length === 0 && templeId) {
-        // Seed default personnel for this new temple to ensure services have assigned staff
-        const defaults = (gStore.db_personnel || db_personnel).filter((p: any) => p.templeId === 'temple-1').map((p: any) => ({
-          ...p,
-          templeId
-        }));
-        gStore.db_personnel = [...(gStore.db_personnel || db_personnel), ...defaults];
-        db_personnel = gStore.db_personnel;
-        return defaults;
+        return [];
       }
       return myPersonnel;
     } else {
@@ -1162,24 +1140,7 @@ export async function fetchPersonnel() {
       `);
       const res = await client.query('SELECT * FROM personnel WHERE temple_id = $1', [templeId]);
       if ((res.rowCount ?? 0) === 0) {
-        for (const p of db_personnel) {
-          await client.query(`
-            INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status, avatar, permissions)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          `, [p.id.toString(), templeId, p.name, p.role, p.account || p.name, p.phone || '0912-345-678', 'admin123', p.status || 'Active', p.avatar, p.permissions || []]);
-        }
-        const resRetry = await client.query('SELECT * FROM personnel WHERE temple_id = $1', [templeId]);
-        return resRetry.rows.map(r => ({
-          id: r.id,
-          name: r.name,
-          role: r.role,
-          account: r.account,
-          phone: r.phone,
-          status: r.status,
-          avatar: r.avatar,
-          permissions: r.permissions || [],
-          serviceCount: 0
-        }));
+        return [];
       }
       return res.rows.map(r => ({
         id: r.id,
