@@ -2816,7 +2816,9 @@ export async function generateInitialBills(newTemple: any) {
           await dbQuery(
             "INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)",
             [newBill.id, newTemple.id, newBill.type, newBill.amount, newBill.dueDate, newBill.payeeRole, newBill.payeeId]
-          );
+          ).catch(err => {
+             console.error('Failed dbQuery in generateInitialBills', err);
+          });
         }
       }
       if (typeof gStore !== 'undefined') gStore.db_temple_bills = db_temple_bills;
@@ -3703,9 +3705,9 @@ export async function createTempleAccount(data: any) {
   try {
       const { dbQuery } = await import('@/db/db');
       await dbQuery(`
-        INSERT INTO temples (id, temple_name, city, status, sales_id, setup_fee, monthly_rent, payment_cycle)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [id, newTemple.templeName, newTemple.city || '台北市', 'Active', newTemple.salesId, 0, newTemple.monthlyRent, newTemple.paymentCycle]);
+        INSERT INTO temples (id, temple_name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [id, newTemple.templeName, newTemple.city || '台北市', 'Active', newTemple.salesId, newTemple.distributorId || null, newTemple.setupFee || 0, newTemple.monthlyRent, newTemple.paymentCycle]);
       
       await dbQuery(`
         INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
