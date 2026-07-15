@@ -153,6 +153,24 @@ export default function SuperAdminClient({
 
   // --- Handlers ---
   
+  
+  const handleClearFakeDistributors = async () => {
+    if (confirm("確定要清空所有的經銷商假資料嗎？這將會從資料庫中刪除所有的經銷商與業務。")) {
+      try {
+        const res = await fetch('/api/clear-db');
+        const data = await res.json();
+        if (data.success) {
+          alert("清空成功！");
+          window.location.reload();
+        } else {
+          alert("清空失敗：" + data.error);
+        }
+      } catch (e: any) {
+        alert("清空失敗：" + e.message);
+      }
+    }
+  };
+
   const handleExecuteTransfer = async () => {
      if (!transferTarget.id || !transferTarget.type) return;
      startTransition(async () => {
@@ -487,6 +505,7 @@ export default function SuperAdminClient({
                     <div className="flex items-center justify-between">
                        <div className="flex items-center gap-4"><div className="w-2 h-8 bg-emerald-500 rounded-full"></div><h3 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">經銷商代理體系</h3></div>
   <button onClick={() => {setAccountType('Distributor'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-emerald-600 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm mx-4">+ 開通經銷商</button>
+  <button onClick={handleClearFakeDistributors} className="px-6 py-2 bg-red-500 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-sm mr-4">清空測試資料</button>
                        <div className="relative"><input type="text" placeholder="快速搜尋經銷商..." className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-emerald-500 transition-all"/><span className="absolute right-4 top-3.5 text-slate-400">🔍</span></div>
                     </div>
                     <table className="w-full bg-white rounded-[40px] shadow-sm overflow-hidden text-left border-collapse">
