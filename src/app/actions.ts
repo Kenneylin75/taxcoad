@@ -5280,10 +5280,22 @@ export async function createPersonnel(formData: FormData) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     const name = formData.get('name') as string;
-    const account = formData.get('account') as string;
+    const rawAccount = formData.get('account') as string;
+    const account = (rawAccount || '').trim();
     
-    if (account && await checkAccountExists(account)) {
-      return { success: false, error: '帳號已被註冊，請更換' };
+    if (account) {
+      if (!client) {
+        const current = gStore.db_personnel || db_personnel || [];
+        const isDuplicate = current.some((p: any) => p.templeId === templeId && (p.account || '').toLowerCase() === account.toLowerCase());
+        if (isDuplicate) {
+          return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
+        }
+      } else {
+        const checkRes = await client.query('SELECT id FROM personnel WHERE temple_id = $1 AND LOWER(account) = $2', [templeId, account.toLowerCase()]);
+        if (checkRes && checkRes.rowCount && checkRes.rowCount > 0) {
+          return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
+        }
+      }
     }
 
     const phone = formData.get('phone') as string;
