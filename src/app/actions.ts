@@ -5939,7 +5939,7 @@ export async function fetchGuestHistory(p: string) {
       const queueRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", event_title as "eventTitle", phone, guest_name as "guestName", status, assigned_number as "assignedNumber", actual_order as "actualOrder", payment_status as "paymentStatus", payment_ref as "paymentRef", payment_proof_url as "paymentProofUrl", created_at as "createdAt" FROM queue_tickets WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
       const eventsRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", title, phone, guest_name as "guestName", price, payment_status as "paymentStatus", actual_price as "actualPrice", payment_ref as "paymentRef", timestamp as "createdAt", payment_proof_url as "paymentProofUrl" FROM event_registrations WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
 
-      return {
+      return JSON.parse(JSON.stringify({
         appointments: appsRes.rows,
         records: db_deep_records.filter((r: any) => normCompare(r.phone, p)),
         files: files,
@@ -5947,7 +5947,7 @@ export async function fetchGuestHistory(p: string) {
         activities: db_activities.filter((a: any) => normCompare(a.phone, p)),
         queueTickets: queueRes.rows,
         eventRegistrations: eventsRes.rows
-      };
+      }));
     }
 
     const apps = db_appointments.filter((a: any) => normCompare(a.phone, p));
@@ -5960,7 +5960,7 @@ export async function fetchGuestHistory(p: string) {
       }
     });
 
-    return { 
+    return JSON.parse(JSON.stringify({ 
       appointments: apps, 
       records: db_deep_records.filter((r: any) => normCompare(r.phone, p)), 
       files: files, 
@@ -5968,7 +5968,7 @@ export async function fetchGuestHistory(p: string) {
       activities: db_activities.filter((a: any) => normCompare(a.phone, p)),
       queueTickets: db_queue_tickets.filter((t: any) => normCompare(t.phone, p)),
       eventRegistrations: db_event_registrations.filter((e: any) => normCompare(e.phone, p))
-    }; 
+    })); 
   });
 }
 
