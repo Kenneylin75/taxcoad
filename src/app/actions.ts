@@ -994,7 +994,7 @@ export async function fetchServiceDefinitions() {
       if (res.rowCount === 0) {
         return [];
       }
-      return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }));
+      return JSON.parse(JSON.stringify(res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }))));
     }
   });
 }
@@ -1094,7 +1094,7 @@ export async function fetchForms() {
   const templeId = await getDynamicTempleId();
   const current = gStore.db_forms || db_forms;
   const mine = current.filter((f: any) => f.templeId === templeId);
-  return mine;
+  return JSON.parse(JSON.stringify(mine));
 }
 
 export async function saveForm(data: any) {
@@ -5688,15 +5688,15 @@ export async function fetchGuests() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return db_guests.filter((g: any) => !g.templeId || g.templeId === templeId);
+      return JSON.parse(JSON.stringify(db_guests.filter((g: any) => !g.templeId || g.templeId === templeId)));
     } else {
       const res = await client.query('SELECT * FROM guests WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
-      return res.rows.map(r => ({
+      return JSON.parse(JSON.stringify(res.rows.map(r => ({
         id: r.id, templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email,
         address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday,
         birthHour: r.birth_hour, lineId: r.line_id, status: r.status,
         createdAt: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : r.created_at
-      }));
+      }))));
     }
   });
 }

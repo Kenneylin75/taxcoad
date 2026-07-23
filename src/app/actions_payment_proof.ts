@@ -137,7 +137,7 @@ export async function getAdminNotifications() {
     } else {
       try {
           const res = await client.query(`SELECT * FROM admin_notifications WHERE temple_id = $1 ORDER BY created_at DESC`, [templeId]);
-          return res.rows.map(r => ({
+          return JSON.parse(JSON.stringify(res.rows.map(r => ({
             id: r.id,
             templeId: r.temple_id,
             guestId: r.guest_id,
@@ -146,7 +146,7 @@ export async function getAdminNotifications() {
             isRead: r.is_read,
             linkPath: r.link_path,
             createdAt: r.created_at
-          }));
+          }))));
       } catch(e) {
           return [];
       }
