@@ -988,6 +988,10 @@ function DeepFileCenterContent() {
                                           </div>
                                        )}
                                     </div>
+                                    <div className="px-2 text-center opacity-70 group-hover/item:opacity-100 transition-opacity">
+                                       <p className="text-xs font-bold text-slate-600 truncate" title={file.name || '未知檔案'}>{file.name || '未知檔案'}</p>
+                                    </div>
+                                 </div>
                                  ))}
                               </div>
                            </div>
