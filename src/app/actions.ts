@@ -5352,17 +5352,22 @@ export async function createPersonnel(formData: FormData) {
 export async function deletePersonnel(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    const personnel = db_personnel.find((p: any) => p.id.toString() === id.toString() && p.templeId === templeId);
+    let currentPersonnel = gStore.db_personnel || db_personnel || [];
+    const personnel = currentPersonnel.find((p: any) => p.id.toString() === id.toString() && p.templeId === templeId);
     if (personnel) {
-      const hasAppointments = db_appointments.some((a: any) => a.staff === personnel.name && a.status !== 'Completed' && a.templeId === templeId);
-      const hasSlots = db_slots.some((s: any) => s.staff === personnel.name && s.status !== 'Completed' && s.templeId === templeId);
+      const currentAppts = gStore.db_appointments || db_appointments || [];
+      const currentSlots = gStore.db_slots || db_slots || [];
+      const hasAppointments = currentAppts.some((a: any) => a.staff === personnel.name && a.status !== 'Completed' && a.templeId === templeId);
+      const hasSlots = currentSlots.some((s: any) => s.staff === personnel.name && s.status !== 'Completed' && s.templeId === templeId);
       if (hasAppointments || hasSlots) {
         return { success: false, message: '此人員目前尚有預約服務或已排班時段，請先清空後再進行刪除！' };
       }
     }
 
     if (!client) {
-      db_personnel = gStore.db_personnel = db_personnel.filter((p: any) => p.id.toString() !== id.toString());
+      currentPersonnel = currentPersonnel.filter((p: any) => p.id.toString() !== id.toString());
+      gStore.db_personnel = currentPersonnel;
+      db_personnel = currentPersonnel;
     } else {
       await client.query('DELETE FROM personnel WHERE id = $1 AND temple_id = $2', [id, templeId]);
     }
@@ -5375,10 +5380,12 @@ export async function updateAccountPermissions(id: string, permissions: string[]
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const idx = db_personnel.findIndex((p: any) => p.id.toString() === id.toString());
+      let pData = gStore.db_personnel || db_personnel || [];
+      const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
       if (idx > -1) {
-        db_personnel[idx].permissions = permissions;
-        gStore.db_personnel = db_personnel;
+        pData[idx].permissions = permissions;
+        gStore.db_personnel = pData;
+        db_personnel = pData;
       }
     } else {
       await client.query('UPDATE personnel SET permissions = $1 WHERE id = $2 AND temple_id = $3', [permissions, id, templeId]);
