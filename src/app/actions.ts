@@ -2690,31 +2690,54 @@ export async function fetchSyncQueue() { return [...db_sync_queue]; }
 
 export async function fetchSystemConfig() {
   const gStore = globalThis as any;
-  const config = gStore.db_config || db_config;
+  let config = gStore.db_config || db_config;
   
-  if (!config.b2bPayment || !config.b2bPayment.thirdParty) {
-    config.b2bPayment = {
-      thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
-      linePay: { enabled: false, channelId: '', channelSecret: '' },
-      customTransfer: { enabled: true, bankCode: '808', accountName: '天首科技有限公司', accountNo: '808-1234-5678-901' },
-      serviceMapping: {
-        'new-temple': ['customTransfer'],
-        'monthly-rent': ['thirdParty', 'customTransfer'],
-        'distributor-auth': ['customTransfer']
-      }
-    };
-    gStore.db_config = config;
-  }
-  
-  return { ...config };
+  return withTempleSession(null, false, async (client) => {
+    if (client) {
+      try {
+        await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
+        const res = await client.query(`SELECT value FROM system_config WHERE key = 'global'`);
+        if (res.rowCount && res.rowCount > 0) {
+          config = res.rows[0].value;
+        } else {
+          await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1)`, [config]);
+        }
+      } catch (e) {}
+    }
+    
+    if (!config.b2bPayment || !config.b2bPayment.thirdParty) {
+      config.b2bPayment = {
+        thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
+        linePay: { enabled: false, channelId: '', channelSecret: '' },
+        customTransfer: { enabled: true, bankCode: '808', accountName: '天成科技股份有限公司', accountNo: '808-1234-5678-901' },
+        serviceMapping: {
+          'new-temple': ['customTransfer'],
+          'monthly-rent': ['thirdParty', 'customTransfer'],
+          'distributor-auth': ['customTransfer']
+        }
+      };
+      gStore.db_config = config;
+    }
+    
+    return { ...config };
+  });
 }
 
 export async function updateSystemConfig(data: any) {
-  const currentConfig = gStore.db_config || db_config;
+  const currentConfig = (globalThis as any).db_config || db_config;
   const newConfig = { ...currentConfig, ...data };
   
-  gStore.db_config = newConfig;
+  (globalThis as any).db_config = newConfig;
   db_config = newConfig;
+
+  await withTempleSession(null, false, async (client) => {
+    if (client) {
+      try {
+        await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
+        await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [newConfig]);
+      } catch (e) {}
+    }
+  });
 
   await logAdminAction('UPDATE_CONFIG', 'System Parameters');
   revalidatePath('/super-admin');
@@ -7151,27 +7174,74 @@ export async function fetchAuditLogs() {
 
 export async function getTempleBasicInfo(templeId?: string) {
   const tId = templeId || await getDynamicTempleId();
-  const t = db_temples.find(t => t.id === tId) || null;
-  if (t && !t.templeName && t.name) {
-    return { ...t, templeName: t.name };
-  }
-  return t;
+  return withTempleSession(null, false, async (client) => {
+    let t = null;
+    if (client) {
+      try {
+        const res = await client.query('SELECT * FROM temples WHERE id = $1', [tId]);
+        if (res.rowCount && res.rowCount > 0) {
+          const row = res.rows[0];
+          t = {
+            id: row.id,
+            name: row.name,
+            templeName: row.temple_name || row.name,
+            phone: row.phone,
+            address: row.address,
+            city: row.city,
+            distributorId: row.distributor_id,
+            plan: row.plan,
+            status: row.status,
+            createdAt: row.created_at,
+            timestamp: row.timestamp || row.created_at,
+            trialMonths: row.trial_months,
+            freeType: row.free_type,
+            rentType: row.rent_type,
+            monthlyFee: row.monthly_fee,
+            yearlyFee: row.yearly_fee,
+            paymentCycle: row.payment_cycle,
+            storagePlanId: row.storage_plan_id,
+            aiPlanId: row.ai_plan_id,
+            logoUrl: row.logo_url
+          };
+        }
+      } catch (e) {}
+    }
+    if (!t) {
+      t = (globalThis as any).db_temples?.find((x: any) => x.id === tId) || db_temples.find(x => x.id === tId) || null;
+    }
+    if (t && !t.templeName && t.name) {
+      return { ...t, templeName: t.name };
+    }
+    return t;
+  });
 }
 
 export async function updateTempleBasicInfo(data: any, templeId?: string) {
   const tId = templeId || await getDynamicTempleId();
-  const idx = db_temples.findIndex(t => t.id === tId);
-  if (idx > -1) {
-    db_temples[idx] = { ...db_temples[idx], ...data };
-    gStore.db_temples = db_temples;
-    try {
-      const { dbQuery } = await import('@/db/db');
-      const updated = db_temples[idx];
-      await dbQuery('UPDATE temples SET temple_name = $1, city = $2 WHERE id = $3', [updated.templeName || updated.name, updated.city || '台北市', tId]);
-    } catch(e) {}
+  return withTempleSession(null, false, async (client) => {
+    if (client) {
+      try {
+        const tName = data.templeName || data.name || '';
+        const tCity = data.city || '';
+        if (tName || tCity) {
+          const sets = [];
+          const params = [];
+          if (tName) { sets.push(`temple_name = $${sets.length + 1}`); params.push(tName); }
+          if (tCity) { sets.push(`city = $${sets.length + 1}`); params.push(tCity); }
+          params.push(tId);
+          await client.query(`UPDATE temples SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
+        }
+      } catch(e) {}
+    }
+    
+    // Update memory fallback
+    const idx = db_temples.findIndex(t => t.id === tId);
+    if (idx > -1) {
+      db_temples[idx] = { ...db_temples[idx], ...data };
+      (globalThis as any).db_temples = db_temples;
+    }
     return { success: true };
-  }
-  return { success: false, message: 'Temple not found' };
+  });
 }
 
 
