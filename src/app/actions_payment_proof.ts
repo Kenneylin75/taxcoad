@@ -25,6 +25,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
             if (paymentRef) gStore.db_appointments[idx].paymentRef = paymentRef;
             if (paymentMethod) gStore.db_appointments[idx].paymentMethod = paymentMethod;
             gStore.db_appointments[idx].paymentStatus = 'PENDING_REVIEW';
+            gStore.db_appointments[idx].paymentUpdatedAt = new Date().toISOString();
             message = `預約單號 ${recordId} 上傳了匯款截圖/後五碼`;
             linkPath = `/${templeId}/admin/calendar`;
         }
@@ -35,6 +36,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
             if (paymentRef) gStore.db_lamp_records[idx].paymentRef = paymentRef;
             if (paymentMethod) gStore.db_lamp_records[idx].paymentMethod = paymentMethod;
             gStore.db_lamp_records[idx].paymentStatus = 'PENDING_REVIEW';
+            gStore.db_lamp_records[idx].paymentUpdatedAt = new Date().toISOString();
             message = `點燈紀錄 ${recordId} 上傳了匯款截圖/後五碼`;
             linkPath = `/${templeId}/admin/lamps`;
         }
@@ -45,6 +47,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
             if (paymentRef) gStore.db_event_registrations[idx].paymentRef = paymentRef;
             if (paymentMethod) gStore.db_event_registrations[idx].paymentMethod = paymentMethod;
             gStore.db_event_registrations[idx].paymentStatus = 'PENDING_REVIEW';
+            gStore.db_event_registrations[idx].paymentUpdatedAt = new Date().toISOString();
             message = `法會報名 ${recordId} 上傳了匯款截圖/後五碼`;
             linkPath = `/${templeId}/admin/events`;
         }
@@ -79,6 +82,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
             if (paymentRef) { updates.push(`"paymentRef" = $${paramIdx++}`); values.push(paymentRef); }
             if (paymentMethod) { updates.push(`"paymentMethod" = $${paramIdx++}`); values.push(paymentMethod); }
             updates.push(`"paymentStatus" = 'PENDING_REVIEW'`);
+            updates.push(`"paymentUpdatedAt" = $${paramIdx++}`); values.push(new Date().toISOString());
             await client.query(`UPDATE ${tableName} SET ${updates.join(', ')} WHERE id = $1`, values);
           } catch(e) {
             try {
@@ -90,6 +94,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
                if (paymentRef) { updates.push(`payment_ref = $${paramIdx++}`); values.push(paymentRef); }
                if (paymentMethod) { updates.push(`payment_method = $${paramIdx++}`); values.push(paymentMethod); }
                updates.push(`payment_status = 'PENDING_REVIEW'`);
+               updates.push(`payment_updated_at = $${paramIdx++}`); values.push(new Date().toISOString());
                await client.query(`UPDATE ${tableName} SET ${updates.join(', ')} WHERE id = $1`, values);
             } catch (err) {}
           }

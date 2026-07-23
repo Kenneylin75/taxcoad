@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 "use client";
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
@@ -272,9 +272,11 @@ function DeepFileCenterContent() {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploadType, setUploadType] = useState<'photo' | 'video' | 'file'>('photo');
+  const [pendingServiceFileName, setPendingServiceFileName] = useState<string | null>(null);
 
-  const triggerFileBrowser = (type: 'photo' | 'video' | 'file') => {
+  const triggerFileBrowser = (type: 'photo' | 'video' | 'file', customName?: string) => {
     setUploadType(type);
+    setPendingServiceFileName(customName || null);
     if (fileInputRef.current) {
       fileInputRef.current.accept = type === 'photo' ? 'image/*' : type === 'video' ? 'video/*' : '*/*';
       fileInputRef.current.click();
@@ -290,12 +292,14 @@ function DeepFileCenterContent() {
     // 我們使用瀏覽器原生的 URL.createObjectURL 來產生一個本地的預覽連結，
     // 取代原本會 404 的假路徑 (/uploads/...)。
     const previewUrl = URL.createObjectURL(file);
+    const finalName = pendingServiceFileName ? `${pendingServiceFileName}.${file.name.split('.').pop()}` : file.name;
     
-    await uploadCustomerMedia(selectedGuest.phone, previewUrl, uploadType, 'Temple', file.name);
+    await uploadCustomerMedia(selectedGuest.phone, previewUrl, uploadType, 'Temple', finalName);
     await loadHistory(selectedGuest.phone);
     setIsSaving(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
-    alert(`✨ 檔案「${file.name}」已成功上傳並歸檔至該信眾檔案庫中！`);
+    alert(`✨ 檔案「${finalName}」已成功上傳並歸檔至該信眾檔案庫中！`);
+    setPendingServiceFileName(null);
   };
 
   const handleCreateGuest = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -502,6 +506,37 @@ function DeepFileCenterContent() {
                                      <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase border-2 ${lamp.status === 'Cancelled' ? 'bg-slate-100 text-slate-400 border-slate-200' : isExpired ? 'bg-rose-50 text-rose-600 border-rose-100' : lamp.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{lamp.status === 'Cancelled' ? '已取消' : isExpired ? '已屆期' : lamp.status === 'Pending' ? '等待安奉' : '安奉中'}</span>
                                   </div>
                                   <div className="flex flex-col gap-4 mt-2">
+                                     {/* Media Row for Lamps */}
+                                     <div className="flex items-center gap-2 flex-wrap justify-start pt-2">
+                                       {(() => {
+                                         const timeStr = lamp.createdAt ? lamp.createdAt.split(/[ T]/)[0] : 'UnknownTime';
+                                         const prefix = `${lamp.categoryName || lamp.lampType}_${timeStr}_${lamp.guestName || selectedGuest?.name}`;
+                                         const svcVideo = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'video');
+                                         const svcPhoto = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'photo');
+                                         return (
+                                           <>
+                                             {svcVideo ? (
+                                               <button onClick={() => setPreviewFile(svcVideo)} className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1 border border-blue-100">
+                                                 <span>📹</span> 查看服務影片
+                                               </button>
+                                             ) : (
+                                               <button onClick={() => triggerFileBrowser('video', prefix)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-700 transition-colors bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center gap-1 border border-slate-200">
+                                                 <span>📹</span> 上傳服務影片
+                                               </button>
+                                             )}
+                                             {svcPhoto ? (
+                                                <button onClick={() => setPreviewFile(svcPhoto)} className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1 border border-blue-100">
+                                                 <span>📸</span> 查看服務圖片
+                                               </button>
+                                             ) : (
+                                               <button onClick={() => triggerFileBrowser('photo', prefix)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-700 transition-colors bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center gap-1 border border-slate-200">
+                                                 <span>📸</span> 上傳服務圖片
+                                               </button>
+                                             )}
+                                           </>
+                                         );
+                                       })()}
+                                     </div>
                                      <div className="flex flex-wrap justify-between items-center gap-4 pb-4 border-b border-slate-100/50">
                                         <div className="space-y-1">
                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p>
@@ -675,7 +710,38 @@ function DeepFileCenterContent() {
                                     <div>
                                       <span className="text-xs font-medium text-slate-400 mb-1 inline-block">{event.date} {event.time}</span>
                                       <h4 className="text-base font-medium text-slate-900">{event.service}</h4>
-                                      <p className="text-sm text-slate-500 mt-1">負責：{event.staff}</p>
+                                      <p className="text-sm text-slate-500 mt-1 mb-3">負責：{event.staff}</p>
+                                      
+                                      {/* Media Row */}
+                                      <div className="flex items-center gap-2 flex-wrap justify-start">
+                                        {(() => {
+                                          const prefix = `${event.service}_${event.date} ${event.time}_${event.staff}`;
+                                          const svcVideo = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'video');
+                                          const svcPhoto = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'photo');
+                                          return (
+                                            <>
+                                              {svcVideo ? (
+                                                <button onClick={() => setPreviewFile(svcVideo)} className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1 border border-blue-100">
+                                                  <span>📹</span> 查看服務影片
+                                                </button>
+                                              ) : (
+                                                <button onClick={() => triggerFileBrowser('video', prefix)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-700 transition-colors bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center gap-1 border border-slate-200">
+                                                  <span>📹</span> 上傳服務影片
+                                                </button>
+                                              )}
+                                              {svcPhoto ? (
+                                                <button onClick={() => setPreviewFile(svcPhoto)} className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1 border border-blue-100">
+                                                  <span>📸</span> 查看服務圖片
+                                                </button>
+                                              ) : (
+                                                <button onClick={() => triggerFileBrowser('photo', prefix)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-700 transition-colors bg-slate-50 hover:bg-slate-100 rounded-lg flex items-center gap-1 border border-slate-200">
+                                                  <span>📸</span> 上傳服務圖片
+                                                </button>
+                                              )}
+                                            </>
+                                          );
+                                        })()}
+                                      </div>
                                     </div>
                                     <div className="flex flex-col gap-2 items-end">
                                       {/* Action Row */}
@@ -885,18 +951,18 @@ function DeepFileCenterContent() {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-10">
                                  {group.files.map((file) => (
-                                    <div 
-                                       key={file.id} 
-                                       onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (file.type === 'file' && file.name && file.name.endsWith('.pdf')) {
-                                             const possibleServiceType = file.name.split('_')[0];
-                                             const matchedRecord = history.records?.find((r: any) => r.serviceType === possibleServiceType);
-                                             if (matchedRecord) {
-                                                setViewingRecord(matchedRecord);
-                                                return;
+                                    <div key={file.id} className="flex flex-col gap-3 group/item">
+                                       <div 
+                                          onClick={(e) => {
+                                             e.stopPropagation();
+                                             if (file.type === 'file' && file.name && file.name.endsWith('.pdf')) {
+                                                const possibleServiceType = file.name.split('_')[0];
+                                                const matchedRecord = history.records?.find((r: any) => r.serviceType === possibleServiceType);
+                                                if (matchedRecord) {
+                                                   setViewingRecord(matchedRecord);
+                                                   return;
+                                                }
                                              }
-                                          }
                                           setPreviewFile(file);
                                        }}
                                        className="relative rounded-[45px] overflow-hidden border-4 border-slate-50 aspect-square bg-slate-50 shadow-sm hover:scale-105 hover:shadow-lg transition-all cursor-zoom-in flex items-center justify-center group/file"

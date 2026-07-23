@@ -861,8 +861,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                           : 'bg-rose-50 text-rose-700'
                       }`}>
                         {activeAppointment.paymentMethod === 'Cash' 
-                          ? (activeAppointment.paymentStatus === 'Paid' ? '標記已完成支付' : '現金支付: 未付款')
-                          : (activeAppointment.paymentStatus === 'Paid' ? '標記已完成支付' : '未完成預約: 待付款/對帳')
+                          ? (activeAppointment.paymentStatus === 'Paid' ? '已結帳' : '現金支付: 未付款')
+                          : (activeAppointment.paymentStatus === 'Paid' ? '已結帳' : (activeAppointment.paymentStatus === 'PENDING_REVIEW' ? '已上傳憑證，待對帳' : '未付款'))
                         }
                       </span>
                     )}

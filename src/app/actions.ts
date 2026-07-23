@@ -4602,7 +4602,15 @@ export async function fetchFinancialOverview() {
           dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
           dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
           dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
-          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null)
+          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
+          dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null)
         ]);
       } catch (e) {}
 
@@ -4621,10 +4629,10 @@ export async function fetchFinancialOverview() {
             title: a.service,
             source: 'Appointment',
             amount: Number(a.amount) || 0,
-            timestamp: a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date),
+            timestamp: a.payment_updated_at || a.created_at || (a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date)),
             guestName: a.guest_name || a.phone,
             paymentMethod: a.payment_method || '現金/臨櫃',
-            status: 'Paid',
+            status: a.payment_status || 'Paid',
             paymentRef: a.payment_ref,
             remarks: a.remarks
           });
@@ -4638,10 +4646,10 @@ export async function fetchFinancialOverview() {
             title: r.lamp_type || r.categoryName,
             source: 'Lamp',
             amount: Number(r.amount || r.price) || 0,
-            timestamp: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : String(r.created_at),
+            timestamp: r.payment_updated_at || (r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : String(r.created_at)),
             guestName: r.guest_name || r.phone,
             paymentMethod: r.payment_method || '現金/臨櫃',
-            status: 'Paid',
+            status: r.payment_status || 'Paid',
             paymentRef: r.payment_ref,
             remarks: r.remarks
           });
@@ -4655,10 +4663,10 @@ export async function fetchFinancialOverview() {
             title: r.event_title || r.title,
             source: 'Event',
             amount: Number(r.actual_price || r.amount || r.price) || 0,
-            timestamp: r.timestamp || (r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at || new Date().toISOString())),
+            timestamp: r.payment_updated_at || r.timestamp || (r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at || new Date().toISOString())),
             guestName: r.guest_name || r.phone,
             paymentMethod: r.payment_method || '現金/臨櫃',
-            status: 'Paid',
+            status: r.payment_status || 'Paid',
             paymentRef: r.payment_ref,
             remarks: r.remarks
           });
@@ -4672,10 +4680,10 @@ export async function fetchFinancialOverview() {
             title: '現場排隊服務',
             source: 'Queue',
             amount: Number(t.price || 0) || 0,
-            timestamp: t.scanned_at || (t.created_at instanceof Date ? t.created_at.toISOString().split('T')[0] : String(t.created_at)),
+            timestamp: t.payment_updated_at || t.scanned_at || (t.created_at instanceof Date ? t.created_at.toISOString().split('T')[0] : String(t.created_at)),
             guestName: t.phone || '現場信眾',
             paymentMethod: '現金/臨櫃',
-            status: 'Paid',
+            status: t.payment_status || t.status || 'Paid',
             paymentRef: t.payment_ref,
             remarks: t.remarks
           });
@@ -4698,10 +4706,10 @@ export async function fetchFinancialOverview() {
             title: r.service_type,
             source: 'Merit',
             amount: amt,
-            timestamp: r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date),
+            timestamp: r.payment_updated_at || r.created_at || (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date)),
             guestName: payer,
             paymentMethod: pMethod,
-            status: 'Paid',
+            status: r.payment_status || 'Paid',
             paymentRef: r.payment_ref,
             remarks: r.remarks
           });
@@ -4720,10 +4728,10 @@ export async function fetchFinancialOverview() {
         title: r.categoryName,
         source: 'Lamp',
         amount: r.price,
-        timestamp: r.createdAt || r.date,
+        timestamp: r.paymentUpdatedAt || r.createdAt || r.date,
         guestName: r.guestName || r.phone,
         paymentMethod: '現金/臨櫃',
-        status: 'Paid',
+        status: r.paymentStatus || 'Paid',
         paymentRef: r.paymentRef,
         remarks: r.remarks
       });
@@ -4737,7 +4745,7 @@ export async function fetchFinancialOverview() {
         title: r.title,
         source: 'Event',
         amount: r.actualPrice || r.price,
-        timestamp: r.timestamp || new Date().toISOString(),
+        timestamp: r.paymentUpdatedAt || r.timestamp || new Date().toISOString(),
         guestName: r.guestName || r.phone,
         paymentMethod: '現金/臨櫃',
         status: r.paymentStatus,
@@ -4754,10 +4762,10 @@ export async function fetchFinancialOverview() {
         title: a.service,
         source: 'Appointment',
         amount: a.amount || 0,
-        timestamp: a.date,
+        timestamp: a.paymentUpdatedAt || a.createdAt || a.date,
         guestName: a.guestName || a.phone,
         paymentMethod: a.paymentMethod || '現金/臨櫃',
-        status: 'Paid',
+        status: a.paymentStatus || 'Paid',
         paymentRef: a.paymentRef,
         remarks: a.remarks
       });
@@ -4774,10 +4782,10 @@ export async function fetchFinancialOverview() {
         title: r.serviceType,
         source: 'Merit',
         amount: amt,
-        timestamp: r.date,
+        timestamp: r.paymentUpdatedAt || r.createdAt || r.date,
         guestName: r.guestName || (r.values && r.values['付款人']) || r.phone || '信眾',
         paymentMethod: (r.values && r.values['支付方式']) || '現金/臨櫃',
-        status: 'Paid',
+        status: r.paymentStatus || 'Paid',
         paymentRef: r.paymentRef,
         remarks: r.remarks
       });
@@ -4790,10 +4798,10 @@ export async function fetchFinancialOverview() {
         title: '現場排隊服務',
         source: 'Queue',
         amount: t.price || 0,
-        timestamp: t.scannedAt || t.date || new Date().toISOString().split('T')[0],
+        timestamp: t.paymentUpdatedAt || t.scannedAt || t.date || new Date().toISOString().split('T')[0],
         guestName: t.phone || '現場信眾',
         paymentMethod: '現金/臨櫃',
-        status: 'Paid',
+        status: t.paymentStatus || t.status || 'Paid',
         paymentRef: t.paymentRef,
         remarks: t.remarks
       });
@@ -6061,6 +6069,7 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
         const idx = db_lamp_records.findIndex(r => r.id === recordId);
         if (idx > -1) {
           db_lamp_records[idx].paymentStatus = 'Paid';
+          db_lamp_records[idx].paymentUpdatedAt = new Date().toISOString();
         }
       }
       if (recordType === 'Appointment') {
@@ -6068,12 +6077,14 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
         if (idx > -1) {
           db_appointments[idx].status = 'Confirmed';
           db_appointments[idx].paymentStatus = 'Paid';
+          db_appointments[idx].paymentUpdatedAt = new Date().toISOString();
         }
       }
       if (recordType === 'Event') {
         const idx = db_event_registrations.findIndex(r => r.id === recordId);
         if (idx > -1) {
           db_event_registrations[idx].paymentStatus = 'Paid';
+          db_event_registrations[idx].paymentUpdatedAt = new Date().toISOString();
         }
       }
       if (recordType === 'Queue') {
@@ -6081,21 +6092,22 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
           const idx = db_queue_tickets.findIndex(r => r.id === recordId);
           if (idx > -1) {
             db_queue_tickets[idx].paymentStatus = 'Paid';
+            db_queue_tickets[idx].paymentUpdatedAt = new Date().toISOString();
           }
         }
       }
     } else {
       if (recordType === 'Appointment') {
-        await client.query('UPDATE appointments SET status = \'Confirmed\', payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+        await client.query('UPDATE appointments SET status = \'Confirmed\', payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
       }
       if (recordType === 'Lamp') {
-        await client.query('UPDATE lamp_records SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+        await client.query('UPDATE lamp_records SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
       }
       if (recordType === 'Event') {
-        await client.query('UPDATE event_registrations SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+        await client.query('UPDATE event_registrations SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
       }
       if (recordType === 'Queue') {
-        await client.query('UPDATE queue_tickets SET payment_status = \'Paid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+        await client.query('UPDATE queue_tickets SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
       }
     }
     await revalidateTemple();
