@@ -17,7 +17,7 @@
     "leaflet-defaulticon-compatibility": "^0.1.2",
     "lucide-react": "^1.23.0",
     "lunar-javascript": "^1.7.7",
-    "next": "^16.3.0-canary.8",
+    "next": "^16.2.11",
     "pdf-parse": "^2.4.5",
     "pg": "^8.21.0",
     "react": "19.2.4",

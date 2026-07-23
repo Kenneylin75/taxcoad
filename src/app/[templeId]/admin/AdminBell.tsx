@@ -68,7 +68,7 @@ export default function AdminBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="absolute right-0 mt-3 w-[450px] bg-white rounded-2xl shadow-2xl border border-slate-100 z-[9999] overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="p-4 border-b border-slate-100 bg-slate-50">
             <h3 className="text-sm font-black text-slate-800 flex items-center justify-between">
               通知中心 
@@ -100,7 +100,7 @@ export default function AdminBell() {
             ))}
           </div>
 
-          <div className="max-h-80 overflow-y-auto custom-scrollbar">
+          <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
             {filteredNotifs.length === 0 ? (
               <div className="py-12 text-center flex flex-col items-center justify-center opacity-50">
                 <span className="text-3xl mb-2">📭</span>
