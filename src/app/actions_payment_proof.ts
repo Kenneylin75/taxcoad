@@ -9,11 +9,11 @@ const gStore = globalThis as any;
 if (!gStore.db_admin_notifications) gStore.db_admin_notifications = [];
 
 // 1. Upload Payment Proof
-export async function uploadPaymentProof(recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration', imageUrl: string, guestId?: string) {
+export async function uploadPaymentProof(recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration', imageUrl: string, guestId?: string, paymentRef?: string, paymentMethod?: string) {
   const templeId = await getDynamicTempleId();
   
   return withTempleSession(templeId, false, async (client) => {
-    let message = `有信眾上傳了匯款截圖，請盡快核對款項。`;
+    let message = `有信眾上傳了匯款截圖/後五碼，請盡快核對款項。`;
     let linkPath = `/${templeId}/admin/queue`; // Default fallback path
 
     if (!client) {
@@ -21,25 +21,31 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
       if (recordType === 'Appointment') {
         const idx = gStore.db_appointments?.findIndex((a: any) => String(a.id) === String(recordId));
         if (idx !== undefined && idx !== -1) {
-            gStore.db_appointments[idx].paymentProofUrl = imageUrl;
+            if (imageUrl) gStore.db_appointments[idx].paymentProofUrl = imageUrl;
+            if (paymentRef) gStore.db_appointments[idx].paymentRef = paymentRef;
+            if (paymentMethod) gStore.db_appointments[idx].paymentMethod = paymentMethod;
             gStore.db_appointments[idx].paymentStatus = 'PENDING_REVIEW';
-            message = `預約單號 ${recordId} 上傳了匯款截圖`;
+            message = `預約單號 ${recordId} 上傳了匯款截圖/後五碼`;
             linkPath = `/${templeId}/admin/calendar`;
         }
       } else if (recordType === 'LampRecord') {
         const idx = gStore.db_lamp_records?.findIndex((a: any) => String(a.id) === String(recordId));
         if (idx !== undefined && idx !== -1) {
-            gStore.db_lamp_records[idx].paymentProofUrl = imageUrl;
+            if (imageUrl) gStore.db_lamp_records[idx].paymentProofUrl = imageUrl;
+            if (paymentRef) gStore.db_lamp_records[idx].paymentRef = paymentRef;
+            if (paymentMethod) gStore.db_lamp_records[idx].paymentMethod = paymentMethod;
             gStore.db_lamp_records[idx].paymentStatus = 'PENDING_REVIEW';
-            message = `點燈紀錄 ${recordId} 上傳了匯款截圖`;
+            message = `點燈紀錄 ${recordId} 上傳了匯款截圖/後五碼`;
             linkPath = `/${templeId}/admin/lamps`;
         }
       } else if (recordType === 'EventRegistration') {
         const idx = gStore.db_event_registrations?.findIndex((a: any) => String(a.id) === String(recordId));
         if (idx !== undefined && idx !== -1) {
-            gStore.db_event_registrations[idx].paymentProofUrl = imageUrl;
+            if (imageUrl) gStore.db_event_registrations[idx].paymentProofUrl = imageUrl;
+            if (paymentRef) gStore.db_event_registrations[idx].paymentRef = paymentRef;
+            if (paymentMethod) gStore.db_event_registrations[idx].paymentMethod = paymentMethod;
             gStore.db_event_registrations[idx].paymentStatus = 'PENDING_REVIEW';
-            message = `法會報名 ${recordId} 上傳了匯款截圖`;
+            message = `法會報名 ${recordId} 上傳了匯款截圖/後五碼`;
             linkPath = `/${templeId}/admin/events`;
         }
       }
@@ -66,11 +72,25 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
       if (tableName) {
           try {
             // First try with camelCase (Prisma generated tables if any)
-            await client.query(`UPDATE ${tableName} SET "paymentProofUrl" = $1, "paymentStatus" = 'PENDING_REVIEW' WHERE id = $2`, [imageUrl, recordId]);
+            const updates = [];
+            const values = [recordId];
+            let paramIdx = 2;
+            if (imageUrl) { updates.push(`"paymentProofUrl" = $${paramIdx++}`); values.push(imageUrl); }
+            if (paymentRef) { updates.push(`"paymentRef" = $${paramIdx++}`); values.push(paymentRef); }
+            if (paymentMethod) { updates.push(`"paymentMethod" = $${paramIdx++}`); values.push(paymentMethod); }
+            updates.push(`"paymentStatus" = 'PENDING_REVIEW'`);
+            await client.query(`UPDATE ${tableName} SET ${updates.join(', ')} WHERE id = $1`, values);
           } catch(e) {
             try {
                // Then fallback to snake_case schema logic
-               await client.query(`UPDATE ${tableName} SET payment_proof_url = $1, payment_status = 'PENDING_REVIEW' WHERE id = $2`, [imageUrl, recordId]);
+               const updates = [];
+               const values = [recordId];
+               let paramIdx = 2;
+               if (imageUrl) { updates.push(`payment_proof_url = $${paramIdx++}`); values.push(imageUrl); }
+               if (paymentRef) { updates.push(`payment_ref = $${paramIdx++}`); values.push(paymentRef); }
+               if (paymentMethod) { updates.push(`payment_method = $${paramIdx++}`); values.push(paymentMethod); }
+               updates.push(`payment_status = 'PENDING_REVIEW'`);
+               await client.query(`UPDATE ${tableName} SET ${updates.join(', ')} WHERE id = $1`, values);
             } catch (err) {}
           }
       }

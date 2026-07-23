@@ -1432,6 +1432,30 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       )}
                     </div>
                   )}
+                  {(!record.paymentProofUrl && !record.paymentRef) && record.amount !== undefined && record.amount > 0 && record.status !== 'Paid' && record.status !== 'PAID' && record.status !== 'Completed' && (
+                    <div className="pt-2 mt-2 border-t border-slate-100">
+                       <button onClick={() => {
+                          setPaymentIntent({
+                             amount: record.amount,
+                             module: record.type === '預約' ? 'Booking' : record.type === '點燈' ? 'Lamp' : 'Event',
+                             onPaid: async (method: string, ref: string, proofFile: File | null) => {
+                                let proofUrl = '';
+                                if (proofFile) {
+                                   const { fileToBase64 } = await import('@/app/utils/client_utils');
+                                   proofUrl = await fileToBase64(proofFile);
+                                }
+                                const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
+                                const recordType = record.type === '預約' ? 'Appointment' : record.type === '點燈' ? 'LampRecord' : 'EventRegistration';
+                                await uploadPaymentProof(record.id.toString(), recordType, proofUrl, guestUser?.phone, ref, method);
+                                refreshAllData(guestUser?.phone);
+                             }
+                          });
+                          setPaymentSubView('methods');
+                       }} className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[11px] font-black tracking-widest flex items-center justify-center gap-2 transition-colors">
+                          <span>💳</span> 付款 / 上傳憑證
+                       </button>
+                    </div>
+                  )}
 
                   {/* 
                     TEMPORARILY DISABLED BY TEMPLE: 
