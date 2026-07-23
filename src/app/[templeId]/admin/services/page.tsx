@@ -20,6 +20,21 @@ import {
 const AdminMobileView = ({ services, forms, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm }: any) => {
    const [isMenuOpen, setIsMenuOpen] = useState(false);
    const [editingService, setEditingService] = useState<any>(null);
+   
+   const [servicePage, setServicePage] = useState(1);
+   const [formPage, setFormPage] = useState(1);
+   const ITEMS_PER_PAGE = 5;
+
+   useEffect(() => {
+      setServicePage(1);
+      setFormPage(1);
+   }, [activeTab]);
+
+   const paginatedServices = services.slice((servicePage - 1) * ITEMS_PER_PAGE, servicePage * ITEMS_PER_PAGE);
+   const totalServicePages = Math.ceil(services.length / ITEMS_PER_PAGE);
+
+   const paginatedForms = forms.slice((formPage - 1) * ITEMS_PER_PAGE, formPage * ITEMS_PER_PAGE);
+   const totalFormPages = Math.ceil(forms.length / ITEMS_PER_PAGE);
 
    return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans">
@@ -53,24 +68,46 @@ const AdminMobileView = ({ services, forms, staffList, availableSlots, loadData,
          )}
 
          <main className="flex-1 p-4">
-            {activeTab === 'services' && services.map((s: any) => (
-               <div key={s.id} onClick={() => setEditingService(s)} className="bg-white p-5 mb-4 rounded-3xl border border-slate-100 shadow-sm relative">
-                  <h3 className="text-lg font-bold text-slate-900 mb-1">{s.name}</h3>
-                  <p className="text-[11px] text-slate-400">{forms.find((f: any) => f.id === s.linkedFormId)?.name || '未關聯表單'}</p>
-                  <button 
-                     onClick={(e) => handleDeleteService(s.id, e)}
-                     className="absolute top-5 right-5 text-[10px] font-bold text-rose-300 uppercase tracking-widest hover:text-rose-600 transition-colors p-2"
-                  >
-                     刪除
-                  </button>
-               </div>
-            ))}
-            {activeTab === 'forms' && forms.map(f => (
-               <div key={f.id} className="bg-white p-5 mb-4 rounded-3xl border border-slate-100 shadow-sm">
-                  <h3 className="text-lg font-bold text-slate-900">{f.name}</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">欄位數: {f.fields?.length || 0}</p>
-               </div>
-            ))}
+            {activeTab === 'services' && (
+               <>
+                  {paginatedServices.map((s: any) => (
+                     <div key={s.id} onClick={() => setEditingService(s)} className="bg-white p-5 mb-4 rounded-3xl border border-slate-100 shadow-sm relative">
+                        <h3 className="text-lg font-bold text-slate-900 mb-1">{s.name}</h3>
+                        <p className="text-[11px] text-slate-400">{forms.find((f: any) => f.id === s.linkedFormId)?.name || '未關聯表單'}</p>
+                        <button 
+                           onClick={(e) => handleDeleteService(s.id, e)}
+                           className="absolute top-5 right-5 text-[10px] font-bold text-rose-300 uppercase tracking-widest hover:text-rose-600 transition-colors p-2"
+                        >
+                           刪除
+                        </button>
+                     </div>
+                  ))}
+                  {totalServicePages > 1 && (
+                     <div className="flex justify-center items-center mt-6 gap-4 pb-6">
+                        <button disabled={servicePage === 1} onClick={() => setServicePage(p => p - 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">上一頁</button>
+                        <span className="text-sm font-bold text-slate-500">{servicePage} / {totalServicePages}</span>
+                        <button disabled={servicePage === totalServicePages} onClick={() => setServicePage(p => p + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">下一頁</button>
+                     </div>
+                  )}
+               </>
+            )}
+            {activeTab === 'forms' && (
+               <>
+                  {paginatedForms.map(f => (
+                     <div key={f.id} className="bg-white p-5 mb-4 rounded-3xl border border-slate-100 shadow-sm">
+                        <h3 className="text-lg font-bold text-slate-900">{f.name}</h3>
+                        <p className="text-[10px] text-slate-400 mt-1">欄位數: {f.fields?.length || 0}</p>
+                     </div>
+                  ))}
+                  {totalFormPages > 1 && (
+                     <div className="flex justify-center items-center mt-6 gap-4 pb-6">
+                        <button disabled={formPage === 1} onClick={() => setFormPage(p => p - 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">上一頁</button>
+                        <span className="text-sm font-bold text-slate-500">{formPage} / {totalFormPages}</span>
+                        <button disabled={formPage === totalFormPages} onClick={() => setFormPage(p => p + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">下一頁</button>
+                     </div>
+                  )}
+               </>
+            )}
 
             {activeTab === 'print-templates' && (
                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm text-center">
@@ -92,6 +129,12 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
    const [isSaving, setIsSaving] = useState(false);
    const [aiPrompt, setAiPrompt] = useState('');
    const [isAiGenerating, setIsAiGenerating] = useState(false);
+   
+   const [ptPage, setPtPage] = useState(1);
+   const ITEMS_PER_PAGE = 5;
+
+   const paginatedTemplates = printTemplates.slice((ptPage - 1) * ITEMS_PER_PAGE, ptPage * ITEMS_PER_PAGE);
+   const totalPtPages = Math.ceil(printTemplates.length / ITEMS_PER_PAGE);
 
    const handleCreate = () => {
       setEditingTemplate({
@@ -149,7 +192,7 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
          </div>
 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {printTemplates.map((pt: any) => (
+            {paginatedTemplates.map((pt: any) => (
                <div key={pt.id} className="bg-white rounded-3xl p-6 border-2 border-slate-100 hover:border-indigo-200 hover:shadow-xl transition-all group flex flex-col">
                   <div className="flex-1">
                      <h3 className="text-lg font-black text-slate-800 mb-1">{pt.name}</h3>
@@ -177,6 +220,14 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
                </div>
             ))}
          </div>
+
+         {totalPtPages > 1 && (
+            <div className="flex justify-center items-center mt-8 gap-4">
+               <button disabled={ptPage === 1} onClick={() => setPtPage(p => p - 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">上一頁</button>
+               <span className="text-sm font-bold text-slate-500">{ptPage} / {totalPtPages}</span>
+               <button disabled={ptPage === totalPtPages} onClick={() => setPtPage(p => p + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">下一頁</button>
+            </div>
+         )}
 
          {editingTemplate && (
             <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in">
@@ -273,6 +324,21 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
    const [isAiScanning, setIsAiScanning] = useState(false);
    const templeId = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'default';
    const aiFileInputRef = useRef<HTMLInputElement>(null);
+   
+   const [servicePage, setServicePage] = useState(1);
+   const [formPage, setFormPage] = useState(1);
+   const ITEMS_PER_PAGE = 5;
+
+   useEffect(() => {
+      setServicePage(1);
+      setFormPage(1);
+   }, [activeTab]);
+
+   const paginatedServices = services.slice((servicePage - 1) * ITEMS_PER_PAGE, servicePage * ITEMS_PER_PAGE);
+   const totalServicePages = Math.ceil(services.length / ITEMS_PER_PAGE);
+
+   const paginatedForms = forms.slice((formPage - 1) * ITEMS_PER_PAGE, formPage * ITEMS_PER_PAGE);
+   const totalFormPages = Math.ceil(forms.length / ITEMS_PER_PAGE);
    const [newSlot, setNewSlot] = useState<any>({ date: '', time: '10:00', staff: '', serviceId: '' });
 
    // 真實檔案上傳觸發 AI 邏輯
@@ -347,7 +413,7 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                      <button onClick={() => setEditingService({ id: 's-' + Date.now(), name: '新服務項目', assignedStaff: [], status: 'Active', linkedFormId: '', price: 0 })} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl font-bold text-sm shadow-lg hover:bg-indigo-700 hover:translate-y-[-2px] transition-all">＋ 新增服務項目</button>
                   </div>
                   <div className="grid grid-cols-1 xl:grid-cols-1 md:grid-cols-2 3xl:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                     {services.map(s => (
+                     {paginatedServices.map(s => (
                         <div key={s.id} className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer" onClick={() => setEditingService(s)}>
                            <div className="flex justify-between items-center mb-8">
                               <div className="w-16 h-16 bg-slate-50 text-slate-600 rounded-[24px] flex items-center justify-center text-3xl group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">⛩️</div>
@@ -372,6 +438,13 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                         </div>
                      ))}
                   </div>
+                  {totalServicePages > 1 && (
+                     <div className="flex justify-center items-center mt-8 gap-4">
+                        <button disabled={servicePage === 1} onClick={() => setServicePage(p => p - 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">上一頁</button>
+                        <span className="text-sm font-bold text-slate-500">{servicePage} / {totalServicePages}</span>
+                        <button disabled={servicePage === totalServicePages} onClick={() => setServicePage(p => p + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">下一頁</button>
+                     </div>
+                  )}
                </div>
             )}
 
@@ -423,7 +496,7 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                      </div>
                   </div>
                   <div className="grid grid-cols-1 xl:grid-cols-1 md:grid-cols-2 3xl:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                     {forms.map(f => (
+                     {paginatedForms.map(f => (
                         <div key={f.id} className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer" onClick={() => setEditingForm(f)}>
                            <div className="flex justify-between items-center mb-8">
                               <div className="w-16 h-16 bg-slate-50 text-slate-600 rounded-[24px] flex items-center justify-center text-3xl group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">📑</div>
@@ -443,6 +516,13 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                         </div>
                      ))}
                   </div>
+                  {totalFormPages > 1 && (
+                     <div className="flex justify-center items-center mt-8 gap-4">
+                        <button disabled={formPage === 1} onClick={() => setFormPage(p => p - 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">上一頁</button>
+                        <span className="text-sm font-bold text-slate-500">{formPage} / {totalFormPages}</span>
+                        <button disabled={formPage === totalFormPages} onClick={() => setFormPage(p => p + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-50 shadow-sm">下一頁</button>
+                     </div>
+                  )}
                </div>
             )}
 
