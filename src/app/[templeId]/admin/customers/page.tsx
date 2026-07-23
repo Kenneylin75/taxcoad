@@ -288,13 +288,18 @@ function DeepFileCenterContent() {
     if (!file || !selectedGuest) return;
     setIsSaving(true);
     
-    // 為了讓展示環境中，使用者能「真的」看到自己上傳的影片與照片，
-    // 我們使用瀏覽器原生的 URL.createObjectURL 來產生一個本地的預覽連結，
-    // 取代原本會 404 的假路徑 (/uploads/...)。
-    const previewUrl = URL.createObjectURL(file);
+    // 為了讓展示環境中，信眾端與管理端能跨元件看到圖片與影片，
+    // 我們將檔案轉為 Base64 格式儲存。
+    const base64Url = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+    
     const finalName = pendingServiceFileName ? `${pendingServiceFileName}.${file.name.split('.').pop()}` : file.name;
     
-    await uploadCustomerMedia(selectedGuest.phone, previewUrl, uploadType, 'Temple', finalName);
+    await uploadCustomerMedia(selectedGuest.phone, base64Url, uploadType, 'Temple', finalName);
     await loadHistory(selectedGuest.phone);
     setIsSaving(false);
     if (fileInputRef.current) fileInputRef.current.value = '';

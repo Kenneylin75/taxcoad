@@ -1210,7 +1210,10 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   autoPlay
                   className="w-full h-full object-contain"
                   onError={(e) => {
-                    (e.target as HTMLVideoElement).src = "https://assets.mixkit.co/videos/preview/mixkit-worship-hands-raised-in-church-41716-large.mp4";
+                    const target = e.target as HTMLVideoElement;
+                    if (target.getAttribute('data-error-handled')) return;
+                    target.setAttribute('data-error-handled', 'true');
+                    target.src = "https://www.w3schools.com/html/mov_bbb.mp4";
                   }}
                 />
               </div>
