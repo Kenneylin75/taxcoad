@@ -4384,13 +4384,13 @@ export async function fetchComplexAnalyticsData() {
   };
 
   db_appointments.forEach((a: any) => {
-    if (a.paymentStatus !== 'Pending' && a.status !== 'Cancelled') {
+    if (a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid' && a.status !== 'Cancelled') {
       addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0, a.templeId);
     }
   });
 
   db_lamp_records.forEach((r: any) => {
-    if (r.paymentStatus !== 'Pending') {
+    if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
          const cat = db_lamp_categories.find((c: any) => c.id === r.categoryId);
@@ -4401,8 +4401,24 @@ export async function fetchComplexAnalyticsData() {
   });
 
   db_event_registrations.forEach((r: any) => {
-    if (r.paymentStatus !== 'Pending') {
-      addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice) || 0, r.templeId);
+    if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
+      addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0, r.templeId);
+    }
+  });
+
+  db_queue_tickets.forEach((t: any) => {
+    if (t.paymentStatus === 'Paid' || t.status === 'Paid') {
+      addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(t.price || 0) || 0, t.templeId);
+    }
+  });
+
+  db_deep_records.forEach((r: any) => {
+    if ((r.id.startsWith('MERIT-') || r.serviceType?.includes('功德')) && (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid')) {
+      let amt = 0;
+      if (r.values && r.values['金額']) {
+        amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
+      }
+      addRevenue(r.paymentUpdatedAt || r.createdAt || r.date, amt, r.templeId);
     }
   });
 
