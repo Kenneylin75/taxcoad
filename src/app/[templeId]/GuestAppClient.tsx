@@ -1441,7 +1441,6 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                              onPaid: async (method: string, ref: string, proofFile: File | null) => {
                                 let proofUrl = '';
                                 if (proofFile) {
-                                   const { fileToBase64 } = await import('@/app/utils/client_utils');
                                    proofUrl = await fileToBase64(proofFile);
                                 }
                                 const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
