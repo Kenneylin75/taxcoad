@@ -1382,7 +1382,18 @@ export default function SuperAdminClient({
                                      <span className="px-4 py-2 bg-emerald-100 text-emerald-600 rounded-full text-xs font-black uppercase tracking-widest">已匯款</span>
                                      {w.receiptUrl && (
                                         <button 
-                                           onClick={() => window.open(w.receiptUrl, '_blank')}
+                                           onClick={() => {
+                                              if (w.receiptUrl?.startsWith('data:')) {
+                                                const newTab = window.open();
+                                                if (newTab) {
+                                                  newTab.document.body.innerHTML = `<img src="${w.receiptUrl}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />`;
+                                                } else {
+                                                  alert('請允許瀏覽器彈出視窗');
+                                                }
+                                              } else {
+                                                window.open(w.receiptUrl, '_blank');
+                                              }
+                                           }}
                                            className="text-[10px] text-blue-500 underline font-bold"
                                         >
                                            查看匯款截圖
