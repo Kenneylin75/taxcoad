@@ -13,7 +13,8 @@ import {
   fetchEarningsStats,
   requestWithdrawal,
   fetchSystemConfig,
-  fetchCommissionHistory
+  fetchCommissionHistory,
+  fetchSuperSalesApplications
 } from '@/app/actions';
 
 import { useParams } from "next/navigation";
@@ -22,7 +23,7 @@ export default function SuperSalesPage() {
   const params = useParams();
   const salesId = params.salesId as string;
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'apply' | 'registry' | 'performance' | 'tools' | 'profile'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'apply' | 'registry' | 'performance' | 'tools' | 'profile' | 'records'>('overview');
   const [applyType, setApplyType] = useState<'temple' | 'distributor'>('temple');
   const [registryTab, setRegistryTab] = useState<'temples' | 'distributors'>('temples');
   const [performanceTab, setPerformanceTab] = useState<'monitor' | 'withdraw'>('monitor');
@@ -45,6 +46,11 @@ export default function SuperSalesPage() {
   const [sysConfig, setSysConfig] = useState<any>(null);
   const [commissionHistory, setCommissionHistory] = useState<any>(null);
   const [viewingBillsTemple, setViewingBillsTemple] = useState<any>(null);
+  const [records, setRecords] = useState<any[]>([]);
+  const [filterYearMonth, setFilterYearMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [withdrawalMonth, setWithdrawalMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -63,7 +69,11 @@ export default function SuperSalesPage() {
     fetchSystemConfig().then(setSysConfig);
     const d = new Date();
     fetchCommissionHistory(salesId, d.getFullYear().toString(), String(d.getMonth() + 1).padStart(2, '0')).then(setCommissionHistory);
-  }, [salesId, activeTab]); 
+    
+    if (activeTab === 'records' && profile?.name) {
+        fetchSuperSalesApplications(profile.name).then(setRecords);
+    }
+  }, [salesId, activeTab, profile?.name]); 
 
   if (submitted) {
     return (
@@ -562,6 +572,62 @@ export default function SuperSalesPage() {
     );
   };
 
+  
+  const renderRecords = () => {
+    const filteredRecords = records.filter((r: any) => {
+      const dateStr = r.timestamp || r.created_at || r.rejectedAt || '';
+      return dateStr.startsWith(filterYearMonth) && (r.status === 'Approved' || r.status === 'Rejected');
+    });
+
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex justify-between items-end">
+          <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter italic">歷史紀錄中心</h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Application Records</p>
+          </div>
+          <input 
+            type="month" 
+            value={filterYearMonth}
+            onChange={(e: any) => setFilterYearMonth(e.target.value)}
+            className="px-4 py-2 rounded-xl bg-white border-2 border-slate-100 text-sm font-bold text-slate-600 outline-none focus:border-indigo-200"
+          />
+        </div>
+
+        <div className="space-y-4">
+          {filteredRecords.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-[30px] border border-slate-100">
+              <p className="text-sm font-bold text-slate-400">當月份無任何紀錄</p>
+            </div>
+          ) : (
+            filteredRecords.map((r: any) => (
+              <div key={r.id} className="p-6 bg-white rounded-[30px] shadow-sm border border-slate-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">{r.distributorName || '經銷商申請'}</h3>
+                  <p className="text-xs font-bold text-slate-500 mt-1">{r.type === 'temple' ? '直屬宮廟' : '區代理經銷商'}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{(r.timestamp || r.created_at || r.rejectedAt)?.substring(0, 10)}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${r.status === 'Approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    {r.status === 'Approved' ? '已核准' : '已駁回'}
+                  </span>
+                  {r.status === 'Rejected' && r.rejectReason && (
+                    <button 
+                      onClick={() => alert('駁回原因：\n' + r.rejectReason)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black transition-all"
+                    >
+                      備註
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderProfile = () => (
     <div className="space-y-8 animate-in fade-in duration-500 pb-24">
        <div className="bg-white p-12 rounded-[48px] border border-slate-200 shadow-sm space-y-12">
@@ -746,6 +812,7 @@ export default function SuperSalesPage() {
              case 'registry': return renderRegistry();
              case 'performance': return renderPerformance();
              case 'tools': return renderTools();
+             case 'records': return renderRecords();
              case 'profile': return renderProfile();
              default: return renderOverview();
            }
@@ -765,6 +832,7 @@ export default function SuperSalesPage() {
            {id: 'registry', icon: '📊', label: '管理'},
            {id: 'performance', icon: '💰', label: '績效'},
            {id: 'tools', icon: '⚒️', label: '工具'},
+           {id: 'records', icon: '📁', label: '紀錄'},
            {id: 'profile', icon: '👤', label: '個人'}
          ].map(t => (
            <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`flex flex-col items-center gap-1 w-16 transition-all duration-300 ${activeTab === t.id ? 'text-indigo-600 scale-105' : 'text-slate-300'}`}>

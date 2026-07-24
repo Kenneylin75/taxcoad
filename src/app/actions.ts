@@ -371,6 +371,9 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
             }
             const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
             const temple = allTemples.find((t: any) => t.id === person.templeId);
+            if (!temple) {
+               return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
+            }
             if (temple && temple.status === "Inactive") {
                loginStatus = "Inactive";
             } else {
@@ -2907,6 +2910,22 @@ export async function submitFreeAccountApplication(data: any) {
     db_temples.push(newTemple);
     gStore.db_temples = db_temples;
 
+    try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery(
+        `INSERT INTO temples (id, temple_name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle]
+      );
+      await dbQuery(
+        `INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [newTemple.id, 0, 5368709120, '標準免費空間', newTemple.city || '台北市']
+      );
+    } catch (e) {
+      console.error("Failed to insert new temple into postgres", e);
+    }
+
     if (data.freeType === 'Permanent') {
       await grantTempleAiVip(newTemple.id, true);
       await grantTempleStorageVip(newTemple.id, true);
@@ -2916,8 +2935,9 @@ export async function submitFreeAccountApplication(data: any) {
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
   if (status === 'Active' && account && password) {
     const pData = (gStore.db_personnel || db_personnel);
+    const pId = `p-${Date.now()}`;
     pData.push({
-      id: `p-${Date.now()}`,
+      id: pId,
       templeId: newTemple.id,
       name: data.templeName || '宮廟管理員',
       account: account,
@@ -2926,6 +2946,17 @@ export async function submitFreeAccountApplication(data: any) {
       status: 'Active'
     });
     gStore.db_personnel = pData;
+    
+    try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery(
+        `INSERT INTO personnel (id, temple_id, name, account, password, role, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [pId, newTemple.id, data.templeName || '宮廟管理員', account, password, 'TempleAdmin', 'Active']
+      );
+    } catch (e) {
+      console.error("Failed to insert personnel", e);
+    }
   }
   
   if (status === 'Active') {
@@ -3084,11 +3115,16 @@ export async function approveDistributorBySuperAdmin(id: string, overrideQuota?:
   return { success: true };
 }
 
-export async function rejectDistributorBySuperAdmin(id: string) {
-  const idx = db_distributor_applications.findIndex(a => a.id === id);
-  if (idx > -1) db_distributor_applications.splice(idx, 1);
-  try { await dbQuery("DELETE FROM distributor_applications WHERE id = $1", [id]); } catch(e) {}
+export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: string) {
+  const app = db_distributor_applications.find(a => a.id === id);
+  if (app) {
+    app.status = 'Rejected';
+    (app as any).rejectReason = rejectReason || '';
+    (app as any).rejectedAt = new Date().toISOString();
+  }
+  try { await dbQuery("UPDATE distributor_applications SET status = 'Rejected' WHERE id = $1", [id]); } catch(e) {}
   revalidatePath('/super-admin');
+  revalidatePath('/super-sales');
   return { success: true };
 }
 
@@ -4308,6 +4344,12 @@ export async function approveTempleByDistributor(templeId: string) {
     t.status = 'Active';
     const gStore = globalThis as any;
     gStore.db_temples = db_temples;
+    
+    try {
+      const { dbQuery } = await import('@/db/db');
+      await dbQuery(`UPDATE temples SET status = 'Active' WHERE id = $1`, [templeId]);
+    } catch (e) {}
+    
     await generateInitialBills(t);
     if (t.account && t.password) {
       const pData = (gStore.db_personnel || db_personnel);
@@ -8822,5 +8864,23 @@ export async function updateRevenueRemark(id: string, source: string, remark: st
       return { success: false, message: e.message };
     }
   });
+}
+
+
+
+export async function fetchSuperSalesApplications(salesName: string) {
+  let list = [...db_distributor_applications];
+  try {
+    const { dbQuery } = await import('@/db/db');
+    const res = await dbQuery("SELECT * FROM distributor_applications WHERE submitted_by = $1", [salesName], () => null) as any;
+    if (res && res.rows) {
+      list = res.rows.map((r: any) => ({
+        ...r,
+        rejectReason: r.reject_reason || '',
+        rejectedAt: r.rejected_at || ''
+      }));
+    }
+  } catch(e) {}
+  return list.filter(a => a.submittedBy === salesName);
 }
 
