@@ -45,6 +45,10 @@ export default function SuperSalesPage() {
   const [sysConfig, setSysConfig] = useState<any>(null);
   const [commissionHistory, setCommissionHistory] = useState<any>(null);
   const [viewingBillsTemple, setViewingBillsTemple] = useState<any>(null);
+  const [withdrawalMonth, setWithdrawalMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   useEffect(() => {
     fetchSuperSalesProfile(salesId).then(p => {
@@ -410,14 +414,32 @@ export default function SuperSalesPage() {
 
              {/* 提領歷史紀錄 */}
              <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-8 mt-8">
-                <div className="text-center space-y-2">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">WITHDRAWAL HISTORY</p>
-                   <h3 className="text-2xl font-black text-slate-900 tracking-tight">提領紀錄</h3>
+                <div className="flex justify-between items-center relative">
+                   <div className="text-left space-y-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">WITHDRAWAL HISTORY</p>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">提領紀錄</h3>
+                   </div>
+                   <input
+                      type="month"
+                      value={withdrawalMonth}
+                      onChange={(e) => setWithdrawalMonth(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500"
+                   />
                 </div>
                 
                 <div className="space-y-4">
-                   {commissionHistory?.withdrawals && commissionHistory.withdrawals.length > 0 ? (
-                      commissionHistory.withdrawals.map((w: any) => (
+                   {(() => {
+                      const filteredWithdrawals = commissionHistory?.withdrawals?.filter((w: any) => {
+                         if (!withdrawalMonth) return true;
+                         const wDate = w.date || (w.timestamp && typeof w.timestamp === 'string' ? w.timestamp.split('T')[0] : '');
+                         return wDate.startsWith(withdrawalMonth);
+                      }) || [];
+                      
+                      if (filteredWithdrawals.length === 0) {
+                         return <p className="text-center text-sm font-bold text-slate-400 py-10">尚無提領紀錄</p>;
+                      }
+                      
+                      return filteredWithdrawals.map((w: any) => (
                          <div key={w.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between">
                             <div>
                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date || (w.timestamp && typeof w.timestamp === 'string' ? w.timestamp.split('T')[0] : '')}</p>
@@ -432,10 +454,12 @@ export default function SuperSalesPage() {
                                      onClick={() => {
                                         const url = w.receiptUrl || w.receipt_url;
                                         if (url.startsWith('data:')) {
-                                           const a = document.createElement('a');
-                                           a.href = url;
-                                           a.download = `receipt_${w.id}.png`;
-                                           a.click();
+                                           const newTab = window.open();
+                                           if (newTab) {
+                                              newTab.document.body.innerHTML = `<img src="${url}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />`;
+                                           } else {
+                                              alert('請允許瀏覽器彈出視窗');
+                                           }
                                         } else {
                                            window.open(url, '_blank');
                                         }
@@ -447,10 +471,8 @@ export default function SuperSalesPage() {
                                )}
                             </div>
                          </div>
-                      ))
-                   ) : (
-                      <p className="text-center text-sm font-bold text-slate-400 py-10">尚無提領紀錄</p>
-                   )}
+                      ));
+                   })()}
                 </div>
              </div>
           </div>
