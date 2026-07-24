@@ -2502,7 +2502,7 @@ export async function fetchRoleWallets() {
     for (const s of sales.rows) {
       await client.query(
         `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, 0) ON CONFLICT (name) DO NOTHING`,
-        ['DistSales', s.name]
+        [s.role || 'DistSales', s.name]
       );
     }
     const res = await client.query('SELECT * FROM wallets');
@@ -3651,7 +3651,6 @@ export async function createSuperSalesAccount(data: any) {
   db_super_sales_overrides[data.name] = commissionRates;
   gStore.db_dist_sales = db_dist_sales;
 
-  await ensurePlatformTables();
   try {
     const { dbQuery } = await import('@/db/db');
     await dbQuery(`
@@ -3660,6 +3659,8 @@ export async function createSuperSalesAccount(data: any) {
       ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
     `, [id, null, data.name, safeAccount, (data.password || '').trim(), 'SuperSales', 'Active', newAccount.joinedAt]);
   } catch(e) {}
+
+  await ensurePlatformTables();
 
   revalidatePath('/super-admin');
   return { success: true, id };
@@ -7547,9 +7548,7 @@ export async function fetchSuperAdminFinancials() {
       joinedAt: t.timestamp || t.created_at || new Date().toISOString()
     };
   });
-
-  const superSalesWithdrawals = allWithdrawals.filter((w: any) => w.salesName && db_dist_sales.some(s => s.name === w.salesName && s.role === 'SuperSales'));
-
+  const superSalesWithdrawals = allWithdrawals.filter((w: any) => w.role === 'SuperSales' || w.role === 'SuperSalesRole');
   return {
     records: records.slice().reverse(),
     summary: {

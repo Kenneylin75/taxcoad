@@ -138,7 +138,7 @@ export default function SuperAdminClient({
     });
     fetchAdminLogs().then(setLogs);
     fetchSuperAdminFinancials().then(data => {
-      setFinance({ records: data.records, summary: data.summary, templePayments: data.templePayments });
+      setFinance({ records: data.records, summary: data.summary, templePayments: data.templePayments, superSalesWithdrawals: data.superSalesWithdrawals });
       setWallets(data.wallets);
     });
     fetchSyncQueue().then(setSyncQueue);
