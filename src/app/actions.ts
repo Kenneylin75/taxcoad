@@ -3004,7 +3004,7 @@ export async function fetchPendingDistributors() {
   return Array.from(allApps.values());
 }
 
-export async function approveDistributorBySuperAdmin(id: string) {
+export async function approveDistributorBySuperAdmin(id: string, overrideQuota?: number) {
   let app = db_distributor_applications.find(a => a.id === id);
   if (!app) {
     try {
@@ -3049,7 +3049,7 @@ export async function approveDistributorBySuperAdmin(id: string) {
       planName: plan?.name || '標準代理方案',
       price: Number(app.price || app.customPrice || 0),
       status: 'Active',
-      quota: Number(app.customNodes || plan?.nodes || app.nodes || 100),
+      quota: overrideQuota !== undefined ? overrideQuota : Number(app.customNodes || plan?.nodes || app.nodes || 100),
       joinedAt: new Date().toISOString().split('T')[0],
       expirationDate: app.expirationDate || '',
       creatorSalesId: actualSales?.id || app.submittedBy || '',

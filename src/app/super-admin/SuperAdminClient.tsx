@@ -675,7 +675,7 @@ export default function SuperAdminClient({
                              </div>
                           </div>
                           <div className="flex gap-6">
-                             <button onClick={()=>approveDistributorBySuperAdmin(app.id).then(()=>window.location.reload())} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
+                             <button onClick={()=>{ const currentQuota = app.nodes || app.customNodes || 100; const newQuotaStr = prompt(請確認或修改經銷商配額（目前申請： 組）, String(currentQuota)); if (newQuotaStr) { const newQuota = parseInt(newQuotaStr, 10); if (!isNaN(newQuota) && newQuota >= 0) { approveDistributorBySuperAdmin(app.id, newQuota).then(()=>window.location.reload()); } else { alert(配額必須是有效的正整數); } } }} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
                           </div>
                        </div>
                     ))}
@@ -698,27 +698,7 @@ export default function SuperAdminClient({
                            </div>
                         </div>
                      ))}
-                     {withdrawals.filter((w: any) => w.status === 'Verified' || w.status === 'Approved').map((req: any) => (
-                        <div key={req.id} className="bg-slate-50 p-12 rounded-[60px] border border-slate-100 flex items-center justify-between opacity-70">
-                           <div className="flex items-center gap-10">
-                              <div className="w-24 h-24 bg-white rounded-[40px] flex items-center justify-center text-4xl shadow-sm">✅</div>
-                              <div className="space-y-2">
-                                 <div className="flex items-center gap-4">
-                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter italic">{req.salesName}</h4>
-                                    <span className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Approved</span>
-                                 </div>
-                                 <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">提領金額：${req.amount.toLocaleString()} | 日期：{req.date}</p>
-                              </div>
-                           </div>
-                           <div className="flex gap-4">
-                              {req.receiptUrl && (
-                                 <button onClick={() => setViewingReceiptUrl(req.receiptUrl)} className="px-8 py-4 bg-white text-slate-600 rounded-[20px] text-[10px] font-black tracking-widest hover:bg-slate-100 transition-all shadow-sm">
-                                    🖼️ 查看匯款憑證
-                                 </button>
-                              )}
-                           </div>
-                        </div>
-                     ))}
+
                      {initialTemples.filter(t => t.status === 'Pending').length === 0 && pendingDistributors.length === 0 && pendingWithdrawals.length === 0 && (
                         <div className="py-40 text-center space-y-6">
                            <p className="text-6xl">✨</p>
