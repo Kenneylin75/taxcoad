@@ -2185,11 +2185,8 @@ export async function fetchB2BPaymentConfig(templeId: string) {
         return null;
       }
     } else {
-      if (!client) {
-        return db_config.b2bPayment || null;
-      } else {
-        return null;
-      }
+      const sysConfig = await fetchSystemConfig();
+      return sysConfig?.b2bPayment || db_config.b2bPayment || null;
     }
   });
 }
@@ -3060,7 +3057,13 @@ export async function approveDistributorBySuperAdmin(id: string) {
       email: app.email || '',
       address: app.address || '',
       contactName: app.contactName || app.owner || '',
-      taxId: app.taxId || ''
+      taxId: app.taxId || '',
+      bankInfo: app.bankInfo || {
+        bankCode: app.bankCode || '',
+        bankName: app.bankName || '',
+        accountName: app.accountName || app.name || '',
+        accountNumber: app.accountNumber || ''
+      }
     };
 
     db_distributors.push(newDist);
@@ -4902,7 +4905,8 @@ export async function fetchFinancialOverview() {
             payeeSettings[pId] = b2b || null;
           }
         } else {
-           payeeSettings[pId] = db_config?.b2bPayment || null;
+           const sysConfig = await fetchSystemConfig();
+           payeeSettings[pId] = sysConfig?.b2bPayment || db_config?.b2bPayment || null;
         }
       }
     }
@@ -5505,14 +5509,16 @@ export async function fetchDistributorProfile(distId?: string) {
       const r = res.rows[0];
       let b2bPayment = undefined;
       try { if (r.b2b_payment_config) b2bPayment = typeof r.b2b_payment_config === 'string' ? JSON.parse(r.b2b_payment_config) : r.b2b_payment_config; } catch(e){}
-      return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || '', accountName: r.name || '', accountNumber: r.bank_account || '', bankCode: r.bank_code || '' }, b2bPayment };
+      const allDists = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
+      const memDist = allDists.find((d: any) => d.id === distId);
+      return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || memDist?.bankInfo?.bankName || '', accountName: memDist?.bankInfo?.accountName || memDist?.accountName || r.name || '', accountNumber: r.bank_account || memDist?.bankInfo?.accountNumber || '', bankCode: r.bank_code || memDist?.bankInfo?.bankCode || '' }, b2bPayment };
     }
   } catch (e) {}
   
   const allDistributors = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
   const dist = allDistributors.find((d: any) => d.id === distId);
   if (dist && !dist.bankInfo && (dist.bank_name || dist.bank_account)) {
-    dist.bankInfo = { bankName: dist.bank_name || '', accountName: dist.name || '', accountNumber: dist.bank_account || '', bankCode: dist.bank_code || '' };
+    dist.bankInfo = { bankName: dist.bank_name || '', accountName: dist.accountName || dist.name || '', accountNumber: dist.bank_account || '', bankCode: dist.bank_code || '' };
   }
   return dist || null;
 }
@@ -7497,8 +7503,10 @@ export async function fetchSuperAdminFinancials() {
       });
   });
 
-  db_withdrawals.filter(w => w.status === 'Approved' || w.status === 'Verified').forEach(w => {
-      const wDate = w.timestamp || w.created_at;
+  const allWithdrawals = await fetchAllWithdrawals();
+
+  allWithdrawals.filter((w: any) => w.status === 'Approved' || w.status === 'Verified').forEach((w: any) => {
+      const wDate = w.timestamp || w.created_at || w.date;
       records.push({
          id: w.id,
          date: wDate instanceof Date ? wDate.toISOString().split('T')[0] : (wDate ? String(wDate).split('T')[0] : new Date().toISOString().split('T')[0]),
@@ -7540,7 +7548,7 @@ export async function fetchSuperAdminFinancials() {
     };
   });
 
-  const superSalesWithdrawals = db_withdrawals.filter(w => w.salesName && db_dist_sales.some(s => s.name === w.salesName && s.role === 'SuperSales'));
+  const superSalesWithdrawals = allWithdrawals.filter((w: any) => w.salesName && db_dist_sales.some(s => s.name === w.salesName && s.role === 'SuperSales'));
 
   return {
     records: records.slice().reverse(),
