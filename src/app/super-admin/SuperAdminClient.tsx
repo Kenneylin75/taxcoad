@@ -1542,7 +1542,7 @@ export default function SuperAdminClient({
                                         }}
                                         className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.status === 'PendingVerification' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}
                                      >
-                                       {payment.status === 'Paid' ? '已付款' : '未付款'}
+                                       {payment.status === 'Paid' ? '已付款' : payment.status === 'PendingVerification' ? '審核中' : '未付款'}
                                      </button>
                                   </div>
                                </div>

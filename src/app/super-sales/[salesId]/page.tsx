@@ -407,6 +407,52 @@ export default function SuperSalesPage() {
                    </button>
                 </form>
              </div>
+
+             {/* 提領歷史紀錄 */}
+             <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm space-y-8 mt-8">
+                <div className="text-center space-y-2">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">WITHDRAWAL HISTORY</p>
+                   <h3 className="text-2xl font-black text-slate-900 tracking-tight">提領紀錄</h3>
+                </div>
+                
+                <div className="space-y-4">
+                   {commissionHistory?.withdrawals && commissionHistory.withdrawals.length > 0 ? (
+                      commissionHistory.withdrawals.map((w: any) => (
+                         <div key={w.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between">
+                            <div>
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date || (w.timestamp && typeof w.timestamp === 'string' ? w.timestamp.split('T')[0] : '')}</p>
+                               <p className="text-lg font-black text-slate-900 mt-1">NT$ {w.amount.toLocaleString()}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                               <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${w.status === 'Paid' || w.status === 'Approved' || w.status === 'Verified' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                  {w.status === 'Paid' || w.status === 'Approved' || w.status === 'Verified' ? '已撥款' : '審核中'}
+                               </span>
+                               {(w.receiptUrl || w.receipt_url) && (
+                                  <button
+                                     onClick={() => {
+                                        const url = w.receiptUrl || w.receipt_url;
+                                        if (url.startsWith('data:')) {
+                                           const a = document.createElement('a');
+                                           a.href = url;
+                                           a.download = `receipt_${w.id}.png`;
+                                           a.click();
+                                        } else {
+                                           window.open(url, '_blank');
+                                        }
+                                     }}
+                                     className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+                                  >
+                                     查看匯款憑證 &rarr;
+                                  </button>
+                               )}
+                            </div>
+                         </div>
+                      ))
+                   ) : (
+                      <p className="text-center text-sm font-bold text-slate-400 py-10">尚無提領紀錄</p>
+                   )}
+                </div>
+             </div>
           </div>
        )}
     </div>
