@@ -675,7 +675,7 @@ export default function SuperAdminClient({
                              </div>
                           </div>
                           <div className="flex gap-6">
-                             <button onClick={()=>{ const currentQuota = app.nodes || app.customNodes || 100; const newQuotaStr = prompt(請確認或修改經銷商配額（目前申請： 組）, String(currentQuota)); if (newQuotaStr) { const newQuota = parseInt(newQuotaStr, 10); if (!isNaN(newQuota) && newQuota >= 0) { approveDistributorBySuperAdmin(app.id, newQuota).then(()=>window.location.reload()); } else { alert(配額必須是有效的正整數); } } }} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
+                             <button onClick={()=>{ const currentQuota = app.nodes || app.customNodes || 100; const newQuotaStr = prompt(`請確認或修改經銷商配額（目前申請：${currentQuota} 組）`, String(currentQuota)); if (newQuotaStr) { const newQuota = parseInt(newQuotaStr, 10); if (!isNaN(newQuota) && newQuota >= 0) { approveDistributorBySuperAdmin(app.id, newQuota).then(()=>window.location.reload()); } else { alert('配額必須是有效的正整數'); } } }} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
                           </div>
                        </div>
                     ))}
