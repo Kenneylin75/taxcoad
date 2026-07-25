@@ -518,7 +518,7 @@ export async function createSlot(data: any) {
     datesStr = data.dates || data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
   }
   if (!datesStr) return { success: false, message: "無效的日期" };
-  const dateList = datesStr.includes(',') ? datesStr.split(",") : [datesStr];
+  const dateList = datesStr?.includes(',') ? datesStr.split(",") : [datesStr];
   const templeId = await getDynamicTempleId();
 
   return withTempleSession(templeId, false, async (client) => {
@@ -2186,7 +2186,7 @@ export async function fetchB2BPaymentConfig(templeId: string) {
   return withTempleSession(templeId, true, async (client) => {
     let distributorId = null;
     if (!client) {
-      const temple = _allTemplesForAi.find(t => t.id === templeId);
+      const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
       distributorId = temple?.distributorId;
     } else {
       const res = await client.query('SELECT distributor_id FROM temples WHERE id = $1', [templeId]);
@@ -2399,7 +2399,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       const discount = db_config.yearlyDiscountRate || 20;
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.priceMonthly * priceFactor);
-      const temple = _allTemplesForAi.find((t: any) => t.id === templeId);
+      const temple = (await jsonStore.find('temples')).find((t: any) => t.id === templeId);
 
       if (!isManualGrant) {
         const adminWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
@@ -3965,7 +3965,7 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
     const shortRegion = region.substring(0, 2);
     
-    const matchedRegion = majorRegions.find(r => shortRegion.includes(r));
+    const matchedRegion = majorRegions.find(r => shortRegion?.includes(r));
     if (matchedRegion) {
        regionCounts[matchedRegion] = (regionCounts[matchedRegion] || 0) + 1;
     }
@@ -4105,8 +4105,8 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
           type: label,
           amount: commission,
           percent,
-          phase: bill.type.includes('Setup') ? 'Setup' : 'Rent',
-          calculation: `${bill.type.includes('Setup') ? '開辦費' : (bill.type === 'YearlyFee' ? '年繳' : '月租')} $${bill.amount.toLocaleString()} * ${percent}%`
+          phase: bill.type?.includes('Setup') ? 'Setup' : 'Rent',
+          calculation: `${bill.type?.includes('Setup') ? '開辦費' : (bill.type === 'YearlyFee' ? '年繳' : '月租')} $${bill.amount.toLocaleString()} * ${percent}%`
         });
       } else {
         totalPending += commission;
@@ -4297,7 +4297,7 @@ export async function fetchDistributorVisits(distributorId: string) {
     }
   } catch(e) {}
   const teamIds = listSales.filter(s => s.distributorId === distributorId).map(s => s.name);
-  return (await jsonStore.find('sales_visits')).filter(v => teamIds.includes(v.salesName));
+  return (await jsonStore.find('sales_visits')).filter(v => teamIds?.includes(v.salesName));
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
@@ -4645,7 +4645,7 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  const temple = _allTemplesForAi.find(t => t.id === templeId);
+  const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
   
@@ -4818,7 +4818,7 @@ export async function fetchFinancialOverview() {
     });
 
     const myEvents = (await jsonStore.find('events')).filter(e => e.templeId === templeId).map(e => e.id);
-    (await jsonStore.find('event_registrations')).filter(r => myEvents.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
+    (await jsonStore.find('event_registrations')).filter(r => myEvents?.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.title,
@@ -4835,7 +4835,7 @@ export async function fetchFinancialOverview() {
     });
 
     const myServices = (await jsonStore.find('services')).filter(s => s.templeId === templeId).map(s => s.id);
-    (await jsonStore.find('appointments')).filter(a => myServices.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
+    (await jsonStore.find('appointments')).filter(a => myServices?.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
       revenue.push({
         id: a.id,
         title: a.service,
@@ -4851,7 +4851,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += (a.amount || 0);
     });
 
-    (await jsonStore.find('deep_records')).filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType.includes('功德'))).forEach(r => {
+    (await jsonStore.find('deep_records')).filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType?.includes('功德'))).forEach(r => {
       let amt = 0;
       if (r.values && r.values['金額']) {
         amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
@@ -4918,7 +4918,7 @@ export async function fetchFinancialOverview() {
       expenses = rows.map((r: any) => {
         const t = _allTemplesForBills?.find((x: any) => x.id === r.temple_id);
         const type = r.item_name || '';
-        const isSuperAdminService = type.includes('空間') || type.includes('AI') || type.includes('Storage') || type.includes('Agi');
+        const isSuperAdminService = type?.includes('空間') || type?.includes('AI') || type?.includes('Storage') || type?.includes('Agi');
         const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
         const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
         
@@ -5292,12 +5292,12 @@ export async function fetchNotifications(userRole: string, userName?: string) {
       if (n.targetUser) return n.targetUser === userName;
       
       const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
-      if (adminOnlyTitles.includes(n.title)) {
-        return userName ? n.content.includes(userName) : false;
+      if (adminOnlyTitles?.includes(n.title)) {
+        return userName ? n.content?.includes(userName) : false;
       }
       
       if (n.title === '手動獎金撥發通知') {
-        return userName ? n.content.includes(userName) : false;
+        return userName ? n.content?.includes(userName) : false;
       }
       
       return true;
@@ -5782,7 +5782,7 @@ export async function searchGuestsByNameOrPhone(query: string) {
       }));
       
       return (await jsonStore.find('guests')).filter((g: any) => 
-        g.name.toLowerCase().includes(normalizedQuery) || 
+        g.name?.toLowerCase()?.includes(normalizedQuery) || 
         normalizePhone(g.phone).includes(normalizePhone(normalizedQuery))
       );
     } else {
@@ -6096,7 +6096,7 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
   // (await jsonStore.find('deep_records')) synced
 
   let activityContent = `完成【${serviceType}】紀錄歸檔`;
-  if (serviceType.includes('功德')) {
+  if (serviceType?.includes('功德')) {
     const amount = values['金額'] || '';
     const payer = values['付款人'] || '';
     const method = values['支付方式'] || '';
@@ -6339,7 +6339,7 @@ export async function fetchActiveQueueCount(): Promise<number> {
     if (!client) {
       const activeEventIds = (await jsonStore.find('queue_events')).filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)).map(e => e.id);
       if (activeEventIds.length === 0) return 0;
-      return (await jsonStore.find('queue_tickets')).filter(t => activeEventIds.includes(t.eventId) && t.status === 'Queuing').length;
+      return (await jsonStore.find('queue_tickets')).filter(t => activeEventIds?.includes(t.eventId) && t.status === 'Queuing').length;
     } else {
       const res = await client.query('SELECT COUNT(qt.id) as count FROM queue_tickets qt JOIN queue_events qe ON qt.event_id = qe.id WHERE qe.status = \'Active\' AND qt.status = \'Queuing\' AND qt.temple_id = $1', [templeId]);
       return parseInt(res.rows[0].count) || 0;
@@ -7011,7 +7011,7 @@ export async function impersonateTemple(templeId: string, originRole?: string) {
 // -------------------------------------------------------------------------
 
 export async function transferTempleOwnership(templeId: string, newDistributorId: string | null, newSalesId: string | null) {
-  const temple = _allTemplesForAi.find(t => t.id === templeId);
+  const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
   if (!temple) return { success: false, error: 'Temple not found' };
 
   if (newDistributorId !== undefined) {
@@ -7228,7 +7228,7 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
 
   const plan = db_ai_plans.find(p => p.id === planId);
   if (plan) {
-    const temple = _allTemplesForAi.find(t => t.id === templeId);
+    const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
     await jsonStore.createRecord('finance_records', {
       id: `F-${Date.now()}`,
       type: 'INCOME',
@@ -7516,7 +7516,7 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
       const salesVisits = vRes?.rows || [];
       const convertedTempleNames = temples.map((t: any) => t.temple_name || t.name);
       const uniqueVisitedTemples = [...new Set(salesVisits.map((v: any) => v.temple_name))];
-      const unconvertedVisitsCount = uniqueVisitedTemples.filter((name: any) => !convertedTempleNames.includes(name)).length;
+      const unconvertedVisitsCount = uniqueVisitedTemples.filter((name: any) => !convertedTempleNames?.includes(name)).length;
 
       return {
         id: s.id,
@@ -7636,7 +7636,7 @@ export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-  const temple = _allTemplesForAi.find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
+  const temple = (await jsonStore.find('temples')).find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
   if (!temple) {
     return {
       type: 'super_admin',
@@ -7697,7 +7697,7 @@ export async function getTempleCreatorInfo(templeId: string) {
 
 export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
   if (role === 'TempleAdmin' || role === 'Temple') {
-    const temple = _allTemplesForAi.find(t => t.id === id);
+    const temple = (await jsonStore.find('temples')).find(t => t.id === id);
     if (temple) temple.status = status;
     // synced
     try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
@@ -7717,7 +7717,7 @@ export async function updateAccountStatus(id: string, role: string, status: 'Act
 
 export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
   for (const tId of templeIds) {
-    const temple = _allTemplesForAi.find(t => t.id === tId);
+    const temple = (await jsonStore.find('temples')).find(t => t.id === tId);
     if (temple) {
       if (targetRole === 'HQ') {
         temple.distributorId = null;
@@ -7900,7 +7900,7 @@ export async function fetchDistributorLogs(distributorId: string) {
       }));
     }
   } catch (e) {}
-  return logs.filter((l: any) => l.target && l.target.includes(distributorId)); 
+  return logs.filter((l: any) => l.target && l.target?.includes(distributorId)); 
 }
 export async function requestBonus(salesId: string, distributorId: string, amount: number, method: string = 'Bank Transfer', salesName: string = '') {
   try {

@@ -68,6 +68,8 @@ export async function initializeStorage() {
   await autoCreateMissingFile('super_sales_overrides', {});
   await autoCreateMissingFile('config', {});
   await autoCreateMissingFile('distributor_applications', []);
+  await autoCreateMissingFile('withdrawals', []);
+  await autoCreateMissingFile('bonuses', []);
   console.log('[StorageInit] All Phases JSON Storage verified and initialized (safely).');
 }
 

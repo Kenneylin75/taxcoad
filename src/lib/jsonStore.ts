@@ -8,7 +8,7 @@ const ALLOWED_COLLECTIONS = [
   'temples', 'members', 'users', 'admins', 'distributors', 'donations', 'payments',
   'events', 'announcements', 'notifications', 'settings',
   'accounting', 'audit_logs', 'admin_logs', 'queue_events', 'queue_tickets', 'commissions', 'wallets',
-  'services', 'print_templates', 'forms', 'queue_events', 'queue_tickets', 'temple_payment_configs', 'lamp_categories', 'lamp_records', 'service_settings_mock', 'guest_files', 'event_registrations', 'activities', 'deep_records', 'events', 'distributors', 'dist_sales', 'sales_visits', 'audit_logs', 'tools', 'commissions', 'admin_logs', 'sync_queue', 'temple_storages', 'ai_plans', 'ai_api_models', 'temple_ai_usage', 'wallets', 'notifications', 'password_resets', 'price_plans', 'temple_applications', 'temple_notifications', 'super_sales_overrides', 'config', 'distributor_applications', 'finance_records', 'temple_bills'
+  'services', 'print_templates', 'forms', 'queue_events', 'queue_tickets', 'temple_payment_configs', 'lamp_categories', 'lamp_records', 'service_settings_mock', 'guest_files', 'event_registrations', 'activities', 'deep_records', 'events', 'distributors', 'dist_sales', 'sales_visits', 'audit_logs', 'tools', 'commissions', 'admin_logs', 'sync_queue', 'temple_storages', 'ai_plans', 'ai_api_models', 'temple_ai_usage', 'wallets', 'notifications', 'password_resets', 'price_plans', 'temple_applications', 'temple_notifications', 'super_sales_overrides', 'config', 'distributor_applications', 'finance_records', 'temple_bills', 'withdrawals', 'bonuses'
 ];
 
 const STORAGE_ROOT = path.join(process.cwd(), 'storage');
@@ -37,7 +37,7 @@ export async function acquireLock(collection: string, timeoutMs: number = 5000):
       await fs.mkdir(lockPath);
       break; // Lock acquired
     } catch (err: any) {
-      if (err.code === 'EEXIST') {
+      if (err.code === 'EEXIST' || err.code === 'EPERM') {
         // Check for stale lock (timeout)
         try {
           const stat = await fs.stat(lockPath);
