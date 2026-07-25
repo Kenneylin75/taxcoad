@@ -1,0 +1,103 @@
+[
+  {
+    "id": "1",
+    "name": "光明燈祈福",
+    "price": 600,
+    "duration": "30 min",
+    "description": "消災解厄，前途光明",
+    "assignedStaff": [
+      1,
+      2
+    ],
+    "color": "#f59e0b"
+  },
+  {
+    "id": "2",
+    "name": "文昌開運",
+    "price": 800,
+    "duration": "45 min",
+    "description": "金榜題名，智慧大開",
+    "assignedStaff": [
+      3
+    ],
+    "color": "#3b82f6"
+  },
+  {
+    "id": "3",
+    "name": "太歲安奉",
+    "price": 1000,
+    "duration": "20 min",
+    "description": "歲歲平安，諸事順遂",
+    "assignedStaff": [
+      1
+    ],
+    "color": "#ef4444"
+  },
+  {
+    "id": "4",
+    "name": "問事服務",
+    "price": 0,
+    "duration": "20 min",
+    "description": "指點迷津，解惑人生",
+    "assignedStaff": [
+      1,
+      2
+    ],
+    "color": "#8b5cf6"
+  },
+  {
+    "id": "5",
+    "name": "例行祈福",
+    "price": 0,
+    "duration": "30 min",
+    "description": "日常平安祈福",
+    "assignedStaff": [
+      1
+    ],
+    "color": "#10b981"
+  },
+  {
+    "id": "3",
+    "name": "太歲安奉",
+    "price": 1000,
+    "duration": "20 min",
+    "description": "歲歲平安，諸事順遂",
+    "assignedStaff": [
+      1
+    ],
+    "color": "#ef4444"
+  },
+  {
+    "id": "3",
+    "name": "太歲安奉",
+    "price": 1000,
+    "duration": "20 min",
+    "description": "歲歲平安，諸事順遂",
+    "assignedStaff": [
+      1
+    ],
+    "color": "#ef4444"
+  },
+  {
+    "id": "3",
+    "name": "太歲安奉",
+    "price": 1000,
+    "duration": "20 min",
+    "description": "歲歲平安，諸事順遂",
+    "assignedStaff": [
+      1
+    ],
+    "color": "#ef4444"
+  },
+  {
+    "id": "3",
+    "name": "太歲安奉",
+    "price": 1000,
+    "duration": "20 min",
+    "description": "歲歲平安，諸事順遂",
+    "assignedStaff": [
+      1
+    ],
+    "color": "#ef4444"
+  }
+]

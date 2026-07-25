@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "name": "光明燈祈福",
+    "price": 600,
+    "duration": "30 min",
+    "description": "消災解厄，前途光明",
+    "assignedStaff": [
+      1,
+      2
+    ],
+    "color": "#f59e0b"
+  }
+]

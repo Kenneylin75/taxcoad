@@ -1,0 +1,32 @@
+[
+  {
+    "id": "4",
+    "name": "測試宮廟管理員",
+    "role": "TempleAdmin",
+    "account": "admin02",
+    "password": "admin02",
+    "status": "Active",
+    "phone": "0900-000-002",
+    "templeId": "temple-2"
+  },
+  {
+    "id": "100",
+    "name": "宮廟管理員100",
+    "role": "TempleAdmin",
+    "account": "admin100",
+    "password": "admin100",
+    "status": "Active",
+    "phone": "0900-100-100",
+    "templeId": "temple-1"
+  },
+  {
+    "id": "999",
+    "name": "系統預設帳號",
+    "role": "TempleAdmin",
+    "account": "login",
+    "password": "login",
+    "status": "Active",
+    "phone": "0900-999-999",
+    "templeId": "temple-1"
+  }
+]

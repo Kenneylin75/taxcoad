@@ -1,30 +1,27 @@
 // @ts-nocheck
 "use server";
-import { initializeStorage } from '@/lib/storageInit';
-initializeStorage().catch(console.error);
-import * as jsonStore from '@/lib/jsonStore';
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { withTempleSession, dbQuery } from "../db/db";
 
 // Helper to dynamically get templeId from cookies or fallback
 
-async function getRoleLabel(name: string): Promise<string> {
+function getRoleLabel(name: string): string {
   if (!name) return '未知人員';
   
   // 1. Check DistSales (SuperSales / DistSales)
-  const sales = (await jsonStore.find('dist_sales')).find((s: any) => s.name === name);
+  const sales = db_dist_sales.find((s: any) => s.name === name);
   if (sales) {
     if (sales.role === 'SuperSales') return `超級業務 ${name}`;
     if (sales.role === 'DistSales') {
-      const dist = (await jsonStore.find('distributors')).find((d: any) => d.id === sales.distributorId);
+      const dist = db_distributors.find((d: any) => d.id === sales.distributorId);
       const distName = dist ? dist.name : '經銷商';
       return `${distName} 經銷業務 ${name}`;
     }
   }
 
   // 2. Check Distributor Admin
-  const distAdmin = (await jsonStore.find('distributors')).find((d: any) => d.name === name || d.contactName === name);
+  const distAdmin = db_distributors.find((d: any) => d.name === name || d.contactName === name);
   if (distAdmin) {
     return `經銷商 ${name}`;
   }
@@ -84,9 +81,11 @@ const initGlobal = (key: string, defaultValue: any) => {
   return gStore[key];
 };
 
+let db_slots: any[] = initGlobal("db_slots", []);
+gStore.db_slots = db_slots;
 
-
-
+let db_appointments: any[] = initGlobal("db_appointments", []);
+gStore.db_appointments = db_appointments;
 
 const DEFAULT_SERVICES = [
   { id: '1', name: '光明燈祈福', price: 600, duration: '30 min', description: '消災解厄，前途光明', assignedStaff: [1, 2], color: '#f59e0b' },
@@ -96,24 +95,30 @@ const DEFAULT_SERVICES = [
   { id: '5', name: '例行祈福', price: 0, duration: '30 min', description: '日常平安祈福', assignedStaff: [1], color: '#10b981' },
 ];
 
-// migrated (await jsonStore.find('services')) to (await jsonStore.find('services'))
+let db_services: any[] = initGlobal('db_services', []);
 
 // Ensure core services are present and have correct colors, but DO NOT wipe other services
-for (const ds of DEFAULT_SERVICES) {
-  const existing = (await jsonStore.find('services')).find(s => s.id === ds.id);
+DEFAULT_SERVICES.forEach(ds => {
+  const existing = db_services.find(s => s.id === ds.id);
   if (!existing) {
-    await jsonStore.createRecord('services', ds);
+    db_services.push(ds);
   } else {
     existing.color = ds.color; // Force update color for demo consistency
   }
-}
-// (await jsonStore.find('services')) synced
+});
+gStore.db_services = db_services;
 
-// migrated (await jsonStore.find('print_templates')) to (await jsonStore.find('print_templates'))
-// migrated (await jsonStore.find('forms')) to (await jsonStore.find('forms'))
+let db_print_templates: any[] = initGlobal('db_print_templates', []);
+let db_forms: any[] = initGlobal('db_forms', []);
 
-// migrated (await jsonStore.find('queue_events')) to (await jsonStore.find('queue_events'))
-// migrated (await jsonStore.find('queue_tickets')) to (await jsonStore.find('queue_tickets'))
+let db_personnel: any[] = initGlobal('db_personnel', [
+  { id: '4', name: "測試宮廟管理員", role: "TempleAdmin", account: "admin02", password: "admin02", status: "Active", phone: "0900-000-002", templeId: "temple-2" },
+  { id: '100', name: "宮廟管理員100", role: "TempleAdmin", account: "admin100", password: "admin100", status: "Active", phone: "0900-100-100", templeId: "temple-1" },
+  { id: '999', name: "系統預設帳號", role: "TempleAdmin", account: "login", password: "login", status: "Active", phone: "0900-999-999", templeId: "temple-1" }
+].map(x => x.templeId ? x : ({...x, templeId: 'temple-1'})));
+
+let db_queue_events: any[] = initGlobal("db_queue_events", []);
+let db_queue_tickets: any[] = initGlobal("db_queue_tickets", []);
 
 // -------------------------------------------------------------------------
 // 🚀 核心 Actions
@@ -161,7 +166,7 @@ export async function getCurrentUser() {
     } catch(e) {}
     
     if (!person) {
-      const pData = await jsonStore.find('personnel');
+      const pData = (gStore.db_personnel || db_personnel);
       person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === account.toLowerCase()) && p.templeId === templeId);
     }
     
@@ -214,7 +219,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
   await ensurePlatformTables();
 
   const searchAccount = account.toLowerCase();
-  const pData = await jsonStore.find('personnel');
+  const pData = (gStore.db_personnel || db_personnel);
 
   if (targetTempleId) {
     let person = null;
@@ -231,7 +236,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
     }
 
     if (person) {
-      const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+      const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
       const temple = allTemples.find((t: any) => t.id === person.templeId);
       if (temple && temple.status === "Inactive") {
          return { success: false, error: "該宮廟已被停權，無法登入" };
@@ -249,7 +254,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       redirectPath = "/super-admin";
       loggedInName = "超級總裁";
       assignedRole = "SuperAdmin";
-    } else if ((await jsonStore.find('admins')).some(a => (a.account || "").toLowerCase() === searchAccount && a.password === password)) {
+    } else if (db_admins.some(a => (a.account || "").toLowerCase() === searchAccount && a.password === password)) {
       success = true;
       redirectPath = "/super-admin";
       assignedRole = "SuperAdmin";
@@ -264,7 +269,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       } catch (e) {}
       
       if (!distributor) {
-        const allDistributors = typeof gStore !== 'undefined' ? ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors'))) : (await jsonStore.find('distributors'));
+        const allDistributors = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
         distributor = allDistributors.find((d: any) => (d.account || '').toLowerCase() === searchAccount && d.password === password);
       }
 
@@ -288,7 +293,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
         } catch (e) {}
 
         if (!salesPerson) {
-          const allSales = typeof gStore !== 'undefined' ? ((await jsonStore.find('dist_sales')) || (await jsonStore.find('dist_sales'))) : (await jsonStore.find('dist_sales'));
+          const allSales = typeof gStore !== 'undefined' ? (gStore.db_dist_sales || db_dist_sales) : db_dist_sales;
           salesPerson = allSales.find((s: any) => (s.account || '').toLowerCase() === searchAccount && s.password === password);
         }
 
@@ -315,7 +320,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
 
           // Auto-heal: If personnel not found, check if a temple has this account/password (created by sales but not yet in personnel)
           if (!person) {
-             const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+             const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
              const temple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
              if (temple) {
                 person = {
@@ -328,7 +333,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
                     status: temple.status
                 };
                 pData.push(person);
-                if (typeof gStore !== 'undefined') await jsonStore.atomicWrite('personnel', () => pData);
+                if (typeof gStore !== 'undefined') gStore.db_personnel = pData;
              }
           }
 
@@ -364,7 +369,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
             if (person.role !== 'TempleAdmin') {
               return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
             }
-            const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+            const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
             const temple = allTemples.find((t: any) => t.id === person.templeId);
             if (!temple) {
                return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
@@ -380,7 +385,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
         } else {
           // 最後嘗試從記憶體尋找宮廟主帳號 (PG 已無 account 欄位)
           let mainTemple = null;
-          const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+          const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
           mainTemple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
           
           if (mainTemple) {
@@ -420,7 +425,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       timestamp: new Date().toISOString(),
       performedBy: loggedInName
     };
-    await jsonStore.createRecord('admin_logs', newLog);
+    db_admin_logs.push(newLog);
 
     withTempleSession("hq", true, async (client) => {
       if (client) {
@@ -444,16 +449,16 @@ export async function checkAccountExists(account: string) {
   
   if (account === "PIVOTADMIN01") return true;
   
-  const pData = await jsonStore.find('personnel');
+  const pData = (gStore.db_personnel || db_personnel || []);
   if (pData.some((p: any) => (p.account || "").toLowerCase() === searchAccount)) return true;
   
-  const distData = ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors')) || []);
+  const distData = (gStore.db_distributors || db_distributors || []);
   if (distData.some((d: any) => (d.account || "").toLowerCase() === searchAccount)) return true;
 
-  const salesData = ((await jsonStore.find('dist_sales')) || (await jsonStore.find('dist_sales')) || []);
+  const salesData = (gStore.db_dist_sales || db_dist_sales || []);
   if (salesData.some((s: any) => (s.account || "").toLowerCase() === searchAccount)) return true;
 
-  const adminData = ((await jsonStore.find('admins')) || (await jsonStore.find('admins')) || []);
+  const adminData = (gStore.db_admins || db_admins || []);
   if (adminData.some((a: any) => (a.account || "").toLowerCase() === searchAccount)) return true;
   
   try {
@@ -471,7 +476,7 @@ export async function checkAccountExists(account: string) {
 export async function fetchAvailableSlots() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [...(await jsonStore.find('slots'))].filter(x => x.templeId === templeId);
+    if (!client) return [...(gStore.db_slots || db_slots)].filter(x => x.templeId === templeId);
     await client.query(`
       CREATE TABLE IF NOT EXISTS slots (
         id SERIAL PRIMARY KEY,
@@ -523,13 +528,13 @@ export async function createSlot(data: any) {
 
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const currentSlots = await jsonStore.find('slots');
+      const currentSlots = gStore.db_slots || db_slots;
       const now = Date.now();
       dateList.forEach((date, idx) => {
         currentSlots.push({ id: now + idx + Math.floor(Math.random() * 1000), date, time, staff, description, location, bound_service_id, price, status: "Available", templeId });
       });
-      await jsonStore.atomicWrite('slots', () => [...currentSlots]);
-      // (await jsonStore.find('slots')) synced via jsonStore
+      gStore.db_slots = [...currentSlots];
+      db_slots = gStore.db_slots;
     } else {
       for (const date of dateList) {
         await client.query(
@@ -560,13 +565,13 @@ export async function updateSlot(id: number, data: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const currentSlots = await jsonStore.find('slots');
+      const currentSlots = gStore.db_slots || db_slots;
       const idx = currentSlots.findIndex((s: any) => s.id === id);
       if (idx !== -1) {
         currentSlots[idx] = { ...currentSlots[idx], date, time, staff, description, location, bound_service_id, price };
       }
-      await jsonStore.atomicWrite('slots', () => [...currentSlots]);
-      // (await jsonStore.find('slots')) synced via jsonStore
+      gStore.db_slots = [...currentSlots];
+      db_slots = gStore.db_slots;
     } else {
       await client.query(
         'UPDATE slots SET date = $1, time = $2, staff = $3, description = $4, location = $5, bound_service_id = $6, price = $7 WHERE id = $8 AND temple_id = $9',
@@ -594,7 +599,7 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
   // Find 'Immediate' stages that are enabled
   const immediateStages = config.stages.filter((s: any) => s.enabled && s.timeType === 'Immediate');
   
-  for (const stage of immediateStages) {
+  immediateStages.forEach((stage: any) => {
     const logMsg = `[LINE 推播成功] 已發送【${serviceTitle}】通知至信眾 ${targetName} (${targetPhone}) | 內容: ${stage.content}`;
     const newLog = {
       id: "log-" + Date.now() + Math.random(),
@@ -603,9 +608,9 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
       timestamp: new Date().toISOString(),
       performedBy: 'System (Auto)'
     };
-    await jsonStore.createRecord('audit_logs', newLog);
-    // (await jsonStore.find('audit_logs')) synced
-  }
+    db_audit_logs.push(newLog);
+    gStore.db_audit_logs = db_audit_logs;
+  });
 }
 
 export async function bookAppointment(slotId: number, guestName: string, phone: string, paymentMethod?: string, paymentRef?: string, amount?: number) {
@@ -614,17 +619,17 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
   return withTempleSession(templeId, false, async (client) => {
     let newId = Date.now();
     if (!client) {
-      const slotIdx = (await jsonStore.find('slots')).findIndex(s => s.id === slotId);
+      const slotIdx = db_slots.findIndex(s => s.id === slotId);
       if (slotIdx === -1) return { success: false, message: "找不到該時段" };
       
-      const slot = (await jsonStore.find('slots'))[slotIdx];
+      const slot = db_slots[slotIdx];
       if (slot.status === "Booked") return { success: false, message: "該時段已被預約" };
 
-      await jsonStore.updateRecord('slots', (await jsonStore.find('slots'))[slotIdx].id, { status: "Booked", guestName });
-
+      db_slots[slotIdx].status = "Booked";
+      db_slots[slotIdx].guestName = guestName;
 
       const svcId = slot.bound_service_id || slot.serviceId;
-      const svc = (await jsonStore.find('services')).find((s: any) => s.id === svcId);
+      const svc = db_services.find((s: any) => s.id === svcId);
       const serviceName = svc ? svc.name : (slot.service || '一般預約');
 
       const newAppointment = {
@@ -642,13 +647,13 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
         paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
         amount
       };
-      await jsonStore.createRecord('appointments', newAppointment);
+      db_appointments.push(newAppointment);
 
       // Automatically register guest profile if not already in-memory
       const normPhone = normalizePhone(phone);
-      const hasGuest = (await jsonStore.find('guests')).some((g: any) => normalizePhone(g.phone) === normPhone);
+      const hasGuest = db_guests.some((g: any) => normalizePhone(g.phone) === normPhone);
       if (!hasGuest) {
-        (await jsonStore.find('guests')).push({
+        db_guests.push({
           phone,
           name: guestName,
           status: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Active' : 'Pending',
@@ -657,7 +662,7 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
     paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName)}&background=B91C1C&color=fff`
         });
-        // invalid assignment removed: (await jsonStore.find('guests'));
+        gStore.db_guests = db_guests;
       }
     } else {
       const slotRes = await client.query('SELECT * FROM slots WHERE id = $1', [slotId]);
@@ -731,12 +736,12 @@ export async function cancelAppointment(appId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex(a => a.id === appId);
+      const appIdx = db_appointments.findIndex(a => a.id === appId);
       if (appIdx === -1) return { success: false, message: '找不到該預約' };
-      const app = (await jsonStore.find('appointments'))[appIdx];
-      await jsonStore.updateRecord('appointments', (await jsonStore.find('appointments'))[appIdx].id, { status: 'Cancelled' });
+      const app = db_appointments[appIdx];
+      db_appointments[appIdx].status = 'Cancelled';
       
-      const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+      const slot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
       if (slot) { slot.status = 'Available'; slot.guestName = ''; }
     } else {
       const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
@@ -760,18 +765,18 @@ export async function rescheduleSingleAppointment(appointmentId: number, newSlot
     let newTimeStr = "";
 
     if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex(a => a.id === appointmentId && (!a.templeId || a.templeId === templeId));
+      const appIdx = db_appointments.findIndex(a => a.id === appointmentId && (!a.templeId || a.templeId === templeId));
       if (appIdx === -1) return { success: false, message: '找不到該預約' };
-      const app = (await jsonStore.find('appointments'))[appIdx];
+      const app = db_appointments[appIdx];
       guestName = app.guestName;
       oldTimeStr = `${app.date} ${app.time}`;
       
-      const newSlotIdx = (await jsonStore.find('slots')).findIndex(s => String(s.id) === String(newSlotId));
+      const newSlotIdx = db_slots.findIndex(s => String(s.id) === String(newSlotId));
       if (newSlotIdx === -1) return { success: false, message: '找不到新選擇的時段' };
-      const newSlot = (await jsonStore.find('slots'))[newSlotIdx];
+      const newSlot = db_slots[newSlotIdx];
       if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
       
-      const oldSlot = (await jsonStore.find('slots')).find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+      const oldSlot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
       if (oldSlot) {
         oldSlot.status = 'Available';
         oldSlot.guestName = '';
@@ -852,24 +857,24 @@ export async function modifyAppointment(appId: number, newSlotId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex(a => a.id === appId);
+      const appIdx = db_appointments.findIndex(a => a.id === appId);
       if (appIdx === -1) return { success: false, message: '找不到該預約' };
-      const app = (await jsonStore.find('appointments'))[appIdx];
+      const app = db_appointments[appIdx];
       
-      const newSlotIdx = (await jsonStore.find('slots')).findIndex(s => s.id === newSlotId);
+      const newSlotIdx = db_slots.findIndex(s => s.id === newSlotId);
       if (newSlotIdx === -1) return { success: false, message: '找不到新時段' };
-      const newSlot = (await jsonStore.find('slots'))[newSlotIdx];
+      const newSlot = db_slots[newSlotIdx];
       if (newSlot.status === 'Booked') return { success: false, message: '該時段已被預約' };
 
-      const oldSlot = (await jsonStore.find('slots')).find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+      const oldSlot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
       if (oldSlot) { oldSlot.status = 'Available'; oldSlot.guestName = ''; }
 
       newSlot.status = 'Booked';
       newSlot.guestName = app.guestName;
       
-      (await jsonStore.find('appointments'))[appIdx].date = newSlot.date;
-      (await jsonStore.find('appointments'))[appIdx].time = newSlot.time;
-      (await jsonStore.find('appointments'))[appIdx].staff = newSlot.staff;
+      db_appointments[appIdx].date = newSlot.date;
+      db_appointments[appIdx].time = newSlot.time;
+      db_appointments[appIdx].staff = newSlot.staff;
     } else {
       const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
       if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
@@ -900,9 +905,9 @@ export async function markAppointmentAsArrived(appointmentId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
+      const appIdx = db_appointments.findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
       if (appIdx === -1) return { success: false, message: "找不到該筆預約" };
-      (await jsonStore.find('appointments'))[appIdx].status = "Arrived";
+      db_appointments[appIdx].status = "Arrived";
     } else {
       await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Arrived', appointmentId, templeId]);
     }
@@ -916,9 +921,9 @@ export async function markAppointmentAsPaid(appointmentId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
+      const appIdx = db_appointments.findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
       if (appIdx === -1) return { success: false, message: "找不到該筆預約" };
-      (await jsonStore.find('appointments'))[appIdx].status = "Paid";
+      db_appointments[appIdx].status = "Paid";
     } else {
       await client.query("UPDATE appointments SET status = 'Paid' WHERE id = $1 AND temple_id = $2", [appointmentId, templeId]);
     }
@@ -933,18 +938,17 @@ export async function fetchAppointments() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const filtered = (await jsonStore.find('appointments')).filter((a: any) => !a.templeId || a.templeId === templeId);
-      const allServices = await jsonStore.find('services');
-      for (const app of filtered) {
+      const filtered = db_appointments.filter((a: any) => !a.templeId || a.templeId === templeId);
+      filtered.forEach((app: any) => {
         if (!app.serviceId) {
-          const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
+          const slot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
           if (slot && (slot.bound_service_id || slot.serviceId)) { app.serviceId = slot.bound_service_id || slot.serviceId; }
         }
         if (app.serviceId) {
-          const svc = allServices.find((s: any) => s.id === app.serviceId && s.templeId === templeId);
+          const svc = db_services.find((s: any) => s.id === app.serviceId && s.templeId === templeId);
           if (svc) { app.service = svc.name; if (app.amount === undefined) app.amount = svc.price; }
         }
-      }
+      });
       return [...filtered];
     } else {
       await client.query(`
@@ -990,7 +994,7 @@ export async function fetchServiceDefinitions() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const currentServices = (await jsonStore.find('services')) || (await jsonStore.find('services'));
+      const currentServices = gStore.db_services || db_services;
       return currentServices.filter((x: any) => x.templeId === templeId);
     } else {
       await client.query(`
@@ -1024,15 +1028,15 @@ export async function saveServiceDefinition(data: any) {
     const newColor = data.color || '#6366f1';
     
     if (!client) {
-      let currentServices = (await jsonStore.find('services')) || (await jsonStore.find('services'));
+      let currentServices = gStore.db_services || db_services;
       const idx = currentServices.findIndex((s: any) => s.id === id);
       if (idx > -1) {
         currentServices[idx] = { ...currentServices[idx], ...data };
       } else {
         currentServices.push({ id, status: 'Active', color: newColor, ...data , templeId});
       }
-      await jsonStore.atomicWrite('services', (data) => [...currentServices]);
-      // array synced manually
+      gStore.db_services = [...currentServices];
+      db_services = gStore.db_services;
     } else {
       const res = await client.query('SELECT 1 FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
       if (res.rowCount > 0) {
@@ -1057,9 +1061,9 @@ export async function deleteServiceDefinition(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      let currentServices = (await jsonStore.find('services')) || (await jsonStore.find('services'));
-      await jsonStore.atomicWrite('services', (data) => currentServices.filter((s: any) => !(s.id === id && s.templeId === templeId)));
-      // array synced manually
+      let currentServices = gStore.db_services || db_services;
+      gStore.db_services = currentServices.filter((s: any) => !(s.id === id && s.templeId === templeId));
+      db_services = gStore.db_services;
     } else {
       await client.query('DELETE FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
     }
@@ -1073,7 +1077,7 @@ export async function fetchPrintTemplates() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const current = (await jsonStore.find('print_templates')) || (await jsonStore.find('print_templates'));
+      const current = gStore.db_print_templates || db_print_templates;
       const mine = current.filter((t: any) => t.templeId === templeId);
       return mine;
     }
@@ -1087,9 +1091,9 @@ export async function savePrintTemplate(template: any) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       template.templeId = templeId;
-      const idx = (await jsonStore.find('print_templates')).findIndex(t => t.id === template.id);
-      if (idx !== -1) (await jsonStore.find('print_templates'))[idx] = template;
-      else await jsonStore.createRecord('print_templates', template);
+      const idx = db_print_templates.findIndex(t => t.id === template.id);
+      if (idx !== -1) db_print_templates[idx] = template;
+      else db_print_templates.push(template);
       return { success: true };
     }
     return { success: true };
@@ -1100,8 +1104,8 @@ export async function deletePrintTemplate(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const idx = (await jsonStore.find('print_templates')).findIndex(t => t.id === id && t.templeId === templeId);
-      if (idx !== -1) (await jsonStore.find('print_templates')).splice(idx, 1);
+      const idx = db_print_templates.findIndex(t => t.id === id && t.templeId === templeId);
+      if (idx !== -1) db_print_templates.splice(idx, 1);
       return { success: true };
     }
     return { success: true };
@@ -1110,7 +1114,7 @@ export async function deletePrintTemplate(id: string) {
 
 export async function fetchForms() {
   const templeId = await getDynamicTempleId();
-  const current = (await jsonStore.find('forms')) || (await jsonStore.find('forms'));
+  const current = gStore.db_forms || db_forms;
   const mine = current.filter((f: any) => f.templeId === templeId);
   return JSON.parse(JSON.stringify(mine));
 }
@@ -1118,14 +1122,14 @@ export async function fetchForms() {
 export async function saveForm(data: any) {
   const templeId = await getDynamicTempleId();
   const id = data.id;
-  const current = (await jsonStore.find('forms')) || (await jsonStore.find('forms'));
+  const current = gStore.db_forms || db_forms;
   const exists = current.some((f: any) => f.id === id);
   if (exists) {
-    await jsonStore.atomicWrite('forms', (data) => data.map((f: any) => f.id === id ? { ...f, ...data } : f));
+    gStore.db_forms = current.map((f: any) => f.id === id ? { ...f, ...data } : f);
   } else {
-    await jsonStore.atomicWrite('forms', (data) => [...data, { id: id || Date.now().toString(), templeId, ...data }]);
+    gStore.db_forms = [...current, { id: id || Date.now().toString(), templeId, ...data }];
   }
-  // array synced manually
+  db_forms = gStore.db_forms;
   await revalidateTemple();
     return { success: true };
 }
@@ -1135,7 +1139,7 @@ export async function fetchPersonnel() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const myPersonnel = (await jsonStore.find('personnel')).filter((p: any) => p.templeId === templeId);
+      const myPersonnel = (gStore.db_personnel || db_personnel).filter((p: any) => p.templeId === templeId);
       if (myPersonnel.length === 0 && templeId) {
         return [];
       }
@@ -1185,10 +1189,10 @@ export async function removeSingleSlot(id: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      let currentSlots = (await jsonStore.find('slots')) || (await jsonStore.find('slots'));
+      let currentSlots = gStore.db_slots || db_slots;
       const filtered = currentSlots.filter((s: any) => String(s.id) !== String(id));
-      // invalid assignment removed: [...filtered];
-      // (await jsonStore.find('slots')) synced via jsonStore
+      gStore.db_slots = [...filtered];
+      db_slots = gStore.db_slots;
     } else {
       await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
     }
@@ -1202,10 +1206,10 @@ export async function removeBatchSlots(ids: any[]) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      let currentSlots = (await jsonStore.find('slots')) || (await jsonStore.find('slots'));
+      let currentSlots = gStore.db_slots || db_slots;
       const filtered = currentSlots.filter((s: any) => !ids.includes(s.id) && !ids.includes(String(s.id)));
-      // invalid assignment removed: [...filtered];
-      // (await jsonStore.find('slots')) synced via jsonStore
+      gStore.db_slots = [...filtered];
+      db_slots = gStore.db_slots;
     } else {
       for (const id of ids) {
         await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
@@ -1218,7 +1222,7 @@ export async function removeBatchSlots(ids: any[]) {
 
 // 9. 智能分析受影響預約
 export async function analyzeAffectedAppointments(staff: string, start: string, end: string) {
-  return (await jsonStore.find('appointments')).filter((app: any) => 
+  return db_appointments.filter((app: any) => 
     app.staff === staff && 
     app.date >= start && 
     app.date <= end
@@ -1230,7 +1234,7 @@ export async function analyzeAffectedAppointments(staff: string, start: string, 
 // ==========================================
 // 金流收款設定 (Payment Configurations)
 // ==========================================
-// migrated (await jsonStore.find('temple_payment_configs')) to (await jsonStore.find('temple_payment_configs'))
+let db_temple_payment_configs: any[] = initGlobal("db_temple_payment_configs", []);
 
 export interface TemplePaymentConfig {
   templeId: string;
@@ -1250,7 +1254,7 @@ export interface TemplePaymentConfig {
 
 export async function fetchPaymentConfig() {
   const templeId = await getDynamicTempleId();
-  const config = (await jsonStore.find('temple_payment_configs')).find(c => c.templeId === templeId);
+  const config = db_temple_payment_configs.find(c => c.templeId === templeId);
   if (config) {
     if (!config.cash) {
       config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
@@ -1279,11 +1283,11 @@ export async function fetchPaymentConfig() {
 
 export async function savePaymentConfig(data: TemplePaymentConfig) {
   const templeId = await getDynamicTempleId();
-  const idx = (await jsonStore.find('temple_payment_configs')).findIndex(c => c.templeId === templeId);
+  const idx = db_temple_payment_configs.findIndex(c => c.templeId === templeId);
   if (idx > -1) {
-    (await jsonStore.find('temple_payment_configs'))[idx] = { ...data, templeId };
+    db_temple_payment_configs[idx] = { ...data, templeId };
   } else {
-    await jsonStore.createRecord('temple_payment_configs', { ...data, templeId });
+    db_temple_payment_configs.push({ ...data, templeId });
   }
   await revalidateTemple();
     return { success: true };
@@ -1298,18 +1302,18 @@ export async function executeEmergencyReschedule(formData: FormData) {
 export async function fetchLampRecords() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [...(await jsonStore.find('lamp_records'))].filter(r => !r.templeId || r.templeId === templeId).reverse();
+    if (!client) return [...db_lamp_records].filter(r => !r.templeId || r.templeId === templeId).reverse();
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
     try { await client.query(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS category_id VARCHAR(50)`); } catch(e) {}
     const res = await client.query('SELECT * FROM lamp_records WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
     return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, categoryId: r.category_id, guestName: r.guest_name, phone: r.phone, lampType: r.lamp_type, amount: r.amount, status: r.status, createdAt: r.created_at, paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status }));
   });
 }
-// migrated (await jsonStore.find('lamp_categories')) to (await jsonStore.find('lamp_categories'))
+let db_lamp_categories: any[] = initGlobal('db_lamp_categories', []);
 export async function fetchLampCategories() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return ((await jsonStore.find('lamp_categories')) || (await jsonStore.find('lamp_categories'))).filter((x: any) => !x.templeId || x.templeId === templeId);
+    if (!client) return (gStore.db_lamp_categories || db_lamp_categories).filter((x: any) => !x.templeId || x.templeId === templeId);
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_categories (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), name VARCHAR(255), price INTEGER, description TEXT, color VARCHAR(50), is_active BOOLEAN DEFAULT true, type VARCHAR(50))`);
     await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS duration_days INTEGER DEFAULT 365`);
     await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS total_slots INTEGER DEFAULT 500`);
@@ -1318,7 +1322,7 @@ export async function fetchLampCategories() {
     return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, description: r.description, durationDays: r.duration_days, totalSlots: r.total_slots, precautions: r.precautions, color: r.color, isActive: r.is_active, type: r.type }));
   });
 }
-// migrated (await jsonStore.find('lamp_records')) to (await jsonStore.find('lamp_records'))
+let db_lamp_records: any[] = initGlobal("db_lamp_records", []);
 export async function createLightingOrder(fd: FormData) { 
   return createLampRecord(fd);
 }
@@ -1330,7 +1334,7 @@ export async function getGuestUser() {
   
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('guests')).find((g: any) => g.phone === phone && g.templeId === templeId) || null;
+      return (gStore.db_guests || db_guests).find((g: any) => g.phone === phone && g.templeId === templeId) || null;
     }
     const res = await client.query('SELECT * FROM guests WHERE phone = $1 AND temple_id = $2', [phone, templeId]);
     if ((res.rowCount ?? 0) > 0) {
@@ -1360,7 +1364,7 @@ export async function checkPhoneStatus(phone: string) {
     let existing: any = null;
 
     if (!client) {
-      existing = (await jsonStore.find('guests')).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
+      existing = (gStore.db_guests || db_guests).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
     } else {
       const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
       if ((res.rowCount ?? 0) > 0) {
@@ -1382,7 +1386,7 @@ export async function liffAutoLogin(lineId: string) {
   return withTempleSession(templeId, false, async (client) => {
     let existing: any = null;
     if (!client) {
-      existing = (await jsonStore.find('guests')).find((g: any) => g.lineId === lineId && g.templeId === templeId);
+      existing = (gStore.db_guests || db_guests).find((g: any) => g.lineId === lineId && g.templeId === templeId);
     } else {
       const res = await client.query('SELECT * FROM guests WHERE line_id = $1 AND temple_id = $2', [lineId, templeId]);
       if ((res.rowCount ?? 0) > 0) {
@@ -1408,7 +1412,7 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
     let existing: any = null;
 
     if (!client) {
-      existing = (await jsonStore.find('guests')).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
+      existing = (gStore.db_guests || db_guests).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
@@ -1444,10 +1448,10 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
         // 首次綁定密碼
         existing.password = password;
         if (!client) {
-          const idx = (await jsonStore.find('guests')).findIndex((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
+          const idx = (gStore.db_guests || db_guests).findIndex((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
           if (idx > -1) {
-            if ((await jsonStore.find('guests'))) (await jsonStore.find('guests'))[idx].password = password;
-            else (await jsonStore.find('guests'))[idx].password = password;
+            if (gStore.db_guests) gStore.db_guests[idx].password = password;
+            else db_guests[idx].password = password;
           }
         } else {
           await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [password, normLogin, templeId]);
@@ -1469,9 +1473,9 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
 
     if (!existing) {
       if (!client) {
-        const currentGuests = (await jsonStore.find('guests')) || (await jsonStore.find('guests'));
-        // invalid assignment removed: [...currentGuests, fullGuest];
-        // synced
+        const currentGuests = gStore.db_guests || db_guests;
+        gStore.db_guests = [...currentGuests, fullGuest];
+        db_guests = gStore.db_guests;
       } else {
         await client.query(`
           INSERT INTO guests (temple_id, phone, name, password, status)
@@ -1562,7 +1566,7 @@ export async function fetchGuestAppointments(p: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('appointments')).filter((a: any) => normCompare(a.phone, p) && (!a.templeId || a.templeId === templeId));
+      return db_appointments.filter((a: any) => normCompare(a.phone, p) && (!a.templeId || a.templeId === templeId));
     }
     const normPhone = normalizePhone(p);
     const res = await client.query(`
@@ -1574,12 +1578,12 @@ export async function fetchGuestAppointments(p: any) {
     return res.rows;
   });
 }
-// migrated (await jsonStore.find('service_settings_mock')) to (await jsonStore.find('service_settings_mock'))
+let db_service_settings_mock: any[] = initGlobal('db_service_settings_mock', []);
 export async function fetchServiceSettings() { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const s = (await jsonStore.find('service_settings_mock')).find(x => x.templeId === templeId);
+      const s = db_service_settings_mock.find(x => x.templeId === templeId);
       return s || { 
         cancelHoursBefore: 24, 
         modifyHoursBefore: 24, 
@@ -1611,12 +1615,12 @@ export async function fetchServiceSettings() {
   });
 }
 
-// migrated (await jsonStore.find('guest_files')) to (await jsonStore.find('guest_files'))
+let db_guest_files: any[] = initGlobal("db_guest_files", []);
 export async function fetchGuestFiles(phone: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('guest_files')).filter(f => normCompare(f.phone, phone));
+      return db_guest_files.filter(f => normCompare(f.phone, phone));
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
@@ -1652,12 +1656,12 @@ export async function fetchGuestFiles(phone: string) {
   });
 }
 
-// migrated (await jsonStore.find('event_registrations')) to (await jsonStore.find('event_registrations'))
+let db_event_registrations: any[] = initGlobal("db_event_registrations", []);
 
 export async function fetchEventRegistrationsByEventId(eventId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return (await jsonStore.find('event_registrations')).filter(r => r.eventId === eventId && (!r.templeId || r.templeId === templeId));
+    if (!client) return db_event_registrations.filter(r => r.eventId === eventId && (!r.templeId || r.templeId === templeId));
     await client.query(`CREATE TABLE IF NOT EXISTS event_registrations (id VARCHAR(50) PRIMARY KEY, event_id VARCHAR(50), temple_id VARCHAR(50), title VARCHAR(255), phone VARCHAR(50), guest_name VARCHAR(255), price INTEGER, payment_status VARCHAR(50), actual_price INTEGER, timestamp VARCHAR(50))`);
     const res = await client.query('SELECT * FROM event_registrations WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
     return res.rows.map(r => ({ id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone, guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status, actualPrice: r.actual_price, timestamp: r.timestamp }));
@@ -1667,7 +1671,7 @@ export async function markRegistrationAsPaid(registrationId: string, actualPrice
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const reg = (await jsonStore.find('event_registrations')).find(r => r.id === registrationId && (!r.templeId || r.templeId === templeId));
+      const reg = db_event_registrations.find(r => r.id === registrationId && (!r.templeId || r.templeId === templeId));
       if (!reg) return { success: false, message: '找不到報名紀錄' };
       reg.paymentStatus = 'Paid';
       reg.actualPrice = actualPrice;
@@ -1678,17 +1682,17 @@ export async function markRegistrationAsPaid(registrationId: string, actualPrice
     return { success: true };
   });
 }
-// migrated (await jsonStore.find('activities')) to (await jsonStore.find('activities'))
-// migrated (await jsonStore.find('deep_records')) to (await jsonStore.find('deep_records'))
+let db_activities: any[] = initGlobal('db_activities', []);
+let db_deep_records: any[] = initGlobal('db_deep_records', []);
 
 // (Removed duplicate createOrUpdateGuest)
 export async function verifyQueueTicket(eventId: any, phone: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const t = (await jsonStore.find('queue_tickets')).find(t => t.eventId === eventId && normCompare(t.phone, phone) && (!t.templeId || t.templeId === templeId));
+      const t = db_queue_tickets.find(t => t.eventId === eventId && normCompare(t.phone, phone) && (!t.templeId || t.templeId === templeId));
       if (!t) return { success: false, error: 'No ticket found' };
-      if (t.status === 'Pending') { t.status = 'Queuing'; t.scannedAt = new Date().toLocaleTimeString(); t.actualOrder = (await jsonStore.find('queue_tickets')).filter((x: any) => x.eventId === eventId && x.status !== 'Pending').length + 1; }
+      if (t.status === 'Pending') { t.status = 'Queuing'; t.scannedAt = new Date().toLocaleTimeString(); t.actualOrder = db_queue_tickets.filter((x: any) => x.eventId === eventId && x.status !== 'Pending').length + 1; }
     } else {
       const tRes = await client.query('SELECT id, status FROM queue_tickets WHERE event_id = $1 AND REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [eventId, phone.replace(/-/g, ''), templeId]);
       if (tRes.rowCount === 0) return { success: false, error: 'No ticket found' };
@@ -1712,11 +1716,11 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
 
     let newId = '';
     if (!client) {
-      const ev = (await jsonStore.find('events')).find(e => e.id === id && (!e.templeId || e.templeId === templeId));
+      const ev = db_events.find(e => e.id === id && (!e.templeId || e.templeId === templeId));
       if (!ev) return { success: false };
       ev.enrolled += 1;
       newId = `REG-${Date.now()}`;
-      await jsonStore.createRecord('event_registrations', { id: newId, eventId: id, templeId, title: ev.title, phone, guestName: n, price: pr, paymentStatus: pStatus, actualPrice: pr > 0 ? pr : 0, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      db_event_registrations.push({ id: newId, eventId: id, templeId, title: ev.title, phone, guestName: n, price: pr, paymentStatus: pStatus, actualPrice: pr > 0 ? pr : 0, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] });
     } else {
       const evRes = await client.query('SELECT title, enrolled, capacity FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
       if (evRes.rowCount === 0) return { success: false };
@@ -1738,7 +1742,7 @@ export async function fetchGuestRegistrations(p: any) {
   const normPhone = (p || '').replace(/[- ]/g, '');
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('event_registrations')).filter(r => normCompare(r.phone, p) && (!r.templeId || r.templeId === templeId));
+      return db_event_registrations.filter(r => normCompare(r.phone, p) && (!r.templeId || r.templeId === templeId));
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS event_registrations (
@@ -1774,7 +1778,7 @@ export async function fetchGuestQueueTickets(p: any) {
   const normPhone = (p || '').replace(/[- ]/g, '');
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('queue_tickets')).filter((t: any) => normCompare(t.phone, p) && (!t.templeId || t.templeId === templeId));
+      return db_queue_tickets.filter((t: any) => normCompare(t.phone, p) && (!t.templeId || t.templeId === templeId));
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS queue_tickets (
@@ -1810,7 +1814,7 @@ export async function fetchGuestLampRecords(p: any) {
   const normPhone = (p || '').replace(/[- ]/g, '');
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('lamp_records')).filter(l => normCompare(l.phone, p) && (!l.templeId || l.templeId === templeId));
+      return db_lamp_records.filter(l => normCompare(l.phone, p) && (!l.templeId || l.templeId === templeId));
     } else {
       await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
       const res = await client.query(`
@@ -1850,11 +1854,11 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
   return withTempleSession(templeId, false, async (client) => {
     const pStatus = paymentMethod === 'Cash' || !paymentMethod ? 'Pending' : 'Paid';
     if (!client) {
-      const ev = (await jsonStore.find('queue_events')).find((e: any) => e.id === eventId && (!e.templeId || e.templeId === templeId));
+      const ev = db_queue_events.find((e: any) => e.id === eventId && (!e.templeId || e.templeId === templeId));
       if (!ev) return { success: false };
-      const assignedNumber = `A${((await jsonStore.find('queue_tickets')).filter((t: any) => t.eventId === eventId).length + 1).toString().padStart(3, '0')}`;
+      const assignedNumber = `A${(db_queue_tickets.filter((t: any) => t.eventId === eventId).length + 1).toString().padStart(3, '0')}`;
       const tix = { id: `TIX-${Date.now()}`, eventId, templeId, eventTitle: ev.title, phone, guestName, status: 'Pending', assignedNumber, paymentStatus: pStatus, createdAt: new Date().toISOString().replace('T', ' ').split('.')[0] };
-      await jsonStore.createRecord('queue_tickets', tix);
+      db_queue_tickets.push(tix);
       return { success: true, ticket: tix };
     } else {
       const evRes = await client.query('SELECT title FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
@@ -1873,12 +1877,12 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
   });
 }
 export type EventItem = { id: string; title: string; date: string; location: string; price: number; status: 'Active' | 'Draft' | 'Completed'; capacity: number; enrolled: number; imageUrl?: string; description?: string; precautions?: string };
-// migrated (await jsonStore.find('events')) to (await jsonStore.find('events'))
+let db_events: any[] = initGlobal("db_events", []);
 
 export async function fetchEvents() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [...(await jsonStore.find('events'))].filter(x => x.templeId === templeId);
+    if (!client) return [...db_events].filter(x => x.templeId === templeId);
     await client.query(`CREATE TABLE IF NOT EXISTS events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), location VARCHAR(255), price INTEGER, status VARCHAR(50), capacity INTEGER, enrolled INTEGER DEFAULT 0, image_url TEXT)`);
     await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS description TEXT`);
     await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS precautions TEXT`);
@@ -1918,12 +1922,12 @@ export async function saveEvent(fd: FormData) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       if (id) {
-        const idx = (await jsonStore.find('events')).findIndex(e => e.id === id && (!e.templeId || e.templeId === templeId));
+        const idx = db_events.findIndex(e => e.id === id && (!e.templeId || e.templeId === templeId));
         if (idx > -1) {
-          (await jsonStore.find('events'))[idx] = { ...(await jsonStore.find('events'))[idx], title, date, location, price, capacity, status, templeId, imageUrl, description, precautions };
+          db_events[idx] = { ...db_events[idx], title, date, location, price, capacity, status, templeId, imageUrl, description, precautions };
         }
       } else {
-        await jsonStore.createRecord('events', { id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl, description, precautions });
+        db_events.push({ id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl, description, precautions });
       }
     } else {
       if (id) {
@@ -1940,9 +1944,9 @@ export async function deleteEvent(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const hasRegistrations = (await jsonStore.find('event_registrations')).some(r => r.eventId === id && (!r.templeId || r.templeId === templeId));
+      const hasRegistrations = db_event_registrations.some(r => r.eventId === id && (!r.templeId || r.templeId === templeId));
       if (hasRegistrations) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' }; 
-      await jsonStore.deleteRecord('events', id);
+      db_events = gStore.db_events = db_events.filter(e => !(e.id === id && (!e.templeId || e.templeId === templeId)));
     } else {
       const regCheck = await client.query('SELECT 1 FROM event_registrations WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
       if (regCheck.rowCount && regCheck.rowCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
@@ -2030,12 +2034,13 @@ export async function ensurePlatformTables() {
 }
 
 // --- B2B SaaS 多租戶與經銷架構全域變數 ---
-// migrated (await jsonStore.find('distributors')) to (await jsonStore.find('distributors'))
-// migrated (await jsonStore.find('dist_sales')) to (await jsonStore.find('dist_sales'))
-// migrated (await jsonStore.find('sales_visits')) to (await jsonStore.find('sales_visits'))
-// migrated (await jsonStore.find('audit_logs')) to (await jsonStore.find('audit_logs'))
-// migrated (await jsonStore.find('tools')) to (await jsonStore.find('tools'))
-// migrated (await jsonStore.find('commissions')) to (await jsonStore.find('commissions'))
+let db_distributors: any[] = initGlobal('db_distributors', []);
+let db_dist_sales: any[] = initGlobal('db_dist_sales', []);
+let db_temples: any[] = initGlobal('db_temples', []);
+let db_sales_visits: any[] = initGlobal("db_sales_visits", []);
+let db_audit_logs: any[] = initGlobal("db_audit_logs", []);
+let db_tools: any[] = initGlobal('db_tools', []);
+let db_commissions: any[] = initGlobal('db_commissions', []);
 
 let db_config = initGlobal('db_config', {
   fixedMonthlyRent: 3600,
@@ -2076,11 +2081,13 @@ let db_config = initGlobal('db_config', {
 });
 
 // --- NEW GLOBAL DATA STRUCTURES ---
-// migrated (await jsonStore.find('admin_logs')) to (await jsonStore.find('admin_logs'))
+let db_admin_logs: any[] = initGlobal("db_admin_logs", []);
 
-// migrated (await jsonStore.find('finance_records')) to finance_records
+let db_finance_records: any[] = initGlobal("db_finance_records", []);
 
-// migrated (await jsonStore.find('sync_queue')) to (await jsonStore.find('sync_queue'))
+let db_sync_queue: any[] = initGlobal("db_sync_queue", []);
+
+let db_admins: any[] = initGlobal('db_admins', []);
 
 let db_storage_plans: any[] = initGlobal('db_storage_plans', [
   { id: 'SP-50', name: '50GB 大容量方案', sizeGb: 50, priceMonthly: 300 },
@@ -2088,7 +2095,7 @@ let db_storage_plans: any[] = initGlobal('db_storage_plans', [
   { id: 'SP-1000', name: '1TB 至尊方案', sizeGb: 1000, priceMonthly: 3000 }
 ]);
 
-// migrated (await jsonStore.find('temple_storages')) to (await jsonStore.find('temple_storages'))
+let db_temple_storages: any[] = initGlobal('db_temple_storages', []);
 
 export interface TempleBill {
   id: string;
@@ -2102,7 +2109,7 @@ export interface TempleBill {
   payeeId: string;
   timestamp: string;
 }
-// migrated (await jsonStore.find('temple_bills')) to temple_bills
+let db_temple_bills: TempleBill[] = initGlobal('db_temple_bills', []);
 
 export interface AiPlan {
   id: string;
@@ -2121,7 +2128,7 @@ export interface AiApiModel {
   apiKey: string;
   isEnabled: boolean;
 }
-// migrated (await jsonStore.find('ai_api_models')) to (await jsonStore.find('ai_api_models'))
+let db_ai_api_models: AiApiModel[] = initGlobal('db_ai_api_models', []);
 
 export interface TempleAiUsage {
   templeId: string;
@@ -2131,20 +2138,20 @@ export interface TempleAiUsage {
   expiryDate: string;
   isVip: boolean;
 }
-// migrated (await jsonStore.find('temple_ai_usage')) to (await jsonStore.find('temple_ai_usage'))
+let db_temple_ai_usage: TempleAiUsage[] = initGlobal('db_temple_ai_usage', []);
 
-// migrated (await jsonStore.find('wallets')) to wallets
+let db_wallets: any[] = initGlobal('', []);
 
-// migrated (await jsonStore.readJson('super_sales_overrides')) to (await jsonStore.readJson('super_sales_overrides'))
+let db_super_sales_overrides: Record<string, any> = initGlobal('db_super_sales_overrides', {});
 
 let db_distributor_applications: any[] = initGlobal('db_distributor_applications', [
   { id: 'DAPP-001', name: '大甲區域授權中心', plan: 'PLAN-A', submittedBy: '超級精英業務', status: 'Active', account: 'dajia_dist', owner: '顏主委', date: '2026-05-12' }
 ]);
 
 
-export async function fetchAdminLogs() { return [...(await jsonStore.find('admin_logs'))].reverse(); }
+export async function fetchAdminLogs() { return [...db_admin_logs].reverse(); }
 export async function logAdminAction(action: string, target: string) {
-  await jsonStore.createRecord('admin_logs', { id: `L-${Date.now()}`, user: 'System Admin', action, target, timestamp: new Date().toLocaleString() });
+  db_admin_logs.unshift({ id: `L-${Date.now()}`, user: 'System Admin', action, target, timestamp: new Date().toLocaleString() });
   return { success: true };
 }
 
@@ -2160,20 +2167,20 @@ export async function createAdminAccount(data: any) {
     return { success: false, error: '帳號已被註冊，請更換' };
   }
   const newAdmin = { id: `adm-${Date.now()}`, ...data, role: 'SuperAdmin' };
-  await jsonStore.createRecord('admins', newAdmin);
+  db_admins.push(newAdmin);
   await logAdminAction('CREATE_ADMIN', data.name);
   revalidatePath('/super-admin');
   return { success: true };
 }
 
 export async function fetchFinanceData() {
-  const incomes = (await jsonStore.find('finance_records')).filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
-  const expenses = (await jsonStore.find('finance_records')).filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
+  const incomes = db_finance_records.filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
+  const expenses = db_finance_records.filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
   return {
-    records: (await jsonStore.find('finance_records')),
+    records: db_finance_records,
     summary: {
       totalRevenue: incomes,
-      totalCommission: (await jsonStore.find('finance_records')).filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
+      totalCommission: db_finance_records.filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
       netProfit: incomes - expenses
     }
   };
@@ -2186,7 +2193,7 @@ export async function fetchB2BPaymentConfig(templeId: string) {
   return withTempleSession(templeId, true, async (client) => {
     let distributorId = null;
     if (!client) {
-      const temple = _allTemplesForAi.find(t => t.id === templeId);
+      const temple = db_temples.find(t => t.id === templeId);
       distributorId = temple?.distributorId;
     } else {
       const res = await client.query('SELECT distributor_id FROM temples WHERE id = $1', [templeId]);
@@ -2195,7 +2202,7 @@ export async function fetchB2BPaymentConfig(templeId: string) {
 
     if (distributorId) {
       if (!client) {
-        const dist = (await jsonStore.find('distributors')).find(d => d.id === distributorId);
+        const dist = db_distributors.find(d => d.id === distributorId);
         return dist?.b2bPayment || null;
       } else {
         return null;
@@ -2244,8 +2251,8 @@ export async function updateStoragePlans(plans: any[]) {
 export async function fetchTempleStorages() {
   return withTempleSession(null, true, async (client) => {
     if (!client) {
-      for (const t of (await jsonStore.find('temples'))) {
-        if (!(await jsonStore.find('temple_storages')).some(s => s.templeId === t.id)) {
+      db_temples.forEach(t => {
+        if (!db_temple_storages.some(s => s.templeId === t.id)) {
           const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || t.cloudStorage?.includes('無限') || t.cloudStorage === 'Free' || t.cloudStorage === '免費' || !t.cloudStorage;
           let qGB = 5;
           let pName = '免費 5GB 空間';
@@ -2261,7 +2268,7 @@ export async function fetchTempleStorages() {
                  pName = `${qGB}GB`;
              }
           }
-          await jsonStore.createRecord('temple_storages', {
+          db_temple_storages.push({
             id: `TS-${Date.now()}-${t.id}`,
             templeId: t.id,
             templeName: t.templeName,
@@ -2271,8 +2278,8 @@ export async function fetchTempleStorages() {
             planName: pName
           });
         }
-      }
-      return [...(await jsonStore.find('temple_storages'))];
+      });
+      return [...db_temple_storages];
     } else {
       const templesRes = await client.query('SELECT * FROM temples');
       for (const t of templesRes.rows) {
@@ -2328,7 +2335,7 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
     if (!client) {
-      await jsonStore.createRecord('temple_bills', {
+      db_temple_bills.push({
         id: `BILL-STORAGE-${Date.now()}`,
         templeId,
         type: 'StorageUpgrade',
@@ -2341,7 +2348,7 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
         payeeId: 'system-hq',
         timestamp: new Date().toISOString()
       });
-      // (await jsonStore.find('temple_bills')) synced
+      gStore.db_temple_bills = db_temple_bills;
     } else {
       await client.query(`
         INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
@@ -2362,7 +2369,7 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
     if (!plan) return { success: false, message: '找不到選定的AI方案' };
 
     if (!client) {
-      await jsonStore.createRecord('temple_bills', {
+      db_temple_bills.push({
         id: `BILL-AI-${Date.now()}`,
         templeId,
         type: 'AiUpgrade',
@@ -2375,7 +2382,7 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
         payeeId: 'system-hq',
         timestamp: new Date().toISOString()
       });
-      // (await jsonStore.find('temple_bills')) synced
+      gStore.db_temple_bills = db_temple_bills;
     } else {
       await client.query(`
         INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
@@ -2399,15 +2406,15 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       const discount = db_config.yearlyDiscountRate || 20;
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.priceMonthly * priceFactor);
-      const temple = _allTemplesForAi.find((t: any) => t.id === templeId);
+      const temple = db_temples.find((t: any) => t.id === templeId);
 
       if (!isManualGrant) {
-        const adminWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
+        const adminWallet = db_wallets.find(w => w.role === 'SuperAdmin');
         if (adminWallet) {
           adminWallet.balance += finalAmount;
         }
 
-        await jsonStore.createRecord('finance_records', {
+        db_finance_records.unshift({
           id: `F-${Date.now()}`,
           type: 'INCOME',
           category: 'SPACE_UPGRADE',
@@ -2416,7 +2423,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           date: new Date().toISOString().split('T')[0]
         });
 
-        await jsonStore.createRecord('temple_bills', {
+        db_temple_bills.push({
           id: `BILL-STORAGE-${Date.now()}`,
           templeId,
           type: 'StorageUpgrade',
@@ -2431,7 +2438,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
         });
       }
 
-      let storage = (await jsonStore.find('temple_storages')).find(s => s.templeId === templeId);
+      let storage = db_temple_storages.find(s => s.templeId === templeId);
       if (!storage) {
         storage = {
           id: `TS-${Date.now()}-${templeId}`,
@@ -2442,7 +2449,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           quotaGb: 5,
           planName: '免費 5GB 空間'
         };
-        await jsonStore.createRecord('temple_storages', storage);
+        db_temple_storages.push(storage);
       }
       storage.quotaGb = plan.sizeGb;
       storage.planName = `${plan.name} (${plan.sizeGb}GB)`;
@@ -2534,18 +2541,18 @@ export async function fetchRoleWallets() {
 export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE' | 'AUTH_FEE', amount: number, templeId?: string, distributorId?: string, salesId?: string) {
   return withTempleSession(templeId || null, true, async (client) => {
     if (!client) {
-      const t = (await jsonStore.find('temples')).find(x => x.id === templeId);
+      const t = db_temples.find(x => x.id === templeId);
       const distId = t?.distributorId || distributorId || 'system-hq';
       const sId = t?.salesId || salesId || '';
 
       if (category === 'AUTH_FEE') {
-        const saWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
+        const saWallet = db_wallets.find(w => w.role === 'SuperAdmin');
         if (saWallet) saWallet.balance += amount * 0.85;
 
-        const ssWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperSales');
+        const ssWallet = db_wallets.find(w => w.role === 'SuperSales');
         if (ssWallet) ssWallet.balance += amount * 0.15;
 
-        await jsonStore.createRecord('finance_records', {
+        db_finance_records.unshift({
           id: `F-EXP-${Date.now()}`,
           type: 'EXPENSE',
           category: 'COMMISSION',
@@ -2554,23 +2561,23 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
           date: new Date().toISOString().split('T')[0]
         });
 
-        await jsonStore.createRecord('finance_records', {
+        db_finance_records.unshift({
           id: `F-INC-${Date.now()}`,
           type: 'INCOME',
           category: 'AUTH_FEE',
           amount: amount,
-          source: (await jsonStore.find('distributors')).find(d => d.id === distributorId)?.name || '新經銷商授權',
+          source: db_distributors.find(d => d.id === distributorId)?.name || '新經銷商授權',
           date: new Date().toISOString().split('T')[0]
         });
       } else if (category === 'MONTHLY_RENT' || category === 'SETUP_FEE') {
         if (distId === 'system-hq') {
-          const saWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
+          const saWallet = db_wallets.find(w => w.role === 'SuperAdmin');
           if (saWallet) saWallet.balance += amount * 0.85;
 
-          const ssWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperSales');
+          const ssWallet = db_wallets.find(w => w.role === 'SuperSales');
           if (ssWallet) ssWallet.balance += amount * 0.15;
 
-          await jsonStore.createRecord('finance_records', {
+          db_finance_records.unshift({
             id: `F-EXP-${Date.now()}`,
             type: 'EXPENSE',
             category: 'COMMISSION',
@@ -2579,26 +2586,26 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
             date: new Date().toISOString().split('T')[0]
           });
         } else {
-          const distWallet = (await jsonStore.find('wallets')).find(w => w.id === distId);
+          const distWallet = db_wallets.find(w => w.id === distId);
           if (distWallet) distWallet.balance += amount * 0.65;
 
-          const saWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
+          const saWallet = db_wallets.find(w => w.role === 'SuperAdmin');
           if (saWallet) saWallet.balance += amount * 0.20;
 
-          const dsWallet = (await jsonStore.find('wallets')).find(w => w.id === sId);
+          const dsWallet = db_wallets.find(w => w.id === sId);
           if (dsWallet) dsWallet.balance += amount * 0.15;
 
-          await jsonStore.createRecord('finance_records', {
+          db_finance_records.unshift({
             id: `F-EXP-S-${Date.now()}`,
             type: 'EXPENSE',
             category: 'COMMISSION',
             amount: amount * 0.15,
-            source: (await jsonStore.find('dist_sales')).find(s => s.id === sId)?.name || '經銷業務',
+            source: db_dist_sales.find(s => s.id === sId)?.name || '經銷業務',
             date: new Date().toISOString().split('T')[0]
           });
         }
 
-        await jsonStore.createRecord('finance_records', {
+        db_finance_records.unshift({
           id: `F-INC-T-${Date.now()}`,
           type: 'INCOME',
           category,
@@ -2699,7 +2706,7 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
   });
 }
 
-export async function fetchSyncQueue() { return [...(await jsonStore.find('sync_queue'))]; }
+export async function fetchSyncQueue() { return [...db_sync_queue]; }
 
 export async function fetchSystemConfig() {
   const gStore = globalThis as any;
@@ -2737,10 +2744,10 @@ export async function fetchSystemConfig() {
 }
 
 export async function updateSystemConfig(data: any) {
-  const currentConfig = (await jsonStore.find('config')) || db_config;
+  const currentConfig = (globalThis as any).db_config || db_config;
   const newConfig = { ...currentConfig, ...data };
   
-  await jsonStore.atomicWrite('config', () => newConfig);
+  (globalThis as any).db_config = newConfig;
   db_config = newConfig;
 
   await withTempleSession(null, false, async (client) => {
@@ -2762,7 +2769,7 @@ export async function updateSystemConfig(data: any) {
 
 // --- 經銷業務 (Dist-Sales) ---
 export async function fetchFreeApplications(distId?: string) { 
-  let list = [...(await jsonStore.find('temples'))];
+  let list = [...db_temples];
   try {
     const { dbQuery } = await import('@/db/db');
     const res = await dbQuery("SELECT * FROM temples ORDER BY created_at DESC", [], () => null) as any;
@@ -2784,10 +2791,9 @@ export async function fetchFreeApplications(distId?: string) {
   } catch (e) {}
 
   if (distId) {
-     const allSales2 = await jsonStore.find('dist_sales');
      list = list.filter((t: any) => {
         if (t.distributorId !== distId) return false;
-        const sales = allSales2.find(s => s.id === t.salesId);
+        const sales = db_dist_sales.find(s => s.id === t.salesId);
         if (sales && sales.role === 'SuperSales') return false;
         return true;
      });
@@ -2843,7 +2849,7 @@ export async function generateInitialBills(newTemple: any) {
 
     const storagePlanId = newTemple.cloudStorage;
     if (storagePlanId && storagePlanId.startsWith('SP-')) {
-       const plan = (await jsonStore.find('storage_plans'))?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
+       const plan = (globalThis as any).db_storage_plans?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
        if (plan) {
          const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
          if (storageFee > 0) {
@@ -2867,9 +2873,9 @@ export async function generateInitialBills(newTemple: any) {
     try {
       const { dbQuery } = await import('@/db/db');
       for (const newBill of billsToInsert) {
-        const exists = (await jsonStore.find('temple_bills')).find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
+        const exists = db_temple_bills.find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
         if (!exists) {
-          await jsonStore.createRecord('temple_bills', newBill);
+          db_temple_bills.push(newBill);
           await dbQuery(
             "INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)",
             [newBill.id, newTemple.id, newBill.type, newBill.amount, newBill.dueDate, newBill.payeeRole, newBill.payeeId]
@@ -2878,7 +2884,7 @@ export async function generateInitialBills(newTemple: any) {
           });
         }
       }
-      // (await jsonStore.find('temple_bills')) synced
+      if (typeof gStore !== 'undefined') gStore.db_temple_bills = db_temple_bills;
     } catch(e) { console.error('Failed to insert bill', e); }
   }
 }
@@ -2894,10 +2900,10 @@ export async function submitFreeAccountApplication(data: any) {
   
   const status = (role === 'distributor' || role === 'super-admin' || role === 'dist-sales') ? 'Active' : 'Pending';
 
-  const sales = (await jsonStore.find('dist_sales')).find(s => s.name === data.submittedBy);
+  const sales = db_dist_sales.find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
-  const templeNo = (await jsonStore.find('temples')).length + 1;
+  const templeNo = (gStore.db_temples || db_temples).length + 1;
 
       const newTemple = {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
@@ -2921,8 +2927,8 @@ export async function submitFreeAccountApplication(data: any) {
         new Date().toISOString(),
       paymentStatus: 'PendingPayment'
     };
-    await jsonStore.createRecord('temples', newTemple);
-    // synced
+    db_temples.push(newTemple);
+    gStore.db_temples = db_temples;
 
     try {
       const { dbQuery } = await import('@/db/db');
@@ -2948,7 +2954,7 @@ export async function submitFreeAccountApplication(data: any) {
 
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
   if (status === 'Active' && account && password) {
-    const pData = await jsonStore.find('personnel');
+    const pData = (gStore.db_personnel || db_personnel);
     const pId = `p-${Date.now()}`;
     pData.push({
       id: pId,
@@ -2959,7 +2965,7 @@ export async function submitFreeAccountApplication(data: any) {
       role: 'TempleAdmin',
       status: 'Active'
     });
-    await jsonStore.atomicWrite('personnel', () => pData);
+    gStore.db_personnel = pData;
     
     try {
       const { dbQuery } = await import('@/db/db');
@@ -2978,10 +2984,10 @@ export async function submitFreeAccountApplication(data: any) {
   }
   
   // Create Notification for Super Admin
-  await jsonStore.createRecord('notifications', {
+  db_notifications.unshift({
     id: `N-${Date.now()}`,
     title: '新宮廟核定申請',
-    content: `${(await getRoleLabel(data.submittedBy))} 提報了「${newTemple.templeName}」開戶申請。`,
+    content: `${getRoleLabel(data.submittedBy)} 提報了「${newTemple.templeName}」開戶申請。`,
     date: new Date().toISOString().split('T')[0],
     isRead: false
   });
@@ -2995,13 +3001,13 @@ export async function submitFreeAccountApplication(data: any) {
 }
 
 export async function approveTempleBySuperAdmin(id: string) {
-  const t = (await jsonStore.find('temples')).find(x => x.id === id);
+  const t = db_temples.find(x => x.id === id);
    if (t) {
      t.status = 'Active';
-     // synced
+     gStore.db_temples = db_temples;
      await generateInitialBills(t);
      if (t.account && t.password) {
-       const pData = await jsonStore.find('personnel');
+       const pData = (gStore.db_personnel || db_personnel);
        // check if already exists
        if (!pData.some(p => p.account === t.account)) {
          pData.push({
@@ -3013,7 +3019,7 @@ export async function approveTempleBySuperAdmin(id: string) {
            role: 'TempleAdmin',
            status: 'Active'
          });
-         await jsonStore.atomicWrite('personnel', () => pData);
+         gStore.db_personnel = pData;
        }
      }
   }
@@ -3022,8 +3028,8 @@ export async function approveTempleBySuperAdmin(id: string) {
 }
 
 export async function rejectTempleBySuperAdmin(id: string) {
-  const idx = (await jsonStore.find('temples')).findIndex(x => x.id === id);
-  if (idx > -1) (await jsonStore.find('temples')).splice(idx, 1);
+  const idx = db_temples.findIndex(x => x.id === id);
+  if (idx > -1) db_temples.splice(idx, 1);
   revalidatePath('/super-admin');
   return { success: true };
 }
@@ -3077,12 +3083,12 @@ export async function approveDistributorBySuperAdmin(id: string, overrideQuota?:
     const plan = db_config.distributorPlans.find((p: any) => p.id === app.planId) || db_config.distributorPlans[0];
     
     // 反查業務員實際 ID
-    const actualSales = (await jsonStore.find('dist_sales')).find(s => s.name === app.submittedBy);
+    const actualSales = db_dist_sales.find(s => s.name === app.submittedBy);
     
     const accountName = app.account || app.name;
     
     // Prevent duplicate insertion in memory
-    const existingDist = (await jsonStore.find('distributors')).find(d => d.account === accountName);
+    const existingDist = db_distributors.find(d => d.account === accountName);
     if (existingDist) return { success: true };
 
     const newDist = {
@@ -3111,8 +3117,8 @@ export async function approveDistributorBySuperAdmin(id: string, overrideQuota?:
       }
     };
 
-    await jsonStore.createRecord('distributors', newDist);
-    // (await jsonStore.find('distributors')) synced
+    db_distributors.push(newDist);
+    gStore.db_distributors = db_distributors;
     
     await ensurePlatformTables();
     try {
@@ -3144,9 +3150,9 @@ export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: s
 
 export async function updateSuperSalesCommission(salesName: string, rates: any) {
   console.log(`Updating rates for ${salesName}:`, rates);
-  (await jsonStore.readJson('super_sales_overrides'))[salesName] = rates;
+  db_super_sales_overrides[salesName] = rates;
   
-  await jsonStore.createRecord('notifications', {
+  db_notifications.unshift({
     id: `N-COMM-${Date.now()}`,
     title: '佣金比例異動通知',
     content: `您的個人分潤比例已由超級管理員調整，請至績效分頁查看。`,
@@ -3160,8 +3166,8 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
 }
 
 export async function fetchSalesPerformance(salesName: string) { 
-  let listTemples = [...(await jsonStore.find('temples'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listTemples = [...db_temples];
+  let listSales = [...db_dist_sales];
   try {
     const { dbQuery } = await import('@/db/db');
     const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
@@ -3183,7 +3189,7 @@ export async function fetchSalesPerformance(salesName: string) {
 }
 
 export async function fetchVisitationRecords(salesName: string) { 
-  return (await jsonStore.find('sales_visits')).filter(v => v.salesName === salesName); 
+  return db_sales_visits.filter(v => v.salesName === salesName); 
 }
 
 export async function fetchAllAccountsForAdmin() {
@@ -3202,7 +3208,7 @@ export async function fetchAllAccountsForAdmin() {
   } catch (e) {}
 
   const allAdminsMap = new Map();
-  (await jsonStore.find('personnel')).forEach(p => {
+  db_personnel.forEach(p => {
     if (p.role === 'Admin') allAdminsMap.set(p.account, p);
   });
   pgAdmins.forEach(p => {
@@ -3222,7 +3228,7 @@ export async function fetchAllAccountsForAdmin() {
   } catch (e) {}
 
   const allDistributorsMap = new Map();
-  (await jsonStore.find('distributors')).forEach(d => {
+  db_distributors.forEach(d => {
     allDistributorsMap.set(d.account, d);
   });
   pgDistributors.forEach(d => {
@@ -3243,20 +3249,19 @@ export async function fetchAllAccountsForAdmin() {
   } catch (e) {}
 
   const allSalesMap = new Map();
-  (await jsonStore.find('dist_sales')).forEach(s => allSalesMap.set(s.account, s));
+  db_dist_sales.forEach(s => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
-  const superOverrides = await jsonStore.readJson('super_sales_overrides');
-  for (const s of Array.from(allSalesMap.values()) as any[]) {
+  Array.from(allSalesMap.values()).forEach(s => {
     if (s.role === 'SuperSales') {
-      const overrides = superOverrides[s.name];
+      const overrides = db_super_sales_overrides[s.name];
       const mergedRules = overrides || s.commissionRules || db_config.defaultSuperSalesRates;
       accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active', commissionRules: mergedRules });
     }
-  }
+  });
   
-  const templePromises = (await jsonStore.find('temples')).map(async t => {
-    const personnel = (await jsonStore.find('personnel')).find(p => p.templeId === t.id);
+  const templePromises = db_temples.map(async t => {
+    const personnel = db_personnel.find(p => p.templeId === t.id);
     const creatorInfo = await getTempleCreatorInfo(t.id);
     return { 
       ...t,
@@ -3286,19 +3291,18 @@ export async function fetchSuperSalesAccounts() {
   } catch (e) {}
   
   const allSalesMap = new Map();
-  (await jsonStore.find('dist_sales')).forEach(s => allSalesMap.set(s.account, s));
+  db_dist_sales.forEach(s => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
-  const superOverrides = await jsonStore.readJson('super_sales_overrides');
   return Array.from(allSalesMap.values()).filter((s: any) => s.role === 'SuperSales').map(ss => ({
     ...ss,
-    rates: superOverrides[ss.name] || db_config.defaultSuperSalesRates
+    rates: db_super_sales_overrides[ss.name] || db_config.defaultSuperSalesRates
   }));
 }
 
 
 export async function addVisitationRecord(data: any) { 
-  await jsonStore.createRecord('sales_visits', {
+  db_sales_visits.push({
     id: `visit-${Date.now()}`,
     ...data,
     timestamp: new Date().toISOString()
@@ -3307,7 +3311,7 @@ export async function addVisitationRecord(data: any) {
   return { success: true }; 
 }
 
-export async function fetchSalesTools() { return [...(await jsonStore.find('tools'))]; }
+export async function fetchSalesTools() { return [...db_tools]; }
 export async function uploadTool(formData: FormData) {
   const type = formData.get('type') as string;
   const title = formData.get('title') as string;
@@ -3335,7 +3339,7 @@ export async function uploadTool(formData: FormData) {
   }
 
   const uploadedAt = new Date().toISOString().split('T')[0];
-  await jsonStore.createRecord('tools', { id: 'tool-' + Date.now(), uploadedAt, type, title, category, thumbnail, url });
+  db_tools.push({ id: 'tool-' + Date.now(), uploadedAt, type, title, category, thumbnail, url });
   
   const { revalidatePath } = require('next/cache');
   revalidatePath('/super-admin');
@@ -3363,8 +3367,8 @@ export async function createDistributorSales(distId: string, data: any) {
     status: 'Active'
   };
   
-  await jsonStore.createRecord('dist_sales', newSales);
-  // (await jsonStore.find('dist_sales')) synced
+  db_dist_sales.push(newSales);
+  gStore.db_dist_sales = db_dist_sales;
 
   await ensurePlatformTables();
   try {
@@ -3379,9 +3383,9 @@ export async function createDistributorSales(distId: string, data: any) {
   return { success: true, data: newSales };
 }
 export async function deleteTool(toolId: string) {
-  const idx = (await jsonStore.find('tools')).findIndex((t: any) => t.id === toolId);
+  const idx = db_tools.findIndex((t: any) => t.id === toolId);
   if (idx > -1) {
-    (await jsonStore.find('tools')).splice(idx, 1);
+    db_tools.splice(idx, 1);
     revalidatePath('/super-admin');
     revalidatePath('/distributor');
     revalidatePath('/dist-sales');
@@ -3393,8 +3397,8 @@ export async function deleteTool(toolId: string) {
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
 export async function fetchDistributorCapacity(distId?: string) { 
-  let listTemples = [...(await jsonStore.find('temples'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listTemples = [...db_temples];
+  let listSales = [...db_dist_sales];
 
   try {
     const { dbQuery } = await import('@/db/db');
@@ -3486,10 +3490,10 @@ export async function submitDistributorApplication(data: any) {
     console.error("Failed to insert distributor_application:", e);
   }
 
-  await jsonStore.createRecord('notifications', {
+  db_notifications.unshift({
     id: `N-DIST-${Date.now()}`,
     title: '新經銷商授權申請',
-    content: `${(await getRoleLabel(data.submittedBy))} 提交了「${data.name}」的經銷授權申請案。`,
+    content: `${getRoleLabel(data.submittedBy)} 提交了「${data.name}」的經銷授權申請案。`,
     date: new Date().toISOString().split('T')[0],
     isRead: false
   });
@@ -3500,7 +3504,7 @@ export async function submitDistributorApplication(data: any) {
 }
 
 export async function fetchSuperSalesProfile(salesId: string) {
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listSales = [...db_dist_sales];
   try {
     const { dbQuery } = await import('@/db/db');
     const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE id = $1", [salesId], () => null) as any;
@@ -3510,9 +3514,9 @@ export async function fetchSuperSalesProfile(salesId: string) {
     }
   } catch(e) {}
   
-  const salesPerson = listSales.find(s => s.id === salesId) || listSales[0] || (await jsonStore.find('dist_sales'))[0];
+  const salesPerson = listSales.find(s => s.id === salesId) || listSales[0] || db_dist_sales[0];
   const name = salesPerson?.name || '超級精英業務';
-  const commissionRates = salesPerson?.commissionRules || (await jsonStore.readJson('super_sales_overrides'))[name] || db_config.defaultSuperSalesRates;
+  const commissionRates = salesPerson?.commissionRules || db_super_sales_overrides[name] || db_config.defaultSuperSalesRates;
   return {
     name: name,
     rank: '超級精英業務',
@@ -3527,7 +3531,7 @@ export async function fetchSuperSalesProfile(salesId: string) {
 }
 
 export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bankName: string, accountName: string, accountNumber: string }) {
-  const salesPerson = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+  const salesPerson = db_dist_sales.find(s => s.id === salesId);
   if (salesPerson) {
     salesPerson.bankInfo = bankInfo;
     revalidatePath('/super-sales/[salesId]', 'page');
@@ -3538,7 +3542,7 @@ export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bank
 }
 
 export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: string, email: string }) {
-  const salesPerson = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+  const salesPerson = db_dist_sales.find(s => s.id === salesId);
   if (salesPerson) {
     salesPerson.phone = data.phone;
     salesPerson.email = data.email;
@@ -3550,9 +3554,9 @@ export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: 
 }
 
 export async function fetchSuperSalesRegistry(salesId: string) {
-  let listTemples = [...(await jsonStore.find('temples'))];
-  let listDistributors = [...(await jsonStore.find('distributors'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listTemples = [...db_temples];
+  let listDistributors = [...db_distributors];
+  let listSales = [...db_dist_sales];
 
   try {
     const { dbQuery } = await import('@/db/db');
@@ -3641,7 +3645,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     };
   });
 
-  const pendingTempleCount = (await jsonStore.find('temple_applications')).filter(a => a.submittedBy === name && a.status === 'Pending').length;
+  const pendingTempleCount = db_temple_applications.filter(a => a.submittedBy === name && a.status === 'Pending').length;
   let pgPendingDistCount = 0;
   try {
     const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name], () => null) as any;
@@ -3684,7 +3688,7 @@ export async function createSuperSalesAccount(data: any) {
     joinedAt: new Date().toISOString().split('T')[0]
   };
   
-  await jsonStore.createRecord('dist_sales', {
+  db_dist_sales.push({
     id,
     name: data.name,
     account: safeAccount,
@@ -3700,8 +3704,8 @@ export async function createSuperSalesAccount(data: any) {
     commissionRules: commissionRates
   });
 
-  (await jsonStore.readJson('super_sales_overrides'))[data.name] = commissionRates;
-  // (await jsonStore.find('dist_sales')) synced
+  db_super_sales_overrides[data.name] = commissionRates;
+  gStore.db_dist_sales = db_dist_sales;
 
   try {
     const { dbQuery } = await import('@/db/db');
@@ -3719,7 +3723,7 @@ export async function createSuperSalesAccount(data: any) {
 }
 
 export async function updateDistributorQuota(distId: string, newQuota: number) {
-  const dist = (await jsonStore.find('distributors')).find((d: any) => d.id === distId || d.account === distId);
+  const dist = db_distributors.find((d: any) => d.id === distId || d.account === distId);
   if (dist) {
     dist.quota = newQuota;
     dist.customNodes = newQuota;
@@ -3732,7 +3736,7 @@ export async function updateDistributorQuota(distId: string, newQuota: number) {
     app.nodes = newQuota;
   }
 
-  // (await jsonStore.find('distributors')) synced
+  gStore.db_distributors = db_distributors;
   gStore.db_distributor_applications = db_distributor_applications;
 
   return withGlobalSession(async (client) => {
@@ -3783,7 +3787,7 @@ export async function createDistributorAccount(data: any) {
     creatorSalesId: 'SuperAdmin'
   };
   
-  await jsonStore.createRecord('distributors', newDist);
+  db_distributors.push(newDist);
   
   db_distributor_applications.push({
     id: `DAPP-${id}`,
@@ -3798,7 +3802,7 @@ export async function createDistributorAccount(data: any) {
     date: new Date().toISOString().split('T')[0]
   });
   
-  // (await jsonStore.find('distributors')) synced
+  gStore.db_distributors = db_distributors;
 
   await ensurePlatformTables();
   try {
@@ -3823,7 +3827,7 @@ export async function createTempleAccount(data: any) {
   const creatorRole = reqRole;
   const creatorId = currentUser.name;
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
-    const templeNo = (await jsonStore.find('temples')).length + 1;
+    const templeNo = (gStore.db_temples || db_temples).length + 1;
   const { paymentCycle, ...rest } = data;
   
   const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || db_config.fixedMonthlyRent);
@@ -3849,8 +3853,8 @@ export async function createTempleAccount(data: any) {
       new Date(Date.now() + (5 * 24 * 60 * 60 * 1000)).toISOString()
   };
   
-  await jsonStore.createRecord('temples', newTemple);
-  // synced
+  db_temples.push(newTemple);
+  gStore.db_temples = db_temples;
   
   // Initialize temple storage immediately to prevent overriding
   const isVip = newTemple.plan === 'Unlimited Node' || newTemple.plan === 'Free' || newTemple.plan === '免費' || newTemple.cloudStorage?.includes('無限') || newTemple.cloudStorage === 'Free' || newTemple.cloudStorage === '免費' || !newTemple.cloudStorage;
@@ -3861,7 +3865,7 @@ export async function createTempleAccount(data: any) {
       pName = '無限免費方案';
   } else if (newTemple.cloudStorage) {
      if (newTemple.cloudStorage.startsWith('SP-')) {
-         const p = (await jsonStore.find('storage_plans'))?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
+         const p = (globalThis as any).db_storage_plans?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
          if (p) { qGB = p.sizeGb; pName = p.name; }
      } else {
          qGB = parseInt(newTemple.cloudStorage) || 5;
@@ -3877,12 +3881,12 @@ export async function createTempleAccount(data: any) {
     quotaGb: qGB,
     planName: pName
   };
-  
-  await jsonStore.createRecord('temple_storages', newStorage);
+  (globalThis as any).db_temple_storages = (globalThis as any).db_temple_storages || [];
+  (globalThis as any).db_temple_storages.push(newStorage);
   
   // Create personnel account for login
   if (data.account && data.password) {
-    const pData = await jsonStore.find('personnel');
+    const pData = (gStore.db_personnel || db_personnel);
     pData.push({
       id: `p-${Date.now()}`,
       templeId: id,
@@ -3892,7 +3896,7 @@ export async function createTempleAccount(data: any) {
       role: 'TempleAdmin',
       status: 'Active'
     });
-    await jsonStore.atomicWrite('personnel', () => pData);
+    gStore.db_personnel = pData;
   }
 
   await ensurePlatformTables();
@@ -3924,7 +3928,7 @@ export async function createTempleAccount(data: any) {
   
     if (currentRole === 'Distributor' || currentRole === 'DistSales') {
       if (currentRole === 'Distributor') {
-        const dist = (await jsonStore.find('distributors')).find((d: any) => d.account === accountStr);
+        const dist = db_distributors.find((d: any) => d.account === accountStr);
         if (dist) {
            if (dist.quota <= 0) return { success: false, message: '配額已耗盡，無法開設新宮廟' };
            dist.quota -= 1;
@@ -3948,18 +3952,18 @@ export async function createTempleAccount(data: any) {
 
 export async function fetchAggregatedAnalytics(targetYear?: string) {
   const currentYear = targetYear || new Date().getFullYear().toString();
-  const totalTemples = (await jsonStore.find('temples')).length;
-  const activeTemples = (await jsonStore.find('temples')).filter(t => t.status === 'Active').length;
-  const totalDistributors = (await jsonStore.find('distributors')).length;
-  const totalSuperSales = (await jsonStore.find('dist_sales')).filter(s => s.role === 'SuperSales').length;
+  const totalTemples = db_temples.length;
+  const activeTemples = db_temples.filter(t => t.status === 'Active').length;
+  const totalDistributors = db_distributors.length;
+  const totalSuperSales = db_dist_sales.filter(s => s.role === 'SuperSales').length;
   
-  const monthlyRevenue = (await jsonStore.find('temple_bills')).filter(b => b.status === 'Paid').reduce((sum, b) => sum + Number(b.amount || 0), 0);
+  const monthlyRevenue = db_temple_bills.filter(b => b.status === 'Paid').reduce((sum, b) => sum + Number(b.amount || 0), 0);
   const regionCounts: Record<string, number> = {};
   const majorRegions = [
     '基隆', '台北', '新北', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', 
     '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'
   ];
-  (await jsonStore.find('temples')).forEach(t => {
+  db_temples.forEach(t => {
     if (t.status !== 'Active') return;
     
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
@@ -3976,7 +3980,7 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
   const growthTrend = Array.from({ length: 12 }).map((_, i) => {
     const month = String(i + 1).padStart(2, '0');
     const prefix = `${currentYear}-${month}`;
-    const count = _allTemplesForStats.filter(t => (t.timestamp || t.createdAt || '').startsWith(prefix)).length;
+    const count = db_temples.filter(t => (t.timestamp || t.createdAt || '').startsWith(prefix)).length;
     return { date: prefix, count };
   });
   
@@ -3996,10 +4000,10 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
 
 
 export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
-  let listTemples = [...(await jsonStore.find('temples'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
-  let listBills = [...(await jsonStore.find('temple_bills'))];
-  let listWithdrawals = [...((await jsonStore.find('withdrawals')) || [])];
+  let listTemples = [...db_temples];
+  let listSales = [...db_dist_sales];
+  let listBills = [...db_temple_bills];
+  let listWithdrawals = [...((globalThis as any).db_withdrawals || [])];
 
   try {
     const { dbQuery } = await import('@/db/db');
@@ -4052,7 +4056,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   let totalRevenue = 0;
   const records: any[] = [];
   
-  const overrides = salesName ? (await jsonStore.readJson('super_sales_overrides'))[salesName] : null;
+  const overrides = salesName ? db_super_sales_overrides[salesName] : null;
   const rules = sales?.commissionRules || overrides || db_config.defaultSuperSalesRates;
   const setupRate = rules.templeSetupRate ?? rules.setupFeePercent ?? 20;
   const rentY1 = rules.templeRentRates?.[0] ?? rules.rentYear1Percent ?? 15;
@@ -4115,7 +4119,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   });
   
   // 3. 手動獎金覆寫 (Bonus Overrides)
-  const myBonuses = (await jsonStore.find('bonuses')).filter(b => b.salesName === salesName);
+  const myBonuses = db_bonuses.filter(b => b.salesName === salesName);
   myBonuses.forEach(b => {
     totalEarned += b.amount;
     records.push({
@@ -4129,7 +4133,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     });
   });
   
-  let myWithdrawals = (await jsonStore.find('withdrawals')).filter(w => w.salesName === salesName);
+  let myWithdrawals = db_withdrawals.filter(w => w.salesName === salesName);
   try {
     const { dbQuery } = await import('@/db/db');
     const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
@@ -4223,7 +4227,7 @@ export async function addSalesMember(data: any) {
     },
     ...data 
   };
-  await jsonStore.createRecord('dist_sales', newSales);
+  db_dist_sales.push(newSales);
 
   await ensurePlatformTables();
   try {
@@ -4247,7 +4251,7 @@ export async function fetchDistributorTeam(distributorId: string) {
     }
   } catch (e) {}
 
-  const memSales = (await jsonStore.find('dist_sales')).filter(s => s.distributorId === distributorId);
+  const memSales = db_dist_sales.filter(s => s.distributorId === distributorId);
   const salesMap = new Map();
   memSales.forEach(s => salesMap.set(s.id, s));
   pgSales.forEach(s => salesMap.set(s.id, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
@@ -4269,16 +4273,15 @@ export async function fetchDistributorTemples(distributorId: string) {
     
     // Fallback to memory
     if (temples.length === 0) {
-      const allDistSales = await jsonStore.find('dist_sales');
-      temples = (await jsonStore.find('temples')).filter(t => {
+      temples = db_temples.filter(t => {
          if (t.distributorId !== distributorId) return false;
-         const sales = allDistSales.find(s => s.id === t.salesId);
+         const sales = db_dist_sales.find(s => s.id === t.salesId);
          if (sales && sales.role === 'SuperSales') return false;
          return true;
       });
     }
     
-    const discountRate = (await jsonStore.find('config'))?.yearlyDiscountRate || 20;
+    const discountRate = (globalThis as any).db_config?.yearlyDiscountRate || 20;
     return temples.map((t: any) => {
        const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
        return { ...t, templeName: t.temple_name || t.name, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
@@ -4288,7 +4291,7 @@ export async function fetchDistributorTemples(distributorId: string) {
   }
 }
 export async function fetchDistributorVisits(distributorId: string) {
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listSales = [...db_dist_sales];
   try {
     const { dbQuery } = await import('@/db/db');
     const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE distributor_id = $1", [distributorId], () => null) as any;
@@ -4297,7 +4300,7 @@ export async function fetchDistributorVisits(distributorId: string) {
     }
   } catch(e) {}
   const teamIds = listSales.filter(s => s.distributorId === distributorId).map(s => s.name);
-  return (await jsonStore.find('sales_visits')).filter(v => teamIds.includes(v.salesName));
+  return db_sales_visits.filter(v => teamIds.includes(v.salesName));
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
@@ -4355,11 +4358,11 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
   }
 }
 export async function approveTempleByDistributor(templeId: string) {
-  const t = (await jsonStore.find('temples')).find(x => x.id === templeId);
+  const t = db_temples.find(x => x.id === templeId);
   if (t) {
     t.status = 'Active';
     const gStore = globalThis as any;
-    // synced
+    gStore.db_temples = db_temples;
     
     try {
       const { dbQuery } = await import('@/db/db');
@@ -4368,7 +4371,7 @@ export async function approveTempleByDistributor(templeId: string) {
     
     await generateInitialBills(t);
     if (t.account && t.password) {
-      const pData = await jsonStore.find('personnel');
+      const pData = (gStore.db_personnel || db_personnel);
       const newPersonId = `p-${Date.now()}`;
       if (!pData.some((p:any) => p.account === t.account)) {
         pData.push({
@@ -4380,7 +4383,7 @@ export async function approveTempleByDistributor(templeId: string) {
           role: 'TempleAdmin',
           status: 'Active'
         });
-        await jsonStore.atomicWrite('personnel', () => pData);
+        gStore.db_personnel = pData;
         
         // Ensure insertion into PostgreSQL
         try {
@@ -4403,7 +4406,7 @@ export async function approveTempleByDistributor(templeId: string) {
   return { success: true };
 }
 export async function rejectTempleByDistributor(templeId: string) { 
-  await jsonStore.deleteRecord('temples', templeId);
+  db_temples = db_temples.filter(t => t.id !== templeId);
   revalidatePath('/distributor');
   revalidatePath('/dist-sales');
   return { success: true }; 
@@ -4445,37 +4448,36 @@ export async function fetchComplexAnalyticsData() {
     }
   };
 
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  db_appointments.forEach((a: any) => {
     if (a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid' && a.status !== 'Cancelled') {
       addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0, a.templeId);
     }
   });
 
-  const allLampCats = await jsonStore.find('lamp_categories');
-  (await jsonStore.find('lamp_records')).forEach((r: any) => {
+  db_lamp_records.forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
-         const cat = allLampCats.find((c: any) => c.id === r.categoryId);
+         const cat = db_lamp_categories.find((c: any) => c.id === r.categoryId);
          if (cat) price = cat.price;
       }
       addRevenue(r.createdAt || r.date || r.timestamp, Number(price) || 0, r.templeId);
     }
   });
 
-  (await jsonStore.find('event_registrations')).forEach((r: any) => {
+  db_event_registrations.forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0, r.templeId);
     }
   });
 
-  (await jsonStore.find('queue_tickets')).forEach((t: any) => {
+  db_queue_tickets.forEach((t: any) => {
     if (t.paymentStatus === 'Paid' || t.status === 'Paid') {
       addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(t.price || 0) || 0, t.templeId);
     }
   });
 
-  (await jsonStore.find('deep_records')).forEach((r: any) => {
+  db_deep_records.forEach((r: any) => {
     if ((r.id.startsWith('MERIT-') || r.serviceType?.includes('功德')) && (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid')) {
       let amt = 0;
       if (r.values && r.values['金額']) {
@@ -4498,7 +4500,7 @@ export async function fetchComplexAnalyticsData() {
   
   let totalGuests = 0;
 
-  (await jsonStore.find('guests')).forEach((g: any) => {
+  db_guests.forEach((g: any) => {
     if (templeId && g.templeId && g.templeId !== templeId) return;
     
     totalGuests++;
@@ -4537,13 +4539,13 @@ export async function fetchComplexAnalyticsData() {
   // 3. Queue Stats
   let validEventIds: string[] | null = null;
   if (templeId) {
-    validEventIds = (await jsonStore.find('queue_events')).filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
+    validEventIds = db_queue_events.filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
   }
 
   let totalTickets = 0;
   let completedTickets = 0;
   
-  (await jsonStore.find('queue_tickets')).forEach((t: any) => {
+  db_queue_tickets.forEach((t: any) => {
     if (validEventIds && !validEventIds.includes(t.eventId)) return;
     totalTickets++;
     if (t.status === 'Completed') completedTickets++;
@@ -4562,7 +4564,7 @@ export async function fetchComplexAnalyticsData() {
   // Calculate Conversion Rate
   let totalOrders = 0;
   let paidOrders = 0;
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  db_appointments.forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     totalOrders++;
     if (a.paymentStatus === 'Paid') paidOrders++;
@@ -4574,7 +4576,7 @@ export async function fetchComplexAnalyticsData() {
   let returningGuestCount = 0;
   
   const guestApptCounts: Record<string, number> = {};
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  db_appointments.forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     if (a.phone) {
       guestApptCounts[a.phone] = (guestApptCounts[a.phone] || 0) + 1;
@@ -4593,7 +4595,7 @@ export async function fetchComplexAnalyticsData() {
   // C. Service Heat
   const serviceCounts: Record<string, number> = {};
   let totalServices = 0;
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  db_appointments.forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     if (a.service) {
       serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1;
@@ -4645,7 +4647,7 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  const temple = _allTemplesForAi.find(t => t.id === templeId);
+  const temple = db_temples.find(t => t.id === templeId);
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
   
@@ -4801,7 +4803,7 @@ export async function fetchFinancialOverview() {
   }
 
   if (!usedPgForRevenue) {
-    (await jsonStore.find('lamp_records')).filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
+    db_lamp_records.filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.categoryName,
@@ -4817,8 +4819,8 @@ export async function fetchFinancialOverview() {
       totalRevenue += r.price;
     });
 
-    const myEvents = (await jsonStore.find('events')).filter(e => e.templeId === templeId).map(e => e.id);
-    (await jsonStore.find('event_registrations')).filter(r => myEvents.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
+    const myEvents = db_events.filter(e => e.templeId === templeId).map(e => e.id);
+    db_event_registrations.filter(r => myEvents.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.title,
@@ -4834,8 +4836,8 @@ export async function fetchFinancialOverview() {
       totalRevenue += (r.actualPrice || r.price);
     });
 
-    const myServices = (await jsonStore.find('services')).filter(s => s.templeId === templeId).map(s => s.id);
-    (await jsonStore.find('appointments')).filter(a => myServices.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
+    const myServices = db_services.filter(s => s.templeId === templeId).map(s => s.id);
+    db_appointments.filter(a => myServices.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
       revenue.push({
         id: a.id,
         title: a.service,
@@ -4851,7 +4853,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += (a.amount || 0);
     });
 
-    (await jsonStore.find('deep_records')).filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType.includes('功德'))).forEach(r => {
+    db_deep_records.filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType.includes('功德'))).forEach(r => {
       let amt = 0;
       if (r.values && r.values['金額']) {
         amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
@@ -4871,7 +4873,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += amt;
     });
 
-    (await jsonStore.find('queue_tickets')).filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
+    db_queue_tickets.filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
       revenue.push({
         id: t.id,
         title: '現場排隊服務',
@@ -4890,11 +4892,10 @@ export async function fetchFinancialOverview() {
 
   revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  const _allTemplesForBills = await jsonStore.find('temples');
-  let expenses: ExpenseEntry[] = (await jsonStore.find('temple_bills'))
+  let expenses: ExpenseEntry[] = db_temple_bills
     .filter(b => b.templeId === templeId)
     .map(b => {
-      const t = _allTemplesForBills?.find((x: any) => x.id === templeId);
+      const t = (globalThis as any).db_temples?.find((x: any) => x.id === templeId);
       const isSuperAdminService = b.type === 'StorageUpgrade' || b.type === 'AgiService';
       const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
       const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
@@ -4916,7 +4917,7 @@ export async function fetchFinancialOverview() {
     const rows = res?.rows;
     if (rows && rows.length > 0) {
       expenses = rows.map((r: any) => {
-        const t = _allTemplesForBills?.find((x: any) => x.id === r.temple_id);
+        const t = (globalThis as any).db_temples?.find((x: any) => x.id === r.temple_id);
         const type = r.item_name || '';
         const isSuperAdminService = type.includes('空間') || type.includes('AI') || type.includes('Storage') || type.includes('Agi');
         const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
@@ -4953,7 +4954,7 @@ export async function fetchFinancialOverview() {
       
       if (!payeeSettings[pId]) {
         if (pRole === 'Distributor' && pId && pId !== 'superadmin') {
-          let dist = (await jsonStore.find('distributors')).find((d: any) => d.id === pId);
+          let dist = db_distributors.find((d: any) => d.id === pId);
           if (!dist) {
              const dRes = await dbQuery("SELECT * FROM distributors WHERE id = $1", [pId], () => null) as any;
              if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
@@ -4979,7 +4980,7 @@ export async function fetchFinancialOverview() {
   const payeeId = expenses.length > 0 ? expenses[0].payeeId : null;
   const payeeRole = expenses.length > 0 ? expenses[0].payeeRole : null;
   if (payeeRole === 'Distributor' && payeeId) {
-    let dist = (await jsonStore.find('distributors')).find((d: any) => d.id === payeeId);
+    let dist = db_distributors.find((d: any) => d.id === payeeId);
     if (!dist) {
       try {
         const { dbQuery } = await import('@/db/db');
@@ -5015,9 +5016,9 @@ export async function fetchFinancialOverview() {
 }
 export async function markAppointmentCompleted() { return { success: true }; }
 
-// migrated (await jsonStore.find('bonuses')) to bonuses
-// migrated (await jsonStore.find('withdrawals')) to withdrawals
-// migrated (await jsonStore.find('notifications')) to (await jsonStore.find('notifications'))
+let db_bonuses: any[] = initGlobal('db_bonuses', []);
+let db_withdrawals: any[] = initGlobal('db_withdrawals', []);
+let db_notifications: any[] = initGlobal("db_notifications", []);
 
 export async function applyBonusOverride(salesName: string, amount: number, reason: string) {
   const newBonus = {
@@ -5028,9 +5029,9 @@ export async function applyBonusOverride(salesName: string, amount: number, reas
     date: new Date().toISOString().split('T')[0],
     timestamp: new Date().toISOString()
   };
-  await jsonStore.createRecord('bonuses', newBonus);
+  db_bonuses.push(newBonus);
 
-  await jsonStore.createRecord('notifications', {
+  db_notifications.unshift({
     id: `N-BONUS-${Date.now()}`,
     title: '手動獎金撥發通知',
     content: `管理員已為您撥發手動獎金 $${amount.toLocaleString()}，原因：${reason}`,
@@ -5044,14 +5045,14 @@ export async function applyBonusOverride(salesName: string, amount: number, reas
 }
 
 export async function fetchSuperSalesBonuses(salesName: string) {
-  return (await jsonStore.find('bonuses')).filter(b => b.salesName === salesName);
+  return db_bonuses.filter(b => b.salesName === salesName);
 }
 
 export async function fetchAllWithdrawals() {
   return withTempleSession(null, true, async (client) => {
     if (!client) {
-      if (!(await jsonStore.find('withdrawals'))) return [];
-      const allWithdrawals = (await jsonStore.find('withdrawals')).map((r: any) => ({
+      if (!(globalThis as any).db_withdrawals) return [];
+      const allWithdrawals = (globalThis as any).db_withdrawals.map((r: any) => ({
         id: r.id,
         salesName: r.salesName || r.sales_name,
         amount: r.amount,
@@ -5117,9 +5118,9 @@ export async function updateServiceSettings(settings: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const idx = (await jsonStore.find('service_settings_mock')).findIndex(x => x.templeId === templeId);
-      if (idx !== -1) (await jsonStore.find('service_settings_mock'))[idx] = { templeId, ...settings };
-      else await jsonStore.createRecord('service_settings_mock', { templeId, ...settings });
+      const idx = db_service_settings_mock.findIndex(x => x.templeId === templeId);
+      if (idx !== -1) db_service_settings_mock[idx] = { templeId, ...settings };
+      else db_service_settings_mock.push({ templeId, ...settings });
       return { success: true };
     }
     
@@ -5152,7 +5153,7 @@ export async function fetchEarningsStats(salesId: string = '超級精英業務')
 
 export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptUrl: string) {
   try {
-    const withdrawal = (await jsonStore.find('withdrawals')).find(w => w.id === withdrawalId);
+    const withdrawal = db_withdrawals.find(w => w.id === withdrawalId);
     if (!withdrawal) return { success: false, error: 'Withdrawal not found' };
 
     try {
@@ -5163,7 +5164,7 @@ export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptU
     withdrawal.status = 'Approved';
     withdrawal.receiptUrl = receiptUrl;
 
-    await jsonStore.createRecord('notifications', {
+    db_notifications.unshift({
       id: `N-WITHDRAW-APPROVED-${Date.now()}`,
       title: '提領獎金已匯款',
       content: `您的提領申請 $${withdrawal.amount.toLocaleString()} 已經匯款，請查看匯款截圖。`,
@@ -5182,16 +5183,16 @@ export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptU
 export async function requestWithdrawal(salesName: string, amount: number) { 
   return withTempleSession(null, true, async (client) => {
     if (!client) {
-      
-      const w = (await jsonStore.find('wallets')).find((w: any) => w.name === salesName);
+      if (!(globalThis as any).db_wallets) (globalThis as any).db_wallets = [];
+      const w = (globalThis as any).db_wallets.find((w: any) => w.name === salesName);
       if (!w) return { success: false, error: '找不到該錢包帳戶' };
       if (amount > w.balance) return { success: false, error: '餘額不足' };
       
       w.balance -= amount;
       
       const wdId = `WD-${Date.now()}`;
-      
-      await jsonStore.createRecord('withdrawals', {
+      if (!(globalThis as any).db_withdrawals) (globalThis as any).db_withdrawals = [];
+      (globalThis as any).db_withdrawals.push({
         id: wdId,
         salesName: salesName,
         amount: amount,
@@ -5222,7 +5223,7 @@ export async function requestWithdrawal(salesName: string, amount: number) {
   });
 }
 
-// migrated (await jsonStore.find('password_resets')) to (await jsonStore.find('password_resets'))
+let db_password_resets: any[] = initGlobal('db_password_resets', []);
 
 export async function requestPasswordReset(salesName: string) {
   const newReq = {
@@ -5231,12 +5232,12 @@ export async function requestPasswordReset(salesName: string) {
     status: 'Pending',
     date: new Date().toISOString().split('T')[0]
   };
-  await jsonStore.createRecord('password_resets', newReq);
+  db_password_resets.unshift(newReq);
 
-  await jsonStore.createRecord('notifications', {
+  db_notifications.unshift({
     id: `N-PR-${Date.now()}`,
     title: '密碼重設申請',
-    content: `${(await getRoleLabel(salesName))} 發起了密碼重設請求，請至核定中心處理。`,
+    content: `${getRoleLabel(salesName)} 發起了密碼重設請求，請至核定中心處理。`,
     date: new Date().toISOString().split('T')[0],
     isRead: false
   });
@@ -5245,16 +5246,16 @@ export async function requestPasswordReset(salesName: string) {
 }
 
 export async function fetchPasswordResets() {
-  return [...(await jsonStore.find('password_resets'))];
+  return [...db_password_resets];
 }
 
 export async function handlePasswordReset(id: string, action: 'Approve' | 'Reject') {
-  const req = (await jsonStore.find('password_resets')).find(r => r.id === id);
+  const req = db_password_resets.find(r => r.id === id);
   if (!req) return { success: false, error: 'Request not found' };
 
   req.status = action === 'Approve' ? 'Approved' : 'Rejected';
   
-  await jsonStore.createRecord('notifications', {
+  db_notifications.unshift({
     id: `N-PR-RES-${Date.now()}`,
     title: action === 'Approve' ? '密碼重設核准' : '密碼重設拒絕',
     content: action === 'Approve' 
@@ -5270,7 +5271,7 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
 }
 
 export async function fetchNotifications(userRole: string, userName?: string) {
-  let notifs = [...(await jsonStore.find('notifications'))];
+  let notifs = [...db_notifications];
   try {
     const { dbQuery } = await import('@/db/db');
     const resNotifs = await dbQuery("SELECT * FROM notifications ORDER BY date DESC", [], () => null) as any;
@@ -5332,8 +5333,8 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
     };
 
     // Always push to in-memory first for reliability
-    await jsonStore.createRecord('guest_files', newFile);
-    // (await jsonStore.find('guest_files')) synced
+    db_guest_files.push(newFile);
+    gStore.db_guest_files = db_guest_files;
 
     if (client) {
       await client.query(`
@@ -5374,7 +5375,7 @@ export async function createPersonnel(formData: FormData) {
     
     if (account) {
       if (!client) {
-        const current = await jsonStore.find('personnel');
+        const current = gStore.db_personnel || db_personnel || [];
         const isDuplicate = current.some((p: any) => p.templeId === templeId && (p.account || '').toLowerCase() === account.toLowerCase());
         if (isDuplicate) {
           return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
@@ -5394,7 +5395,7 @@ export async function createPersonnel(formData: FormData) {
     const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4F46E5&color=fff`;
 
     if (!client) {
-      const current = await jsonStore.find('personnel');
+      const current = gStore.db_personnel || db_personnel;
       const newPersonnel = {
         id: newId,
         templeId,
@@ -5408,8 +5409,8 @@ export async function createPersonnel(formData: FormData) {
         serviceCount: 0,
         permissions: role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers']
       };
-      await jsonStore.createRecord('personnel', newPersonnel);
-      // synced via jsonStore
+      gStore.db_personnel = [...current, newPersonnel];
+      db_personnel = gStore.db_personnel;
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
@@ -5441,11 +5442,11 @@ export async function createPersonnel(formData: FormData) {
 export async function deletePersonnel(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    let currentPersonnel = await jsonStore.find('personnel');
+    let currentPersonnel = gStore.db_personnel || db_personnel || [];
     const personnel = currentPersonnel.find((p: any) => p.id.toString() === id.toString() && p.templeId === templeId);
     if (personnel) {
-      const currentAppts = await jsonStore.find('appointments');
-      const currentSlots = await jsonStore.find('slots');
+      const currentAppts = gStore.db_appointments || db_appointments || [];
+      const currentSlots = gStore.db_slots || db_slots || [];
       const hasAppointments = currentAppts.some((a: any) => a.staff === personnel.name && a.status !== 'Completed' && a.templeId === templeId);
       const hasSlots = currentSlots.some((s: any) => s.staff === personnel.name && s.status !== 'Completed' && s.templeId === templeId);
       if (hasAppointments || hasSlots) {
@@ -5455,8 +5456,8 @@ export async function deletePersonnel(id: string) {
 
     if (!client) {
       currentPersonnel = currentPersonnel.filter((p: any) => p.id.toString() !== id.toString());
-      await jsonStore.atomicWrite('personnel', () => currentPersonnel);
-      // synced via jsonStore
+      gStore.db_personnel = currentPersonnel;
+      db_personnel = currentPersonnel;
     } else {
       await client.query('DELETE FROM personnel WHERE id = $1 AND temple_id = $2', [id, templeId]);
     }
@@ -5469,12 +5470,12 @@ export async function updateAccountPermissions(id: string, permissions: string[]
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      let pData = await jsonStore.find('personnel');
+      let pData = gStore.db_personnel || db_personnel || [];
       const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
       if (idx > -1) {
         pData[idx].permissions = permissions;
-        await jsonStore.atomicWrite('personnel', () => pData);
-        // synced via jsonStore
+        gStore.db_personnel = pData;
+        db_personnel = pData;
       }
     } else {
       await client.query('UPDATE personnel SET permissions = $1 WHERE id = $2 AND temple_id = $3', [permissions, id, templeId]);
@@ -5490,13 +5491,13 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
     const gStore = globalThis as any;
     // 永遠更新記憶體資料，以免登入時 fallback 到舊密碼
     if (role === 'Temple' || id.startsWith('temple-')) {
-       let pData = await jsonStore.find('personnel');
+       let pData = (gStore.db_personnel || db_personnel);
        const idx = pData.findIndex((p: any) => p.templeId === id);
        if (idx > -1) { 
          pData[idx].password = newPass; 
-         await jsonStore.atomicWrite('personnel', () => pData); 
+         gStore.db_personnel = pData; 
        } else {
-         const tData = await jsonStore.find('temples');
+         const tData = (gStore.db_temples || db_temples);
          const temple = tData.find((t: any) => t.id === id);
          if (temple) {
            pData.push({
@@ -5508,29 +5509,29 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
              role: 'TempleAdmin',
              status: 'Active'
            });
-           await jsonStore.atomicWrite('personnel', () => pData);
+           gStore.db_personnel = pData;
          }
        }
        
-       // 同步更新 (await jsonStore.find('temples')) 以便 Auto-heal 登入機制生效
-       const tData = await jsonStore.find('temples');
+       // 同步更新 db_temples 以便 Auto-heal 登入機制生效
+       const tData = (gStore.db_temples || db_temples);
        const tIdx = tData.findIndex((t: any) => t.id === id);
        if (tIdx > -1) {
          tData[tIdx].password = newPass;
-         await jsonStore.atomicWrite('temples', () => tData);
+         gStore.db_temples = tData;
        }
     } else if (role === 'Distributor') {
-       let dData = ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors')));
+       let dData = (gStore.db_distributors || db_distributors);
        const idx = dData.findIndex((p: any) => p.id === id);
-       if (idx > -1) { dData[idx].password = newPass; await jsonStore.atomicWrite('distributors', (data) => dData); }
+       if (idx > -1) { dData[idx].password = newPass; gStore.db_distributors = dData; }
     } else if (role === 'SuperSales' || role === 'DistSales') {
-       let sData = ((await jsonStore.find('dist_sales')) || (await jsonStore.find('dist_sales')));
+       let sData = (gStore.db_dist_sales || db_dist_sales);
        const idx = sData.findIndex((p: any) => p.id === id);
-       if (idx > -1) { sData[idx].password = newPass; await jsonStore.atomicWrite('dist_sales', (data) => sData); }
+       if (idx > -1) { sData[idx].password = newPass; gStore.db_dist_sales = sData; }
     } else {
-       let pData = await jsonStore.find('personnel');
+       let pData = (gStore.db_personnel || db_personnel);
        const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
-       if (idx > -1) { pData[idx].password = newPass; await jsonStore.atomicWrite('personnel', () => pData); }
+       if (idx > -1) { pData[idx].password = newPass; gStore.db_personnel = pData; }
     }
 
     if (client) {
@@ -5542,7 +5543,7 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
         const res = await client.query('UPDATE personnel SET password = $1 WHERE id = $2 OR temple_id = $2 RETURNING id', [newPass, id]);
         // Auto-heal PostgreSQL insertion
         if (res.rowCount === 0 && (role === 'Temple' || id.startsWith('temple-'))) {
-           const tData = await jsonStore.find('temples');
+           const tData = (gStore.db_temples || db_temples);
            const temple = tData.find((t: any) => t.id === id);
            const account = temple?.account || `admin-${id.slice(-4)}`;
            const name = temple?.templeName || '宮廟管理員';
@@ -5570,13 +5571,13 @@ export async function fetchDistributorProfile(distId?: string) {
       const r = res.rows[0];
       let b2bPayment = undefined;
       try { if (r.b2b_payment_config) b2bPayment = typeof r.b2b_payment_config === 'string' ? JSON.parse(r.b2b_payment_config) : r.b2b_payment_config; } catch(e){}
-      const allDists = typeof gStore !== 'undefined' ? ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors'))) : (await jsonStore.find('distributors'));
+      const allDists = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
       const memDist = allDists.find((d: any) => d.id === distId);
       return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || memDist?.bankInfo?.bankName || '', accountName: memDist?.bankInfo?.accountName || memDist?.accountName || r.name || '', accountNumber: r.bank_account || memDist?.bankInfo?.accountNumber || '', bankCode: r.bank_code || memDist?.bankInfo?.bankCode || '' }, b2bPayment };
     }
   } catch (e) {}
   
-  const allDistributors = typeof gStore !== 'undefined' ? ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors'))) : (await jsonStore.find('distributors'));
+  const allDistributors = typeof gStore !== 'undefined' ? (gStore.db_distributors || db_distributors) : db_distributors;
   const dist = allDistributors.find((d: any) => d.id === distId);
   if (dist && !dist.bankInfo && (dist.bank_name || dist.bank_account)) {
     dist.bankInfo = { bankName: dist.bank_name || '', accountName: dist.accountName || dist.name || '', accountNumber: dist.bank_account || '', bankCode: dist.bank_code || '' };
@@ -5611,7 +5612,7 @@ export async function fetchGlobalTempleData() {
       // In-Memory Fallback
       let todayAppointments = 0; let completedAppointments = 0; let totalServices = 0;
       const serviceCounts: Record<string, number> = {};
-      const apps = (await jsonStore.find('appointments')).filter((a: any) => !a.templeId || a.templeId === templeId);
+      const apps = db_appointments.filter((a: any) => !a.templeId || a.templeId === templeId);
       apps.forEach((a: any) => {
         if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
         if (a.date === todayStr) {
@@ -5624,24 +5625,23 @@ export async function fetchGlobalTempleData() {
         return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
       });
       if (sortedServices.length === 0) sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
-      const validEventIds = (await jsonStore.find('queue_events')).filter((e: any) => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
-      const allQix = await jsonStore.find('queue_tickets');
+      const validEventIds = db_queue_events.filter((e: any) => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
       const qActive = validEventIds.map((evt: any) => {
-        const tix = allQix.filter((t: any) => t.eventId === evt.id);
+        const tix = db_queue_tickets.filter((t: any) => t.eventId === evt.id);
         const waiting = tix.filter((t: any) => t.status === 'Queuing').length;
         const completed = tix.filter((t: any) => t.status === 'Completed').length;
         return { title: evt.title, waiting, completed };
       });
-      const guests = (await jsonStore.find('guests')).filter((g: any) => !g.templeId || g.templeId === templeId);
+      const guests = db_guests.filter((g: any) => !g.templeId || g.templeId === templeId);
       const totalGuests = guests.length;
       let totalLamps = 0; let activeLamps = 0;
-      (await jsonStore.find('lamp_records')).forEach((l: any) => {
+      db_lamp_records.forEach((l: any) => {
         if (templeId && l.templeId && l.templeId !== templeId) return;
         totalLamps++;
         if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
       });
-      const temple = (await jsonStore.find('temples'))?.find((t: any) => t.id === templeId);
-      const templeStorage = (await jsonStore.find('temple_storages'))?.find((s: any) => s.templeId === templeId);
+      const temple = (globalThis as any).db_temples?.find((t: any) => t.id === templeId);
+      const templeStorage = (globalThis as any).db_temple_storages?.find((s: any) => s.templeId === templeId);
       let isVip = false;
       let totalGB = 100;
       let planName = '免費 5GB 空間';
@@ -5660,7 +5660,7 @@ export async function fetchGlobalTempleData() {
           planName = isVip ? '無限使用' : `${totalGB}GB`;
         }
       }
-      const usedBytes = (await jsonStore.find('customer_media'))?.filter((m: any) => m.templeId === templeId).reduce((sum: number, m: any) => sum + (m.sizeBytes || 0), 0) || 0;
+      const usedBytes = (globalThis as any).db_customer_media?.filter((m: any) => m.templeId === templeId).reduce((sum: number, m: any) => sum + (m.sizeBytes || 0), 0) || 0;
       const used = usedBytes / (1024 * 1024 * 1024);
 
       return { analyticsSettings: {}, analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, raw: { apps, agiStats: {}, guests, storageInfo: { used: used, total: totalGB, isVip, planName }, qActive } };
@@ -5750,11 +5750,13 @@ export type ServiceDefinition = any;
 export type GuestRecord = any;
 export type LampCategory = any;
 
+let db_guests: any[] = initGlobal("db_guests", []);
+
 export async function fetchGuests() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return JSON.parse(JSON.stringify((await jsonStore.find('guests')).filter((g: any) => !g.templeId || g.templeId === templeId)));
+      return JSON.parse(JSON.stringify(db_guests.filter((g: any) => !g.templeId || g.templeId === templeId)));
     } else {
       const res = await client.query('SELECT * FROM guests WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
       return JSON.parse(JSON.stringify(res.rows.map(r => ({
@@ -5774,14 +5776,15 @@ export async function searchGuestsByNameOrPhone(query: string) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       const seen = new Set();
-      await jsonStore.atomicWrite('guests', (guests) => guests.filter((g: any) => {
+      db_guests = db_guests.filter((g: any) => {
         const p = normalizePhone(g.phone);
         if (seen.has(p)) return false;
         seen.add(p);
         return true;
-      }));
+      });
+      gStore.db_guests = db_guests;
       
-      return (await jsonStore.find('guests')).filter((g: any) => 
+      return db_guests.filter((g: any) => 
         g.name.toLowerCase().includes(normalizedQuery) || 
         normalizePhone(g.phone).includes(normalizePhone(normalizedQuery))
       );
@@ -5832,7 +5835,7 @@ export async function checkGuestProfile(phone: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('guests')).find((g: any) => normalizePhone(g.phone) === normPhone) || null;
+      return db_guests.find((g: any) => normalizePhone(g.phone) === normPhone) || null;
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
@@ -5879,25 +5882,25 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
     if (!client) {
       // 避免將手機號碼修改成其他已存在的號碼
       if (originalPhone && originalPhone !== d.phone) {
-        const conflict = (await jsonStore.find('guests')).find((g: any) => g.phone === d.phone && g.templeId === templeId);
+        const conflict = db_guests.find((g: any) => g.phone === d.phone && g.templeId === templeId);
         if (conflict) {
           return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
         }
       }
 
-      const idx = (await jsonStore.find('guests')).findIndex((g: any) => g.phone === lookupPhone && g.templeId === templeId);
+      const idx = db_guests.findIndex((g: any) => g.phone === lookupPhone && g.templeId === templeId);
       if (idx > -1) {
-        (await jsonStore.find('guests'))[idx] = { ...(await jsonStore.find('guests'))[idx], ...d };
+        db_guests[idx] = { ...db_guests[idx], ...d };
       } else {
         // 建立新信眾時，防範重複手機號碼
-        const exists = (await jsonStore.find('guests')).find((g: any) => g.phone === d.phone && g.templeId === templeId);
+        const exists = db_guests.find((g: any) => g.phone === d.phone && g.templeId === templeId);
         if (exists) {
           return { success: false, error: "此手機號碼的信眾檔案已存在！" };
         }
         // 若未填帳號，預設使用手機
         if (!d.account) d.account = d.phone;
         d.templeId = templeId;
-        await jsonStore.createRecord('guests', d);
+        db_guests.push(d);
       }
     } else {
       await client.query(`
@@ -5965,7 +5968,7 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
 export async function fetchGuestHistory(p: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    let files = (await jsonStore.find('guest_files')).filter((f: any) => normCompare(f.phone, p));
+    let files = db_guest_files.filter((f: any) => normCompare(f.phone, p));
     if (client) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
@@ -6006,20 +6009,19 @@ export async function fetchGuestHistory(p: string) {
 
       return JSON.parse(JSON.stringify({
         appointments: appsRes.rows,
-        records: (await jsonStore.find('deep_records')).filter((r: any) => normCompare(r.phone, p)),
+        records: db_deep_records.filter((r: any) => normCompare(r.phone, p)),
         files: files,
         lampRecords: lampsRes.rows,
-        activities: (await jsonStore.find('activities')).filter((a: any) => normCompare(a.phone, p)),
+        activities: db_activities.filter((a: any) => normCompare(a.phone, p)),
         queueTickets: queueRes.rows,
         eventRegistrations: eventsRes.rows
       }));
     }
 
-    const apps = (await jsonStore.find('appointments')).filter((a: any) => normCompare(a.phone, p));
-    const _allSlotsForQueue = await jsonStore.find('slots');
+    const apps = db_appointments.filter((a: any) => normCompare(a.phone, p));
     apps.forEach((app: any) => {
       if (!app.serviceId) {
-        const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.description === app.service);
+        const slot = db_slots.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.description === app.service);
         if (slot && (slot.bound_service_id || slot.serviceId)) {
           app.serviceId = slot.bound_service_id || slot.serviceId;
         }
@@ -6028,12 +6030,12 @@ export async function fetchGuestHistory(p: string) {
 
     return JSON.parse(JSON.stringify({ 
       appointments: apps, 
-      records: (await jsonStore.find('deep_records')).filter((r: any) => normCompare(r.phone, p)), 
+      records: db_deep_records.filter((r: any) => normCompare(r.phone, p)), 
       files: files, 
-      lampRecords: (await jsonStore.find('lamp_records')).filter((l: any) => normCompare(l.phone, p)), 
-      activities: (await jsonStore.find('activities')).filter((a: any) => normCompare(a.phone, p)),
-      queueTickets: (await jsonStore.find('queue_tickets')).filter((t: any) => normCompare(t.phone, p)),
-      eventRegistrations: (await jsonStore.find('event_registrations')).filter((e: any) => normCompare(e.phone, p))
+      lampRecords: db_lamp_records.filter((l: any) => normCompare(l.phone, p)), 
+      activities: db_activities.filter((a: any) => normCompare(a.phone, p)),
+      queueTickets: db_queue_tickets.filter((t: any) => normCompare(t.phone, p)),
+      eventRegistrations: db_event_registrations.filter((e: any) => normCompare(e.phone, p))
     })); 
   });
 }
@@ -6043,7 +6045,7 @@ export async function fetchGuestRecords(phone: string) {
   return withTempleSession(templeId, [], async (client) => {
     // Memory fallback currently used for records
     const normPhone = phone.replace(/-/g, '');
-    return (await jsonStore.find('deep_records')).filter((r: any) => r.phone && r.phone.replace(/-/g, '') === normPhone);
+    return db_deep_records.filter((r: any) => r.phone && r.phone.replace(/-/g, '') === normPhone);
   });
 }
 
@@ -6051,26 +6053,26 @@ export async function updateDeepRecord(recordId: string, phone: string, staffNam
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, { success: false, message: "失敗" }, async (client) => {
     // Memory fallback
-    const idx = (await jsonStore.find('deep_records')).findIndex((r: any) => r.id === recordId);
+    const idx = db_deep_records.findIndex((r: any) => r.id === recordId);
     if (idx !== -1) {
-      (await jsonStore.find('deep_records'))[idx] = {
-        ...(await jsonStore.find('deep_records'))[idx],
+      db_deep_records[idx] = {
+        ...db_deep_records[idx],
         values,
         staffName,
         timestamp: new Date().toISOString()
       };
-      // (await jsonStore.find('deep_records')) synced
+      gStore.db_deep_records = db_deep_records;
 
-      const serviceType = (await jsonStore.find('deep_records'))[idx].serviceType;
+      const serviceType = db_deep_records[idx].serviceType;
       
-      await jsonStore.createRecord('activities', {
+      db_activities.unshift({
         id: `act-${Date.now()}`,
         phone,
         type: 'RECORD_MODIFIED',
         content: `修改【${serviceType}】紀錄歸檔`,
         timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
       });
-      // (await jsonStore.find('activities')) synced
+      gStore.db_activities = db_activities;
 
       await revalidateTemple();
       return { success: true, message: "紀錄已更新" };
@@ -6092,8 +6094,8 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
     timestamp: new Date().toISOString()
   };
   
-  await jsonStore.createRecord('deep_records', newRecord);
-  // (await jsonStore.find('deep_records')) synced
+  db_deep_records.push(newRecord);
+  gStore.db_deep_records = db_deep_records;
 
   let activityContent = `完成【${serviceType}】紀錄歸檔`;
   if (serviceType.includes('功德')) {
@@ -6104,14 +6106,14 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
   }
 
   // Also add to activities for unified log display
-  await jsonStore.createRecord('activities', {
+  db_activities.unshift({
     id: `act-${Date.now()}`,
     phone,
     type: 'RECORD_ADDED',
     content: activityContent,
     timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
   });
-  // (await jsonStore.find('activities')) synced
+  gStore.db_activities = db_activities;
 
   await revalidateTemple();
     return { success: true, record: newRecord };
@@ -6123,10 +6125,10 @@ export async function updateGuestPassword(phone: string, newPassword: string) {
   return withTempleSession(templeId, false, async (client) => {
     const normPhone = normalizePhone(phone);
     if (!client) {
-      const idx = (await jsonStore.find('guests')).findIndex((g: any) => normalizePhone(g.phone) === normPhone && g.templeId === templeId);
+      const idx = (gStore.db_guests || db_guests).findIndex((g: any) => normalizePhone(g.phone) === normPhone && g.templeId === templeId);
       if (idx > -1) {
-        if ((await jsonStore.find('guests'))) (await jsonStore.find('guests'))[idx].password = newPassword;
-        else (await jsonStore.find('guests'))[idx].password = newPassword;
+        if (gStore.db_guests) gStore.db_guests[idx].password = newPassword;
+        else db_guests[idx].password = newPassword;
       } else {
         return { success: false, error: "找不到該信眾" };
       }
@@ -6141,40 +6143,40 @@ export async function updateGuestPassword(phone: string, newPassword: string) {
 export type LampRecord = any;
 
 export async function fetchGuestByPhone(p: string) { 
-  return (await jsonStore.find('guests')).find((g: any) => g.phone === p) || null; 
+  return db_guests.find((g: any) => g.phone === p) || null; 
 }
 export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       if (recordType === 'Lamp') {
-        const idx = (await jsonStore.find('lamp_records')).findIndex(r => r.id === recordId);
+        const idx = db_lamp_records.findIndex(r => r.id === recordId);
         if (idx > -1) {
-          (await jsonStore.find('lamp_records'))[idx].paymentStatus = 'Paid';
-          (await jsonStore.find('lamp_records'))[idx].paymentUpdatedAt = new Date().toISOString();
+          db_lamp_records[idx].paymentStatus = 'Paid';
+          db_lamp_records[idx].paymentUpdatedAt = new Date().toISOString();
         }
       }
       if (recordType === 'Appointment') {
-        const idx = (await jsonStore.find('appointments')).findIndex(r => r.id.toString() === recordId.toString());
+        const idx = db_appointments.findIndex(r => r.id.toString() === recordId.toString());
         if (idx > -1) {
-          (await jsonStore.find('appointments'))[idx].status = 'Confirmed';
-          (await jsonStore.find('appointments'))[idx].paymentStatus = 'Paid';
-          (await jsonStore.find('appointments'))[idx].paymentUpdatedAt = new Date().toISOString();
+          db_appointments[idx].status = 'Confirmed';
+          db_appointments[idx].paymentStatus = 'Paid';
+          db_appointments[idx].paymentUpdatedAt = new Date().toISOString();
         }
       }
       if (recordType === 'Event') {
-        const idx = (await jsonStore.find('event_registrations')).findIndex(r => r.id === recordId);
+        const idx = db_event_registrations.findIndex(r => r.id === recordId);
         if (idx > -1) {
-          (await jsonStore.find('event_registrations'))[idx].paymentStatus = 'Paid';
-          (await jsonStore.find('event_registrations'))[idx].paymentUpdatedAt = new Date().toISOString();
+          db_event_registrations[idx].paymentStatus = 'Paid';
+          db_event_registrations[idx].paymentUpdatedAt = new Date().toISOString();
         }
       }
       if (recordType === 'Queue') {
-        if (typeof (await jsonStore.find('queue_tickets')) !== 'undefined') {
-          const idx = (await jsonStore.find('queue_tickets')).findIndex(r => r.id === recordId);
+        if (typeof db_queue_tickets !== 'undefined') {
+          const idx = db_queue_tickets.findIndex(r => r.id === recordId);
           if (idx > -1) {
-            (await jsonStore.find('queue_tickets'))[idx].paymentStatus = 'Paid';
-            (await jsonStore.find('queue_tickets'))[idx].paymentUpdatedAt = new Date().toISOString();
+            db_queue_tickets[idx].paymentStatus = 'Paid';
+            db_queue_tickets[idx].paymentUpdatedAt = new Date().toISOString();
           }
         }
       }
@@ -6209,14 +6211,14 @@ export async function createLampRecord(data: any) {
   return withTempleSession(templeId, false, async (client) => {
     let cat: any = null;
     if (!client) {
-      cat = (await jsonStore.find('lamp_categories')).find((c: any) => c.id === categoryId && (!c.templeId || c.templeId === templeId));
+      cat = db_lamp_categories.find((c: any) => c.id === categoryId && (!c.templeId || c.templeId === templeId));
       if(!cat) return { success: false, error: '未找到燈種類別' };
       const today = new Date();
       const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
       const newId = `LMP-${Date.now()}`;
       const newRecord = { id: newId, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Pending', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid'), createdAt: new Date().toISOString() };
-      await jsonStore.createRecord('lamp_records', newRecord);
-      if (typeof (await jsonStore.find('activities')) !== 'undefined') await jsonStore.createRecord('activities', { phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
+      db_lamp_records.push(newRecord);
+      if (typeof db_activities !== 'undefined') db_activities.push({ phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
       await revalidateTemple();
       return { success: true, id: newId };
     } else {
@@ -6240,10 +6242,10 @@ export async function saveLampCategory(data: any) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       if (id) {
-        const idx = (await jsonStore.find('lamp_categories')).findIndex(c => c.id === id);
-        if (idx > -1) (await jsonStore.find('lamp_categories'))[idx] = { ...(await jsonStore.find('lamp_categories'))[idx], ...data, templeId };
+        const idx = db_lamp_categories.findIndex(c => c.id === id);
+        if (idx > -1) db_lamp_categories[idx] = { ...db_lamp_categories[idx], ...data, templeId };
       } else {
-        await jsonStore.createRecord('lamp_categories', { id: `cat-${Date.now()}`, ...data, totalSlots: data.totalSlots || 500, templeId });
+        db_lamp_categories.push({ id: `cat-${Date.now()}`, ...data, totalSlots: data.totalSlots || 500, templeId });
       }
     } else {
       if (id) {
@@ -6267,9 +6269,9 @@ export async function deleteLampCategory(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const hasRecords = (await jsonStore.find('lamp_records')).some(r => r.categoryId === id);
+      const hasRecords = db_lamp_records.some(r => r.categoryId === id);
       if (hasRecords) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
-      await jsonStore.atomicWrite('lamp_categories', (data) => data.filter(c => c.id !== id));
+      db_lamp_categories = gStore.db_lamp_categories = db_lamp_categories.filter(c => c.id !== id);
     } else {
       const hasRecords = await client.query('SELECT 1 FROM lamp_records WHERE category_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
       if (hasRecords.rowCount && hasRecords.rowCount > 0) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
@@ -6292,9 +6294,8 @@ export async function fetchQueueEvents() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const allQueueTix = await jsonStore.find('queue_tickets');
-      return (await jsonStore.find('queue_events')).filter(e => !e.templeId || e.templeId === templeId).map(evt => {
-        const participantCount = allQueueTix.filter(t => t.eventId === evt.id && t.status === 'Queuing').length;
+      return db_queue_events.filter(e => !e.templeId || e.templeId === templeId).map(evt => {
+        const participantCount = db_queue_tickets.filter(t => t.eventId === evt.id && t.status === 'Queuing').length;
         return { ...evt, participantCount };
       });
     } else {
@@ -6315,7 +6316,7 @@ export async function fetchQueueEvents() {
 export async function fetchActiveQueues() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return (await jsonStore.find('queue_events')).filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
+    if (!client) return db_queue_events.filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
     const res = await client.query('SELECT * FROM queue_events WHERE status = \'Active\' AND temple_id = $1', [templeId]);
     return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time, location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status }));
   });
@@ -6324,7 +6325,7 @@ export async function fetchQueueDashboard(eventId?: string) {
   if (!eventId) return { tickets: [] };
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return { tickets: (await jsonStore.find('queue_tickets')).filter(t => t.eventId === eventId) };
+    if (!client) return { tickets: db_queue_tickets.filter(t => t.eventId === eventId) };
     const res = await client.query('SELECT * FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
     return { tickets: res.rows.map(r => ({
       id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title, phone: r.phone, guestName: r.guest_name,
@@ -6337,9 +6338,9 @@ export async function fetchActiveQueueCount(): Promise<number> {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const activeEventIds = (await jsonStore.find('queue_events')).filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)).map(e => e.id);
+      const activeEventIds = db_queue_events.filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)).map(e => e.id);
       if (activeEventIds.length === 0) return 0;
-      return (await jsonStore.find('queue_tickets')).filter(t => activeEventIds.includes(t.eventId) && t.status === 'Queuing').length;
+      return db_queue_tickets.filter(t => activeEventIds.includes(t.eventId) && t.status === 'Queuing').length;
     } else {
       const res = await client.query('SELECT COUNT(qt.id) as count FROM queue_tickets qt JOIN queue_events qe ON qt.event_id = qe.id WHERE qe.status = \'Active\' AND qt.status = \'Queuing\' AND qt.temple_id = $1', [templeId]);
       return parseInt(res.rows[0].count) || 0;
@@ -6354,7 +6355,7 @@ export async function createQueueEvent(data: any) {
     if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
 
     if (!client) {
-      await jsonStore.createRecord('queue_events', { id: `qe-${Date.now()}`, ...data, templeId, status: 'Active' });
+      db_queue_events.push({ id: `qe-${Date.now()}`, ...data, templeId, status: 'Active' });
     } else {
       await client.query('INSERT INTO queue_events (id, temple_id, title, date, start_time, end_time, location, service_type, price, max_capacity, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
         [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Active']);
@@ -6369,9 +6370,9 @@ export async function updateQueueEvent(id: string, data: any) {
   return withTempleSession(templeId, false, async (client) => {
     try {
       if (!client) {
-        const idx = (await jsonStore.find('queue_events')).findIndex(e => e.id === id);
+        const idx = db_queue_events.findIndex(e => e.id === id);
         if (idx !== -1) {
-          (await jsonStore.find('queue_events'))[idx] = { ...(await jsonStore.find('queue_events'))[idx], ...data };
+          db_queue_events[idx] = { ...db_queue_events[idx], ...data };
         }
       } else {
         await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
@@ -6388,12 +6389,12 @@ export async function activateQueueEvent(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      await jsonStore.atomicWrite('queue_events', (data) => data.map((e: any) => {
+      db_queue_events = gStore.db_queue_events = db_queue_events.map((e: any) => {
         if (e.id === id) {
           return { ...e, status: e.status === 'Active' ? 'Draft' : 'Active' };
         }
         return e;
-      }));
+      });
     } else {
       // Toggle status between Active and Draft
       const res = await client.query('SELECT status FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
@@ -6410,11 +6411,11 @@ export async function deleteQueueEvent(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const hasTickets = (await jsonStore.find('queue_tickets')).some((t: any) => t.eventId === id && (!t.templeId || t.templeId === templeId));
+      const hasTickets = db_queue_tickets.some((t: any) => t.eventId === id && (!t.templeId || t.templeId === templeId));
       if (hasTickets) {
-        await jsonStore.atomicWrite('queue_events', (data) => data.map((e: any) => e.id === id ? { ...e, status: 'Cancelled' } : e));
+        db_queue_events = gStore.db_queue_events = db_queue_events.map((e: any) => e.id === id ? { ...e, status: 'Cancelled' } : e);
       } else {
-        await jsonStore.atomicWrite('queue_events', (data) => data.filter((e: any) => !(e.id === id && (!e.templeId || e.templeId === templeId))));
+        db_queue_events = gStore.db_queue_events = db_queue_events.filter((e: any) => !(e.id === id && (!e.templeId || e.templeId === templeId)));
       }
     } else {
       const tRes = await client.query('SELECT 1 FROM queue_tickets WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
@@ -6432,12 +6433,12 @@ export async function checkInWithQr(ticketId: string, eventId?: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const ticket = (await jsonStore.find('queue_tickets')).find(t => t.id === ticketId);
+      const ticket = db_queue_tickets.find(t => t.id === ticketId);
       if (!ticket) return { success: false, error: '找不到票券' };
       if (ticket.status !== 'Registered' && ticket.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
       if (eventId && ticket.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
 
-      const qCount = (await jsonStore.find('queue_tickets')).filter(x => x.eventId === ticket.eventId && (x.status === 'Queuing' || x.status === 'Calling' || x.status === 'Completed')).length + 1;
+      const qCount = db_queue_tickets.filter(x => x.eventId === ticket.eventId && (x.status === 'Queuing' || x.status === 'Calling' || x.status === 'Completed')).length + 1;
       ticket.status = 'Queuing';
       ticket.actualOrder = qCount;
       ticket.scannedAt = new Date().toLocaleTimeString();
@@ -6461,10 +6462,10 @@ export async function callNextInQueue(eventId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.eventId === eventId && t.status === 'Calling' ? { ...t, status: 'Completed' } : t));
-      const nextTicket = (await jsonStore.find('queue_tickets')).slice().sort((a: any,b: any) => (a.actualOrder||999) - (b.actualOrder||999)).find(t => t.eventId === eventId && t.status === 'Queuing');
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.eventId === eventId && t.status === 'Calling' ? { ...t, status: 'Completed' } : t);
+      const nextTicket = db_queue_tickets.slice().sort((a,b) => (a.actualOrder||999) - (b.actualOrder||999)).find(t => t.eventId === eventId && t.status === 'Queuing');
       if (!nextTicket) return { error: 'NO_ONE_IN_QUEUE' };
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.id === nextTicket.id ? { ...t, status: 'Calling' } : t));
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === nextTicket.id ? { ...t, status: 'Calling' } : t);
     } else {
       await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE event_id = $1 AND status = \'Calling\' AND temple_id = $2', [eventId, templeId]);
       const nextRes = await client.query('SELECT id FROM queue_tickets WHERE event_id = $1 AND status = \'Queuing\' AND temple_id = $2 ORDER BY actual_order ASC LIMIT 1', [eventId, templeId]);
@@ -6480,7 +6481,7 @@ export async function completeQueueService(ticketId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.id === ticketId ? { ...t, status: 'Completed' } : t));
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === ticketId ? { ...t, status: 'Completed' } : t);
     } else {
       await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
     }
@@ -6493,7 +6494,7 @@ export async function updateQueueStatus(ticketId: string, status: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.id === ticketId ? { ...t, status } : t));
+      db_queue_tickets = gStore.db_queue_tickets = db_queue_tickets.map(t => t.id === ticketId ? { ...t, status } : t);
     } else {
       await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', [status, ticketId, templeId]);
     }
@@ -6507,9 +6508,9 @@ export async function registerGuestForQueue(eventId: string, data: { guestName: 
   return withTempleSession(templeId, false, async (client) => {
     let newTicket: any;
     if (!client) {
-      const event = (await jsonStore.find('queue_events')).find(e => e.id === eventId);
+      const event = db_queue_events.find(e => e.id === eventId);
       if (!event) return { error: 'EVENT_NOT_FOUND' };
-      const eventTickets = (await jsonStore.find('queue_tickets')).filter(t => t.eventId === eventId);
+      const eventTickets = db_queue_tickets.filter(t => t.eventId === eventId);
       if (event.maxCapacity && eventTickets.length >= event.maxCapacity) return { error: '活動預約已額滿！' };
 
       const nextNumber = `A${(eventTickets.length + 1).toString().padStart(3, '0')}`;
@@ -6523,8 +6524,8 @@ export async function registerGuestForQueue(eventId: string, data: { guestName: 
         actualOrder: data.isOnline ? null : eventTickets.filter(t => t.status === 'Queuing' || t.status === 'Calling' || t.status === 'Completed').length + 1,
         scannedAt: data.isOnline ? null : new Date().toLocaleTimeString()
       };
-      await jsonStore.createRecord('queue_tickets', newTicket);
-      // (await jsonStore.find('queue_tickets')) synced
+      db_queue_tickets.push(newTicket);
+      gStore.db_queue_tickets = db_queue_tickets;
     } else {
       const evRes = await client.query('SELECT title, capacity FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
       if (evRes.rowCount === 0) return { error: 'EVENT_NOT_FOUND' };
@@ -6603,8 +6604,8 @@ let db_price_plans: PricePlan[] = initGlobal('db_price_plans', [
 ]);
 gStore.db_price_plans = db_price_plans;
 
-// migrated (await jsonStore.find('temple_applications')) to (await jsonStore.find('temple_applications'))
-// (await jsonStore.find('temple_applications')) synced
+let db_temple_applications: any[] = initGlobal("db_temple_applications", []);
+gStore.db_temple_applications = db_temple_applications;
 
 export async function fetchDistributorStats() {
   const templeId = await getDynamicTempleId();
@@ -6612,11 +6613,11 @@ export async function fetchDistributorStats() {
     if (!client) {
       return {
         totalNodes: 100,
-        usedNodes: (await jsonStore.find('temples')).length,
-        activeTemples: (await jsonStore.find('temples')).filter(t => t.status === 'Active').length,
+        usedNodes: db_temples.length,
+        activeTemples: db_temples.filter(t => t.status === 'Active').length,
         totalRevenue: 1250000,
         totalCommission: 187500,
-        activeSales: (await jsonStore.find('dist_sales')).length
+        activeSales: db_dist_sales.length
       };
     } else {
       const activeRes = await client.query('SELECT COUNT(*) as active_count FROM temples WHERE status = $1', ['Active']);
@@ -6720,7 +6721,7 @@ export async function fetchTempleApplications() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return [...(await jsonStore.find('temple_applications'))];
+      return [...db_temple_applications];
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS temple_applications (
@@ -6776,7 +6777,7 @@ export async function submitTempleApplication(data: any) {
         status: 'Pending',
         salesId: 'sales-1'
       };
-      await jsonStore.createRecord('temple_applications', newApp);
+      db_temple_applications.push(newApp);
     } else {
       const planRes = await client.query('SELECT * FROM price_plans WHERE id = $1', [data.planId]);
       if ((planRes.rowCount ?? 0) > 0) {
@@ -6797,14 +6798,14 @@ export async function approveTempleApplication(appId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const appIdx = (await jsonStore.find('temple_applications')).findIndex(a => a.id === appId);
+      const appIdx = db_temple_applications.findIndex(a => a.id === appId);
       if (appIdx === -1) return { success: false, error: '找不到該筆開案申請' };
       
-      (await jsonStore.find('temple_applications'))[appIdx].status = 'Approved';
-      const app = (await jsonStore.find('temple_applications'))[appIdx];
+      db_temple_applications[appIdx].status = 'Approved';
+      const app = db_temple_applications[appIdx];
       
       const newTempleId = `temple-${Date.now()}`;
-      await jsonStore.createRecord('temples', {
+      db_temples.push({
         id: newTempleId,
         templeName: app.templeName,
         city: '台北市',
@@ -6815,7 +6816,7 @@ export async function approveTempleApplication(appId: string) {
         payment_cycle: 'Monthly'
       });
       
-      await jsonStore.createRecord('temple_storages', {
+      db_temple_storages.push({
         id: `ts-${Date.now()}`,
         templeId: newTempleId,
         templeName: app.templeName,
@@ -6865,8 +6866,8 @@ export interface TempleNotification {
   createdAt: string; // ISO string
 }
 
-// migrated (await jsonStore.find('temple_notifications')) to (await jsonStore.find('temple_notifications'))
-// (await jsonStore.find('temple_notifications')) synced
+let db_temple_notifications: any[] = initGlobal("db_temple_notifications", []);
+gStore.db_temple_notifications = db_temple_notifications;
 
 // 1. 創立通知資料表與發佈公告
 export async function createNotification(title: string, content: string, sendTime: string) {
@@ -6881,8 +6882,8 @@ export async function createNotification(title: string, content: string, sendTim
       createdAt: new Date().toISOString()
     };
 
-    await jsonStore.createRecord('temple_notifications', { templeId, ...newNotif });
-    // (await jsonStore.find('temple_notifications')) synced
+    db_temple_notifications.unshift({ templeId, ...newNotif });
+    gStore.db_temple_notifications = db_temple_notifications;
 
     if (client) {
       await client.query(`
@@ -6912,7 +6913,7 @@ export async function fetchTempleNotifications(): Promise<TempleNotification[]> 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return [...(await jsonStore.find('temple_notifications'))].filter((n: any) => !n.templeId || n.templeId === templeId).sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
+      return [...db_temple_notifications].filter((n: any) => !n.templeId || n.templeId === templeId).sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (
@@ -6949,7 +6950,7 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
   return withTempleSession(templeId, false, async (client) => {
     const now = new Date();
     if (!client) {
-      return (await jsonStore.find('temple_notifications'))
+      return db_temple_notifications
         .filter(n => (!n.templeId || n.templeId === templeId) && new Date(n.sendTime).getTime() <= now.getTime())
         .sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
     } else {
@@ -7011,7 +7012,7 @@ export async function impersonateTemple(templeId: string, originRole?: string) {
 // -------------------------------------------------------------------------
 
 export async function transferTempleOwnership(templeId: string, newDistributorId: string | null, newSalesId: string | null) {
-  const temple = _allTemplesForAi.find(t => t.id === templeId);
+  const temple = db_temples.find(t => t.id === templeId);
   if (!temple) return { success: false, error: 'Temple not found' };
 
   if (newDistributorId !== undefined) {
@@ -7022,7 +7023,7 @@ export async function transferTempleOwnership(templeId: string, newDistributorId
   }
   
   // Create an audit log
-  await jsonStore.createRecord('admin_logs', {
+  db_admin_logs.push({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
     adminId: 'SuperAdmin',
@@ -7038,14 +7039,14 @@ export async function transferTempleOwnership(templeId: string, newDistributorId
 }
 
 export async function transferDistributorOwnership(distributorId: string, newSalesId: string | null) {
-  const dist = (await jsonStore.find('distributors')).find(d => d.id === distributorId);
+  const dist = db_distributors.find(d => d.id === distributorId);
   if (!dist) return { success: false, error: 'Distributor not found' };
 
   dist.salesId = newSalesId;
 
   // Transfer all underlying temples if they belong to this distributor
   // And update their salesId to the new salesId if applicable
-  (await jsonStore.find('temples')).forEach(t => {
+  db_temples.forEach(t => {
      if (t.distributorId === distributorId) {
         if (newSalesId !== undefined) {
            t.salesId = newSalesId;
@@ -7053,7 +7054,7 @@ export async function transferDistributorOwnership(distributorId: string, newSal
      }
   });
 
-  await jsonStore.createRecord('admin_logs', {
+  db_admin_logs.push({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
     adminId: 'SuperAdmin',
@@ -7094,18 +7095,18 @@ export async function returnToSuperAdmin() {
 
 export async function updateAppointmentPayment(appId: number, paymentMethod: string, paymentRef?: string) {
   return withTempleSession(null, false, async (client) => {
-    const idx = (await jsonStore.find('appointments')).findIndex(a => a.id === appId);
+    const idx = db_appointments.findIndex(a => a.id === appId);
     if (idx === -1) return { success: false, message: '找不到該預約' };
     
-    (await jsonStore.find('appointments'))[idx].paymentMethod = paymentMethod;
-    if (paymentRef) (await jsonStore.find('appointments'))[idx].paymentRef = paymentRef;
+    db_appointments[idx].paymentMethod = paymentMethod;
+    if (paymentRef) db_appointments[idx].paymentRef = paymentRef;
     
     if (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
-      (await jsonStore.find('appointments'))[idx].paymentStatus = 'Paid';
-      (await jsonStore.find('appointments'))[idx].status = 'Confirmed';
+      db_appointments[idx].paymentStatus = 'Paid';
+      db_appointments[idx].status = 'Confirmed';
     } else {
-      (await jsonStore.find('appointments'))[idx].paymentStatus = 'Pending';
-      (await jsonStore.find('appointments'))[idx].status = 'Pending';
+      db_appointments[idx].paymentStatus = 'Pending';
+      db_appointments[idx].status = 'Pending';
     }
     
     await revalidateTemple();
@@ -7138,21 +7139,20 @@ export async function deleteAiPlan(id: string) {
 
 // --- AI Plan & Usage Management ---
 export async function fetchAiApiModels() {
-  return [...(await jsonStore.find('ai_api_models'))];
+  return [...db_ai_api_models];
 }
 
 export async function saveAiApiModels(models: any[]) {
-  await jsonStore.atomicWrite('ai_api_models', (data) => [...models]);
-  // (await jsonStore.find('ai_api_models')) synced
+  db_ai_api_models = [...models];
+  gStore.db_ai_api_models = db_ai_api_models;
   return { success: true };
 }
 
 
 export async function fetchAllTempleAiUsage() {
   // Returns AI usage for all temples, joining with temple profiles and plans
-  const _allTemplesForAi = await jsonStore.find('temples');
-  return (await jsonStore.find('temple_ai_usage')).map(usage => {
-    const temple = _allTemplesForAi.find(t => t.id === usage.templeId) || { templeName: '未知宮廟', name: '未知宮廟', city: '未知' };
+  return db_temple_ai_usage.map(usage => {
+    const temple = db_temples.find(t => t.id === usage.templeId) || { templeName: '未知宮廟', name: '未知宮廟', city: '未知' };
     const plan = db_ai_plans.find(p => p.id === usage.planId) || { name: '無方案', chatLimit: 0 };
     return { 
       ...usage, 
@@ -7166,10 +7166,10 @@ export async function fetchAllTempleAiUsage() {
 
 
 export async function grantTempleAiVip(templeId: string, isVip: boolean = true) {
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
   if (!usage) {
     usage = { templeId, enabled: true, planId: 'VIP', planName: isVip ? '無限免費方案' : '基礎智慧助理方案', usedCount: 0, usedTokens: 0, monthlyTokenLimit: isVip ? 999999 : 1000, expiryDate: new Date().toISOString(), isVip };
-    await jsonStore.createRecord('temple_ai_usage', usage);
+    db_temple_ai_usage.push(usage);
   } else {
     usage.isVip = isVip;
     if (isVip) {
@@ -7177,21 +7177,21 @@ export async function grantTempleAiVip(templeId: string, isVip: boolean = true) 
       usage.monthlyTokenLimit = 999999;
     }
   }
-  // (await jsonStore.find('temple_ai_usage')) synced
+  gStore.db_temple_ai_usage = db_temple_ai_usage;
   return { success: true };
 }
 
 export async function fetchTempleAiUsage() {
   const templeId = await getDynamicTempleId();
   if (!templeId) return null;
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
   if (!usage) {
     // Default 1-month trial
     const thirtyDaysLater = new Date();
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
     usage = { templeId, enabled: false, planId: 'AI-500', usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-    await jsonStore.createRecord('temple_ai_usage', usage);
-    // (await jsonStore.find('temple_ai_usage')) synced
+    db_temple_ai_usage.push(usage);
+    gStore.db_temple_ai_usage = db_temple_ai_usage;
   }
   const plan = db_ai_plans.find(p => p.id === usage.planId) || { chatLimit: 0, name: '無方案', monthlyFee: 0 };
   return { ...usage, chatLimit: plan.chatLimit, planName: plan.name, monthlyFee: plan.monthlyFee };
@@ -7200,10 +7200,10 @@ export async function fetchTempleAiUsage() {
 export async function toggleTempleAiStatus(enabled: boolean) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
   if (usage) {
     usage.enabled = enabled;
-    // (await jsonStore.find('temple_ai_usage')) synced
+    gStore.db_temple_ai_usage = db_temple_ai_usage;
   }
   return { success: true };
 }
@@ -7211,7 +7211,7 @@ export async function toggleTempleAiStatus(enabled: boolean) {
 export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = db_temple_ai_usage.find(u => u.templeId === templeId);
   const thirtyDaysLater = new Date();
   thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
   
@@ -7222,14 +7222,14 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
     usage.enabled = true;
   } else {
     usage = { templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-    await jsonStore.createRecord('temple_ai_usage', usage);
+    db_temple_ai_usage.push(usage);
   }
-  // (await jsonStore.find('temple_ai_usage')) synced
+  gStore.db_temple_ai_usage = db_temple_ai_usage;
 
   const plan = db_ai_plans.find(p => p.id === planId);
   if (plan) {
-    const temple = _allTemplesForAi.find(t => t.id === templeId);
-    await jsonStore.createRecord('finance_records', {
+    const temple = db_temples.find(t => t.id === templeId);
+    db_finance_records.unshift({
       id: `F-${Date.now()}`,
       type: 'INCOME',
       category: 'AI_UPGRADE',
@@ -7247,8 +7247,8 @@ export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS
   const timestamp = new Date().toLocaleString('zh-TW');
   const newLog = { id: `log-${Date.now()}`, level, action, target, operator, timestamp, templeId };
   
-  await jsonStore.createRecord('audit_logs', newLog);
-  if (gStore) // (await jsonStore.find('audit_logs')) synced
+  db_audit_logs.unshift(newLog);
+  if (gStore) gStore.db_audit_logs = db_audit_logs;
 
   return withTempleSession(templeId, false, async (client) => {
     if (client) {
@@ -7269,7 +7269,7 @@ export async function fetchAuditLogs() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return (await jsonStore.find('audit_logs')).filter(log => log.templeId === templeId || !log.templeId);
+      return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
     }
     
     try {
@@ -7282,7 +7282,7 @@ export async function fetchAuditLogs() {
       }));
     } catch (e) {
       console.error('Error fetching audit logs', e);
-      return (await jsonStore.find('audit_logs')).filter(log => log.templeId === templeId || !log.templeId);
+      return db_audit_logs.filter(log => log.templeId === templeId || !log.templeId);
     }
   });
 }
@@ -7322,7 +7322,7 @@ export async function getTempleBasicInfo(templeId?: string) {
       } catch (e) {}
     }
     if (!t) {
-      t = (await jsonStore.find('temples'))?.find((x: any) => x.id === tId) || (await jsonStore.find('temples')).find(x => x.id === tId) || null;
+      t = (globalThis as any).db_temples?.find((x: any) => x.id === tId) || db_temples.find(x => x.id === tId) || null;
     }
     if (t && !t.templeName && t.name) {
       return { ...t, templeName: t.name };
@@ -7350,7 +7350,11 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
     }
     
     // Update memory fallback
-    await jsonStore.updateRecord('temples', tId, data);
+    const idx = db_temples.findIndex(t => t.id === tId);
+    if (idx > -1) {
+      db_temples[idx] = { ...db_temples[idx], ...data };
+      (globalThis as any).db_temples = db_temples;
+    }
     return { success: true };
   });
 }
@@ -7538,8 +7542,8 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
 
 export async function fetchSuperAdminFinancials() {
   // 取得宮廟與帳單狀態
-  const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
-  let templeBills: any[] = typeof gStore !== 'undefined' ? ((await jsonStore.find('temple_bills')) || (await jsonStore.find('temple_bills'))) : (await jsonStore.find('temple_bills'));
+  const allTemples = typeof gStore !== 'undefined' ? (gStore.db_temples || db_temples) : db_temples;
+  let templeBills: any[] = typeof gStore !== 'undefined' ? (gStore.db_temple_bills || db_temple_bills) : db_temple_bills;
   try {
     const { dbQuery } = await import('@/db/db');
     const res = await dbQuery("SELECT * FROM temple_bills", [], () => null) as any;
@@ -7613,18 +7617,18 @@ export async function fetchSuperAdminFinancials() {
       totalCommission,
       netProfit
     },
-    wallets: (await jsonStore.find('wallets')),
+    wallets: db_wallets,
     templePayments,
     superSalesWithdrawals
   };
 }
 
 export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
-  const distIndex = (await jsonStore.find('distributors')).findIndex(d => d.id === distId);
+  const distIndex = db_distributors.findIndex(d => d.id === distId);
   if (distIndex > -1) {
-    (await jsonStore.find('distributors'))[distIndex].bankInfo = bankInfo;
+    db_distributors[distIndex].bankInfo = bankInfo;
     if (typeof gStore !== 'undefined') {
-      // (await jsonStore.find('distributors')) synced
+      gStore.db_distributors = db_distributors;
     }
     try {
       const { dbQuery } = await import('@/db/db');
@@ -7636,7 +7640,7 @@ export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-  const temple = _allTemplesForAi.find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
+  const temple = db_temples.find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
   if (!temple) {
     return {
       type: 'super_admin',
@@ -7646,11 +7650,11 @@ export async function getTempleCreatorInfo(templeId: string) {
   }
 
   if (temple.salesId) {
-    const sales = (await jsonStore.find('dist_sales')).find(s => s.id === temple.salesId);
+    const sales = db_dist_sales.find(s => s.id === temple.salesId);
     if (sales) {
       if (sales.distributorId) {
         // Distributor Sales
-        const dist = (await jsonStore.find('distributors')).find(d => d.id === sales.distributorId);
+        const dist = db_distributors.find(d => d.id === sales.distributorId);
         const ret = {
           type: 'dist_sales',
           salesName: sales.name,
@@ -7674,7 +7678,7 @@ export async function getTempleCreatorInfo(templeId: string) {
   }
 
   if (temple.distributorId) {
-     const dist = (await jsonStore.find('distributors')).find(d => d.id === temple.distributorId);
+     const dist = db_distributors.find(d => d.id === temple.distributorId);
      if (dist) {
         const ret = {
            type: 'distributor',
@@ -7697,19 +7701,19 @@ export async function getTempleCreatorInfo(templeId: string) {
 
 export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
   if (role === 'TempleAdmin' || role === 'Temple') {
-    const temple = _allTemplesForAi.find(t => t.id === id);
+    const temple = db_temples.find(t => t.id === id);
     if (temple) temple.status = status;
-    // synced
+    gStore.db_temples = db_temples;
     try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   } else if (role === 'Distributor') {
-    const dist = (await jsonStore.find('distributors')).find(d => d.id === id);
+    const dist = db_distributors.find(d => d.id === id);
     if (dist) dist.status = status;
-    // (await jsonStore.find('distributors')) synced
+    gStore.db_distributors = db_distributors;
     try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE distributors SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   } else if (role === 'SuperSales' || role === 'DistSales') {
-    const sales = (await jsonStore.find('dist_sales')).find(s => s.id === id);
+    const sales = db_dist_sales.find(s => s.id === id);
     if (sales) sales.status = status;
-    // (await jsonStore.find('dist_sales')) synced
+    gStore.db_dist_sales = db_dist_sales;
     try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE dist_sales SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   }
   return { success: true };
@@ -7717,7 +7721,7 @@ export async function updateAccountStatus(id: string, role: string, status: 'Act
 
 export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
   for (const tId of templeIds) {
-    const temple = _allTemplesForAi.find(t => t.id === tId);
+    const temple = db_temples.find(t => t.id === tId);
     if (temple) {
       if (targetRole === 'HQ') {
         temple.distributorId = null;
@@ -7734,10 +7738,10 @@ export async function transferTemples(templeIds: string[], targetId: string | nu
       }
     }
   }
-  // synced
+  gStore.db_temples = db_temples;
   
   const targetName = targetRole === 'HQ' ? '系統總部 HQ' : targetId;
-  await jsonStore.createRecord('admin_logs', { id: `L-${Date.now()}`, user: 'System Admin', action: 'BATCH_TRANSFER', target: `${templeIds.length} temples to ${targetName}`, timestamp: new Date().toLocaleString() });
+  db_admin_logs.unshift({ id: `L-${Date.now()}`, user: 'System Admin', action: 'BATCH_TRANSFER', target: `${templeIds.length} temples to ${targetName}`, timestamp: new Date().toLocaleString() });
 
   return { success: true };
 }
@@ -7752,11 +7756,11 @@ export async function confirmPaymentSuccess(orderId: string, method: string) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       // In-memory fallback
-      const app = (await jsonStore.find('appointments')).find(a => a.id === parseInt(orderId) || a.id.toString() === orderId);
+      const app = db_appointments.find(a => a.id === parseInt(orderId) || a.id.toString() === orderId);
       if (app) { app.paymentStatus = 'Paid'; app.paymentMethod = method; return true; }
-      const reg = (await jsonStore.find('event_registrations')).find(r => r.id === orderId);
+      const reg = db_event_registrations.find(r => r.id === orderId);
       if (reg) { reg.paymentStatus = 'Paid'; return true; }
-      const tix = (await jsonStore.find('queue_tickets')).find(t => t.id === orderId);
+      const tix = db_queue_tickets.find(t => t.id === orderId);
       if (tix) { tix.paymentStatus = 'Paid'; return true; }
       return false;
     }
@@ -7782,28 +7786,28 @@ export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Even
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
       if (recordType === 'Lamp') {
-        const idx = (await jsonStore.find('lamp_records')).findIndex((r: any) => r.id === recordId);
+        const idx = db_lamp_records.findIndex((r: any) => r.id === recordId);
         if (idx > -1) {
-          (await jsonStore.find('lamp_records'))[idx].paymentStatus = 'Unpaid';
+          db_lamp_records[idx].paymentStatus = 'Unpaid';
         }
       }
       if (recordType === 'Appointment') {
-        const idx = (await jsonStore.find('appointments')).findIndex((r: any) => r.id.toString() === recordId.toString());
+        const idx = db_appointments.findIndex((r: any) => r.id.toString() === recordId.toString());
         if (idx > -1) {
-          (await jsonStore.find('appointments'))[idx].paymentStatus = 'Unpaid';
+          db_appointments[idx].paymentStatus = 'Unpaid';
         }
       }
       if (recordType === 'Event') {
-        const idx = (await jsonStore.find('event_registrations')).findIndex((r: any) => r.id === recordId);
+        const idx = db_event_registrations.findIndex((r: any) => r.id === recordId);
         if (idx > -1) {
-          (await jsonStore.find('event_registrations'))[idx].paymentStatus = 'Unpaid';
+          db_event_registrations[idx].paymentStatus = 'Unpaid';
         }
       }
       if (recordType === 'Queue') {
-        if (typeof (await jsonStore.find('queue_tickets')) !== 'undefined') {
-          const idx = (await jsonStore.find('queue_tickets')).findIndex((r: any) => r.id === recordId);
+        if (typeof db_queue_tickets !== 'undefined') {
+          const idx = db_queue_tickets.findIndex((r: any) => r.id === recordId);
           if (idx > -1) {
-            (await jsonStore.find('queue_tickets'))[idx].paymentStatus = 'Unpaid';
+            db_queue_tickets[idx].paymentStatus = 'Unpaid';
           }
         }
       }
@@ -7843,13 +7847,13 @@ export async function activateLampRecord(recordId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const idx = (await jsonStore.find('lamp_records')).findIndex((r: any) => r.id === recordId);
+      const idx = db_lamp_records.findIndex((r: any) => r.id === recordId);
       if (idx > -1) {
-        (await jsonStore.find('lamp_records'))[idx].status = 'Active';
-        (await jsonStore.find('lamp_records'))[idx].startDate = new Date().toISOString().split('T')[0];
+        db_lamp_records[idx].status = 'Active';
+        db_lamp_records[idx].startDate = new Date().toISOString().split('T')[0];
         const expiry = new Date();
-        expiry.setDate(expiry.getDate() + ((await jsonStore.find('lamp_records'))[idx].durationDays || 365));
-        (await jsonStore.find('lamp_records'))[idx].expiryDate = expiry.toISOString().split('T')[0];
+        expiry.setDate(expiry.getDate() + (db_lamp_records[idx].durationDays || 365));
+        db_lamp_records[idx].expiryDate = expiry.toISOString().split('T')[0];
       }
     } else {
       const record = await client.query('SELECT lamp_type, created_at FROM lamp_records WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
@@ -7872,9 +7876,9 @@ export async function deactivateLampRecord(recordId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const idx = (await jsonStore.find('lamp_records')).findIndex((r: any) => r.id === recordId);
+      const idx = db_lamp_records.findIndex((r: any) => r.id === recordId);
       if (idx > -1) {
-        (await jsonStore.find('lamp_records'))[idx].status = 'Pending';
+        db_lamp_records[idx].status = 'Pending';
       }
     } else {
       await client.query('UPDATE lamp_records SET status = \'Pending\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
@@ -7885,7 +7889,7 @@ export async function deactivateLampRecord(recordId: string) {
 }
 
 export async function fetchDistributorLogs(distributorId: string) { 
-  let logs = (await jsonStore.find('admin_logs')) || [];
+  let logs = (globalThis as any).db_admin_logs || [];
   try {
     const { dbQuery } = await import('@/db/db');
     const res = await dbQuery("SELECT * FROM admin_logs ORDER BY timestamp DESC", [], () => null) as any;
@@ -7945,7 +7949,7 @@ export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: 
     return { success: false };
   }
 }
-export async function fetchSaasOrders() { return (await jsonStore.find('saas_orders')) || []; }
+export async function fetchSaasOrders() { return (globalThis as any).db_saas_orders || []; }
 
 export async function fetchDistributorTempleBills(distributorId: string) {
   try {
@@ -7986,8 +7990,8 @@ export async function fetchDistributorTempleBills(distributorId: string) {
 }
 export async function logDistributorAction(...args: any[]) {
   const gStore = globalThis as any;
-  if (!(await jsonStore.find('admin_logs'))) await jsonStore.atomicWrite('admin_logs', (data) => []);
-  await jsonStore.createRecord('admin_logs', {
+  if (!gStore.db_admin_logs) gStore.db_admin_logs = [];
+  gStore.db_admin_logs.push({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
     adminId: 'super_admin',
@@ -8000,11 +8004,11 @@ export async function logDistributorAction(...args: any[]) {
 
 export async function grantTempleStorageVip(templeId: string, isVip: boolean = true) {
   const gStore = globalThis as any;
-  if (!(await jsonStore.find('temple_storages'))) await jsonStore.atomicWrite('temple_storages', (data) => []);
-  let storage = (await jsonStore.find('temple_storages')).find((s: any) => s.templeId === templeId);
+  if (!gStore.db_temple_storages) gStore.db_temple_storages = [];
+  let storage = gStore.db_temple_storages.find((s: any) => s.templeId === templeId);
   if (!storage) {
     storage = { templeId, isVip, planName: isVip ? '無限免費方案' : '免費 5GB 空間', usedBytes: 0, capacityGb: isVip ? 999999 : 5 };
-    await jsonStore.createRecord('temple_storages', storage);
+    gStore.db_temple_storages.push(storage);
   } else {
     storage.isVip = isVip;
     if (isVip) {
@@ -8017,12 +8021,12 @@ export async function grantTempleStorageVip(templeId: string, isVip: boolean = t
 
 export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
   const gStore = globalThis as any;
-  if (!(await jsonStore.find('temple_ai_usage'))) await jsonStore.atomicWrite('temple_ai_usage', (data) => []);
+  if (!gStore.db_temple_ai_usage) gStore.db_temple_ai_usage = [];
   const plan = (gStore.db_ai_plans || []).find((p: any) => p.id === planId) || { name: '自訂方案', tokenLimit: 100000 };
-  let ai = (await jsonStore.find('temple_ai_usage')).find((a: any) => a.templeId === templeId);
+  let ai = gStore.db_temple_ai_usage.find((a: any) => a.templeId === templeId);
   if (!ai) {
     ai = { templeId, planId, planName: plan.name, usedTokens: 0, monthlyTokenLimit: plan.tokenLimit, isVip: false };
-    await jsonStore.createRecord('temple_ai_usage', ai);
+    gStore.db_temple_ai_usage.push(ai);
   } else {
     ai.planId = planId;
     ai.planName = plan.name;
@@ -8034,8 +8038,8 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
   const planPrice = plan.priceMonthly || (plan.priceYearly ? Math.round(plan.priceYearly / 12) : 0);
   if (planPrice > 0) {
     const gStore = globalThis as any;
-    if (!(await jsonStore.find('temple_bills'))) // invalid array assignment
-    await jsonStore.createRecord('temple_bills', {
+    if (!gStore.db_temple_bills) gStore.db_temple_bills = [];
+    gStore.db_temple_bills.push({
       id: `BILL-AI-${Date.now()}`,
       templeId,
       type: 'AgiService',
@@ -8075,7 +8079,7 @@ export async function fetchDataBridgeTree() {
     if (resDist && resDist.rows) pgDistributors = resDist.rows;
   } catch (e) {}
   const allDistributorsMap = new Map();
-  ((await jsonStore.find('distributors')) || []).forEach((d: any) => allDistributorsMap.set(d.account, d));
+  (gStore.db_distributors || []).forEach((d: any) => allDistributorsMap.set(d.account, d));
   pgDistributors.forEach(d => allDistributorsMap.set(d.account, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, superSalesId: d.super_sales_id || d.creator_sales_id }));
   const distributors = Array.from(allDistributorsMap.values());
 
@@ -8085,7 +8089,7 @@ export async function fetchDataBridgeTree() {
     if (resSales && resSales.rows) pgSales = resSales.rows;
   } catch (e) {}
   const allSalesMap = new Map();
-  ((await jsonStore.find('dist_sales')) || []).forEach((s: any) => allSalesMap.set(s.account, s));
+  (gStore.db_dist_sales || []).forEach((s: any) => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
   const distSales = Array.from(allSalesMap.values());
 
@@ -8095,7 +8099,7 @@ export async function fetchDataBridgeTree() {
     if (resTemples && resTemples.rows) pgTemples = resTemples.rows;
   } catch (e) {}
   const allTemplesMap = new Map();
-  ((await jsonStore.find('temples')) || []).forEach((t: any) => allTemplesMap.set(t.id, t));
+  (gStore.db_temples || []).forEach((t: any) => allTemplesMap.set(t.id, t));
   pgTemples.forEach(t => allTemplesMap.set(t.id, { ...t, distributorId: t.distributor_id, salesId: t.sales_id, superSalesId: t.super_sales_id, templeName: t.temple_name || t.name }));
   const temples = Array.from(allTemplesMap.values());
 
@@ -8317,7 +8321,7 @@ export async function fetchDataBridgeTree() {
 
 
 export async function updateDistributorProfile(distId: string, data: any) {
-  const dist = (await jsonStore.find('distributors')).find(d => d.id === distId);
+  const dist = db_distributors.find(d => d.id === distId);
   if (dist) {
     if (data.name) dist.name = data.name;
     if (data.account) dist.account = data.account;
@@ -8340,8 +8344,8 @@ export async function updateDistributorProfile(distId: string, data: any) {
     } catch(e) {}
     
     // add to audit log
-    if (!(await jsonStore.find('admin_logs'))) await jsonStore.atomicWrite('admin_logs', (data) => []);
-    await jsonStore.createRecord('admin_logs', {
+    if (!gStore.db_admin_logs) gStore.db_admin_logs = [];
+    gStore.db_admin_logs.push({
       id: 'log-' + Date.now(),
       timestamp: new Date().toISOString(),
       adminId: distId,
@@ -8363,13 +8367,13 @@ export async function updateDistributorPaymentConfig(distId: string, paymentConf
   } catch (e) {
     console.error('Failed to update b2b_payment_config in DB', e);
   }
-  const dist = (await jsonStore.find('distributors')).find(d => d.id === distId);
+  const dist = db_distributors.find(d => d.id === distId);
   if (dist) {
     dist.b2bPayment = paymentConfig;
     
     // add to audit log
-    if (!(await jsonStore.find('admin_logs'))) await jsonStore.atomicWrite('admin_logs', (data) => []);
-    await jsonStore.createRecord('admin_logs', {
+    if (!gStore.db_admin_logs) gStore.db_admin_logs = [];
+    gStore.db_admin_logs.push({
       id: 'log-' + Date.now(),
       timestamp: new Date().toISOString(),
       adminId: distId,
@@ -8412,7 +8416,7 @@ export async function fetchSalesProfileById(salesId: string) {
       account = resSales.rows[0].account;
       distributorId = resSales.rows[0].distributor_id;
     } else {
-      const sales = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+      const sales = db_dist_sales.find(s => s.id === salesId);
       if (sales) {
         name = sales.name;
         account = sales.account;
@@ -8425,15 +8429,15 @@ export async function fetchSalesProfileById(salesId: string) {
       if (resDist && resDist.rowCount > 0) {
         parentDistributor = resDist.rows[0].name;
       } else {
-        const dist = (await jsonStore.find('distributors')).find(d => d.id === distributorId);
+        const dist = db_distributors.find(d => d.id === distributorId);
         if (dist) parentDistributor = dist.name;
       }
     }
 
     return { name, parentDistributor, account };
   } catch(e) {
-    const sales = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
-    const dist = (await jsonStore.find('distributors')).find(d => d.id === sales?.distributorId);
+    const sales = db_dist_sales.find(s => s.id === salesId);
+    const dist = db_distributors.find(d => d.id === sales?.distributorId);
     return { name: sales?.name || '未知', parentDistributor: dist?.name || '未指派', account: sales?.account };
   }
 }
@@ -8454,7 +8458,7 @@ export async function fetchTempleBills(templeId: string) {
       receiptUrl: r.receipt_url
     }));
   } catch (e) {
-    const inMemBills = (await jsonStore.find('temple_bills')).filter(b => b.templeId === templeId);
+    const inMemBills = db_temple_bills.filter(b => b.templeId === templeId);
     return inMemBills.map(r => ({
       id: r.id,
       templeId: r.templeId,
@@ -8469,11 +8473,11 @@ export async function fetchTempleBills(templeId: string) {
 
 export async function uploadTempleBillReceipt(billId: string, imageUrl: string) {
   try {
-    const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+    const bill = db_temple_bills.find(b => b.id === billId);
     if (bill) {
       bill.status = 'PendingVerification' as any;
       (bill as any).receiptUrl = imageUrl;
-      // (await jsonStore.find('temple_bills')) synced
+      gStore.db_temple_bills = db_temple_bills;
     }
     const { dbQuery } = await import('@/db/db');
     await dbQuery("UPDATE temple_bills SET status = 'PendingVerification', receipt_url = $1 WHERE id = $2", [imageUrl, billId]);
@@ -8492,35 +8496,35 @@ export async function approveTempleBill(billId: string) {
         if (res && res.rows) rows = res.rows;
       } catch (err) {}
       
-      const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+      const bill = db_temple_bills.find(b => b.id === billId);
       if (bill) {
         bill.status = 'Paid';
-        // (await jsonStore.find('temple_bills')) synced
+        gStore.db_temple_bills = db_temple_bills;
       }
 
       const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
       if (templeId) {
-         const tIdx = ((await jsonStore.find('temples')) || []).findIndex((t: any) => t.id === templeId);
+         const tIdx = (gStore.db_temples || []).findIndex((t: any) => t.id === templeId);
          if (tIdx > -1) {
-            (await jsonStore.find('temples'))[tIdx].paymentStatus = 'Paid';
-            (await jsonStore.find('temples'))[tIdx].status = 'Active';
+            gStore.db_temples[tIdx].paymentStatus = 'Paid';
+            gStore.db_temples[tIdx].status = 'Active';
          }
       }
 
       if (bill) {
-        const temple = (await jsonStore.find('temples'))?.find((t:any) => t.id === bill.templeId);
+        const temple = (globalThis as any).db_temples?.find((t:any) => t.id === bill.templeId);
 
         // --- ADDED LOGIC FOR UPGRADES ON BILL APPROVAL ---
         if (bill.type === 'StorageUpgrade' || bill.type === 'AiUpgrade') {
            const match = bill.item_name.match(/\(([^)]+)\)$/);
            const planId = match ? match[1] : null;
 
-           const adminWallet = (await jsonStore.find('wallets'))?.find((w:any) => w.role === 'SuperAdmin');
+           const adminWallet = (globalThis as any).db_wallets?.find((w:any) => w.role === 'SuperAdmin');
            if (adminWallet) {
               adminWallet.balance += bill.amount;
            }
            
-           (await jsonStore.find('finance_records'))?.unshift({
+           (globalThis as any).db_finance_records?.unshift({
               id: `F-${Date.now()}-${Math.floor(Math.random()*1000)}`,
               type: 'INCOME',
               category: bill.type === 'StorageUpgrade' ? 'SPACE_UPGRADE' : 'AI_UPGRADE',
@@ -8532,7 +8536,7 @@ export async function approveTempleBill(billId: string) {
            if (bill.type === 'StorageUpgrade' && planId) {
               await upgradeTempleStorage(bill.templeId, planId, 'Monthly', true);
            } else if (bill.type === 'AiUpgrade' && planId) {
-              let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === bill.templeId);
+              let usage = db_temple_ai_usage.find(u => u.templeId === bill.templeId);
               const thirtyDaysLater = new Date();
               thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
               
@@ -8543,19 +8547,19 @@ export async function approveTempleBill(billId: string) {
                  usage.enabled = true;
               } else {
                  usage = { templeId: bill.templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-                 await jsonStore.createRecord('temple_ai_usage', usage);
+                 db_temple_ai_usage.push(usage);
               }
-              // (await jsonStore.find('temple_ai_usage')) synced
+              gStore.db_temple_ai_usage = db_temple_ai_usage;
            }
         }
         // --- END ADDED LOGIC ---
 
         if (temple && temple.salesId) {
           const sId = temple.salesId;
-          const salesPerson = (await jsonStore.find('dist_sales'))?.find((s:any) => s.id === sId);
+          const salesPerson = (globalThis as any).db_dist_sales?.find((s:any) => s.id === sId);
           if (salesPerson) {
-             const overrides = (await jsonStore.find('super_sales_overrides')) || {};
-             const db_config = (await jsonStore.find('config')) || { defaultSuperSalesRates: { templeSetupRate: 20 }};
+             const overrides = (globalThis as any).db_super_sales_overrides || {};
+             const db_config = (globalThis as any).db_config || { defaultSuperSalesRates: { templeSetupRate: 20 }};
              const rates = salesPerson.commissionRules || overrides[salesPerson.name] || db_config.defaultSuperSalesRates || {};
              const rate = rates.templeSetupRate || 20; 
              const commissionAmt = Math.floor(bill.amount * (rate / 100));
@@ -8569,18 +8573,16 @@ export async function approveTempleBill(billId: string) {
                  amount: commissionAmt,
                  date: new Date().toISOString()
                };
-               // Using atomic writes
-               await jsonStore.createRecord('commissions', comm);
+               if (!(globalThis as any).db_commissions) (globalThis as any).db_commissions = [];
+               (globalThis as any).db_commissions.push(comm);
                
-               await jsonStore.atomicWrite('wallets', (wallets) => {
-                 let w = wallets.find((w:any) => w.id === sId);
-                 if (!w) {
-                   w = { id: sId, role: salesPerson.role === 'SuperSales' ? 'SuperSales' : 'DistSales', name: salesPerson.name, balance: 0 };
-                   wallets.push(w);
-                 }
-                 w.balance = (w.balance || 0) + commissionAmt;
-                 return wallets;
-               });
+               if (!(globalThis as any).db_wallets) (globalThis as any).db_wallets = [];
+               let w = (globalThis as any).db_wallets.find((w:any) => w.id === sId);
+               if (!w) {
+                 w = { id: sId, role: salesPerson.role === 'SuperSales' ? 'SuperSales' : 'DistSales', name: salesPerson.name, balance: 0 };
+                 (globalThis as any).db_wallets.push(w);
+               }
+               w.balance = (w.balance || 0) + commissionAmt;
              }
           }
         }
@@ -8598,32 +8600,32 @@ export async function toggleBillStatusSimple(billId: string, status: string) {
         await dbQuery("UPDATE temple_bills SET status = $1 WHERE id = $2", [status, billId]);
       } catch (err) {}
       
-      const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+      const bill = db_temple_bills.find(b => b.id === billId);
       if (bill) {
         bill.status = status as any;
-        // (await jsonStore.find('temple_bills')) synced
+        gStore.db_temple_bills = db_temple_bills;
         if (status === 'Unpaid' || status === 'PendingPayment') {
             const templeId = bill.templeId;
             if (templeId) {
-                const tIdx = ((await jsonStore.find('temples')) || []).findIndex((t: any) => t.id === templeId);
+                const tIdx = (gStore.db_temples || []).findIndex((t: any) => t.id === templeId);
                 if (tIdx > -1) {
-                    (await jsonStore.find('temples'))[tIdx].paymentStatus = 'PendingPayment';
-                    (await jsonStore.find('temples'))[tIdx].status = 'Pending';
+                    gStore.db_temples[tIdx].paymentStatus = 'PendingPayment';
+                    gStore.db_temples[tIdx].status = 'Pending';
                 }
             }
 
             // Reverse commission if it exists
-            if ((await jsonStore.find('commissions'))) {
-                const commIdx = (await jsonStore.find('commissions')).findIndex((c:any) => c.billId === billId);
+            if ((globalThis as any).db_commissions) {
+                const commIdx = (globalThis as any).db_commissions.findIndex((c:any) => c.billId === billId);
                 if (commIdx > -1) {
-                    const comm = (await jsonStore.find('commissions'))[commIdx];
-                    if ((await jsonStore.find('wallets'))) {
-                        const w = (await jsonStore.find('wallets')).find((w:any) => w.id === comm.salesId);
+                    const comm = (globalThis as any).db_commissions[commIdx];
+                    if ((globalThis as any).db_wallets) {
+                        const w = (globalThis as any).db_wallets.find((w:any) => w.id === comm.salesId);
                         if (w) {
                             w.balance = Math.max(0, (w.balance || 0) - comm.amount);
                         }
                     }
-                    (await jsonStore.find('commissions')).splice(commIdx, 1);
+                    (globalThis as any).db_commissions.splice(commIdx, 1);
                 }
             }
         }
@@ -8639,18 +8641,18 @@ export async function rejectTempleBill(billId: string) {
       const { dbQuery } = await import('@/db/db');
       const { rows } = await dbQuery("UPDATE temple_bills SET status = 'PendingPayment', receipt_url = NULL WHERE id = $1 RETURNING temple_id", [billId]) as any;
       
-      const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+      const bill = db_temple_bills.find(b => b.id === billId);
       if (bill) {
         bill.status = 'PendingPayment';
         bill.receiptUrl = '';
-        // (await jsonStore.find('temple_bills')) synced
+        gStore.db_temple_bills = db_temple_bills;
       }
       
       const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
       if (templeId) {
-         const tIdx = ((await jsonStore.find('temples')) || []).findIndex((t: any) => t.id === templeId);
+         const tIdx = (gStore.db_temples || []).findIndex((t: any) => t.id === templeId);
          if (tIdx > -1) {
-            (await jsonStore.find('temples'))[tIdx].paymentStatus = 'PendingPayment';
+            gStore.db_temples[tIdx].paymentStatus = 'PendingPayment';
          }
       }
       return { success: true };
@@ -8681,7 +8683,7 @@ export async function fetchAllSalesBonusRequests() {
 
 
 export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
-  const sales = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+  const sales = db_dist_sales.find(s => s.id === salesId);
   if (sales) {
     sales.bankAccount = bankInfo;
   }
@@ -8701,7 +8703,7 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
 export async function getLineConfig(templeId: string) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const t = (await jsonStore.find('temples')).find((x: any) => x.id === templeId);
+      const t = (gStore.db_temples || db_temples).find((x: any) => x.id === templeId);
       return {
         lineChannelToken: t?.lineChannelToken || '',
         lineChannelSecret: t?.lineChannelSecret || '',
@@ -8727,9 +8729,9 @@ export async function getLineConfig(templeId: string) {
 export async function updateLineConfig(templeId: string, config: any) {
   return withTempleSession(templeId, true, async (client) => {
     if (!client) {
-      const idx = (await jsonStore.find('temples')).findIndex((x: any) => x.id === templeId);
+      const idx = (gStore.db_temples || db_temples).findIndex((x: any) => x.id === templeId);
       if (idx !== -1) {
-         const t = (await jsonStore.find('temples'))[idx];
+         const t = gStore.db_temples[idx];
          t.lineChannelToken = config.lineChannelToken;
          t.lineChannelSecret = config.lineChannelSecret;
          t.lineLoginClientId = config.lineLoginClientId;
@@ -8754,7 +8756,7 @@ export async function getGuestLineId(templeId: string, phone: string) {
     if (rows && rows.length > 0 && rows[0].line_user_id) return rows[0].line_user_id;
   } catch (e) {}
   
-  const g = (await jsonStore.find('guests')).find(g => g.phone === phone);
+  const g = (gStore.db_guests || db_guests).find(g => g.phone === phone);
   return g?.lineId || g?.line_user_id || null;
 }
 
@@ -8795,9 +8797,9 @@ export async function bindCustomerLine(templeId: string, phone: string, lineUser
   return withTempleSession(templeId, false, async (client) => {
     let normPhone = phone.replace(/\D/g, '');
     if (!client) {
-      const idx = (await jsonStore.find('guests')).findIndex((g: any) => g.phone === normPhone && g.templeId === templeId);
+      const idx = (gStore.db_guests || db_guests).findIndex((g: any) => g.phone === normPhone && g.templeId === templeId);
       if (idx !== -1) {
-         (await jsonStore.find('guests'))[idx].lineUserId = lineUserId;
+         gStore.db_guests[idx].lineUserId = lineUserId;
          return { success: true };
       }
       return { success: false };
@@ -8860,19 +8862,19 @@ export async function updateRevenueRemark(id: string, source: string, remark: st
       } else {
         // Fallback to in-memory
         if (source === 'Appointment') {
-          const rec = (await jsonStore.find('appointments')).find(a => a.id === id);
+          const rec = db_appointments.find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Lamp') {
-          const rec = (await jsonStore.find('lamp_records')).find(a => a.id === id);
+          const rec = db_lamp_records.find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Event') {
-          const rec = (await jsonStore.find('event_registrations')).find(a => a.id === id);
+          const rec = db_event_registrations.find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Queue') {
-          const rec = (await jsonStore.find('queue_tickets')).find(a => a.id === id);
+          const rec = db_queue_tickets.find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Merit') {
-          const rec = (await jsonStore.find('deep_records')).find(a => a.id === id);
+          const rec = db_deep_records.find(a => a.id === id);
           if (rec) rec.remarks = remark;
         }
       }
