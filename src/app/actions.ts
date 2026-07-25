@@ -672,6 +672,25 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
 
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', guestName, slotId]);
 
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS appointments (
+          id SERIAL PRIMARY KEY,
+          temple_id VARCHAR(50) NOT NULL,
+          date VARCHAR(50),
+          time VARCHAR(50),
+          staff VARCHAR(255),
+          guest_name VARCHAR(255),
+          service VARCHAR(255),
+          service_id VARCHAR(50),
+          status VARCHAR(50) DEFAULT 'Pending',
+          phone VARCHAR(255),
+          payment_method VARCHAR(50),
+          payment_ref VARCHAR(255),
+          payment_status VARCHAR(50) DEFAULT 'Pending',
+          amount INTEGER DEFAULT 0
+        )
+      `);
+      
       const insRes = await client.query(
         'INSERT INTO appointments (temple_id, date, time, staff, guest_name, service, service_id, status, phone, payment_method, payment_ref, payment_status, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id',
         [templeId, slot.date, slot.time, slot.staff, guestName, slot.description || '日常預約', slot.bound_service_id || null, 'Confirmed', phone, paymentMethod || null, paymentRef || null, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', amount || 0]
@@ -1285,8 +1304,9 @@ export async function fetchLampRecords() {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) return [...db_lamp_records].filter(r => !r.templeId || r.templeId === templeId).reverse();
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
+    try { await client.query(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS category_id VARCHAR(50)`); } catch(e) {}
     const res = await client.query('SELECT * FROM lamp_records WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, guestName: r.guest_name, phone: r.phone, lampType: r.lamp_type, amount: r.amount, status: r.status, createdAt: r.created_at, paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status }));
+    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, categoryId: r.category_id, guestName: r.guest_name, phone: r.phone, lampType: r.lamp_type, amount: r.amount, status: r.status, createdAt: r.created_at, paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status }));
   });
 }
 let db_lamp_categories: any[] = initGlobal('db_lamp_categories', []);
@@ -3789,7 +3809,6 @@ export async function createDistributorAccount(data: any) {
     await dbQuery(`
       INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date, creator_sales_id, phone, email, address, contact_name, tax_id, bank_code, bank_account, bank_name)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-      ON CONFLICT (account) DO UPDATE SET status = 'Active', phone = EXCLUDED.phone, email = EXCLUDED.email, address = EXCLUDED.address, contact_name = EXCLUDED.contact_name, tax_id = EXCLUDED.tax_id, bank_code = EXCLUDED.bank_code, bank_account = EXCLUDED.bank_account, bank_name = EXCLUDED.bank_name
     `, [newDist.id, newDist.name, newDist.account, newDist.password, newDist.planId, newDist.planName, newDist.price, newDist.status, Number(data.customNodes) || 100, newDist.joinedAt, newDist.expirationDate, newDist.creatorSalesId, newDist.phone, newDist.email, newDist.address, newDist.contactName, newDist.taxId, newDist.bankInfo?.bankCode || '', newDist.bankInfo?.accountNumber || '', newDist.bankInfo?.bankName || '']);
   } catch (e) {
     console.error("DB Insert Error for distributor:", e);
@@ -6208,8 +6227,8 @@ export async function createLampRecord(data: any) {
       cat = catRes.rows[0];
       const today = new Date();
       const newId = `LMP-${Date.now()}`;
-      await client.query('INSERT INTO lamp_records (id, temple_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [newId, templeId, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
+      await client.query('INSERT INTO lamp_records (id, temple_id, category_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
+        [newId, templeId, cat.id, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
       );
       await revalidateTemple();
       return { success: true, id: newId };
@@ -6894,7 +6913,7 @@ export async function fetchTempleNotifications(): Promise<TempleNotification[]> 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      return [...db_temple_notifications].sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
+      return [...db_temple_notifications].filter((n: any) => !n.templeId || n.templeId === templeId).sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
     } else {
       await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (

@@ -657,6 +657,42 @@ export default function SuperAdminClient({
                            </div>
                        </div>
                     ))}
+                    {pendingDistributors.map((app: any) => (
+                        <div key={app.id} className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-100 transition-all">
+                           <div className="flex items-center gap-10">
+                              <div className="w-24 h-24 bg-slate-50 rounded-[40px] flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform">🏢</div>
+                              <div className="space-y-2">
+                                 <div className="flex items-center gap-4">
+                                    <h4 className="text-2xl font-black text-slate-900 tracking-tighter italic">{app.name}</h4>
+                                    <span className="bg-indigo-50 text-indigo-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Pending Review</span>
+                                 </div>
+                                 <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+                                    申請身份：經銷商 | 
+                                    提交：{app.submittedBy || '超級業務員'} | 
+                                    日期：{app.date?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                 </p>
+                                 <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
+                                    <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.plan || '標準代理方案'}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">費用：NT$ {Number(app.price || 0).toLocaleString()}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">額度：{app.nodes || 100} 間宮廟</span>
+                                 </div>
+                                 <div className="flex gap-4 text-[11px] font-medium text-slate-400 mt-1">
+                                    <span>負責人：{app.contactName || app.owner || '未提供'}</span>
+                                    <span>電話：{app.phone || '未提供'}</span>
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="flex gap-6">
+                              <button onClick={() => approveDistributorBySuperAdmin(app.id).then(()=>window.location.reload())} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
+                              <button onClick={() => {
+                                 const reason = prompt('請填寫駁回原因：');
+                                 if (reason !== null) {
+                                    rejectDistributorBySuperAdmin(app.id, reason).then(()=>window.location.reload());
+                                 }
+                              }} className="px-10 py-5 bg-rose-500 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-rose-600 transition-all">駁回</button>
+                           </div>
+                        </div>
+                     ))}
                                          {pendingWithdrawals.map((req: any) => (
                         <div key={req.id} className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-amber-100 transition-all">
                            <div className="flex items-center gap-10">
