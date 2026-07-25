@@ -1,8 +1,35 @@
 // @ts-nocheck
 "use server";
-import { initializeStorage } from '@/lib/storageInit';
-initializeStorage().catch(console.error);
 import * as jsonStore from '@/lib/jsonStore';
+
+import { initializeStorage } from '@/lib/storageInit';
+let _isStorageInit = false;
+async function ensureStorage() {
+  if (!_isStorageInit) {
+    _isStorageInit = true;
+    await initializeStorage().catch(console.error);
+  }
+}
+
+export async function getSafeJsonArray(collection: string): Promise<any[]> {
+  await ensureStorage();
+  try {
+    const data = await jsonStore.find(collection);
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+export async function getSafeJsonObject(collection: string): Promise<any> {
+  await ensureStorage();
+  try {
+    const data = await jsonStore.find(collection);
+    return (data && !Array.isArray(data)) ? data : (Array.isArray(data) && data.length > 0 ? data[0] : {});
+  } catch (e) {
+    return {};
+  }
+}
+
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { withTempleSession, dbQuery } from "../db/db";
@@ -231,7 +258,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
     }
 
     if (person) {
-      const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+      const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
       const temple = allTemples.find((t: any) => t.id === person.templeId);
       if (temple && temple.status === "Inactive") {
          return { success: false, error: "該宮廟已被停權，無法登入" };
@@ -315,7 +342,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
 
           // Auto-heal: If personnel not found, check if a temple has this account/password (created by sales but not yet in personnel)
           if (!person) {
-             const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+             const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
              const temple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
              if (temple) {
                 person = {
@@ -364,7 +391,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
             if (person.role !== 'TempleAdmin') {
               return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
             }
-            const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+            const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
             const temple = allTemples.find((t: any) => t.id === person.templeId);
             if (!temple) {
                return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
@@ -380,7 +407,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
         } else {
           // 最後嘗試從記憶體尋找宮廟主帳號 (PG 已無 account 欄位)
           let mainTemple = null;
-          const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+          const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
           mainTemple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
           
           if (mainTemple) {
@@ -2186,7 +2213,7 @@ export async function fetchB2BPaymentConfig(templeId: string) {
   return withTempleSession(templeId, true, async (client) => {
     let distributorId = null;
     if (!client) {
-      const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
+      const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
       distributorId = temple?.distributorId;
     } else {
       const res = await client.query('SELECT distributor_id FROM temples WHERE id = $1', [templeId]);
@@ -2244,7 +2271,7 @@ export async function updateStoragePlans(plans: any[]) {
 export async function fetchTempleStorages() {
   return withTempleSession(null, true, async (client) => {
     if (!client) {
-      for (const t of (await jsonStore.find('temples'))) {
+      for (const t of (await getSafeJsonArray('temples'))) {
         if (!(await jsonStore.find('temple_storages')).some(s => s.templeId === t.id)) {
           const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || t.cloudStorage?.includes('無限') || t.cloudStorage === 'Free' || t.cloudStorage === '免費' || !t.cloudStorage;
           let qGB = 5;
@@ -2399,7 +2426,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       const discount = db_config.yearlyDiscountRate || 20;
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.priceMonthly * priceFactor);
-      const temple = (await jsonStore.find('temples')).find((t: any) => t.id === templeId);
+      const temple = (await getSafeJsonArray('temples')).find((t: any) => t.id === templeId);
 
       if (!isManualGrant) {
         const adminWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
@@ -2534,7 +2561,7 @@ export async function fetchRoleWallets() {
 export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE' | 'AUTH_FEE', amount: number, templeId?: string, distributorId?: string, salesId?: string) {
   return withTempleSession(templeId || null, true, async (client) => {
     if (!client) {
-      const t = (await jsonStore.find('temples')).find(x => x.id === templeId);
+      const t = (await getSafeJsonArray('temples')).find(x => x.id === templeId);
       const distId = t?.distributorId || distributorId || 'system-hq';
       const sId = t?.salesId || salesId || '';
 
@@ -2762,7 +2789,7 @@ export async function updateSystemConfig(data: any) {
 
 // --- 經銷業務 (Dist-Sales) ---
 export async function fetchFreeApplications(distId?: string) { 
-  let list = [...(await jsonStore.find('temples'))];
+  let list = [...(await getSafeJsonArray('temples'))];
   try {
     const { dbQuery } = await import('@/db/db');
     const res = await dbQuery("SELECT * FROM temples ORDER BY created_at DESC", [], () => null) as any;
@@ -2897,7 +2924,7 @@ export async function submitFreeAccountApplication(data: any) {
   const sales = (await jsonStore.find('dist_sales')).find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
-  const templeNo = (await jsonStore.find('temples')).length + 1;
+  const templeNo = (await getSafeJsonArray('temples')).length + 1;
 
       const newTemple = {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
@@ -2995,7 +3022,7 @@ export async function submitFreeAccountApplication(data: any) {
 }
 
 export async function approveTempleBySuperAdmin(id: string) {
-  const t = (await jsonStore.find('temples')).find(x => x.id === id);
+  const t = (await getSafeJsonArray('temples')).find(x => x.id === id);
    if (t) {
      t.status = 'Active';
      // synced
@@ -3022,8 +3049,8 @@ export async function approveTempleBySuperAdmin(id: string) {
 }
 
 export async function rejectTempleBySuperAdmin(id: string) {
-  const idx = (await jsonStore.find('temples')).findIndex(x => x.id === id);
-  if (idx > -1) (await jsonStore.find('temples')).splice(idx, 1);
+  const idx = (await getSafeJsonArray('temples')).findIndex(x => x.id === id);
+  if (idx > -1) (await getSafeJsonArray('temples')).splice(idx, 1);
   revalidatePath('/super-admin');
   return { success: true };
 }
@@ -3160,7 +3187,7 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
 }
 
 export async function fetchSalesPerformance(salesName: string) { 
-  let listTemples = [...(await jsonStore.find('temples'))];
+  let listTemples = [...(await getSafeJsonArray('temples'))];
   let listSales = [...(await jsonStore.find('dist_sales'))];
   try {
     const { dbQuery } = await import('@/db/db');
@@ -3255,7 +3282,7 @@ export async function fetchAllAccountsForAdmin() {
     }
   }
   
-  const templePromises = (await jsonStore.find('temples')).map(async t => {
+  const templePromises = (await getSafeJsonArray('temples')).map(async t => {
     const personnel = (await jsonStore.find('personnel')).find(p => p.templeId === t.id);
     const creatorInfo = await getTempleCreatorInfo(t.id);
     return { 
@@ -3393,7 +3420,7 @@ export async function deleteTool(toolId: string) {
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
 export async function fetchDistributorCapacity(distId?: string) { 
-  let listTemples = [...(await jsonStore.find('temples'))];
+  let listTemples = [...(await getSafeJsonArray('temples'))];
   let listSales = [...(await jsonStore.find('dist_sales'))];
 
   try {
@@ -3550,7 +3577,7 @@ export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: 
 }
 
 export async function fetchSuperSalesRegistry(salesId: string) {
-  let listTemples = [...(await jsonStore.find('temples'))];
+  let listTemples = [...(await getSafeJsonArray('temples'))];
   let listDistributors = [...(await jsonStore.find('distributors'))];
   let listSales = [...(await jsonStore.find('dist_sales'))];
 
@@ -3823,7 +3850,7 @@ export async function createTempleAccount(data: any) {
   const creatorRole = reqRole;
   const creatorId = currentUser.name;
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
-    const templeNo = (await jsonStore.find('temples')).length + 1;
+    const templeNo = (await getSafeJsonArray('temples')).length + 1;
   const { paymentCycle, ...rest } = data;
   
   const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || db_config.fixedMonthlyRent);
@@ -3948,8 +3975,8 @@ export async function createTempleAccount(data: any) {
 
 export async function fetchAggregatedAnalytics(targetYear?: string) {
   const currentYear = targetYear || new Date().getFullYear().toString();
-  const totalTemples = (await jsonStore.find('temples')).length;
-  const activeTemples = (await jsonStore.find('temples')).filter(t => t.status === 'Active').length;
+  const totalTemples = (await getSafeJsonArray('temples')).length;
+  const activeTemples = (await getSafeJsonArray('temples')).filter(t => t.status === 'Active').length;
   const totalDistributors = (await jsonStore.find('distributors')).length;
   const totalSuperSales = (await jsonStore.find('dist_sales')).filter(s => s.role === 'SuperSales').length;
   
@@ -3959,7 +3986,7 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
     '基隆', '台北', '新北', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', 
     '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'
   ];
-  (await jsonStore.find('temples')).forEach(t => {
+  (await getSafeJsonArray('temples')).forEach(t => {
     if (t.status !== 'Active') return;
     
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
@@ -3973,10 +4000,11 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
 
   const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
   
+  const _allTemplesForStats = await getSafeJsonArray("temples");
   const growthTrend = Array.from({ length: 12 }).map((_, i) => {
     const month = String(i + 1).padStart(2, '0');
     const prefix = `${currentYear}-${month}`;
-    const count = _allTemplesForStats.filter(t => (t.timestamp || t.createdAt || '').startsWith(prefix)).length;
+    const count = _allTemplesForStats.filter(t => (t.timestamp || t.createdAt || "").startsWith(prefix)).length;
     return { date: prefix, count };
   });
   
@@ -3996,7 +4024,7 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
 
 
 export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
-  let listTemples = [...(await jsonStore.find('temples'))];
+  let listTemples = [...(await getSafeJsonArray('temples'))];
   let listSales = [...(await jsonStore.find('dist_sales'))];
   let listBills = [...(await jsonStore.find('temple_bills'))];
   let listWithdrawals = [...((await jsonStore.find('withdrawals')) || [])];
@@ -4270,7 +4298,7 @@ export async function fetchDistributorTemples(distributorId: string) {
     // Fallback to memory
     if (temples.length === 0) {
       const allDistSales = await jsonStore.find('dist_sales');
-      temples = (await jsonStore.find('temples')).filter(t => {
+      temples = (await getSafeJsonArray('temples')).filter(t => {
          if (t.distributorId !== distributorId) return false;
          const sales = allDistSales.find(s => s.id === t.salesId);
          if (sales && sales.role === 'SuperSales') return false;
@@ -4355,7 +4383,7 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
   }
 }
 export async function approveTempleByDistributor(templeId: string) {
-  const t = (await jsonStore.find('temples')).find(x => x.id === templeId);
+  const t = (await getSafeJsonArray('temples')).find(x => x.id === templeId);
   if (t) {
     t.status = 'Active';
     const gStore = globalThis as any;
@@ -4645,7 +4673,7 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
+  const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
   
@@ -5512,7 +5540,7 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
          }
        }
        
-       // 同步更新 (await jsonStore.find('temples')) 以便 Auto-heal 登入機制生效
+       // 同步更新 (await getSafeJsonArray('temples')) 以便 Auto-heal 登入機制生效
        const tData = await jsonStore.find('temples');
        const tIdx = tData.findIndex((t: any) => t.id === id);
        if (tIdx > -1) {
@@ -5640,7 +5668,7 @@ export async function fetchGlobalTempleData() {
         totalLamps++;
         if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
       });
-      const temple = (await jsonStore.find('temples'))?.find((t: any) => t.id === templeId);
+      const temple = (await getSafeJsonArray('temples'))?.find((t: any) => t.id === templeId);
       const templeStorage = (await jsonStore.find('temple_storages'))?.find((s: any) => s.templeId === templeId);
       let isVip = false;
       let totalGB = 100;
@@ -6612,8 +6640,8 @@ export async function fetchDistributorStats() {
     if (!client) {
       return {
         totalNodes: 100,
-        usedNodes: (await jsonStore.find('temples')).length,
-        activeTemples: (await jsonStore.find('temples')).filter(t => t.status === 'Active').length,
+        usedNodes: (await getSafeJsonArray('temples')).length,
+        activeTemples: (await getSafeJsonArray('temples')).filter(t => t.status === 'Active').length,
         totalRevenue: 1250000,
         totalCommission: 187500,
         activeSales: (await jsonStore.find('dist_sales')).length
@@ -7011,7 +7039,7 @@ export async function impersonateTemple(templeId: string, originRole?: string) {
 // -------------------------------------------------------------------------
 
 export async function transferTempleOwnership(templeId: string, newDistributorId: string | null, newSalesId: string | null) {
-  const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
+  const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
   if (!temple) return { success: false, error: 'Temple not found' };
 
   if (newDistributorId !== undefined) {
@@ -7045,7 +7073,7 @@ export async function transferDistributorOwnership(distributorId: string, newSal
 
   // Transfer all underlying temples if they belong to this distributor
   // And update their salesId to the new salesId if applicable
-  (await jsonStore.find('temples')).forEach(t => {
+  (await getSafeJsonArray('temples')).forEach(t => {
      if (t.distributorId === distributorId) {
         if (newSalesId !== undefined) {
            t.salesId = newSalesId;
@@ -7228,7 +7256,7 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
 
   const plan = db_ai_plans.find(p => p.id === planId);
   if (plan) {
-    const temple = (await jsonStore.find('temples')).find(t => t.id === templeId);
+    const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
     await jsonStore.createRecord('finance_records', {
       id: `F-${Date.now()}`,
       type: 'INCOME',
@@ -7322,7 +7350,7 @@ export async function getTempleBasicInfo(templeId?: string) {
       } catch (e) {}
     }
     if (!t) {
-      t = (await jsonStore.find('temples'))?.find((x: any) => x.id === tId) || (await jsonStore.find('temples')).find(x => x.id === tId) || null;
+      t = (await getSafeJsonArray('temples'))?.find((x: any) => x.id === tId) || (await getSafeJsonArray('temples')).find(x => x.id === tId) || null;
     }
     if (t && !t.templeName && t.name) {
       return { ...t, templeName: t.name };
@@ -7538,7 +7566,7 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
 
 export async function fetchSuperAdminFinancials() {
   // 取得宮廟與帳單狀態
-  const allTemples = typeof gStore !== 'undefined' ? (await jsonStore.find('temples')) : (await jsonStore.find('temples'));
+  const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
   let templeBills: any[] = typeof gStore !== 'undefined' ? ((await jsonStore.find('temple_bills')) || (await jsonStore.find('temple_bills'))) : (await jsonStore.find('temple_bills'));
   try {
     const { dbQuery } = await import('@/db/db');
@@ -7636,7 +7664,7 @@ export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-  const temple = (await jsonStore.find('temples')).find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
+  const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
   if (!temple) {
     return {
       type: 'super_admin',
@@ -7697,7 +7725,7 @@ export async function getTempleCreatorInfo(templeId: string) {
 
 export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
   if (role === 'TempleAdmin' || role === 'Temple') {
-    const temple = (await jsonStore.find('temples')).find(t => t.id === id);
+    const temple = (await getSafeJsonArray('temples')).find(t => t.id === id);
     if (temple) temple.status = status;
     // synced
     try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
@@ -7717,7 +7745,7 @@ export async function updateAccountStatus(id: string, role: string, status: 'Act
 
 export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
   for (const tId of templeIds) {
-    const temple = (await jsonStore.find('temples')).find(t => t.id === tId);
+    const temple = (await getSafeJsonArray('temples')).find(t => t.id === tId);
     if (temple) {
       if (targetRole === 'HQ') {
         temple.distributorId = null;
@@ -8095,7 +8123,7 @@ export async function fetchDataBridgeTree() {
     if (resTemples && resTemples.rows) pgTemples = resTemples.rows;
   } catch (e) {}
   const allTemplesMap = new Map();
-  ((await jsonStore.find('temples')) || []).forEach((t: any) => allTemplesMap.set(t.id, t));
+  ((await getSafeJsonArray('temples')) || []).forEach((t: any) => allTemplesMap.set(t.id, t));
   pgTemples.forEach(t => allTemplesMap.set(t.id, { ...t, distributorId: t.distributor_id, salesId: t.sales_id, superSalesId: t.super_sales_id, templeName: t.temple_name || t.name }));
   const temples = Array.from(allTemplesMap.values());
 
@@ -8500,15 +8528,15 @@ export async function approveTempleBill(billId: string) {
 
       const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
       if (templeId) {
-         const tIdx = ((await jsonStore.find('temples')) || []).findIndex((t: any) => t.id === templeId);
+         const tIdx = ((await getSafeJsonArray('temples')) || []).findIndex((t: any) => t.id === templeId);
          if (tIdx > -1) {
-            (await jsonStore.find('temples'))[tIdx].paymentStatus = 'Paid';
-            (await jsonStore.find('temples'))[tIdx].status = 'Active';
+            (await getSafeJsonArray('temples'))[tIdx].paymentStatus = 'Paid';
+            (await getSafeJsonArray('temples'))[tIdx].status = 'Active';
          }
       }
 
       if (bill) {
-        const temple = (await jsonStore.find('temples'))?.find((t:any) => t.id === bill.templeId);
+        const temple = (await getSafeJsonArray('temples'))?.find((t:any) => t.id === bill.templeId);
 
         // --- ADDED LOGIC FOR UPGRADES ON BILL APPROVAL ---
         if (bill.type === 'StorageUpgrade' || bill.type === 'AiUpgrade') {
@@ -8605,10 +8633,10 @@ export async function toggleBillStatusSimple(billId: string, status: string) {
         if (status === 'Unpaid' || status === 'PendingPayment') {
             const templeId = bill.templeId;
             if (templeId) {
-                const tIdx = ((await jsonStore.find('temples')) || []).findIndex((t: any) => t.id === templeId);
+                const tIdx = ((await getSafeJsonArray('temples')) || []).findIndex((t: any) => t.id === templeId);
                 if (tIdx > -1) {
-                    (await jsonStore.find('temples'))[tIdx].paymentStatus = 'PendingPayment';
-                    (await jsonStore.find('temples'))[tIdx].status = 'Pending';
+                    (await getSafeJsonArray('temples'))[tIdx].paymentStatus = 'PendingPayment';
+                    (await getSafeJsonArray('temples'))[tIdx].status = 'Pending';
                 }
             }
 
@@ -8648,9 +8676,9 @@ export async function rejectTempleBill(billId: string) {
       
       const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
       if (templeId) {
-         const tIdx = ((await jsonStore.find('temples')) || []).findIndex((t: any) => t.id === templeId);
+         const tIdx = ((await getSafeJsonArray('temples')) || []).findIndex((t: any) => t.id === templeId);
          if (tIdx > -1) {
-            (await jsonStore.find('temples'))[tIdx].paymentStatus = 'PendingPayment';
+            (await getSafeJsonArray('temples'))[tIdx].paymentStatus = 'PendingPayment';
          }
       }
       return { success: true };
@@ -8701,7 +8729,7 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
 export async function getLineConfig(templeId: string) {
   return withTempleSession(templeId, false, async (client) => {
     if (!client) {
-      const t = (await jsonStore.find('temples')).find((x: any) => x.id === templeId);
+      const t = (await getSafeJsonArray('temples')).find((x: any) => x.id === templeId);
       return {
         lineChannelToken: t?.lineChannelToken || '',
         lineChannelSecret: t?.lineChannelSecret || '',
@@ -8727,9 +8755,9 @@ export async function getLineConfig(templeId: string) {
 export async function updateLineConfig(templeId: string, config: any) {
   return withTempleSession(templeId, true, async (client) => {
     if (!client) {
-      const idx = (await jsonStore.find('temples')).findIndex((x: any) => x.id === templeId);
+      const idx = (await getSafeJsonArray('temples')).findIndex((x: any) => x.id === templeId);
       if (idx !== -1) {
-         const t = (await jsonStore.find('temples'))[idx];
+         const t = (await getSafeJsonArray('temples'))[idx];
          t.lineChannelToken = config.lineChannelToken;
          t.lineChannelSecret = config.lineChannelSecret;
          t.lineLoginClientId = config.lineLoginClientId;

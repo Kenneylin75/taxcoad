@@ -6,7 +6,10 @@ import { autoCreateMissingFile } from './jsonStore';
  * This should be called lazily or at server startup to ensure 
  * files exist without overwriting existing data.
  */
+let _initDone = false;
 export async function initializeStorage() {
+  if (_initDone) return;
+  _initDone = true;
   // Phase 1
   const initialPersonnel = [
     { id: '4', name: "測試宮廟管理員", role: "TempleAdmin", account: "admin02", password: "admin02", status: "Active", phone: "0900-000-002", templeId: "temple-2" },
@@ -70,10 +73,7 @@ export async function initializeStorage() {
   await autoCreateMissingFile('distributor_applications', []);
   await autoCreateMissingFile('withdrawals', []);
   await autoCreateMissingFile('bonuses', []);
+  await autoCreateMissingFile('storage_plans', []);
+  await autoCreateMissingFile('saas_orders', []);
   console.log('[StorageInit] All Phases JSON Storage verified and initialized (safely).');
-}
-
-// Automatically invoke on module load in Node environment
-if (typeof process !== 'undefined' && process.release.name === 'node') {
-  initializeStorage().catch(console.error);
 }
