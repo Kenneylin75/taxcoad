@@ -18,85 +18,99 @@ datasource db {
 model PricePlan {
   id           String   @id @default(cuid())
   name         String
-  monthlyPrice Int      @default(0)
-  annualPrice  Int      @default(0)
+  monthlyPrice Int      @default(0) @map("monthly_price")
+  annualPrice  Int      @default(0) @map("annual_price")
   features     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
   temples      Temple[]
+
+  @@map("price_plans")
 }
 
 model Distributor {
   id           String   @id @default(cuid())
   name         String
   status       String   @default("Active")
-  contactName  String?
-  contactPhone String?
+  contactName  String?  @map("contact_name")
+  contactPhone String?  @map("contact_phone")
   email        String?
   account      String?
   password     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   sales   DistributorSales[]
   temples Temple[]
+
+  @@map("distributors")
 }
 
 model DistributorSales {
   id            String   @id @default(cuid())
-  distributorId String?
+  distributorId String?  @map("distributor_id")
   name          String
   phone         String?
   status        String   @default("Active")
   role          String?
   account       String?
   password      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   commissions Commission[]
   visits      SalesVisit[]
+
+  @@map("dist_sales")
 }
 
 model Commission {
   id        String   @id @default(cuid())
-  salesId   String?
+  salesId   String?  @map("sales_id")
   amount    Int      @default(0)
   status    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   sales DistributorSales? @relation(fields: [salesId], references: [id])
+
+  @@map("commissions")
 }
 
 model SalesVisit {
   id         String   @id @default(cuid())
-  salesId    String?
-  templeName String?
+  salesId    String?  @map("sales_id")
+  templeName String?  @map("temple_name")
   content    String?
   date       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   sales DistributorSales? @relation(fields: [salesId], references: [id])
+
+  @@map("sales_visits")
 }
 
 model DistributorApplication {
   id          String   @id @default(cuid())
   name        String?
-  contactInfo String?
+  contactInfo String?  @map("contact_info")
   status      String   @default("Pending")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("distributor_applications")
 }
 
 model SuperSalesOverride {
   id           String   @id @default(cuid())
-  ruleName     String?
-  overrideData Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  ruleName     String?  @map("rule_name")
+  overrideData Json?    @map("override_data")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("super_sales_overrides")
 }
 
 // ---------------------------------------------------------------------
@@ -113,11 +127,11 @@ model Temple {
   address       String?
   phone         String?
   status        String   @default("Active")
-  distributorId String?
-  salesId       String?
-  planId        String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  distributorId String?  @map("distributor_id")
+  salesId       String?  @map("sales_id")
+  planId        String?  @map("plan_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   plan        PricePlan?   @relation(fields: [planId], references: [id])
@@ -142,6 +156,8 @@ model Temple {
   syncQueues          SyncQueue[]
   financeRecords      FinanceRecord[]
   templeNotifications TempleNotification[]
+
+  @@map("temples")
 }
 
 model TempleApplication {
@@ -149,42 +165,50 @@ model TempleApplication {
   name      String
   phone     String?
   status    String   @default("Pending")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("temple_applications")
 }
 
 model TempleBill {
   id        String   @id @default(cuid())
-  templeId  String
+  templeId  String   @map("temple_id")
   type      String?
-  itemName  String?
+  itemName  String?  @map("item_name")
   amount    Int      @default(0)
   status    String   @default("Unpaid")
-  dueDate   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  dueDate   String?  @map("due_date")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("temple_bills")
 }
 
 model StoragePlan {
   id            String   @id @default(cuid())
   name          String
-  capacityBytes BigInt   @default(0)
+  capacityBytes BigInt   @default(0) @map("capacity_bytes")
   price         Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("storage_plans")
 }
 
 model TempleStorage {
   id        String   @id @default(cuid())
-  templeId  String
-  usedBytes BigInt   @default(0)
-  planId    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  templeId  String   @map("temple_id")
+  usedBytes BigInt   @default(0) @map("used_bytes")
+  planId    String?  @map("plan_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("temple_storages")
 }
 
 // ---------------------------------------------------------------------
@@ -198,15 +222,17 @@ model User {
   password    String?
   name        String
   role        String
-  templeId    String?
+  templeId    String?  @map("temple_id")
   phone       String?
   status      String   @default("Active")
   permissions Json?
   avatar      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
+
+  @@map("personnel")
 }
 
 model Admin {
@@ -216,21 +242,25 @@ model Admin {
   password  String?
   role      String?
   status    String   @default("Active")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
 }
 
 model AdminLog {
   id          String   @id @default(cuid())
-  adminId     String?
-  adminName   String?
+  adminId     String?  @map("admin_id")
+  adminName   String?  @map("admin_name")
   action      String?
   target      String?
   details     String?
   timestamp   String?
-  performedBy String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  performedBy String?  @map("performed_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_logs")
 }
 
 model AuditLog {
@@ -238,17 +268,21 @@ model AuditLog {
   action      String?
   details     String?
   timestamp   String?
-  performedBy String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  performedBy String?  @map("performed_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("audit_logs")
 }
 
 model SystemConfig {
   id        String   @id @default(cuid())
   key       String   @unique
   value     Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_config")
 }
 
 // ---------------------------------------------------------------------
@@ -257,21 +291,21 @@ model SystemConfig {
 
 model Guest {
   id            String   @id @default(cuid())
-  templeId      String?
+  templeId      String?  @map("temple_id")
   phone         String   @unique
   name          String
   gender        String?
   birthday      String?
-  lunarBirthday String?
-  birthHour     String?
+  lunarBirthday String?  @map("lunar_birthday")
+  birthHour     String?  @map("birth_hour")
   address       String?
   avatar        String?
-  lineId        String?
+  lineId        String?  @map("line_id")
   email         String?
   password      String?
   status        String   @default("Active")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   temple       Temple?             @relation(fields: [templeId], references: [id])
   appointments Appointment[]
@@ -280,29 +314,35 @@ model Guest {
   queueTickets QueueTicket[]
   adminNotifs  AdminNotification[]
   guestFiles   GuestFile[]
+
+  @@map("guests")
 }
 
 model GuestFile {
   id        String   @id @default(cuid())
-  guestId   String?
-  fileUrl   String?
-  fileName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  guestId   String?  @map("guest_id")
+  fileUrl   String?  @map("file_url")
+  fileName  String?  @map("file_name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   guest Guest? @relation(fields: [guestId], references: [id])
+
+  @@map("guest_files")
 }
 
 model DeepRecord {
-  id        String   @id @default(cuid())
-  phone     String?
-  category  String?
-  content   String?
-  date      String?
-  paymentRef String?
+  id         String   @id @default(cuid())
+  phone      String?
+  category   String?
+  content    String?
+  date       String?
+  paymentRef String?  @map("payment_ref")
   remarks    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("deep_records")
 }
 
 model Activity {
@@ -311,8 +351,10 @@ model Activity {
   type      String?
   content   String?
   timestamp String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("activitys")
 }
 
 // ---------------------------------------------------------------------
@@ -321,70 +363,80 @@ model Activity {
 
 model Service {
   id                    String   @id @default(cuid())
-  templeId              String
+  templeId              String   @map("temple_id")
   name                  String
   price                 Int      @default(0)
   duration              String?
   description           String?
   status                String   @default("Active")
-  assignedStaff         Json?
+  assignedStaff         Json?    @map("assigned_staff")
   color                 String?
-  linkedFormId          String?
-  linkedPrintTemplateId String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  linkedFormId          String?  @map("linked_form_id")
+  linkedPrintTemplateId String?  @map("linked_print_template_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("services")
 }
 
 model ServiceSetting {
   id          String   @id @default(cuid())
-  templeId    String
-  pushConfigs Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  templeId    String   @map("temple_id")
+  pushConfigs Json?    @map("push_configs")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("service_settings")
 }
 
 model PrintTemplate {
   id               String   @id @default(cuid())
-  templeId         String
+  templeId         String   @map("temple_id")
   name             String
-  templeName       String?
-  watermarkUrl     String?
-  watermarkOpacity Float?
-  borderStyle      String?
+  templeName       String?  @map("temple_name")
+  watermarkUrl     String?  @map("watermark_url")
+  watermarkOpacity Float?   @map("watermark_opacity")
+  borderStyle      String?  @map("border_style")
   content          Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("print_templates")
 }
 
 model Form {
   id        String   @id @default(cuid())
-  templeId  String
+  templeId  String   @map("temple_id")
   name      String
   fields    Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("forms")
 }
 
 model TemplePaymentConfig {
   id                   String   @id @default(cuid())
-  templeId             String
-  ecpayHashKey         String?
-  ecpayHashIv          String?
-  ecpayMerchantId      String?
-  linepayChannelId     String?
-  linepayChannelSecret String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  templeId             String   @map("temple_id")
+  ecpayHashKey         String?  @map("ecpay_hash_key")
+  ecpayHashIv          String?  @map("ecpay_hash_iv")
+  ecpayMerchantId      String?  @map("ecpay_merchant_id")
+  linepayChannelId     String?  @map("linepay_channel_id")
+  linepayChannelSecret String?  @map("linepay_channel_secret")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("temple_payment_configs")
 }
 
 // ---------------------------------------------------------------------
@@ -393,45 +445,49 @@ model TemplePaymentConfig {
 
 model Slot {
   id             String   @id @default(cuid())
-  templeId       String
+  templeId       String   @map("temple_id")
   date           String?
   time           String?
   staff          String?
   description    String?
   location       String?
-  boundServiceId String?
+  boundServiceId String?  @map("bound_service_id")
   price          Int      @default(0)
   status         String   @default("Available")
-  guestName      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  guestName      String?  @map("guest_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("slots")
 }
 
 model Appointment {
   id              String   @id @default(cuid())
-  templeId        String
-  guestId         String?
-  guestName       String?
+  templeId        String   @map("temple_id")
+  guestId         String?  @map("guest_id")
+  guestName       String?  @map("guest_name")
   phone           String?
   service         String?
-  serviceId       String?
+  serviceId       String?  @map("service_id")
   date            String?
   time            String?
   staff           String?
   amount          Int      @default(0)
-  paymentMethod   String?
-  paymentStatus   String   @default("Pending")
-  paymentRef      String?
-  paymentProofUrl String?
+  paymentMethod   String?  @map("payment_method")
+  paymentStatus   String   @default("Pending") @map("payment_status")
+  paymentRef      String?  @map("payment_ref")
+  paymentProofUrl String?  @map("payment_proof_url")
   remarks         String?
   status          String   @default("Pending")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   guest  Guest? @relation(fields: [guestId], references: [id])
+
+  @@map("appointments")
 }
 
 // ---------------------------------------------------------------------
@@ -440,43 +496,47 @@ model Appointment {
 
 model LampCategory {
   id           String   @id @default(cuid())
-  templeId     String
+  templeId     String   @map("temple_id")
   name         String
   description  String?
   price        Int      @default(0)
-  durationDays Int      @default(365)
-  totalSlots   Int      @default(500)
+  durationDays Int      @default(365) @map("duration_days")
+  totalSlots   Int      @default(500) @map("total_slots")
   precautions  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   temple  Temple       @relation(fields: [templeId], references: [id])
   records LampRecord[]
+
+  @@map("lamp_categories")
 }
 
 model LampRecord {
   id              String   @id @default(cuid())
-  templeId        String
-  categoryId      String?
-  categoryName    String?
-  guestId         String?
-  guestName       String?
+  templeId        String   @map("temple_id")
+  categoryId      String?  @map("category_id")
+  categoryName    String?  @map("category_name")
+  guestId         String?  @map("guest_id")
+  guestName       String?  @map("guest_name")
   phone           String?
-  applicantName   String?
-  applicantBirth  String?
-  actualPrice     Int      @default(0)
-  paymentMethod   String?
-  paymentStatus   String   @default("Pending")
-  paymentProofUrl String?
+  applicantName   String?  @map("applicant_name")
+  applicantBirth  String?  @map("applicant_birth")
+  actualPrice     Int      @default(0) @map("actual_price")
+  paymentMethod   String?  @map("payment_method")
+  paymentStatus   String   @default("Pending") @map("payment_status")
+  paymentProofUrl String?  @map("payment_proof_url")
   remarks         String?
-  expiryDate      String?
+  expiryDate      String?  @map("expiry_date")
   status          String   @default("Pending")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   temple   Temple        @relation(fields: [templeId], references: [id])
   category LampCategory? @relation(fields: [categoryId], references: [id])
   guest    Guest?        @relation(fields: [guestId], references: [id])
+
+  @@map("lamp_records")
 }
 
 // ---------------------------------------------------------------------
@@ -485,43 +545,47 @@ model LampRecord {
 
 model Event {
   id          String   @id @default(cuid())
-  templeId    String
+  templeId    String   @map("temple_id")
   title       String
   date        String?
   location    String?
   description String?
-  imageUrl    String?
-  bannerUrl   String?
+  imageUrl    String?  @map("image_url")
+  bannerUrl   String?  @map("banner_url")
   price       Int      @default(0)
   capacity    Int      @default(0)
   fields      Json?
   status      String   @default("Draft")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple        Temple              @relation(fields: [templeId], references: [id])
   registrations EventRegistration[]
+
+  @@map("events")
 }
 
 model EventRegistration {
   id               String   @id @default(cuid())
-  templeId         String?
-  eventId          String?
-  guestId          String?
-  guestName        String?
+  templeId         String?  @map("temple_id")
+  eventId          String?  @map("event_id")
+  guestId          String?  @map("guest_id")
+  guestName        String?  @map("guest_name")
   phone            String?
-  actualPrice      Int      @default(0)
-  paymentMethod    String?
-  paymentStatus    String   @default("Pending")
-  paymentProofUrl  String?
-  paymentRef       String?
+  actualPrice      Int      @default(0) @map("actual_price")
+  paymentMethod    String?  @map("payment_method")
+  paymentStatus    String   @default("Pending") @map("payment_status")
+  paymentProofUrl  String?  @map("payment_proof_url")
+  paymentRef       String?  @map("payment_ref")
   remarks          String?
-  registrationData Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  registrationData Json?    @map("registration_data")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   event Event? @relation(fields: [eventId], references: [id])
   guest Guest? @relation(fields: [guestId], references: [id])
+
+  @@map("event_registrations")
 }
 
 // ---------------------------------------------------------------------
@@ -530,40 +594,44 @@ model EventRegistration {
 
 model QueueEvent {
   id          String   @id @default(cuid())
-  templeId    String
+  templeId    String   @map("temple_id")
   title       String
   date        String?
-  startTime   String?
-  endTime     String?
+  startTime   String?  @map("start_time")
+  endTime     String?  @map("end_time")
   location    String?
-  serviceType String?
+  serviceType String?  @map("service_type")
   price       Int      @default(0)
-  maxCapacity Int      @default(0)
+  maxCapacity Int      @default(0) @map("max_capacity")
   status      String   @default("Draft")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple  Temple        @relation(fields: [templeId], references: [id])
   tickets QueueTicket[]
+
+  @@map("queue_events")
 }
 
 model QueueTicket {
   id          String   @id @default(cuid())
-  templeId    String?
-  eventId     String?
-  guestId     String?
-  guestName   String?
+  templeId    String?  @map("temple_id")
+  eventId     String?  @map("event_id")
+  guestId     String?  @map("guest_id")
+  guestName   String?  @map("guest_name")
   phone       String?
-  displayNum  String?
-  paymentRef  String?
+  displayNum  String?  @map("display_num")
+  paymentRef  String?  @map("payment_ref")
   remarks     String?
-  actualOrder Int      @default(0)
+  actualOrder Int      @default(0) @map("actual_order")
   status      String   @default("Queuing")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   queueEvent QueueEvent? @relation(fields: [eventId], references: [id])
   guest      Guest?      @relation(fields: [guestId], references: [id])
+
+  @@map("queue_tickets")
 }
 
 // ---------------------------------------------------------------------
@@ -575,8 +643,10 @@ model AiPlan {
   name      String
   price     Int      @default(0)
   features  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_plans")
 }
 
 model AiApiModel {
@@ -584,124 +654,148 @@ model AiApiModel {
   name      String
   provider  String?
   version   String?
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_api_models")
 }
 
 model TempleAiUsage {
   id         String   @id @default(cuid())
-  templeId   String
-  tokensUsed Int      @default(0)
-  queryCount Int      @default(0)
+  templeId   String   @map("temple_id")
+  tokensUsed Int      @default(0) @map("tokens_used")
+  queryCount Int      @default(0) @map("query_count")
   month      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("temple_ai_usages")
 }
 
 model SyncQueue {
   id        String   @id @default(cuid())
-  templeId  String?
+  templeId  String?  @map("temple_id")
   action    String?
   status    String?
   payload   Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
+
+  @@map("sync_queues")
 }
 
 model FinanceRecord {
   id          String   @id @default(cuid())
-  templeId    String?
+  templeId    String?  @map("temple_id")
   type        String?
   category    String?
   amount      Int      @default(0)
   date        String?
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
+
+  @@map("finance_records")
 }
 
 model Tool {
   id          String   @id @default(cuid())
   name        String?
   description String?
-  isEnabled   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("tools")
 }
 
 model Wallet {
   id        String   @id @default(cuid())
-  ownerId   String?
+  ownerId   String?  @map("owner_id")
   balance   Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("wallets")
 }
 
 model Bonus {
   id        String   @id @default(cuid())
-  targetId  String?
+  targetId  String?  @map("target_id")
   amount    Int      @default(0)
   reason    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bonus")
 }
 
 model Withdrawal {
   id        String   @id @default(cuid())
-  userId    String?
+  userId    String?  @map("user_id")
   amount    Int      @default(0)
   status    String   @default("Pending")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("withdrawals")
 }
 
 model Notification {
   id        String   @id @default(cuid())
-  userId    String?
+  userId    String?  @map("user_id")
   content   String?
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notifications")
 }
 
 model AdminNotification {
   id        String   @id @default(cuid())
-  templeId  String
-  guestId   String?
+  templeId  String   @map("temple_id")
+  guestId   String?  @map("guest_id")
   category  String
   message   String
-  isRead    Boolean  @default(false)
-  linkPath  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isRead    Boolean  @default(false) @map("is_read")
+  linkPath  String?  @map("link_path")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   guest  Guest? @relation(fields: [guestId], references: [id])
+
+  @@map("admin_notifications")
 }
 
 model TempleNotification {
   id        String   @id @default(cuid())
-  templeId  String?
+  templeId  String?  @map("temple_id")
   content   String?
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
+
+  @@map("temple_notifications")
 }
 
 model PasswordReset {
   id        String   @id @default(cuid())
   account   String?
   token     String?
-  isUsed    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("password_resets")
 }

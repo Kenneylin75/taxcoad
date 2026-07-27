@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "log-1785135809696",
+    "level": "INFO",
+    "action": "帳號登入",
+    "target": "使用者 超級總裁 (SuperAdmin) 登入成功",
+    "operator": "超級總裁",
+    "timestamp": "2026/7/27 下午3:03:29",
+    "templeId": "super-admin"
+  }
+]

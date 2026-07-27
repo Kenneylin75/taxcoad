@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "log-1785135809530",
+    "action": "LOGIN",
+    "details": "使用者 超級總裁 (SuperAdmin) 登入成功",
+    "timestamp": "2026-07-27T07:03:29.530Z",
+    "performedBy": "超級總裁"
+  }
+]

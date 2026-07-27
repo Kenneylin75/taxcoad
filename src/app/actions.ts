@@ -180,16 +180,9 @@ export async function getCurrentUser() {
 
   if (templeId) {
     let person: any = null;
-    try {
-      const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND temple_id = $2", [account.toLowerCase(), templeId], () => null) as any;
-      if (resPerson && resPerson.rowCount > 0) {
-        person = resPerson.rows[0];
-      }
-    } catch(e) {}
-    
-    if (!person) {
-      const pData = await jsonStore.find('personnel');
-      person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === account.toLowerCase()) && p.templeId === templeId);
+    const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND temple_id = $2", [account.toLowerCase(), templeId]) as any;
+    if (resPerson && resPerson.rowCount > 0) {
+      person = resPerson.rows[0];
     }
     
     if (person) {
@@ -241,27 +234,21 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
   await ensurePlatformTables();
 
   const searchAccount = account.toLowerCase();
-  const pData = await jsonStore.find('personnel');
 
   if (targetTempleId) {
     let person = null;
-    try {
-      const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2 AND temple_id = $3", [searchAccount, password, targetTempleId], () => null) as any;
-      if (resPerson && resPerson.rowCount > 0) {
-        person = resPerson.rows[0];
-        person.templeId = person.temple_id;
-      }
-    } catch(e) {}
-
-    if (!person) {
-      person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password && p.templeId === targetTempleId);
+    const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2 AND temple_id = $3", [searchAccount, password, targetTempleId]) as any;
+    if (resPerson && resPerson.rowCount > 0) {
+      person = resPerson.rows[0];
+      person.templeId = person.temple_id;
     }
 
     if (person) {
-      const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
-      const temple = allTemples.find((t: any) => t.id === person.templeId);
-      if (temple && temple.status === "Inactive") {
-         return { success: false, error: "該宮廟已被停權，無法登入" };
+      const resTemple = await dbQuery("SELECT status FROM temples WHERE id = $1", [person.templeId]) as any;
+      if (resTemple && resTemple.rowCount > 0) {
+        if (resTemple.rows[0].status === "Inactive") {
+          return { success: false, error: "該宮廟已被停權，無法登入" };
+        }
       }
       success = true; 
       redirectPath = `/${person.templeId}/admin`; 
@@ -276,154 +263,87 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       redirectPath = "/super-admin";
       loggedInName = "超級總裁";
       assignedRole = "SuperAdmin";
-    } else if ((await jsonStore.find('admins')).some(a => (a.account || "").toLowerCase() === searchAccount && a.password === password)) {
-      success = true;
-      redirectPath = "/super-admin";
-      assignedRole = "SuperAdmin";
     } else {
-      // 首先嘗試從 PostgreSQL 獲取經銷商
-      let distributor = null;
-      try {
-        const resDist = await dbQuery("SELECT * FROM distributors WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+      let isSuperAdmin = false;
+      const resAdmin = await dbQuery("SELECT * FROM admins WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
+      if (resAdmin && resAdmin.rowCount > 0) isSuperAdmin = true;
+
+      if (isSuperAdmin) {
+        success = true;
+        redirectPath = "/super-admin";
+        assignedRole = "SuperAdmin";
+      } else {
+        let distributor = null;
+        const resDist = await dbQuery("SELECT * FROM distributors WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
         if (resDist && resDist.rowCount > 0) {
           distributor = resDist.rows[0];
         }
-      } catch (e) {}
-      
-      if (!distributor) {
-        const allDistributors = typeof gStore !== 'undefined' ? ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors'))) : (await jsonStore.find('distributors'));
-        distributor = allDistributors.find((d: any) => (d.account || '').toLowerCase() === searchAccount && d.password === password);
-      }
 
-      if (distributor) {
-        if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
-        else {
-          success = true;
-          redirectPath = `/distributor/${distributor.id}`;
-          assignedRole = "Distributor";
-        }
-      } else {
-        // 首先嘗試從 PostgreSQL 獲取業務員
-        let salesPerson = null;
-        try {
-          const resSales = await dbQuery("SELECT * FROM dist_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
-          if (resSales && resSales.rowCount > 0) {
-            salesPerson = resSales.rows[0];
-            // 為了兼容前後端屬性命名
-            salesPerson.distributorId = salesPerson.distributor_id;
-          }
-        } catch (e) {}
-
-        if (!salesPerson) {
-          const allSales = typeof gStore !== 'undefined' ? ((await jsonStore.find('dist_sales')) || (await jsonStore.find('dist_sales'))) : (await jsonStore.find('dist_sales'));
-          salesPerson = allSales.find((s: any) => (s.account || '').toLowerCase() === searchAccount && s.password === password);
-        }
-
-        if (salesPerson) {
-          if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
+        if (distributor) {
+          if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
           else {
             success = true;
-            redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/dist-sales-portal/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
-            assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
+            redirectPath = `/distributor/${distributor.id}`;
+            assignedRole = "Distributor";
           }
         } else {
-          let person = null;
-          try {
-            const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password], () => null) as any;
+          let salesPerson = null;
+          const resSales = await dbQuery("SELECT * FROM dist_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
+          if (resSales && resSales.rowCount > 0) {
+            salesPerson = resSales.rows[0];
+            salesPerson.distributorId = salesPerson.distributor_id;
+          }
+
+          if (salesPerson) {
+            if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
+            else {
+              success = true;
+              redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/dist-sales-portal/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
+              assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
+            }
+          } else {
+            let person = null;
+            const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
             if (resPerson && resPerson.rowCount > 0) {
               person = resPerson.rows[0];
               person.templeId = person.temple_id;
             }
-          } catch(e) {}
 
-          if (!person) {
-            person = pData.find((p: any) => ((p.account || p.name || "").toLowerCase() === searchAccount) && p.password === password);
-          }
-
-          // Auto-heal: If personnel not found, check if a temple has this account/password (created by sales but not yet in personnel)
-          if (!person) {
-             const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
-             const temple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
-             if (temple) {
-                person = {
-                    id: `p-${Date.now()}`,
-                    templeId: temple.id,
-                    name: temple.templeName || '宮廟管理員',
-                    account: temple.account,
-                    password: temple.password,
-                    role: 'TempleAdmin',
-                    status: temple.status
-                };
-                pData.push(person);
-                if (typeof gStore !== 'undefined') await jsonStore.atomicWrite('personnel', () => pData);
-             }
-          }
-
-          // Auto-heal for PostgreSQL: If temple was approved but personnel missing
-          if (!person) {
-             try {
-               const resApp = await dbQuery("SELECT * FROM temple_applications WHERE contact_phone = $1 AND status = 'Approved'", [searchAccount], () => null) as any;
-               if (resApp && resApp.rowCount > 0) {
-                  const app = resApp.rows[0];
-                  if (password === app.contact_phone) {
-                     const resTemple2 = await dbQuery("SELECT * FROM temples WHERE temple_name = $1", [app.temple_name], () => null) as any;
-                     if (resTemple2 && resTemple2.rowCount > 0) {
-                         const templeId = resTemple2.rows[0].id;
-                         await dbQuery("INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-                            [`p-${Date.now()}`, templeId, app.contact_person || '管理員', 'TempleAdmin', app.contact_phone, app.contact_phone, app.contact_phone, 'Active'], () => null);
-                         
-                         person = {
-                            id: `p-${Date.now()}`,
-                            templeId: templeId,
-                            name: app.contact_person || '管理員',
-                            account: app.contact_phone,
-                            password: app.contact_phone,
-                            role: 'TempleAdmin',
-                            status: 'Active'
-                         };
-                     }
-                  }
-               }
-             } catch(e) {}
-          }
-
-          if (person) { 
-            if (person.role !== 'TempleAdmin') {
-              return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
-            }
-            const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
-            const temple = allTemples.find((t: any) => t.id === person.templeId);
-            if (!temple) {
-               return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
-            }
-            if (temple && temple.status === "Inactive") {
-               loginStatus = "Inactive";
+            if (person) { 
+              if (person.role !== 'TempleAdmin') {
+                return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
+              }
+              const resTemple = await dbQuery("SELECT status FROM temples WHERE id = $1", [person.templeId]) as any;
+              if (!resTemple || resTemple.rowCount === 0) {
+                 return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
+              }
+              if (resTemple.rows[0].status === "Inactive") {
+                 loginStatus = "Inactive";
+              } else {
+                 success = true; 
+                 redirectPath = `/${person.templeId}/admin`; 
+                 loggedInName = person.name;
+                 assignedRole = "TempleAdmin"; 
+              }
             } else {
-               success = true; 
-               redirectPath = `/${person.templeId}/admin`; 
-               loggedInName = person.name;
-               assignedRole = "TempleAdmin"; 
-            }
-        } else {
-          // 最後嘗試從記憶體尋找宮廟主帳號 (PG 已無 account 欄位)
-          let mainTemple = null;
-          const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
-          mainTemple = allTemples.find((t: any) => (t.account || '').toLowerCase() === searchAccount && t.password === password);
-          
-          if (mainTemple) {
-            if (mainTemple.status === "Inactive") {
-              loginStatus = "Inactive";
-            } else {
-              success = true;
-              redirectPath = `/${mainTemple.id}/admin`;
-              loggedInName = mainTemple.templeName;
-              assignedRole = "TempleAdmin";
+              // Try finding temple master account directly
+              const resMainTemple = await dbQuery("SELECT * FROM temples WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
+              if (resMainTemple && resMainTemple.rowCount > 0) {
+                const mainTemple = resMainTemple.rows[0];
+                if (mainTemple.status === "Inactive") {
+                  loginStatus = "Inactive";
+                } else {
+                  success = true;
+                  redirectPath = `/${mainTemple.id}/admin`;
+                  loggedInName = mainTemple.temple_name;
+                  assignedRole = "TempleAdmin";
+                }
+              }
             }
           }
         }
       }
     }
-  }
   }
 
   if (loginStatus === "Inactive") {
@@ -440,20 +360,13 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
     }
     
     const logMsg = "使用者 " + loggedInName + " (" + assignedRole + ") 登入成功";
-    const newLog = {
-      id: "log-" + Date.now(),
-      action: "LOGIN",
-      details: logMsg,
-      timestamp: new Date().toISOString(),
-      performedBy: loggedInName
-    };
-    await jsonStore.createRecord('admin_logs', newLog);
+    const newLogTimestamp = new Date().toISOString();
 
     withTempleSession("hq", true, async (client) => {
       if (client) {
          try {
            await client.query("CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, action VARCHAR(100), details TEXT, timestamp VARCHAR(100), performed_by VARCHAR(100))");
-           await client.query("INSERT INTO admin_logs (action, details, timestamp, performed_by) VALUES ($1, $2, $3, $4)", ["LOGIN", logMsg, newLog.timestamp, loggedInName]);
+           await client.query("INSERT INTO admin_logs (action, details, timestamp, performed_by) VALUES ($1, $2, $3, $4)", ["LOGIN", logMsg, newLogTimestamp, loggedInName]);
          } catch(e) { console.error("Log error", e); }
       }
     });
@@ -471,16 +384,20 @@ export async function checkAccountExists(account: string) {
   
   if (account === "PIVOTADMIN01") return true;
   
-  const pData = await jsonStore.find('personnel');
-  if (pData.some((p: any) => (p.account || "").toLowerCase() === searchAccount)) return true;
+  let exists = false;
+  const res1 = await dbQuery("SELECT 1 FROM personnel WHERE LOWER(account) = $1", [searchAccount]) as any;
+  if (res1 && res1.rowCount > 0) exists = true;
   
-  const distData = ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors')) || []);
-  if (distData.some((d: any) => (d.account || "").toLowerCase() === searchAccount)) return true;
+  const res2 = await dbQuery("SELECT 1 FROM distributors WHERE LOWER(account) = $1", [searchAccount]) as any;
+  if (res2 && res2.rowCount > 0) exists = true;
+  
+  const res3 = await dbQuery("SELECT 1 FROM dist_sales WHERE LOWER(account) = $1", [searchAccount]) as any;
+  if (res3 && res3.rowCount > 0) exists = true;
 
-  const salesData = ((await jsonStore.find('dist_sales')) || (await jsonStore.find('dist_sales')) || []);
-  if (salesData.some((s: any) => (s.account || "").toLowerCase() === searchAccount)) return true;
-
-  const adminData = ((await jsonStore.find('admins')) || (await jsonStore.find('admins')) || []);
+  const res4 = await dbQuery("SELECT 1 FROM temples WHERE LOWER(account) = $1", [searchAccount]) as any;
+  if (res4 && res4.rowCount > 0) exists = true;
+  
+  return exists;
   if (adminData.some((a: any) => (a.account || "").toLowerCase() === searchAccount)) return true;
   
   try {
