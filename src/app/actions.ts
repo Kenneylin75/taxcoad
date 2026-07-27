@@ -1,7 +1,5 @@
-// @ts-nocheck
+import * as jsonStore from "@/lib/jsonStore";
 "use server";
-import * as jsonStore from '@/lib/jsonStore';
-
 import { initializeStorage } from '@/lib/storageInit';
 let _isStorageInit = false;
 async function ensureStorage() {
@@ -91,7 +89,7 @@ export async function checkTempleSuspension(templeId?: string) {
   const tId = templeId || await getDynamicTempleId();
   try {
     const { dbQuery } = await import('@/db/db');
-    const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = $1 AND status = 'Unpaid' AND due_date < CURRENT_DATE", [tId], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1 AND status = 'Unpaid' AND \"dueDate\" < CURRENT_DATE", [tId], () => null) as any;
     const rows = res?.rows;
     return (rows && rows.length > 0);
   } catch(e) {
@@ -180,7 +178,7 @@ export async function getCurrentUser() {
 
   if (templeId) {
     let person: any = null;
-    const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND temple_id = $2", [account.toLowerCase(), templeId]) as any;
+    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND \"templeId\" = $2", [account.toLowerCase(), templeId]) as any;
     if (resPerson && resPerson.rowCount > 0) {
       person = resPerson.rows[0];
     }
@@ -237,14 +235,14 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
 
   if (targetTempleId) {
     let person = null;
-    const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2 AND temple_id = $3", [searchAccount, password, targetTempleId]) as any;
+    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND password = $2 AND \"templeId\" = $3", [searchAccount, password, targetTempleId]) as any;
     if (resPerson && resPerson.rowCount > 0) {
       person = resPerson.rows[0];
       person.templeId = person.temple_id;
     }
 
     if (person) {
-      const resTemple = await dbQuery("SELECT status FROM temples WHERE id = $1", [person.templeId]) as any;
+      const resTemple = await dbQuery("SELECT status FROM \"Temple\" WHERE id = $1", [person.templeId]) as any;
       if (resTemple && resTemple.rowCount > 0) {
         if (resTemple.rows[0].status === "Inactive") {
           return { success: false, error: "該宮廟已被停權，無法登入" };
@@ -303,7 +301,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
             }
           } else {
             let person = null;
-            const resPerson = await dbQuery("SELECT * FROM personnel WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
+            const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
             if (resPerson && resPerson.rowCount > 0) {
               person = resPerson.rows[0];
               person.templeId = person.temple_id;
@@ -313,7 +311,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
               if (person.role !== 'TempleAdmin') {
                 return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
               }
-              const resTemple = await dbQuery("SELECT status FROM temples WHERE id = $1", [person.templeId]) as any;
+              const resTemple = await dbQuery("SELECT status FROM \"Temple\" WHERE id = $1", [person.templeId]) as any;
               if (!resTemple || resTemple.rowCount === 0) {
                  return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
               }
@@ -327,7 +325,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
               }
             } else {
               // Try finding temple master account directly
-              const resMainTemple = await dbQuery("SELECT * FROM temples WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
+              const resMainTemple = await dbQuery("SELECT * FROM \"Temple\" WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
               if (resMainTemple && resMainTemple.rowCount > 0) {
                 const mainTemple = resMainTemple.rows[0];
                 if (mainTemple.status === "Inactive") {
@@ -385,7 +383,7 @@ export async function checkAccountExists(account: string) {
   if (account === "PIVOTADMIN01") return true;
   
   let exists = false;
-  const res1 = await dbQuery("SELECT 1 FROM personnel WHERE LOWER(account) = $1", [searchAccount]) as any;
+  const res1 = await dbQuery("SELECT 1 FROM \"User\" WHERE LOWER(account) = $1", [searchAccount]) as any;
   if (res1 && res1.rowCount > 0) exists = true;
   
   const res2 = await dbQuery("SELECT 1 FROM distributors WHERE LOWER(account) = $1", [searchAccount]) as any;
@@ -394,7 +392,7 @@ export async function checkAccountExists(account: string) {
   const res3 = await dbQuery("SELECT 1 FROM dist_sales WHERE LOWER(account) = $1", [searchAccount]) as any;
   if (res3 && res3.rowCount > 0) exists = true;
 
-  const res4 = await dbQuery("SELECT 1 FROM temples WHERE LOWER(account) = $1", [searchAccount]) as any;
+  const res4 = await dbQuery("SELECT 1 FROM \"Temple\" WHERE LOWER(account) = $1", [searchAccount]) as any;
   if (res4 && res4.rowCount > 0) exists = true;
   
   return exists;
@@ -404,7 +402,7 @@ export async function checkAccountExists(account: string) {
     const resDist = await dbQuery("SELECT id FROM distributors WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
     if (resDist && resDist.rowCount > 0) return true;
     
-    const resSales = await dbQuery("SELECT id FROM distributor_sales WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
+    const resSales = await dbQuery("SELECT id FROM dist_sales WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
     if (resSales && resSales.rowCount > 0) return true;
   } catch(e) {}
   
@@ -415,7 +413,6 @@ export async function checkAccountExists(account: string) {
 export async function fetchAvailableSlots() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [...(await jsonStore.find('slots'))].filter(x => x.templeId === templeId);
     await client.query(`
       CREATE TABLE IF NOT EXISTS slots (
         id SERIAL PRIMARY KEY,
@@ -466,22 +463,12 @@ export async function createSlot(data: any) {
   const templeId = await getDynamicTempleId();
 
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const currentSlots = await jsonStore.find('slots');
-      const now = Date.now();
-      dateList.forEach((date, idx) => {
-        currentSlots.push({ id: now + idx + Math.floor(Math.random() * 1000), date, time, staff, description, location, bound_service_id, price, status: "Available", templeId });
-      });
-      await jsonStore.atomicWrite('slots', () => [...currentSlots]);
-      // (await jsonStore.find('slots')) synced via jsonStore
-    } else {
-      for (const date of dateList) {
-        await client.query(
-          'INSERT INTO slots (temple_id, date, time, staff, description, location, bound_service_id, price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-          [templeId, date, time, staff, description, location, bound_service_id, price, 'Available']
-        );
-      }
-    }
+    for (const date of dateList) {
+              await client.query(
+                'INSERT INTO slots (temple_id, date, time, staff, description, location, bound_service_id, price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                [templeId, date, time, staff, description, location, bound_service_id, price, 'Available']
+              );
+            }
     await revalidateTemple();
     return { success: true, count: dateList.length };
   });
@@ -503,20 +490,10 @@ export async function updateSlot(id: number, data: any) {
 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const currentSlots = await jsonStore.find('slots');
-      const idx = currentSlots.findIndex((s: any) => s.id === id);
-      if (idx !== -1) {
-        currentSlots[idx] = { ...currentSlots[idx], date, time, staff, description, location, bound_service_id, price };
-      }
-      await jsonStore.atomicWrite('slots', () => [...currentSlots]);
-      // (await jsonStore.find('slots')) synced via jsonStore
-    } else {
-      await client.query(
-        'UPDATE slots SET date = $1, time = $2, staff = $3, description = $4, location = $5, bound_service_id = $6, price = $7 WHERE id = $8 AND temple_id = $9',
-        [date, time, staff, description, location, bound_service_id, price, id, templeId]
-      );
-    }
+    await client.query(
+              'UPDATE slots SET date = $1, time = $2, staff = $3, description = $4, location = $5, bound_service_id = $6, price = $7 WHERE id = $8 AND temple_id = $9',
+              [date, time, staff, description, location, bound_service_id, price, id, templeId]
+            );
     await revalidateTemple();
     return { success: true };
   });
@@ -557,60 +534,11 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
   if (await checkTempleSuspension(templeId)) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
   return withTempleSession(templeId, false, async (client) => {
     let newId = Date.now();
-    if (!client) {
-      const slotIdx = (await jsonStore.find('slots')).findIndex(s => s.id === slotId);
-      if (slotIdx === -1) return { success: false, message: "找不到該時段" };
-      
-      const slot = (await jsonStore.find('slots'))[slotIdx];
-      if (slot.status === "Booked") return { success: false, message: "該時段已被預約" };
-
-      await jsonStore.updateRecord('slots', (await jsonStore.find('slots'))[slotIdx].id, { status: "Booked", guestName });
-
-
-      const svcId = slot.bound_service_id || slot.serviceId;
-      const svc = (await jsonStore.find('services')).find((s: any) => s.id === svcId);
-      const serviceName = svc ? svc.name : (slot.service || '一般預約');
-
-      const newAppointment = {
-        id: newId,
-        date: slot.date,
-        time: slot.time,
-        staff: slot.staff,
-        guestName,
-        phone,
-        service: serviceName,
-        serviceId: svcId || null,
-        status: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Confirmed' : 'Pending',
-        paymentMethod,
-        paymentRef,
-        paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
-        amount
-      };
-      await jsonStore.createRecord('appointments', newAppointment);
-
-      // Automatically register guest profile if not already in-memory
-      const normPhone = normalizePhone(phone);
-      const hasGuest = (await jsonStore.find('guests')).some((g: any) => normalizePhone(g.phone) === normPhone);
-      if (!hasGuest) {
-        (await jsonStore.find('guests')).push({
-          phone,
-          name: guestName,
-          status: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Active' : 'Pending',
-    paymentMethod,
-    paymentRef,
-    paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending',
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName)}&background=B91C1C&color=fff`
-        });
-        // invalid assignment removed: (await jsonStore.find('guests'));
-      }
-    } else {
-      const slotRes = await client.query('SELECT * FROM slots WHERE id = $1', [slotId]);
+    const slotRes = await client.query('SELECT * FROM slots WHERE id = $1', [slotId]);
       if ((slotRes.rowCount ?? 0) === 0) return { success: false, message: "找不到該時段" };
       const slot = slotRes.rows[0];
       if (slot.status === 'Booked') return { success: false, message: "該時段已被預約" };
-
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', guestName, slotId]);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS appointments (
           id SERIAL PRIMARY KEY,
@@ -629,14 +557,11 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
           amount INTEGER DEFAULT 0
         )
       `);
-      
       const insRes = await client.query(
-        'INSERT INTO appointments (temple_id, date, time, staff, guest_name, service, service_id, status, phone, payment_method, payment_ref, payment_status, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id',
-        [templeId, slot.date, slot.time, slot.staff, guestName, slot.description || '日常預約', slot.bound_service_id || null, 'Confirmed', phone, paymentMethod || null, paymentRef || null, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', amount || 0]
-      );
+              'INSERT INTO appointments (temple_id, date, time, staff, guest_name, service, service_id, status, phone, payment_method, payment_ref, payment_status, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id',
+              [templeId, slot.date, slot.time, slot.staff, guestName, slot.description || '日常預約', slot.bound_service_id || null, 'Confirmed', phone, paymentMethod || null, paymentRef || null, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', amount || 0]
+            );
       newId = insRes.rows[0].id;
-
-      // Automatically register guest in PostgreSQL if they don't exist yet
       await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
@@ -654,17 +579,15 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      
       const normPhone = normalizePhone(phone);
       const guestCheck = await client.query('SELECT 1 FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1', [normPhone]);
       if ((guestCheck.rowCount ?? 0) === 0) {
-        await client.query(`
+              await client.query(`
           INSERT INTO guests (temple_id, phone, name, status)
           VALUES ($1, $2, $3, $4)
           ON CONFLICT (temple_id, phone) DO NOTHING
         `, [templeId, phone, guestName, 'Active']);
-      }
-    }
+            }
 
     await revalidateTemple();
     return { success: true, id: newId };
@@ -674,23 +597,12 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
 export async function cancelAppointment(appId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex(a => a.id === appId);
-      if (appIdx === -1) return { success: false, message: '找不到該預約' };
-      const app = (await jsonStore.find('appointments'))[appIdx];
-      await jsonStore.updateRecord('appointments', (await jsonStore.find('appointments'))[appIdx].id, { status: 'Cancelled' });
-      
-      const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
-      if (slot) { slot.status = 'Available'; slot.guestName = ''; }
-    } else {
-      const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
+    const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
       if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
       const app = appRes.rows[0];
-      
       await client.query('UPDATE appointments SET status = $1 WHERE id = $2', ['Cancelled', appId]);
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
-        ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
-    }
+              ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
     await revalidateTemple();
     return { success: true };
   });
@@ -703,55 +615,21 @@ export async function rescheduleSingleAppointment(appointmentId: number, newSlot
     let oldTimeStr = "";
     let newTimeStr = "";
 
-    if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex(a => a.id === appointmentId && (!a.templeId || a.templeId === templeId));
-      if (appIdx === -1) return { success: false, message: '找不到該預約' };
-      const app = (await jsonStore.find('appointments'))[appIdx];
-      guestName = app.guestName;
-      oldTimeStr = `${app.date} ${app.time}`;
-      
-      const newSlotIdx = (await jsonStore.find('slots')).findIndex(s => String(s.id) === String(newSlotId));
-      if (newSlotIdx === -1) return { success: false, message: '找不到新選擇的時段' };
-      const newSlot = (await jsonStore.find('slots'))[newSlotIdx];
-      if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
-      
-      const oldSlot = (await jsonStore.find('slots')).find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
-      if (oldSlot) {
-        oldSlot.status = 'Available';
-        oldSlot.guestName = '';
-      }
-      
-      newSlot.status = 'Booked';
-      newSlot.guestName = app.guestName;
-      
-      app.date = newSlot.date;
-      app.time = newSlot.time;
-      app.staff = newSlot.staff;
-      app.serviceId = newSlot.bound_service_id || newSlot.serviceId;
-      newTimeStr = `${newSlot.date} ${newSlot.time}`;
-      
-    } else {
-      const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appointmentId, templeId]);
+    const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appointmentId, templeId]);
       if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
       const app = appRes.rows[0];
       guestName = app.guest_name;
       oldTimeStr = `${app.date} ${app.time}`;
-      
       const slotRes = await client.query('SELECT * FROM slots WHERE id = $1 AND temple_id = $2', [newSlotId, templeId]);
       if (slotRes.rowCount === 0) return { success: false, message: '找不到新選擇的時段' };
       const newSlot = slotRes.rows[0];
       if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
-      
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
-        ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
-        
+              ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', app.guest_name, newSlotId]);
-      
       await client.query('UPDATE appointments SET date = $1, time = $2, staff = $3, service_id = $4 WHERE id = $5', 
-        [newSlot.date, newSlot.time, newSlot.staff, newSlot.bound_service_id, appointmentId]);
-      
+              [newSlot.date, newSlot.time, newSlot.staff, newSlot.bound_service_id, appointmentId]);
       newTimeStr = `${newSlot.date} ${newSlot.time}`;
-    }
 
     const content = `親愛的信眾 ${guestName} 您好，您原本預約的 ${oldTimeStr} 時段，已由宮廟方為您手動改期至 ${newTimeStr}。造成不便敬請見諒，如有疑問請洽宮廟管理員。`;
     await createNotification('【系統通知】您的預約已改期', content, new Date().toISOString());
@@ -765,8 +643,6 @@ export async function rescheduleSingleAppointment(appointmentId: number, newSlot
 export async function cancelServiceRecord(recordId: string, type: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return { success: false, message: "記憶體模式暫不支援取消此服務" };
-
     try {
       if (type === '點燈') {
         await client.query('UPDATE lamp_records SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
@@ -795,45 +671,17 @@ export async function cancelServiceRecord(recordId: string, type: string) {
 export async function modifyAppointment(appId: number, newSlotId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex(a => a.id === appId);
-      if (appIdx === -1) return { success: false, message: '找不到該預約' };
-      const app = (await jsonStore.find('appointments'))[appIdx];
-      
-      const newSlotIdx = (await jsonStore.find('slots')).findIndex(s => s.id === newSlotId);
-      if (newSlotIdx === -1) return { success: false, message: '找不到新時段' };
-      const newSlot = (await jsonStore.find('slots'))[newSlotIdx];
-      if (newSlot.status === 'Booked') return { success: false, message: '該時段已被預約' };
-
-      const oldSlot = (await jsonStore.find('slots')).find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
-      if (oldSlot) { oldSlot.status = 'Available'; oldSlot.guestName = ''; }
-
-      newSlot.status = 'Booked';
-      newSlot.guestName = app.guestName;
-      
-      (await jsonStore.find('appointments'))[appIdx].date = newSlot.date;
-      (await jsonStore.find('appointments'))[appIdx].time = newSlot.time;
-      (await jsonStore.find('appointments'))[appIdx].staff = newSlot.staff;
-    } else {
-      const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
+    const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
       if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
       const app = appRes.rows[0];
-
       const slotRes = await client.query('SELECT * FROM slots WHERE id = $1 AND temple_id = $2', [newSlotId, templeId]);
       if (slotRes.rowCount === 0) return { success: false, message: '找不到新時段' };
       const newSlot = slotRes.rows[0];
       if (newSlot.status === 'Booked') return { success: false, message: '新時段已被預約' };
-
-      // Free old slot
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6', 
-        ['Available', null, app.date, app.time, app.staff, templeId]);
-
-      // Book new slot
+              ['Available', null, app.date, app.time, app.staff, templeId]);
       await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', app.guest_name, newSlotId]);
-
-      // Update appointment
       await client.query('UPDATE appointments SET date = $1, time = $2, staff = $3 WHERE id = $4', [newSlot.date, newSlot.time, newSlot.staff, appId]);
-    }
     await revalidateTemple();
     return { success: true };
   });
@@ -843,13 +691,7 @@ export async function modifyAppointment(appId: number, newSlotId: number) {
 export async function markAppointmentAsArrived(appointmentId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
-      if (appIdx === -1) return { success: false, message: "找不到該筆預約" };
-      (await jsonStore.find('appointments'))[appIdx].status = "Arrived";
-    } else {
-      await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Arrived', appointmentId, templeId]);
-    }
+    await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Arrived', appointmentId, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -859,13 +701,7 @@ export async function markAppointmentAsArrived(appointmentId: number) {
 export async function markAppointmentAsPaid(appointmentId: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const appIdx = (await jsonStore.find('appointments')).findIndex((a: any) => a.id.toString() === appointmentId.toString() && (!a.templeId || a.templeId === templeId));
-      if (appIdx === -1) return { success: false, message: "找不到該筆預約" };
-      (await jsonStore.find('appointments'))[appIdx].status = "Paid";
-    } else {
-      await client.query("UPDATE appointments SET status = 'Paid' WHERE id = $1 AND temple_id = $2", [appointmentId, templeId]);
-    }
+    await client.query("UPDATE appointments SET status = 'Paid' WHERE id = $1 AND temple_id = $2", [appointmentId, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -876,22 +712,7 @@ export async function markAppointmentAsPaid(appointmentId: number) {
 export async function fetchAppointments() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const filtered = (await jsonStore.find('appointments')).filter((a: any) => !a.templeId || a.templeId === templeId);
-      const allServices = await jsonStore.find('services');
-      for (const app of filtered) {
-        if (!app.serviceId) {
-          const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.templeId === templeId);
-          if (slot && (slot.bound_service_id || slot.serviceId)) { app.serviceId = slot.bound_service_id || slot.serviceId; }
-        }
-        if (app.serviceId) {
-          const svc = allServices.find((s: any) => s.id === app.serviceId && s.templeId === templeId);
-          if (svc) { app.service = svc.name; if (app.amount === undefined) app.amount = svc.price; }
-        }
-      }
-      return [...filtered];
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS appointments (
           id SERIAL PRIMARY KEY,
           temple_id VARCHAR(50) NOT NULL,
@@ -911,21 +732,20 @@ export async function fetchAppointments() {
       `);
       const res = await client.query('SELECT * FROM appointments WHERE temple_id = $1 ORDER BY date, time', [templeId]);
       return res.rows.map(r => ({
-        id: r.id,
-        date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
-        time: r.time,
-        staff: r.staff,
-        guestName: r.guest_name,
-        service: r.service,
-        serviceId: r.service_id,
-        status: r.status,
-        phone: r.phone,
-        paymentMethod: r.payment_method,
-        paymentRef: r.payment_ref,
-        paymentStatus: r.payment_status,
-        amount: r.amount
-      }));
-    }
+              id: r.id,
+              date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
+              time: r.time,
+              staff: r.staff,
+              guestName: r.guest_name,
+              service: r.service,
+              serviceId: r.service_id,
+              status: r.status,
+              phone: r.phone,
+              paymentMethod: r.payment_method,
+              paymentRef: r.payment_ref,
+              paymentStatus: r.payment_status,
+              amount: r.amount
+            }));
   });
 }
 
@@ -933,11 +753,7 @@ export async function fetchAppointments() {
 export async function fetchServiceDefinitions() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const currentServices = (await jsonStore.find('services')) || (await jsonStore.find('services'));
-      return currentServices.filter((x: any) => x.templeId === templeId);
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS services (
           id VARCHAR(50) NOT NULL,
           temple_id VARCHAR(50) NOT NULL,
@@ -954,10 +770,9 @@ export async function fetchServiceDefinitions() {
       await client.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0');
       const res = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
       if (res.rowCount === 0) {
-        return [];
-      }
+              return [];
+            }
       return JSON.parse(JSON.stringify(res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }))));
-    }
   });
 }
 
@@ -967,30 +782,18 @@ export async function saveServiceDefinition(data: any) {
     const id = data.id || `s-${Date.now()}`;
     const newColor = data.color || '#6366f1';
     
-    if (!client) {
-      let currentServices = (await jsonStore.find('services')) || (await jsonStore.find('services'));
-      const idx = currentServices.findIndex((s: any) => s.id === id);
-      if (idx > -1) {
-        currentServices[idx] = { ...currentServices[idx], ...data };
-      } else {
-        currentServices.push({ id, status: 'Active', color: newColor, ...data , templeId});
-      }
-      await jsonStore.atomicWrite('services', (data) => [...currentServices]);
-      // array synced manually
-    } else {
-      const res = await client.query('SELECT 1 FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
+    const res = await client.query('SELECT 1 FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
       if (res.rowCount > 0) {
-        await client.query(
-          'UPDATE services SET name = $1, price = $2, duration = $3, description = $4, color = $5, assigned_staff = $6, status = $7 WHERE id = $8 AND temple_id = $9',
-          [data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active', id, templeId]
-        );
-      } else {
-        await client.query(
-          'INSERT INTO services (id, temple_id, name, price, duration, description, color, assigned_staff, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-          [id, templeId, data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active']
-        );
-      }
-    }
+              await client.query(
+                'UPDATE services SET name = $1, price = $2, duration = $3, description = $4, color = $5, assigned_staff = $6, status = $7 WHERE id = $8 AND temple_id = $9',
+                [data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active', id, templeId]
+              );
+            } else {
+              await client.query(
+                'INSERT INTO services (id, temple_id, name, price, duration, description, color, assigned_staff, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                [id, templeId, data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active']
+              );
+            }
     await revalidateTemple();
     await logSystemEvent('SUCCESS', '設定服務項目', `服務名稱：${data.name}`, '管理員', templeId);
     return { success: true };
@@ -1000,13 +803,7 @@ export async function saveServiceDefinition(data: any) {
 export async function deleteServiceDefinition(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      let currentServices = (await jsonStore.find('services')) || (await jsonStore.find('services'));
-      await jsonStore.atomicWrite('services', (data) => currentServices.filter((s: any) => !(s.id === id && s.templeId === templeId)));
-      // array synced manually
-    } else {
-      await client.query('DELETE FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    }
+    await client.query('DELETE FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -1016,11 +813,6 @@ export async function deleteServiceDefinition(id: string) {
 export async function fetchPrintTemplates() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const current = (await jsonStore.find('print_templates')) || (await jsonStore.find('print_templates'));
-      const mine = current.filter((t: any) => t.templeId === templeId);
-      return mine;
-    }
     // DB impl omitted for now
     return [];
   });
@@ -1029,13 +821,6 @@ export async function fetchPrintTemplates() {
 export async function savePrintTemplate(template: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      template.templeId = templeId;
-      const idx = (await jsonStore.find('print_templates')).findIndex(t => t.id === template.id);
-      if (idx !== -1) (await jsonStore.find('print_templates'))[idx] = template;
-      else await jsonStore.createRecord('print_templates', template);
-      return { success: true };
-    }
     return { success: true };
   });
 }
@@ -1043,11 +828,6 @@ export async function savePrintTemplate(template: any) {
 export async function deletePrintTemplate(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const idx = (await jsonStore.find('print_templates')).findIndex(t => t.id === id && t.templeId === templeId);
-      if (idx !== -1) (await jsonStore.find('print_templates')).splice(idx, 1);
-      return { success: true };
-    }
     return { success: true };
   });
 }
@@ -1078,14 +858,7 @@ export async function saveForm(data: any) {
 export async function fetchPersonnel() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const myPersonnel = (await jsonStore.find('personnel')).filter((p: any) => p.templeId === templeId);
-      if (myPersonnel.length === 0 && templeId) {
-        return [];
-      }
-      return myPersonnel;
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
           id VARCHAR(50) NOT NULL,
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
@@ -1100,22 +873,21 @@ export async function fetchPersonnel() {
           PRIMARY KEY (id, temple_id)
         )
       `);
-      const res = await client.query('SELECT * FROM personnel WHERE temple_id = $1', [templeId]);
+      const res = await client.query('SELECT * FROM "User" WHERE "templeId" = $1', [templeId]);
       if ((res.rowCount ?? 0) === 0) {
-        return [];
-      }
+              return [];
+            }
       return res.rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        role: r.role,
-        account: r.account,
-        phone: r.phone,
-        status: r.status,
-        avatar: r.avatar,
-        permissions: r.permissions || [],
-        serviceCount: 0
-      }));
-    }
+              id: r.id,
+              name: r.name,
+              role: r.role,
+              account: r.account,
+              phone: r.phone,
+              status: r.status,
+              avatar: r.avatar,
+              permissions: r.permissions || [],
+              serviceCount: 0
+            }));
   });
 }
 
@@ -1128,14 +900,7 @@ export async function fetchStaff() {
 export async function removeSingleSlot(id: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      let currentSlots = (await jsonStore.find('slots')) || (await jsonStore.find('slots'));
-      const filtered = currentSlots.filter((s: any) => String(s.id) !== String(id));
-      // invalid assignment removed: [...filtered];
-      // (await jsonStore.find('slots')) synced via jsonStore
-    } else {
-      await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    }
+    await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -1145,16 +910,9 @@ export async function removeSingleSlot(id: any) {
 export async function removeBatchSlots(ids: any[]) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      let currentSlots = (await jsonStore.find('slots')) || (await jsonStore.find('slots'));
-      const filtered = currentSlots.filter((s: any) => !ids.includes(s.id) && !ids.includes(String(s.id)));
-      // invalid assignment removed: [...filtered];
-      // (await jsonStore.find('slots')) synced via jsonStore
-    } else {
-      for (const id of ids) {
-        await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      }
-    }
+    for (const id of ids) {
+              await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -1242,7 +1000,6 @@ export async function executeEmergencyReschedule(formData: FormData) {
 export async function fetchLampRecords() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [...(await jsonStore.find('lamp_records'))].filter(r => !r.templeId || r.templeId === templeId).reverse();
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
     try { await client.query(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS category_id VARCHAR(50)`); } catch(e) {}
     const res = await client.query('SELECT * FROM lamp_records WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
@@ -1253,7 +1010,6 @@ export async function fetchLampRecords() {
 export async function fetchLampCategories() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return ((await jsonStore.find('lamp_categories')) || (await jsonStore.find('lamp_categories'))).filter((x: any) => !x.templeId || x.templeId === templeId);
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_categories (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), name VARCHAR(255), price INTEGER, description TEXT, color VARCHAR(50), is_active BOOLEAN DEFAULT true, type VARCHAR(50))`);
     await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS duration_days INTEGER DEFAULT 365`);
     await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS total_slots INTEGER DEFAULT 500`);
@@ -1273,9 +1029,6 @@ export async function getGuestUser() {
   if (!phone) return null;
   
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('guests')).find((g: any) => g.phone === phone && g.templeId === templeId) || null;
-    }
     const res = await client.query('SELECT * FROM guests WHERE phone = $1 AND temple_id = $2', [phone, templeId]);
     if ((res.rowCount ?? 0) > 0) {
       const r = res.rows[0];
@@ -1303,17 +1056,13 @@ export async function checkPhoneStatus(phone: string) {
     const normLogin = normalizePhone(phone);
     let existing: any = null;
 
-    if (!client) {
-      existing = (await jsonStore.find('guests')).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
-    } else {
-      const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
+    const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
       if ((res.rowCount ?? 0) > 0) {
-        const r = res.rows[0];
-        existing = {
-          templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
-        };
-      }
-    }
+              const r = res.rows[0];
+              existing = {
+                templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
+              };
+            }
 
     if (!existing) return { status: 'NEW' };
     if (!existing.password) return { status: 'NO_PASSWORD', name: existing.name };
@@ -1325,17 +1074,13 @@ export async function liffAutoLogin(lineId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     let existing: any = null;
-    if (!client) {
-      existing = (await jsonStore.find('guests')).find((g: any) => g.lineId === lineId && g.templeId === templeId);
-    } else {
-      const res = await client.query('SELECT * FROM guests WHERE line_id = $1 AND temple_id = $2', [lineId, templeId]);
+    const res = await client.query('SELECT * FROM guests WHERE line_id = $1 AND temple_id = $2', [lineId, templeId]);
       if ((res.rowCount ?? 0) > 0) {
-        const r = res.rows[0];
-        existing = {
-          templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
-        };
-      }
-    }
+              const r = res.rows[0];
+              existing = {
+                templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
+              };
+            }
     if (existing) {
       const store = await cookies();
       store.set(`guestPhone_${templeId}`, existing.phone, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
@@ -1351,10 +1096,7 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
     const normLogin = normalizePhone(phone);
     let existing: any = null;
 
-    if (!client) {
-      existing = (await jsonStore.find('guests')).find((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
@@ -1373,12 +1115,11 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
       `);
       const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
       if ((res.rowCount ?? 0) > 0) {
-        const r = res.rows[0];
-        existing = {
-          templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
-        };
-      }
-    }
+              const r = res.rows[0];
+              existing = {
+                templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
+              };
+            }
 
     if (existing) {
       if (existing.password && existing.password !== password) {
@@ -1387,15 +1128,7 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
       if (!existing.password && password) {
         // 首次綁定密碼
         existing.password = password;
-        if (!client) {
-          const idx = (await jsonStore.find('guests')).findIndex((g: any) => normalizePhone(g.phone) === normLogin && g.templeId === templeId);
-          if (idx > -1) {
-            if ((await jsonStore.find('guests'))) (await jsonStore.find('guests'))[idx].password = password;
-            else (await jsonStore.find('guests'))[idx].password = password;
-          }
-        } else {
-          await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [password, normLogin, templeId]);
-        }
+        await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [password, normLogin, templeId]);
       }
     } else if (!inputName || !password) {
       return { success: false, error: "首次登入請務必填寫真實姓名與密碼" };
@@ -1412,17 +1145,11 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
     };
 
     if (!existing) {
-      if (!client) {
-        const currentGuests = (await jsonStore.find('guests')) || (await jsonStore.find('guests'));
-        // invalid assignment removed: [...currentGuests, fullGuest];
-        // synced
-      } else {
-        await client.query(`
+      await client.query(`
           INSERT INTO guests (temple_id, phone, name, password, status)
           VALUES ($1, $2, $3, $4, $5)
           ON CONFLICT (temple_id, phone) DO NOTHING
         `, [templeId, phone, guestName, password, 'Active']);
-      }
     }
 
     const store = await cookies();
@@ -1475,7 +1202,6 @@ export async function askAgiAssistant(q: string, h: number) {
 export async function fetchAiChatLogs() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [];
     await client.query(`
       CREATE TABLE IF NOT EXISTS ai_chat_logs (
         id SERIAL PRIMARY KEY,
@@ -1505,9 +1231,6 @@ const normCompare = (p1: string, p2: string) => {
 export async function fetchGuestAppointments(p: any) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('appointments')).filter((a: any) => normCompare(a.phone, p) && (!a.templeId || a.templeId === templeId));
-    }
     const normPhone = normalizePhone(p);
     const res = await client.query(`
       SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount, payment_proof_url as "paymentProofUrl"
@@ -1522,17 +1245,6 @@ export async function fetchGuestAppointments(p: any) {
 export async function fetchServiceSettings() { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const s = (await jsonStore.find('service_settings_mock')).find(x => x.templeId === templeId);
-      return s || { 
-        cancelHoursBefore: 24, 
-        modifyHoursBefore: 24, 
-        allowCancel: true, 
-        allowModify: true, 
-        pushConfigs: [],
-        modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true }
-      };
-    }
     await client.query(`
       CREATE TABLE IF NOT EXISTS temple_settings (
         temple_id VARCHAR(50) PRIMARY KEY REFERENCES temples(id) ON DELETE CASCADE,
@@ -1559,10 +1271,7 @@ export async function fetchServiceSettings() {
 export async function fetchGuestFiles(phone: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('guest_files')).filter(f => normCompare(f.phone, phone));
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
           id VARCHAR(50) NOT NULL,
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
@@ -1576,23 +1285,20 @@ export async function fetchGuestFiles(phone: string) {
           PRIMARY KEY (id, temple_id)
         )
       `);
-      
       const normPhone = normalizePhone(phone);
       const guestRes = await client.query("SELECT phone FROM guests WHERE REPLACE(phone, '-', '') = $1", [normPhone]);
       const dbPhone = guestRes.rows[0]?.phone || phone;
-      
       const res = await client.query('SELECT * FROM guest_files WHERE temple_id = $1 AND phone = $2 ORDER BY uploaded_at DESC', [templeId, dbPhone]);
       return res.rows.map(r => ({
-        id: r.id,
-        phone: r.phone,
-        url: r.url,
-        type: r.type,
-        name: r.name,
-        folder: r.folder,
-        uploadedBy: r.uploaded_by,
-        uploadedAt: r.uploaded_at instanceof Date ? r.uploaded_at.toISOString().replace('T', ' ').slice(0, 19) : r.uploaded_at
-      }));
-    }
+              id: r.id,
+              phone: r.phone,
+              url: r.url,
+              type: r.type,
+              name: r.name,
+              folder: r.folder,
+              uploadedBy: r.uploaded_by,
+              uploadedAt: r.uploaded_at instanceof Date ? r.uploaded_at.toISOString().replace('T', ' ').slice(0, 19) : r.uploaded_at
+            }));
   });
 }
 
@@ -1601,7 +1307,6 @@ export async function fetchGuestFiles(phone: string) {
 export async function fetchEventRegistrationsByEventId(eventId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return (await jsonStore.find('event_registrations')).filter(r => r.eventId === eventId && (!r.templeId || r.templeId === templeId));
     await client.query(`CREATE TABLE IF NOT EXISTS event_registrations (id VARCHAR(50) PRIMARY KEY, event_id VARCHAR(50), temple_id VARCHAR(50), title VARCHAR(255), phone VARCHAR(50), guest_name VARCHAR(255), price INTEGER, payment_status VARCHAR(50), actual_price INTEGER, timestamp VARCHAR(50))`);
     const res = await client.query('SELECT * FROM event_registrations WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
     return res.rows.map(r => ({ id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone, guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status, actualPrice: r.actual_price, timestamp: r.timestamp }));
@@ -1610,14 +1315,7 @@ export async function fetchEventRegistrationsByEventId(eventId: string) {
 export async function markRegistrationAsPaid(registrationId: string, actualPrice: number) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const reg = (await jsonStore.find('event_registrations')).find(r => r.id === registrationId && (!r.templeId || r.templeId === templeId));
-      if (!reg) return { success: false, message: '找不到報名紀錄' };
-      reg.paymentStatus = 'Paid';
-      reg.actualPrice = actualPrice;
-    } else {
-      await client.query('UPDATE event_registrations SET payment_status = $1, actual_price = $2 WHERE id = $3 AND temple_id = $4', ['Paid', actualPrice, registrationId, templeId]);
-    }
+    await client.query('UPDATE event_registrations SET payment_status = $1, actual_price = $2 WHERE id = $3 AND temple_id = $4', ['Paid', actualPrice, registrationId, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -1629,20 +1327,14 @@ export async function markRegistrationAsPaid(registrationId: string, actualPrice
 export async function verifyQueueTicket(eventId: any, phone: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const t = (await jsonStore.find('queue_tickets')).find(t => t.eventId === eventId && normCompare(t.phone, phone) && (!t.templeId || t.templeId === templeId));
-      if (!t) return { success: false, error: 'No ticket found' };
-      if (t.status === 'Pending') { t.status = 'Queuing'; t.scannedAt = new Date().toLocaleTimeString(); t.actualOrder = (await jsonStore.find('queue_tickets')).filter((x: any) => x.eventId === eventId && x.status !== 'Pending').length + 1; }
-    } else {
-      const tRes = await client.query('SELECT id, status FROM queue_tickets WHERE event_id = $1 AND REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [eventId, phone.replace(/-/g, ''), templeId]);
+    const tRes = await client.query('SELECT id, status FROM queue_tickets WHERE event_id = $1 AND REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [eventId, phone.replace(/-/g, ''), templeId]);
       if (tRes.rowCount === 0) return { success: false, error: 'No ticket found' };
       const t = tRes.rows[0];
       if (t.status === 'Pending') {
-        const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status != \'Pending\' AND temple_id = $2', [eventId, templeId]);
-        const actualOrder = parseInt(orderRes.rows[0].count) + 1;
-        await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, t.id]);
-      }
-    }
+              const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status != \'Pending\' AND temple_id = $2', [eventId, templeId]);
+              const actualOrder = parseInt(orderRes.rows[0].count) + 1;
+              await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, t.id]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -1655,24 +1347,15 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
     const pStatus = paymentMethod === 'Cash' || !paymentMethod ? (pr > 0 ? 'Pending' : 'Unpaid') : 'Paid';
 
     let newId = '';
-    if (!client) {
-      const ev = (await jsonStore.find('events')).find(e => e.id === id && (!e.templeId || e.templeId === templeId));
-      if (!ev) return { success: false };
-      ev.enrolled += 1;
-      newId = `REG-${Date.now()}`;
-      await jsonStore.createRecord('event_registrations', { id: newId, eventId: id, templeId, title: ev.title, phone, guestName: n, price: pr, paymentStatus: pStatus, actualPrice: pr > 0 ? pr : 0, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] });
-    } else {
-      const evRes = await client.query('SELECT title, enrolled, capacity FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+    const evRes = await client.query('SELECT title, enrolled, capacity FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
       if (evRes.rowCount === 0) return { success: false };
       const ev = evRes.rows[0];
       if (ev.capacity > 0 && ev.enrolled >= ev.capacity) return { success: false, message: '名額已滿' };
-      
       newId = `REG-${Date.now()}`;
       await client.query('UPDATE events SET enrolled = enrolled + 1 WHERE id = $1 AND temple_id = $2', [id, templeId]);
       await client.query('INSERT INTO event_registrations (id, event_id, temple_id, title, phone, guest_name, price, payment_status, actual_price, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-        [newId, id, templeId, ev.title, phone, n, pr, pStatus, pr > 0 ? pr : 0, new Date().toISOString().replace('T', ' ').split('.')[0]]
-      );
-    }
+              [newId, id, templeId, ev.title, phone, n, pr, pStatus, pr > 0 ? pr : 0, new Date().toISOString().replace('T', ' ').split('.')[0]]
+            );
     await revalidateTemple();
     return { success: true, id: newId };
   });
@@ -1681,10 +1364,7 @@ export async function fetchGuestRegistrations(p: any) {
   const templeId = await getDynamicTempleId();
   const normPhone = (p || '').replace(/[- ]/g, '');
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('event_registrations')).filter(r => normCompare(r.phone, p) && (!r.templeId || r.templeId === templeId));
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS event_registrations (
           id VARCHAR(50) PRIMARY KEY,
           event_id VARCHAR(50),
@@ -1704,23 +1384,18 @@ export async function fetchGuestRegistrations(p: any) {
         AND temple_id = $2
         ORDER BY timestamp DESC
       `, [normPhone, templeId]);
-      
       return res.rows.map(r => ({
-        id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone,
-        guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status,
-        actualPrice: r.actual_price, timestamp: r.timestamp
-      }));
-    }
+              id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone,
+              guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status,
+              actualPrice: r.actual_price, timestamp: r.timestamp
+            }));
   });
 }
 export async function fetchGuestQueueTickets(p: any) {
   const templeId = await getDynamicTempleId();
   const normPhone = (p || '').replace(/[- ]/g, '');
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('queue_tickets')).filter((t: any) => normCompare(t.phone, p) && (!t.templeId || t.templeId === templeId));
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS queue_tickets (
           id VARCHAR(50) PRIMARY KEY,
           event_id VARCHAR(50),
@@ -1740,52 +1415,45 @@ export async function fetchGuestQueueTickets(p: any) {
         AND temple_id = $2
         ORDER BY created_at DESC
       `, [normPhone, templeId]);
-      
       return res.rows.map(r => ({
-        id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title,
-        phone: r.phone, guestName: r.guest_name, status: r.status, assignedNumber: r.assigned_number,
-        paymentStatus: r.payment_status, createdAt: r.created_at
-      }));
-    }
+              id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title,
+              phone: r.phone, guestName: r.guest_name, status: r.status, assignedNumber: r.assigned_number,
+              paymentStatus: r.payment_status, createdAt: r.created_at
+            }));
   });
 }
 export async function fetchGuestLampRecords(p: any) {
   const templeId = await getDynamicTempleId();
   const normPhone = (p || '').replace(/[- ]/g, '');
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('lamp_records')).filter(l => normCompare(l.phone, p) && (!l.templeId || l.templeId === templeId));
-    } else {
-      await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
+    await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
       const res = await client.query(`
         SELECT * FROM lamp_records 
         WHERE REPLACE(REPLACE(phone, '-', ''), ' ', '') = REPLACE(REPLACE($1, '-', ''), ' ', '')
         AND temple_id = $2
         ORDER BY created_at DESC
       `, [normPhone, templeId]);
-      
       return res.rows.map(r => {
-        let startStr = '';
-        let expStr = '';
-        try {
-          const start = r.created_at ? new Date(r.created_at) : new Date();
-          if (isNaN(start.getTime())) throw new Error();
-          const exp = new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000));
-          startStr = start.toISOString().split('T')[0];
-          expStr = exp.toISOString().split('T')[0];
-        } catch {
-          startStr = new Date().toISOString().split('T')[0];
-          expStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        }
-        return {
-          id: r.id, templeId: r.temple_id, guestName: r.guest_name, phone: r.phone,
-          categoryName: r.lamp_type, price: r.amount, status: r.status,
-          startDate: startStr, expiryDate: expStr,
-          paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status, createdAt: r.created_at,
-          paymentProofUrl: r.payment_proof_url || null
-        };
-      });
-    }
+              let startStr = '';
+              let expStr = '';
+              try {
+                const start = r.created_at ? new Date(r.created_at) : new Date();
+                if (isNaN(start.getTime())) throw new Error();
+                const exp = new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000));
+                startStr = start.toISOString().split('T')[0];
+                expStr = exp.toISOString().split('T')[0];
+              } catch {
+                startStr = new Date().toISOString().split('T')[0];
+                expStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              }
+              return {
+                id: r.id, templeId: r.temple_id, guestName: r.guest_name, phone: r.phone,
+                categoryName: r.lamp_type, price: r.amount, status: r.status,
+                startDate: startStr, expiryDate: expStr,
+                paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status, createdAt: r.created_at,
+                paymentProofUrl: r.payment_proof_url || null
+              };
+            });
   });
 }
 
@@ -1793,27 +1461,16 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     const pStatus = paymentMethod === 'Cash' || !paymentMethod ? 'Pending' : 'Paid';
-    if (!client) {
-      const ev = (await jsonStore.find('queue_events')).find((e: any) => e.id === eventId && (!e.templeId || e.templeId === templeId));
-      if (!ev) return { success: false };
-      const assignedNumber = `A${((await jsonStore.find('queue_tickets')).filter((t: any) => t.eventId === eventId).length + 1).toString().padStart(3, '0')}`;
-      const tix = { id: `TIX-${Date.now()}`, eventId, templeId, eventTitle: ev.title, phone, guestName, status: 'Pending', assignedNumber, paymentStatus: pStatus, createdAt: new Date().toISOString().replace('T', ' ').split('.')[0] };
-      await jsonStore.createRecord('queue_tickets', tix);
-      return { success: true, ticket: tix };
-    } else {
-      const evRes = await client.query('SELECT title FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
+    const evRes = await client.query('SELECT title FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
       if (evRes.rowCount === 0) return { success: false };
       const countRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
       const assignedNumber = `A${(parseInt(countRes.rows[0].count) + 1).toString().padStart(3, '0')}`;
       const newId = `TIX-${Date.now()}`;
       const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
-      
       await client.query(`ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Pending'`);
-      
       await client.query('INSERT INTO queue_tickets (id, event_id, temple_id, event_title, phone, guest_name, status, assigned_number, payment_status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-        [newId, eventId, templeId, evRes.rows[0].title, phone, guestName, 'Pending', assignedNumber, pStatus, nowStr]);
+              [newId, eventId, templeId, evRes.rows[0].title, phone, guestName, 'Pending', assignedNumber, pStatus, nowStr]);
       return { success: true, ticket: { id: newId, eventId, templeId, eventTitle: evRes.rows[0].title, phone, guestName, status: 'Pending', assignedNumber, paymentStatus: pStatus, createdAt: nowStr } };
-    }
   });
 }
 export type EventItem = { id: string; title: string; date: string; location: string; price: number; status: 'Active' | 'Draft' | 'Completed'; capacity: number; enrolled: number; imageUrl?: string; description?: string; precautions?: string };
@@ -1822,7 +1479,6 @@ export type EventItem = { id: string; title: string; date: string; location: str
 export async function fetchEvents() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return [...(await jsonStore.find('events'))].filter(x => x.templeId === templeId);
     await client.query(`CREATE TABLE IF NOT EXISTS events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), location VARCHAR(255), price INTEGER, status VARCHAR(50), capacity INTEGER, enrolled INTEGER DEFAULT 0, image_url TEXT)`);
     await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS description TEXT`);
     await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS precautions TEXT`);
@@ -1860,22 +1516,11 @@ export async function saveEvent(fd: FormData) {
   const templeId = await getDynamicTempleId();
 
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      if (id) {
-        const idx = (await jsonStore.find('events')).findIndex(e => e.id === id && (!e.templeId || e.templeId === templeId));
-        if (idx > -1) {
-          (await jsonStore.find('events'))[idx] = { ...(await jsonStore.find('events'))[idx], title, date, location, price, capacity, status, templeId, imageUrl, description, precautions };
-        }
-      } else {
-        await jsonStore.createRecord('events', { id: `ev-${Date.now()}`, title, date, location, price, capacity, status, enrolled: 0, templeId, imageUrl, description, precautions });
-      }
-    } else {
-      if (id) {
-        await client.query('UPDATE events SET title = $1, date = $2, location = $3, price = $4, capacity = $5, status = $6, image_url = $7, description = $8, precautions = $9 WHERE id = $10 AND temple_id = $11', [title, date, location, price, capacity, status, imageUrl, description, precautions, id, templeId]);
-      } else {
-        await client.query('INSERT INTO events (id, temple_id, title, date, location, price, capacity, status, enrolled, image_url, description, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11)', [`ev-${Date.now()}`, templeId, title, date, location, price, capacity, status, imageUrl, description, precautions]);
-      }
-    }
+    if (id) {
+              await client.query('UPDATE events SET title = $1, date = $2, location = $3, price = $4, capacity = $5, status = $6, image_url = $7, description = $8, precautions = $9 WHERE id = $10 AND temple_id = $11', [title, date, location, price, capacity, status, imageUrl, description, precautions, id, templeId]);
+            } else {
+              await client.query('INSERT INTO events (id, temple_id, title, date, location, price, capacity, status, enrolled, image_url, description, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11)', [`ev-${Date.now()}`, templeId, title, date, location, price, capacity, status, imageUrl, description, precautions]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -1883,15 +1528,9 @@ export async function saveEvent(fd: FormData) {
 export async function deleteEvent(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const hasRegistrations = (await jsonStore.find('event_registrations')).some(r => r.eventId === id && (!r.templeId || r.templeId === templeId));
-      if (hasRegistrations) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' }; 
-      await jsonStore.deleteRecord('events', id);
-    } else {
-      const regCheck = await client.query('SELECT 1 FROM event_registrations WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
+    const regCheck = await client.query('SELECT 1 FROM event_registrations WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
       if (regCheck.rowCount && regCheck.rowCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
       await client.query('DELETE FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    }
     await revalidateTemple();
     return { success: true }; 
   });
@@ -2129,21 +1768,11 @@ export async function fetchFinanceData() {
 export async function fetchB2BPaymentConfig(templeId: string) {
   return withTempleSession(templeId, true, async (client) => {
     let distributorId = null;
-    if (!client) {
-      const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
-      distributorId = temple?.distributorId;
-    } else {
-      const res = await client.query('SELECT distributor_id FROM temples WHERE id = $1', [templeId]);
+    const res = await client.query('SELECT "distributorId" FROM "Temple" WHERE id = $1', [templeId]);
       distributorId = res.rows[0]?.distributor_id;
-    }
 
     if (distributorId) {
-      if (!client) {
-        const dist = (await jsonStore.find('distributors')).find(d => d.id === distributorId);
-        return dist?.b2bPayment || null;
-      } else {
-        return null;
-      }
+      return null;
     } else {
       const sysConfig = await fetchSystemConfig();
       return sysConfig?.b2bPayment || db_config.b2bPayment || null;
@@ -2154,7 +1783,6 @@ export async function fetchB2BPaymentConfig(templeId: string) {
 // --- STORAGE & BILLING APIS ---
 export async function fetchStoragePlans() {
   return withTempleSession(null, true, async (client) => {
-    if (!client) return [...db_storage_plans];
     const res = await client.query('SELECT * FROM storage_plans ORDER BY size_gb');
     return res.rows.map(r => ({
       id: r.id.toString(),
@@ -2168,18 +1796,13 @@ export async function fetchStoragePlans() {
 
 export async function updateStoragePlans(plans: any[]) {
   return withTempleSession(null, true, async (client) => {
-    if (!client) {
-      gStore.db_storage_plans = plans;
-      db_storage_plans = plans;
-    } else {
-      await client.query('DELETE FROM storage_plans');
+    await client.query('DELETE FROM storage_plans');
       for (const p of plans) {
-        await client.query(
-          'INSERT INTO storage_plans (size_gb, price_monthly, price_yearly) VALUES ($1, $2, $3, $4)',
-          [p.sizeGb, p.priceMonthly, p.priceYearly]
-        );
-      }
-    }
+              await client.query(
+                'INSERT INTO storage_plans (size_gb, price_monthly, price_yearly) VALUES ($1, $2, $3, $4)',
+                [p.sizeGb, p.priceMonthly, p.priceYearly]
+              );
+            }
     revalidatePath('/super-admin');
     return { success: true };
   });
@@ -2187,78 +1810,46 @@ export async function updateStoragePlans(plans: any[]) {
 
 export async function fetchTempleStorages() {
   return withTempleSession(null, true, async (client) => {
-    if (!client) {
-      for (const t of (await getSafeJsonArray('temples'))) {
-        if (!(await jsonStore.find('temple_storages')).some(s => s.templeId === t.id)) {
-          const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || t.cloudStorage?.includes('無限') || t.cloudStorage === 'Free' || t.cloudStorage === '免費' || !t.cloudStorage;
-          let qGB = 5;
-          let pName = '免費 5GB 空間';
-          if (isVip) {
-              qGB = 999999;
-              pName = '無限免費方案';
-          } else if (t.cloudStorage) {
-             if (t.cloudStorage.startsWith('SP-')) {
-                 const p = db_storage_plans.find(x => x.id === t.cloudStorage);
-                 if (p) { qGB = p.sizeGb; pName = p.name; }
-             } else {
-                 qGB = parseInt(t.cloudStorage) || 5;
-                 pName = `${qGB}GB`;
-             }
-          }
-          await jsonStore.createRecord('temple_storages', {
-            id: `TS-${Date.now()}-${t.id}`,
-            templeId: t.id,
-            templeName: t.templeName,
-            city: t.city || '台北市',
-            usedBytes: 0,
-            quotaGb: qGB,
-            planName: pName
-          });
-        }
-      }
-      return [...(await jsonStore.find('temple_storages'))];
-    } else {
-      const templesRes = await client.query('SELECT * FROM temples');
+    const templesRes = await client.query('SELECT * FROM "Temple"');
       for (const t of templesRes.rows) {
-        const check = await client.query('SELECT * FROM temple_storages WHERE temple_id = $1', [t.id]);
-        if ((check.rowCount ?? 0) === 0) {
-          const cloudStorage = t.cloud_storage;
-          const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
-          let qGB = 5;
-          let pName = '免費 5GB 空間';
-          if (isVip) {
-              qGB = 999999;
-              pName = '無限免費方案';
-          } else if (cloudStorage) {
-             if (cloudStorage.startsWith('SP-')) {
-                 const p = db_storage_plans.find(x => x.id === cloudStorage);
-                 if (p) { qGB = p.sizeGb; pName = p.name; }
-             } else {
-                 qGB = parseInt(cloudStorage) || 5;
-                 pName = `${qGB}GB`;
-             }
-          }
-          await client.query(
-            'INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) VALUES ($1, $2, $3, $4, $5)',
-            [t.id, 0, qGB * 1024 * 1024 * 1024, pName, t.city || '台北市']
-          );
-        }
-      }
+              const check = await client.query('SELECT * FROM temple_storages WHERE temple_id = $1', [t.id]);
+              if ((check.rowCount ?? 0) === 0) {
+                const cloudStorage = t.cloud_storage;
+                const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
+                let qGB = 5;
+                let pName = '免費 5GB 空間';
+                if (isVip) {
+                    qGB = 999999;
+                    pName = '無限免費方案';
+                } else if (cloudStorage) {
+                   if (cloudStorage.startsWith('SP-')) {
+                       const p = db_storage_plans.find(x => x.id === cloudStorage);
+                       if (p) { qGB = p.sizeGb; pName = p.name; }
+                   } else {
+                       qGB = parseInt(cloudStorage) || 5;
+                       pName = `${qGB}GB`;
+                   }
+                }
+                await client.query(
+                  'INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) VALUES ($1, $2, $3, $4, $5)',
+                  [t.id, 0, qGB * 1024 * 1024 * 1024, pName, t.city || '台北市']
+                );
+              }
+            }
       const res = await client.query(`
         SELECT ts.*, t.temple_name 
         FROM temple_storages ts 
         JOIN temples t ON ts.temple_id = t.id
       `);
       return res.rows.map(r => ({
-        id: r.id.toString(),
-        templeId: r.temple_id,
-        templeName: r.temple_name,
-        city: r.city,
-        usedBytes: Number(r.used_bytes),
-        quotaGb: Number(r.allocated_bytes) / (1024 * 1024 * 1024),
-        planName: r.plan_name
-      }));
-    }
+              id: r.id.toString(),
+              templeId: r.temple_id,
+              templeName: r.temple_name,
+              city: r.city,
+              usedBytes: Number(r.used_bytes),
+              quotaGb: Number(r.allocated_bytes) / (1024 * 1024 * 1024),
+              planName: r.plan_name
+            }));
   });
 }
 
@@ -2271,31 +1862,14 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
     const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
-    if (!client) {
-      await jsonStore.createRecord('temple_bills', {
-        id: `BILL-STORAGE-${Date.now()}`,
-        templeId,
-        type: 'StorageUpgrade',
-        item_name: `雲端空間擴充方案 - ${plan.name} (${planId})`,
-        amount: finalAmount,
-        billingDate: new Date().toISOString().substring(0, 7),
-        dueDate: new Date().toISOString().split('T')[0],
-        status: 'Unpaid',
-        payeeRole: 'SuperAdmin',
-        payeeId: 'system-hq',
-        timestamp: new Date().toISOString()
-      });
-      // (await jsonStore.find('temple_bills')) synced
-    } else {
-      await client.query(`
+    await client.query(`
         INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       `, [
-        `BILL-STORAGE-${Date.now()}`, templeId, 'StorageUpgrade', `雲端空間擴充方案 - ${plan.name} (${planId})`,
-        finalAmount, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
-        'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
-      ]);
-    }
+              `BILL-STORAGE-${Date.now()}`, templeId, 'StorageUpgrade', `雲端空間擴充方案 - ${plan.name} (${planId})`,
+              finalAmount, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
+              'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
+            ]);
     return { success: true };
   });
 }
@@ -2305,131 +1879,52 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
     const plan = db_ai_plans.find((p: any) => p.id === planId);
     if (!plan) return { success: false, message: '找不到選定的AI方案' };
 
-    if (!client) {
-      await jsonStore.createRecord('temple_bills', {
-        id: `BILL-AI-${Date.now()}`,
-        templeId,
-        type: 'AiUpgrade',
-        item_name: `AI 生活助理 - ${plan.name} (${planId})`,
-        amount: plan.monthlyFee,
-        billingDate: new Date().toISOString().substring(0, 7),
-        dueDate: new Date().toISOString().split('T')[0],
-        status: 'Unpaid',
-        payeeRole: 'SuperAdmin',
-        payeeId: 'system-hq',
-        timestamp: new Date().toISOString()
-      });
-      // (await jsonStore.find('temple_bills')) synced
-    } else {
-      await client.query(`
+    await client.query(`
         INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       `, [
-        `BILL-AI-${Date.now()}`, templeId, 'AiUpgrade', `AI 生活助理 - ${plan.name} (${planId})`,
-        plan.monthlyFee, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
-        'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
-      ]);
-    }
+              `BILL-AI-${Date.now()}`, templeId, 'AiUpgrade', `AI 生活助理 - ${plan.name} (${planId})`,
+              plan.monthlyFee, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
+              'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
+            ]);
     return { success: true };
   });
 }
 
 export async function upgradeTempleStorage(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly', isManualGrant: boolean = false) {
   return withTempleSession(templeId, true, async (client) => {
-    if (!client) {
-      const plan = db_storage_plans.find((p: any) => p.id === planId);
-      if (!plan) return { success: false, message: '找不到選定的空間方案' };
-
-      const discount = db_config.yearlyDiscountRate || 20;
-      const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
-      const finalAmount = Math.round(plan.priceMonthly * priceFactor);
-      const temple = (await getSafeJsonArray('temples')).find((t: any) => t.id === templeId);
-
-      if (!isManualGrant) {
-        const adminWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
-        if (adminWallet) {
-          adminWallet.balance += finalAmount;
-        }
-
-        await jsonStore.createRecord('finance_records', {
-          id: `F-${Date.now()}`,
-          type: 'INCOME',
-          category: 'SPACE_UPGRADE',
-          amount: finalAmount,
-          source: `${temple?.templeName || '宮廟'}-升級空間 ${plan.sizeGb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`,
-          date: new Date().toISOString().split('T')[0]
-        });
-
-        await jsonStore.createRecord('temple_bills', {
-          id: `BILL-STORAGE-${Date.now()}`,
-          templeId,
-          type: 'StorageUpgrade',
-          item_name: '雲端空間擴充方案 - ' + plan.name,
-          amount: finalAmount,
-          billingDate: new Date().toISOString().substring(0, 7),
-          dueDate: new Date().toISOString().split('T')[0],
-          status: 'Unpaid',
-          payeeRole: 'SuperAdmin',
-          payeeId: 'system-hq',
-          timestamp: new Date().toISOString()
-        });
-      }
-
-      let storage = (await jsonStore.find('temple_storages')).find(s => s.templeId === templeId);
-      if (!storage) {
-        storage = {
-          id: `TS-${Date.now()}-${templeId}`,
-          templeId,
-          templeName: temple?.templeName || '未知宮廟',
-          city: temple?.city || '台北市',
-          usedBytes: 0,
-          quotaGb: 5,
-          planName: '免費 5GB 空間'
-        };
-        await jsonStore.createRecord('temple_storages', storage);
-      }
-      storage.quotaGb = plan.sizeGb;
-      storage.planName = `${plan.name} (${plan.sizeGb}GB)`;
-
-      await logAdminAction('UPGRADE_STORAGE', `${temple?.templeName || '宮廟'} -> ${plan.sizeGb}GB`);
-    } else {
-      const planRes = await client.query('SELECT * FROM storage_plans WHERE id::text = $1 OR size_gb::text = $1', [planId]);
+    const planRes = await client.query('SELECT * FROM storage_plans WHERE id::text = $1 OR size_gb::text = $1', [planId]);
       if ((planRes.rowCount ?? 0) === 0) return { success: false, message: '找不到選定的空間方案' };
       const plan = planRes.rows[0];
-
       const discount = 20;
       const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
       const finalAmount = Math.round(plan.price_monthly * priceFactor);
-
-      const templeRes = await client.query('SELECT * FROM temples WHERE id = $1', [templeId]);
+      const templeRes = await client.query('SELECT * FROM "Temple" WHERE id = $1', [templeId]);
       const temple = templeRes.rows[0];
-
       if (!isManualGrant) {
-        await client.query(
-          `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, $3, $4) 
+              await client.query(
+                `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, $3, $4) 
            ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance`,
-          ['SuperAdmin', '超級管理員', finalAmount]
-        );
+                ['SuperAdmin', '超級管理員', finalAmount]
+              );
 
-        await client.query(
-          'INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)',
-          [temple?.temple_name || '宮廟', `升級空間 ${plan.size_gb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`, finalAmount, 100, '超級管理員']
-        );
+              await client.query(
+                'INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)',
+                [temple?.temple_name || '宮廟', `升級空間 ${plan.size_gb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`, finalAmount, 100, '超級管理員']
+              );
 
-        await client.query(
-          `INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
-          [`BILL-STORAGE-${Date.now()}`, templeId, '雲端空間擴充方案 - ' + plan.name, finalAmount, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq']
-        );
-      }
-
+              await client.query(
+                `INSERT INTO "TempleBill" (id, temple_id, "itemName", amount, "dueDate", status, "payeeRole", "payeeId") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
+                [`BILL-STORAGE-${Date.now()}`, templeId, '雲端空間擴充方案 - ' + plan.name, finalAmount, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq']
+              );
+            }
       const allocatedBytes = plan.size_gb * 1024 * 1024 * 1024;
       await client.query(
-        `INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) 
+              `INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) 
          VALUES ($1, 0, $2, $3, $4)
          ON CONFLICT (temple_id) DO UPDATE SET allocated_bytes = EXCLUDED.allocated_bytes, plan_name = EXCLUDED.plan_name`,
-        [templeId, allocatedBytes, `${plan.size_gb}GB 雲端空間`, temple?.city || '台北市']
-      );
-    }
+              [templeId, allocatedBytes, `${plan.size_gb}GB 雲端空間`, temple?.city || '台北市']
+            );
 
     revalidatePath('/super-admin');
     await revalidateTemple();
@@ -2439,8 +1934,6 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
 
 export async function fetchRoleWallets() {
   return withTempleSession(null, true, async (client) => {
-    if (!client) return [];
-
     // Ensure SuperAdmin and SuperSales wallets exist
     await client.query(`
       INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', 0) 
@@ -2458,7 +1951,7 @@ export async function fetchRoleWallets() {
         ['Distributor', d.name]
       );
     }
-    const sales = await client.query('SELECT * FROM distributor_sales');
+    const sales = await client.query('SELECT * FROM dist_sales');
     for (const s of sales.rows) {
       await client.query(
         `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, 0) ON CONFLICT (name) DO NOTHING`,
@@ -2477,163 +1970,85 @@ export async function fetchRoleWallets() {
 
 export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE' | 'AUTH_FEE', amount: number, templeId?: string, distributorId?: string, salesId?: string) {
   return withTempleSession(templeId || null, true, async (client) => {
-    if (!client) {
-      const t = (await getSafeJsonArray('temples')).find(x => x.id === templeId);
-      const distId = t?.distributorId || distributorId || 'system-hq';
-      const sId = t?.salesId || salesId || '';
-
-      if (category === 'AUTH_FEE') {
-        const saWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
-        if (saWallet) saWallet.balance += amount * 0.85;
-
-        const ssWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperSales');
-        if (ssWallet) ssWallet.balance += amount * 0.15;
-
-        await jsonStore.createRecord('finance_records', {
-          id: `F-EXP-${Date.now()}`,
-          type: 'EXPENSE',
-          category: 'COMMISSION',
-          amount: amount * 0.15,
-          source: '超級精英業務',
-          date: new Date().toISOString().split('T')[0]
-        });
-
-        await jsonStore.createRecord('finance_records', {
-          id: `F-INC-${Date.now()}`,
-          type: 'INCOME',
-          category: 'AUTH_FEE',
-          amount: amount,
-          source: (await jsonStore.find('distributors')).find(d => d.id === distributorId)?.name || '新經銷商授權',
-          date: new Date().toISOString().split('T')[0]
-        });
-      } else if (category === 'MONTHLY_RENT' || category === 'SETUP_FEE') {
-        if (distId === 'system-hq') {
-          const saWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
-          if (saWallet) saWallet.balance += amount * 0.85;
-
-          const ssWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperSales');
-          if (ssWallet) ssWallet.balance += amount * 0.15;
-
-          await jsonStore.createRecord('finance_records', {
-            id: `F-EXP-${Date.now()}`,
-            type: 'EXPENSE',
-            category: 'COMMISSION',
-            amount: amount * 0.15,
-            source: '超級精英業務',
-            date: new Date().toISOString().split('T')[0]
-          });
-        } else {
-          const distWallet = (await jsonStore.find('wallets')).find(w => w.id === distId);
-          if (distWallet) distWallet.balance += amount * 0.65;
-
-          const saWallet = (await jsonStore.find('wallets')).find(w => w.role === 'SuperAdmin');
-          if (saWallet) saWallet.balance += amount * 0.20;
-
-          const dsWallet = (await jsonStore.find('wallets')).find(w => w.id === sId);
-          if (dsWallet) dsWallet.balance += amount * 0.15;
-
-          await jsonStore.createRecord('finance_records', {
-            id: `F-EXP-S-${Date.now()}`,
-            type: 'EXPENSE',
-            category: 'COMMISSION',
-            amount: amount * 0.15,
-            source: (await jsonStore.find('dist_sales')).find(s => s.id === sId)?.name || '經銷業務',
-            date: new Date().toISOString().split('T')[0]
-          });
-        }
-
-        await jsonStore.createRecord('finance_records', {
-          id: `F-INC-T-${Date.now()}`,
-          type: 'INCOME',
-          category,
-          amount: amount,
-          source: t?.templeName || '宮廟付費',
-          date: new Date().toISOString().split('T')[0]
-        });
-      }
-    } else {
-      const tRes = templeId ? await client.query('SELECT * FROM temples WHERE id = $1', [templeId]) : null;
+    const tRes = templeId ? await client.query('SELECT * FROM "Temple" WHERE id = $1', [templeId]) : null;
       const t = tRes && (tRes.rowCount ?? 0) > 0 ? tRes.rows[0] : null;
-      const distId = t?.sales_id ? (await client.query('SELECT distributor_id FROM distributor_sales WHERE id = $1', [t.sales_id])).rows[0]?.distributor_id : distributorId || 'system-hq';
+      const distId = t?.sales_id ? (await client.query('SELECT "distributorId" FROM dist_sales WHERE id = $1', [t.sales_id])).rows[0]?.distributor_id : distributorId || 'system-hq';
       const sId = t?.sales_id || salesId || '';
-
       const templeName = t?.temple_name || '系統交易';
-
       if (category === 'AUTH_FEE') {
-        const saAmt = Math.round(amount * 0.85);
-        const ssAmt = Math.round(amount * 0.15);
+              const saAmt = Math.round(amount * 0.85);
+              const ssAmt = Math.round(amount * 0.15);
 
-        await client.query(`
+              await client.query(`
           INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', $1) 
           ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
         `, [saAmt]);
 
-        await client.query(`
+              await client.query(`
           INSERT INTO wallets (role, name, balance) VALUES ('SuperSales', '超級精英業務', $1) 
           ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
         `, [ssAmt]);
 
-        await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-          [templeName, '授權金總部提成', saAmt, 85, '超級管理員']);
-        await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-          [templeName, '授權金業務提成', ssAmt, 15, '超級精英業務']);
+              await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                [templeName, '授權金總部提成', saAmt, 85, '超級管理員']);
+              await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                [templeName, '授權金業務提成', ssAmt, 15, '超級精英業務']);
 
-      } else if (category === 'MONTHLY_RENT' || category === 'SETUP_FEE') {
-        const typeLabel = category === 'MONTHLY_RENT' ? '月租費' : '開辦費';
-        
-        if (!distId || distId === 'system-hq') {
-          const saAmt = Math.round(amount * 0.85);
-          const ssAmt = Math.round(amount * 0.15);
+            } else if (category === 'MONTHLY_RENT' || category === 'SETUP_FEE') {
+              const typeLabel = category === 'MONTHLY_RENT' ? '月租費' : '開辦費';
+              
+              if (!distId || distId === 'system-hq') {
+                const saAmt = Math.round(amount * 0.85);
+                const ssAmt = Math.round(amount * 0.15);
 
-          await client.query(`
+                await client.query(`
             INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', $1) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
           `, [saAmt]);
 
-          await client.query(`
+                await client.query(`
             INSERT INTO wallets (role, name, balance) VALUES ('SuperSales', '超級精英業務', $1) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
           `, [ssAmt]);
 
-          await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-            [templeName, `${typeLabel}直屬提成`, saAmt, 85, '超級管理員']);
-          await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-            [templeName, `${typeLabel}業務提成`, ssAmt, 15, '超級精英業務']);
-        } else {
-          const distAmt = Math.round(amount * 0.65);
-          const saAmt = Math.round(amount * 0.20);
-          const dsAmt = Math.round(amount * 0.15);
+                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                  [templeName, `${typeLabel}直屬提成`, saAmt, 85, '超級管理員']);
+                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                  [templeName, `${typeLabel}業務提成`, ssAmt, 15, '超級精英業務']);
+              } else {
+                const distAmt = Math.round(amount * 0.65);
+                const saAmt = Math.round(amount * 0.20);
+                const dsAmt = Math.round(amount * 0.15);
 
-          const distNameRes = await client.query('SELECT name FROM distributors WHERE id = $1', [distId]);
-          const distName = distNameRes.rows[0]?.name || '經銷商';
+                const distNameRes = await client.query('SELECT name FROM distributors WHERE id = $1', [distId]);
+                const distName = distNameRes.rows[0]?.name || '經銷商';
 
-          const dsNameRes = await client.query('SELECT name FROM distributor_sales WHERE id = $1', [sId]);
-          const dsName = dsNameRes.rows[0]?.name || '經銷業務';
+                const dsNameRes = await client.query('SELECT name FROM dist_sales WHERE id = $1', [sId]);
+                const dsName = dsNameRes.rows[0]?.name || '經銷業務';
 
-          await client.query(`
+                await client.query(`
             INSERT INTO wallets (role, name, balance) VALUES ('Distributor', $1, $2) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
           `, [distName, distAmt]);
 
-          await client.query(`
+                await client.query(`
             INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', $1) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
           `, [saAmt]);
 
-          await client.query(`
+                await client.query(`
             INSERT INTO wallets (role, name, balance) VALUES ('DistributorSales', $1, $2) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
           `, [dsName, dsAmt]);
 
-          await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-            [templeName, `${typeLabel}經銷提成`, distAmt, 65, distName]);
-          await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-            [templeName, `${typeLabel}總部提成`, saAmt, 20, '超級管理員']);
-          await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-            [templeName, `${typeLabel}經銷業務提成`, dsAmt, 15, dsName]);
-        }
-      }
-    }
+                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                  [templeName, `${typeLabel}經銷提成`, distAmt, 65, distName]);
+                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                  [templeName, `${typeLabel}總部提成`, saAmt, 20, '超級管理員']);
+                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
+                  [templeName, `${typeLabel}經銷業務提成`, dsAmt, 15, dsName]);
+              }
+            }
 
     revalidatePath('/super-admin');
     revalidatePath('/distributor');
@@ -2709,7 +2124,7 @@ export async function fetchFreeApplications(distId?: string) {
   let list = [...(await getSafeJsonArray('temples'))];
   try {
     const { dbQuery } = await import('@/db/db');
-    const res = await dbQuery("SELECT * FROM temples ORDER BY created_at DESC", [], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"createdAt\" DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
       list = res.rows.map((r: any) => ({
         ...r,
@@ -2815,7 +2230,7 @@ export async function generateInitialBills(newTemple: any) {
         if (!exists) {
           await jsonStore.createRecord('temple_bills', newBill);
           await dbQuery(
-            "INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)",
+            "INSERT INTO \"TempleBill\" (id, temple_id, \"itemName\", amount, \"dueDate\", status, \"payeeRole\", \"payeeId\") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)",
             [newBill.id, newTemple.id, newBill.type, newBill.amount, newBill.dueDate, newBill.payeeRole, newBill.payeeId]
           ).catch(err => {
              console.error('Failed dbQuery in generateInitialBills', err);
@@ -2913,7 +2328,7 @@ export async function submitFreeAccountApplication(data: any) {
         [pId, newTemple.id, data.templeName || '宮廟管理員', account, password, 'TempleAdmin', 'Active']
       );
     } catch (e) {
-      console.error("Failed to insert personnel", e);
+      console.error("Failed to insert \"User\"", e);
     }
   }
   
@@ -3108,11 +2523,11 @@ export async function fetchSalesPerformance(salesName: string) {
   let listSales = [...(await jsonStore.find('dist_sales'))];
   try {
     const { dbQuery } = await import('@/db/db');
-    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
       listTemples = resTemples.rows.map((r: any) => ({ ...r, status: r.status, salesId: r.sales_id }));
     }
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
       listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, name: r.name, id: r.id }));
     }
@@ -3139,7 +2554,7 @@ export async function fetchAllAccountsForAdmin() {
   let pgAdmins: any[] = [];
   try {
     const { dbQuery } = await import('@/db/db');
-    const resAdmins = await dbQuery("SELECT * FROM personnel WHERE role = 'Admin'", [], () => null) as any;
+    const resAdmins = await dbQuery("SELECT * FROM \"User\" WHERE role = 'Admin'", [], () => null) as any;
     if (resAdmins && resAdmins.rows) {
       pgAdmins = resAdmins.rows;
     }
@@ -3180,7 +2595,7 @@ export async function fetchAllAccountsForAdmin() {
   // 從 PostgreSQL 取出所有的業務員
   let pgSales: any[] = [];
   try {
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
       pgSales = resSales.rows;
     }
@@ -3223,7 +2638,7 @@ export async function fetchAllAccountsForAdmin() {
 export async function fetchSuperSalesAccounts() {
   let pgSales: any[] = [];
   try {
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
       pgSales = resSales.rows;
     }
@@ -3342,14 +2757,14 @@ export async function fetchDistributorCapacity(distId?: string) {
 
   try {
     const { dbQuery } = await import('@/db/db');
-    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
       listTemples = resTemples.rows.map((r: any) => ({
         ...r, distributorId: r.distributor_id, salesId: r.sales_id
       }));
     }
 
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
       listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
     }
@@ -3447,7 +2862,7 @@ export async function fetchSuperSalesProfile(salesId: string) {
   let listSales = [...(await jsonStore.find('dist_sales'))];
   try {
     const { dbQuery } = await import('@/db/db');
-    const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE id = $1", [salesId], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales WHERE id = $1", [salesId], () => null) as any;
     if (resSales && resSales.rows && resSales.rows.length > 0) {
        const r = resSales.rows[0];
        listSales = [{ ...r, role: r.role, bankInfo: { bankCode: r.bank_code, accountNumber: r.bank_account, bankName: r.bank_name } }];
@@ -3500,7 +2915,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 
   try {
     const { dbQuery } = await import('@/db/db');
-    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
       listTemples = resTemples.rows.map((r: any) => ({
         ...r,
@@ -3525,7 +2940,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
       }));
     }
 
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
       listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
     }
@@ -3948,7 +3363,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
 
   try {
     const { dbQuery } = await import('@/db/db');
-    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
       listTemples = resTemples.rows.map((r: any) => ({
         ...r,
@@ -3963,17 +3378,17 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
       }));
     }
 
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
       listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
     }
 
-    const resBills = await dbQuery("SELECT * FROM temple_bills", [], () => null) as any;
+    const resBills = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
     if (resBills && resBills.rows) {
       listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
     }
 
-    const resWD = await dbQuery("SELECT * FROM withdrawals", [], () => null) as any;
+    const resWD = await dbQuery("SELECT * FROM \"Withdrawal\"", [], () => null) as any;
     if (resWD && resWD.rows) {
       listWithdrawals = resWD.rows.map((r: any) => ({ ...r, salesName: r.sales_name, status: r.status, amount: r.amount }));
     }
@@ -4126,8 +3541,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
 
 export async function fetchSalesProfile(salesName: string) { 
   return withTempleSession(null, true, async (client) => {
-    if (!client) return { name: salesName, parentDistributor: '無所屬', account: '' };
-    const sRes = await client.query('SELECT * FROM distributor_sales WHERE name = $1', [salesName]);
+    const sRes = await client.query('SELECT * FROM dist_sales WHERE name = $1', [salesName]);
     if ((sRes.rowCount ?? 0) > 0) {
       const sales = sRes.rows[0];
       const dRes = await client.query('SELECT name FROM distributors WHERE id = $1', [sales.distributor_id]);
@@ -4186,7 +3600,7 @@ export async function addSalesMember(data: any) {
 export async function fetchDistributorTeam(distributorId: string) {
   let pgSales: any[] = [];
   try {
-    const res = await dbQuery("SELECT * FROM distributor_sales WHERE distributor_id = $1", [distributorId], () => null) as any;
+    const res = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
     if (res && res.rows) {
       pgSales = res.rows;
     }
@@ -4236,7 +3650,7 @@ export async function fetchDistributorVisits(distributorId: string) {
   let listSales = [...(await jsonStore.find('dist_sales'))];
   try {
     const { dbQuery } = await import('@/db/db');
-    const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE distributor_id = $1", [distributorId], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
     if (resSales && resSales.rows) {
       listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
     }
@@ -4266,7 +3680,7 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
 
     let bills: any[] = [];
     if (templeIds.length > 0) {
-      const bRes = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
+      const bRes = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
       bills = bRes?.rows || [];
     }
 
@@ -4308,7 +3722,7 @@ export async function approveTempleByDistributor(templeId: string) {
     
     try {
       const { dbQuery } = await import('@/db/db');
-      await dbQuery(`UPDATE temples SET status = 'Active' WHERE id = $1`, [templeId]);
+      await dbQuery(`UPDATE "Temple" SET status = 'Active' WHERE id = $1`, [templeId]);
     } catch (e) {}
     
     await generateInitialBills(t);
@@ -4338,7 +3752,7 @@ export async function approveTempleByDistributor(templeId: string) {
             () => null
           );
         } catch (e) {
-          console.error("Failed to insert personnel into postgres during distributor approval:", e);
+          console.error("Failed to insert \"User\" into postgres during distributor approval:", e);
         }
       }
     }
@@ -4857,7 +4271,7 @@ export async function fetchFinancialOverview() {
     
   try {
     const { dbQuery } = await import('@/db/db');
-    const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = $1", [templeId], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1", [templeId], () => null) as any;
     const rows = res?.rows;
     if (rows && rows.length > 0) {
       expenses = rows.map((r: any) => {
@@ -4994,20 +4408,6 @@ export async function fetchSuperSalesBonuses(salesName: string) {
 
 export async function fetchAllWithdrawals() {
   return withTempleSession(null, true, async (client) => {
-    if (!client) {
-      if (!(await jsonStore.find('withdrawals'))) return [];
-      const allWithdrawals = (await jsonStore.find('withdrawals')).map((r: any) => ({
-        id: r.id,
-        salesName: r.salesName || r.sales_name,
-        amount: r.amount,
-        status: r.status,
-        receiptUrl: r.receiptUrl || r.receipt_url,
-        date: r.date,
-        role: r.role
-      }));
-      return allWithdrawals.filter((w: any) => w.role !== 'DistSales' && w.role !== 'DistributorSales');
-    }
-
     const query = `
       SELECT w.*, wal.role as wallet_role 
       FROM withdrawals w
@@ -5033,11 +4433,10 @@ export async function fetchAllWithdrawals() {
 
 export async function approveWithdrawal(id: string, receiptUrl?: string) { 
   return withTempleSession(null, true, async (client) => {
-    if (!client) return { success: false };
     if (receiptUrl) {
-      await client.query("UPDATE withdrawals SET status = 'Approved', receipt_url = $1 WHERE id = $2", [receiptUrl, id]);
+      await client.query("UPDATE \"Withdrawal\" SET status = 'Approved', \"receiptUrl\" = $1 WHERE id = $2", [receiptUrl, id]);
     } else {
-      await client.query("UPDATE withdrawals SET status = 'Approved' WHERE id = $1", [id]);
+      await client.query("UPDATE \"Withdrawal\" SET status = 'Approved' WHERE id = $1", [id]);
     }
     revalidatePath('/super-admin');
     return { success: true }; 
@@ -5046,11 +4445,10 @@ export async function approveWithdrawal(id: string, receiptUrl?: string) {
 
 export async function rejectWithdrawal(id: string) { 
   return withTempleSession(null, true, async (client) => {
-    if (!client) return { success: false };
-    const wRes = await client.query('SELECT * FROM withdrawals WHERE id = $1', [id]);
+    const wRes = await client.query('SELECT * FROM "Withdrawal" WHERE id = $1', [id]);
     if ((wRes.rowCount ?? 0) > 0) {
       const w = wRes.rows[0];
-      await client.query("UPDATE withdrawals SET status = 'Rejected' WHERE id = $1", [id]);
+      await client.query("UPDATE \"Withdrawal\" SET status = 'Rejected' WHERE id = $1", [id]);
       await client.query("UPDATE wallets SET balance = balance + $1 WHERE name = $2", [w.amount, w.sales_name]);
     }
     revalidatePath('/super-admin');
@@ -5061,13 +4459,6 @@ export async function rejectWithdrawal(id: string) {
 export async function updateServiceSettings(settings: any) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const idx = (await jsonStore.find('service_settings_mock')).findIndex(x => x.templeId === templeId);
-      if (idx !== -1) (await jsonStore.find('service_settings_mock'))[idx] = { templeId, ...settings };
-      else await jsonStore.createRecord('service_settings_mock', { templeId, ...settings });
-      return { success: true };
-    }
-    
     await client.query(`
       CREATE TABLE IF NOT EXISTS temple_settings (
         temple_id VARCHAR(50) PRIMARY KEY REFERENCES temples(id) ON DELETE CASCADE,
@@ -5102,7 +4493,7 @@ export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptU
 
     try {
       const { dbQuery } = await import('@/db/db');
-      await dbQuery("UPDATE withdrawals SET status = 'Approved', receipt_url = $1 WHERE id = $2", [receiptUrl, withdrawalId]);
+      await dbQuery("UPDATE \"Withdrawal\" SET status = 'Approved', \"receiptUrl\" = $1 WHERE id = $2", [receiptUrl, withdrawalId]);
     } catch (e) {}
 
     withdrawal.status = 'Approved';
@@ -5126,29 +4517,6 @@ export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptU
 
 export async function requestWithdrawal(salesName: string, amount: number) { 
   return withTempleSession(null, true, async (client) => {
-    if (!client) {
-      
-      const w = (await jsonStore.find('wallets')).find((w: any) => w.name === salesName);
-      if (!w) return { success: false, error: '找不到該錢包帳戶' };
-      if (amount > w.balance) return { success: false, error: '餘額不足' };
-      
-      w.balance -= amount;
-      
-      const wdId = `WD-${Date.now()}`;
-      
-      await jsonStore.createRecord('withdrawals', {
-        id: wdId,
-        salesName: salesName,
-        amount: amount,
-        status: 'Pending',
-        date: new Date().toISOString().split('T')[0],
-        role: w.role
-      });
-      
-      revalidatePath('/super-admin');
-      return { success: true };
-    }
-    
     const wRes = await client.query('SELECT balance FROM wallets WHERE name = $1', [salesName]);
     if ((wRes.rowCount ?? 0) === 0) return { success: false, error: '找不到該錢包帳戶' };
     const balance = Number(wRes.rows[0].balance);
@@ -5158,7 +4526,7 @@ export async function requestWithdrawal(salesName: string, amount: number) {
 
     const wdId = `WD-${Date.now()}`;
     await client.query(
-      'INSERT INTO withdrawals (id, sales_name, amount, status, date) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
+      'INSERT INTO "Withdrawal" (id, "salesName", amount, status, date) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
       [wdId, salesName, amount, 'Pending']
     );
     
@@ -5318,18 +4686,10 @@ export async function createPersonnel(formData: FormData) {
     const account = (rawAccount || '').trim();
     
     if (account) {
-      if (!client) {
-        const current = await jsonStore.find('personnel');
-        const isDuplicate = current.some((p: any) => p.templeId === templeId && (p.account || '').toLowerCase() === account.toLowerCase());
-        if (isDuplicate) {
-          return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
-        }
-      } else {
-        const checkRes = await client.query('SELECT id FROM personnel WHERE temple_id = $1 AND LOWER(account) = $2', [templeId, account.toLowerCase()]);
+      const checkRes = await client.query('SELECT id FROM "User" WHERE "templeId" = $1 AND LOWER(account) = $2', [templeId, account.toLowerCase()]);
         if (checkRes && checkRes.rowCount && checkRes.rowCount > 0) {
-          return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
-        }
-      }
+                  return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
+                }
     }
 
     const phone = formData.get('phone') as string;
@@ -5338,25 +4698,7 @@ export async function createPersonnel(formData: FormData) {
     const newId = `p-${Date.now()}`;
     const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4F46E5&color=fff`;
 
-    if (!client) {
-      const current = await jsonStore.find('personnel');
-      const newPersonnel = {
-        id: newId,
-        templeId,
-        name,
-        account,
-        phone,
-        password,
-        role,
-        status: 'Active',
-        avatar,
-        serviceCount: 0,
-        permissions: role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers']
-      };
-      await jsonStore.createRecord('personnel', newPersonnel);
-      // synced via jsonStore
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
           id VARCHAR(50) NOT NULL,
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
@@ -5376,7 +4718,6 @@ export async function createPersonnel(formData: FormData) {
         INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status, avatar, permissions)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [newId, templeId, name, role, account, phone, password, 'Active', avatar, defaultPerms]);
-    }
     await revalidateTemple();
     await logSystemEvent('SUCCESS', '新增人員', `人員名稱：${name}`, '管理員', templeId);
     return { success: true };
@@ -5398,13 +4739,7 @@ export async function deletePersonnel(id: string) {
       }
     }
 
-    if (!client) {
-      currentPersonnel = currentPersonnel.filter((p: any) => p.id.toString() !== id.toString());
-      await jsonStore.atomicWrite('personnel', () => currentPersonnel);
-      // synced via jsonStore
-    } else {
-      await client.query('DELETE FROM personnel WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    }
+    await client.query('DELETE FROM "User" WHERE id = $1 AND "templeId" = $2', [id, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -5413,17 +4748,7 @@ export async function deletePersonnel(id: string) {
 export async function updateAccountPermissions(id: string, permissions: string[]) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      let pData = await jsonStore.find('personnel');
-      const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
-      if (idx > -1) {
-        pData[idx].permissions = permissions;
-        await jsonStore.atomicWrite('personnel', () => pData);
-        // synced via jsonStore
-      }
-    } else {
-      await client.query('UPDATE personnel SET permissions = $1 WHERE id = $2 AND temple_id = $3', [permissions, id, templeId]);
-    }
+    await client.query('UPDATE "User" SET permissions = $1 WHERE id = $2 AND "templeId" = $3', [permissions, id, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -5484,7 +4809,7 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
       } else if (role === 'SuperSales' || role === 'DistSales') {
         await client.query('UPDATE dist_sales SET password = $1 WHERE id = $2', [newPass, id]);
       } else {
-        const res = await client.query('UPDATE personnel SET password = $1 WHERE id = $2 OR temple_id = $2 RETURNING id', [newPass, id]);
+        const res = await client.query('UPDATE "User" SET password = $1 WHERE id = $2 OR "templeId" = $2 RETURNING id', [newPass, id]);
         // Auto-heal PostgreSQL insertion
         if (res.rowCount === 0 && (role === 'Temple' || id.startsWith('temple-'))) {
            const tData = await jsonStore.find('temples');
@@ -5498,7 +4823,7 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
                 ON CONFLICT (id, temple_id) DO NOTHING`,
                [`p-${Date.now()}`, id, name, account, newPass, 'TempleAdmin', 'Active']
              );
-           } catch(e) { console.error('Failed to auto-insert personnel', e); }
+           } catch(e) { console.error('Failed to auto-insert "User"', e); }
         }
       }
     }
@@ -5552,138 +4877,75 @@ export async function fetchGlobalTempleData() {
   const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      // In-Memory Fallback
-      let todayAppointments = 0; let completedAppointments = 0; let totalServices = 0;
-      const serviceCounts: Record<string, number> = {};
-      const apps = (await jsonStore.find('appointments')).filter((a: any) => !a.templeId || a.templeId === templeId);
-      apps.forEach((a: any) => {
-        if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
-        if (a.date === todayStr) {
-          todayAppointments++;
-          if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') completedAppointments++;
-        }
-      });
-      const sortedServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label, count], index) => {
-        const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
-        return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
-      });
-      if (sortedServices.length === 0) sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
-      const validEventIds = (await jsonStore.find('queue_events')).filter((e: any) => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
-      const allQix = await jsonStore.find('queue_tickets');
-      const qActive = validEventIds.map((evt: any) => {
-        const tix = allQix.filter((t: any) => t.eventId === evt.id);
-        const waiting = tix.filter((t: any) => t.status === 'Queuing').length;
-        const completed = tix.filter((t: any) => t.status === 'Completed').length;
-        return { title: evt.title, waiting, completed };
-      });
-      const guests = (await jsonStore.find('guests')).filter((g: any) => !g.templeId || g.templeId === templeId);
-      const totalGuests = guests.length;
-      let totalLamps = 0; let activeLamps = 0;
-      (await jsonStore.find('lamp_records')).forEach((l: any) => {
-        if (templeId && l.templeId && l.templeId !== templeId) return;
-        totalLamps++;
-        if (l.status === 'Active' || l.paymentStatus === 'Paid') activeLamps++;
-      });
-      const temple = (await getSafeJsonArray('temples'))?.find((t: any) => t.id === templeId);
-      const templeStorage = (await jsonStore.find('temple_storages'))?.find((s: any) => s.templeId === templeId);
-      let isVip = false;
-      let totalGB = 100;
-      let planName = '免費 5GB 空間';
-      if (templeStorage) {
-        totalGB = templeStorage.quotaGb;
-        planName = templeStorage.planName || `${totalGB}GB`;
-      } else {
-        const cloudStorage = temple?.cloudStorage;
-        if (cloudStorage && cloudStorage.startsWith('SP-')) {
-          const plan = db_storage_plans.find(p => p.id === cloudStorage);
-          totalGB = plan ? plan.sizeGb : 100;
-          planName = plan ? plan.name : `${totalGB}GB`;
-        } else {
-          isVip = temple?.plan === 'Unlimited Node' || temple?.plan === 'Free' || temple?.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
-          totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
-          planName = isVip ? '無限使用' : `${totalGB}GB`;
-        }
-      }
-      const usedBytes = (await jsonStore.find('customer_media'))?.filter((m: any) => m.templeId === templeId).reduce((sum: number, m: any) => sum + (m.sizeBytes || 0), 0) || 0;
-      const used = usedBytes / (1024 * 1024 * 1024);
-
-      return { analyticsSettings: {}, analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, raw: { apps, agiStats: {}, guests, storageInfo: { used: used, total: totalGB, isVip, planName }, qActive } };
-    } else {
-      // PostgreSQL Realization
-      const guestsRes = await client.query('SELECT phone, name FROM guests WHERE temple_id = $1', [templeId]);
+    const guestsRes = await client.query('SELECT phone, name FROM guests WHERE temple_id = $1', [templeId]);
       const totalGuests = guestsRes.rowCount || 0;
-      
       const appsRes = await client.query('SELECT id, guest_id as "guestId", service, date, time, status, payment_status as "paymentStatus" FROM appointments WHERE temple_id = $1', [templeId]);
       const apps = appsRes.rows;
-      let todayAppointments = 0; let completedAppointments = 0; let totalServices = 0;
+      let todayAppointments = 0;
+      let completedAppointments = 0;
+      let totalServices = 0;
       const serviceCounts: Record<string, number> = {};
       apps.forEach((a: any) => {
-        if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
-        if (a.date === todayStr) {
-          todayAppointments++;
-          if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') completedAppointments++;
-        }
-      });
+              if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
+              if (a.date === todayStr) {
+                todayAppointments++;
+                if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') completedAppointments++;
+              }
+            });
       const sortedServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label, count], index) => {
-        const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
-        return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
-      });
+              const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
+              return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
+            });
       if (sortedServices.length === 0) sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
-
       const lampsRes = await client.query('SELECT status, payment_status FROM lamp_records WHERE temple_id = $1', [templeId]);
       let totalLamps = lampsRes.rowCount || 0;
       let activeLamps = lampsRes.rows.filter(l => l.status === 'Active' || l.payment_status === 'Paid').length;
-
       const qEventsRes = await client.query('SELECT id, title FROM queue_events WHERE status = \'Active\' AND temple_id = $1', [templeId]);
       const qActive = await Promise.all(qEventsRes.rows.map(async (evt) => {
-        const tRes = await client.query('SELECT status FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [evt.id, templeId]);
-        const waiting = tRes.rows.filter(t => t.status === 'Queuing').length;
-        const completed = tRes.rows.filter(t => t.status === 'Completed').length;
-        return { title: evt.title, waiting, completed };
-      }));
-
+              const tRes = await client.query('SELECT status FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [evt.id, templeId]);
+              const waiting = tRes.rows.filter(t => t.status === 'Queuing').length;
+              const completed = tRes.rows.filter(t => t.status === 'Completed').length;
+              return { title: evt.title, waiting, completed };
+            }));
       let isVip = true;
       let totalGB = 100;
       let used = 0;
       let planName = '免費 5GB 空間';
       try {
-        const storageRes = await client.query('SELECT allocated_bytes, plan_name FROM temple_storages WHERE temple_id = $1', [templeId]);
-        if ((storageRes.rowCount ?? 0) > 0) {
-           totalGB = Math.round(Number(storageRes.rows[0].allocated_bytes) / (1024 * 1024 * 1024));
-           planName = storageRes.rows[0].plan_name || `${totalGB}GB`;
-           isVip = false;
-        } else {
-          const templeRes = await client.query('SELECT plan, cloud_storage as "cloudStorage" FROM temples WHERE id = $1', [templeId]);
-          if (templeRes.rowCount > 0) {
-            const tData = templeRes.rows[0];
-            const cloudStorage = tData.cloudStorage;
-            if (cloudStorage && cloudStorage.startsWith('SP-')) {
-              const plan = db_storage_plans.find(p => p.id === cloudStorage);
-              totalGB = plan ? plan.sizeGb : 100;
-              planName = plan ? plan.name : `${totalGB}GB`;
-              isVip = false;
-            } else {
-              isVip = tData.plan === 'Unlimited Node' || tData.plan === 'Free' || tData.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
-              totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
-              planName = isVip ? '無限使用' : `${totalGB}GB`;
+              const storageRes = await client.query('SELECT allocated_bytes, plan_name FROM temple_storages WHERE temple_id = $1', [templeId]);
+              if ((storageRes.rowCount ?? 0) > 0) {
+                 totalGB = Math.round(Number(storageRes.rows[0].allocated_bytes) / (1024 * 1024 * 1024));
+                 planName = storageRes.rows[0].plan_name || `${totalGB}GB`;
+                 isVip = false;
+              } else {
+                const templeRes = await client.query('SELECT plan, cloud_storage as "cloudStorage" FROM "Temple" WHERE id = $1', [templeId]);
+                if (templeRes.rowCount > 0) {
+                  const tData = templeRes.rows[0];
+                  const cloudStorage = tData.cloudStorage;
+                  if (cloudStorage && cloudStorage.startsWith('SP-')) {
+                    const plan = db_storage_plans.find(p => p.id === cloudStorage);
+                    totalGB = plan ? plan.sizeGb : 100;
+                    planName = plan ? plan.name : `${totalGB}GB`;
+                    isVip = false;
+                  } else {
+                    isVip = tData.plan === 'Unlimited Node' || tData.plan === 'Free' || tData.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
+                    totalGB = isVip ? -1 : parseInt(cloudStorage) || 100;
+                    planName = isVip ? '無限使用' : `${totalGB}GB`;
+                  }
+                }
+              }
+              const mediaRes = await client.query('SELECT SUM(size_bytes) as total_size FROM customer_media WHERE temple_id = $1', [templeId]);
+              if (mediaRes.rowCount > 0 && mediaRes.rows[0].total_size) {
+                 used = parseInt(mediaRes.rows[0].total_size) / (1024 * 1024 * 1024);
+              }
+            } catch (e) {
+               console.error(e);
             }
-          }
-        }
-        const mediaRes = await client.query('SELECT SUM(size_bytes) as total_size FROM customer_media WHERE temple_id = $1', [templeId]);
-        if (mediaRes.rowCount > 0 && mediaRes.rows[0].total_size) {
-           used = parseInt(mediaRes.rows[0].total_size) / (1024 * 1024 * 1024);
-        }
-      } catch (e) {
-         console.error(e);
-      }
-
       return { 
-        analyticsSettings: {}, 
-        analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, 
-        raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used, total: totalGB, isVip, planName }, qActive } 
-      };
-    }
+              analyticsSettings: {}, 
+              analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, 
+              raw: { apps, agiStats: {}, guests: guestsRes.rows, storageInfo: { used, total: totalGB, isVip, planName }, qActive } 
+            };
   });
 }
 
@@ -5698,17 +4960,13 @@ export type LampCategory = any;
 export async function fetchGuests() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return JSON.parse(JSON.stringify((await jsonStore.find('guests')).filter((g: any) => !g.templeId || g.templeId === templeId)));
-    } else {
-      const res = await client.query('SELECT * FROM guests WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
+    const res = await client.query('SELECT * FROM guests WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
       return JSON.parse(JSON.stringify(res.rows.map(r => ({
-        id: r.id, templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email,
-        address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday,
-        birthHour: r.birth_hour, lineId: r.line_id, status: r.status,
-        createdAt: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : r.created_at
-      }))));
-    }
+              id: r.id, templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email,
+              address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday,
+              birthHour: r.birth_hour, lineId: r.line_id, status: r.status,
+              createdAt: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : r.created_at
+            }))));
   });
 }
 export async function searchGuestsByNameOrPhone(query: string) {
@@ -5717,21 +4975,7 @@ export async function searchGuestsByNameOrPhone(query: string) {
   
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const seen = new Set();
-      await jsonStore.atomicWrite('guests', (guests) => guests.filter((g: any) => {
-        const p = normalizePhone(g.phone);
-        if (seen.has(p)) return false;
-        seen.add(p);
-        return true;
-      }));
-      
-      return (await jsonStore.find('guests')).filter((g: any) => 
-        g.name?.toLowerCase()?.includes(normalizedQuery) || 
-        normalizePhone(g.phone).includes(normalizePhone(normalizedQuery))
-      );
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
@@ -5754,21 +4998,19 @@ export async function searchGuestsByNameOrPhone(query: string) {
         OR REPLACE(phone, '-', '') LIKE $2
         ORDER BY created_at DESC
       `, [`%${normalizedQuery}%`, `%${normalizePhone()}%`]);
-      
       return res.rows.map(r => ({
-        phone: r.phone,
-        name: r.name,
-        email: r.email || '',
-        password: r.password || '',
-        address: r.address || '',
-        birthday: r.birthday || '',
-        lunarBirthday: r.lunar_birthday || '',
-        birthHour: r.birth_hour || '',
-        lineId: r.line_id || '',
-        status: r.status || 'Active',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
-      }));
-    }
+              phone: r.phone,
+              name: r.name,
+              email: r.email || '',
+              password: r.password || '',
+              address: r.address || '',
+              birthday: r.birthday || '',
+              lunarBirthday: r.lunar_birthday || '',
+              birthHour: r.birth_hour || '',
+              lineId: r.line_id || '',
+              status: r.status || 'Active',
+              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
+            }));
   });
 }
 
@@ -5776,10 +5018,7 @@ export async function checkGuestProfile(phone: string) {
   const normPhone = normalizePhone(phone);
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('guests')).find((g: any) => normalizePhone(g.phone) === normPhone) || null;
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
@@ -5800,19 +5039,18 @@ export async function checkGuestProfile(phone: string) {
       if ((res.rowCount ?? 0) === 0) return null;
       const r = res.rows[0];
       return {
-        phone: r.phone,
-        name: r.name,
-        email: r.email || '',
-        password: r.password || '',
-        address: r.address || '',
-        birthday: r.birthday || '',
-        lunarBirthday: r.lunar_birthday || '',
-        birthHour: r.birth_hour || '',
-        lineId: r.line_id || '',
-        status: r.status || 'Active',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
-      };
-    }
+              phone: r.phone,
+              name: r.name,
+              email: r.email || '',
+              password: r.password || '',
+              address: r.address || '',
+              birthday: r.birthday || '',
+              lunarBirthday: r.lunar_birthday || '',
+              birthHour: r.birth_hour || '',
+              lineId: r.line_id || '',
+              status: r.status || 'Active',
+              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
+            };
   });
 }
 
@@ -5821,31 +5059,7 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
   return withTempleSession(templeId, false, async (client) => {
     const lookupPhone = originalPhone || d.phone;
     
-    if (!client) {
-      // 避免將手機號碼修改成其他已存在的號碼
-      if (originalPhone && originalPhone !== d.phone) {
-        const conflict = (await jsonStore.find('guests')).find((g: any) => g.phone === d.phone && g.templeId === templeId);
-        if (conflict) {
-          return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
-        }
-      }
-
-      const idx = (await jsonStore.find('guests')).findIndex((g: any) => g.phone === lookupPhone && g.templeId === templeId);
-      if (idx > -1) {
-        (await jsonStore.find('guests'))[idx] = { ...(await jsonStore.find('guests'))[idx], ...d };
-      } else {
-        // 建立新信眾時，防範重複手機號碼
-        const exists = (await jsonStore.find('guests')).find((g: any) => g.phone === d.phone && g.templeId === templeId);
-        if (exists) {
-          return { success: false, error: "此手機號碼的信眾檔案已存在！" };
-        }
-        // 若未填帳號，預設使用手機
-        if (!d.account) d.account = d.phone;
-        d.templeId = templeId;
-        await jsonStore.createRecord('guests', d);
-      }
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
@@ -5862,47 +5076,44 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      
       if (originalPhone && originalPhone !== d.phone) {
-        const conflictRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, d.phone]);
-        if ((conflictRes.rowCount ?? 0) > 0) {
-          return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
-        }
-      }
-      
+              const conflictRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, d.phone]);
+              if ((conflictRes.rowCount ?? 0) > 0) {
+                return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
+              }
+            }
       const checkRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, lookupPhone]);
       if ((checkRes.rowCount ?? 0) > 0) {
-        // Update! COALESCE($9, line_id) ensures that if the frontend doesn't provide a lineId, the existing one in the DB is not overwritten by null.
-        await client.query(`
+              // Update! COALESCE($9, line_id) ensures that if the frontend doesn't provide a lineId, the existing one in the DB is not overwritten by null.
+              await client.query(`
           UPDATE guests 
           SET phone = $1, name = $2, email = $3, password = $4, address = $5, birthday = $6, lunar_birthday = $7, birth_hour = $8, line_id = COALESCE($9, line_id), status = $10
           WHERE temple_id = $11 AND phone = $12
         `, [
-          d.phone, d.name, d.email || null, d.password || null, d.address || null,
-          d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active',
-          templeId, lookupPhone
-        ]);
-        
-        if (lookupPhone !== d.phone) {
-           await client.query('UPDATE appointments SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-           await client.query('UPDATE lamp_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-           await client.query('UPDATE event_registrations SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-           await client.query('UPDATE queue_tickets SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-           await client.query('UPDATE deep_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-           await client.query('UPDATE activities SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-           await client.query('UPDATE guest_files SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-        }
-      } else {
-        // Insert!
-        await client.query(`
+                d.phone, d.name, d.email || null, d.password || null, d.address || null,
+                d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active',
+                templeId, lookupPhone
+              ]);
+              
+              if (lookupPhone !== d.phone) {
+                 await client.query('UPDATE appointments SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+                 await client.query('UPDATE lamp_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+                 await client.query('UPDATE event_registrations SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+                 await client.query('UPDATE queue_tickets SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+                 await client.query('UPDATE deep_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+                 await client.query('UPDATE activities SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+                 await client.query('UPDATE guest_files SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
+              }
+            } else {
+              // Insert!
+              await client.query(`
           INSERT INTO guests (temple_id, phone, name, email, password, address, birthday, lunar_birthday, birth_hour, line_id, status)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, [
-          templeId, d.phone, d.name, d.email || null, d.password || null, d.address || null,
-          d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active'
-        ]);
-      }
-    }
+                templeId, d.phone, d.name, d.email || null, d.password || null, d.address || null,
+                d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active'
+              ]);
+            }
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6067,17 +5278,7 @@ export async function updateGuestPassword(phone: string, newPassword: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     const normPhone = normalizePhone(phone);
-    if (!client) {
-      const idx = (await jsonStore.find('guests')).findIndex((g: any) => normalizePhone(g.phone) === normPhone && g.templeId === templeId);
-      if (idx > -1) {
-        if ((await jsonStore.find('guests'))) (await jsonStore.find('guests'))[idx].password = newPassword;
-        else (await jsonStore.find('guests'))[idx].password = newPassword;
-      } else {
-        return { success: false, error: "找不到該信眾" };
-      }
-    } else {
-      await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [newPassword, normPhone, templeId]);
-    }
+    await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [newPassword, normPhone, templeId]);
     return { success: true };
   });
 }
@@ -6091,52 +5292,18 @@ export async function fetchGuestByPhone(p: string) {
 export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
+    if (recordType === 'Appointment') {
+              await client.query('UPDATE appointments SET status = \'Confirmed\', payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
+            }
       if (recordType === 'Lamp') {
-        const idx = (await jsonStore.find('lamp_records')).findIndex(r => r.id === recordId);
-        if (idx > -1) {
-          (await jsonStore.find('lamp_records'))[idx].paymentStatus = 'Paid';
-          (await jsonStore.find('lamp_records'))[idx].paymentUpdatedAt = new Date().toISOString();
-        }
-      }
-      if (recordType === 'Appointment') {
-        const idx = (await jsonStore.find('appointments')).findIndex(r => r.id.toString() === recordId.toString());
-        if (idx > -1) {
-          (await jsonStore.find('appointments'))[idx].status = 'Confirmed';
-          (await jsonStore.find('appointments'))[idx].paymentStatus = 'Paid';
-          (await jsonStore.find('appointments'))[idx].paymentUpdatedAt = new Date().toISOString();
-        }
-      }
+              await client.query('UPDATE lamp_records SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
+            }
       if (recordType === 'Event') {
-        const idx = (await jsonStore.find('event_registrations')).findIndex(r => r.id === recordId);
-        if (idx > -1) {
-          (await jsonStore.find('event_registrations'))[idx].paymentStatus = 'Paid';
-          (await jsonStore.find('event_registrations'))[idx].paymentUpdatedAt = new Date().toISOString();
-        }
-      }
+              await client.query('UPDATE event_registrations SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
+            }
       if (recordType === 'Queue') {
-        if (typeof (await jsonStore.find('queue_tickets')) !== 'undefined') {
-          const idx = (await jsonStore.find('queue_tickets')).findIndex(r => r.id === recordId);
-          if (idx > -1) {
-            (await jsonStore.find('queue_tickets'))[idx].paymentStatus = 'Paid';
-            (await jsonStore.find('queue_tickets'))[idx].paymentUpdatedAt = new Date().toISOString();
-          }
-        }
-      }
-    } else {
-      if (recordType === 'Appointment') {
-        await client.query('UPDATE appointments SET status = \'Confirmed\', payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
-      }
-      if (recordType === 'Lamp') {
-        await client.query('UPDATE lamp_records SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
-      }
-      if (recordType === 'Event') {
-        await client.query('UPDATE event_registrations SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
-      }
-      if (recordType === 'Queue') {
-        await client.query('UPDATE queue_tickets SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
-      }
-    }
+              await client.query('UPDATE queue_tickets SET payment_status = \'Paid\', payment_updated_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, new Date().toISOString()]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -6153,29 +5320,16 @@ export async function createLampRecord(data: any) {
 
   return withTempleSession(templeId, false, async (client) => {
     let cat: any = null;
-    if (!client) {
-      cat = (await jsonStore.find('lamp_categories')).find((c: any) => c.id === categoryId && (!c.templeId || c.templeId === templeId));
-      if(!cat) return { success: false, error: '未找到燈種類別' };
-      const today = new Date();
-      const exp = new Date(today.getTime() + (cat.durationDays * 24 * 60 * 60 * 1000));
-      const newId = `LMP-${Date.now()}`;
-      const newRecord = { id: newId, templeId, phone, guestName, categoryId: cat.id, categoryName: cat.name, price: cat.price, durationDays: cat.durationDays || 365, notice: notice || '', startDate: today.toISOString().split('T')[0], expiryDate: exp.toISOString().split('T')[0], status: 'Pending', paymentMethod, paymentRef, paymentStatus: paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid'), createdAt: new Date().toISOString() };
-      await jsonStore.createRecord('lamp_records', newRecord);
-      if (typeof (await jsonStore.find('activities')) !== 'undefined') await jsonStore.createRecord('activities', { phone, timestamp: new Date().toISOString().replace('T', ' ').split('.')[0], type: '點燈服務', content: `申請 ${cat.name}` });
-      await revalidateTemple();
-      return { success: true, id: newId };
-    } else {
-      const catRes = await client.query('SELECT name, price FROM lamp_categories WHERE id = $1 AND temple_id = $2', [categoryId, templeId]);
+    const catRes = await client.query('SELECT name, price FROM lamp_categories WHERE id = $1 AND temple_id = $2', [categoryId, templeId]);
       if (catRes.rowCount === 0) return { success: false, error: '未找到燈種類別' };
       cat = catRes.rows[0];
       const today = new Date();
       const newId = `LMP-${Date.now()}`;
       await client.query('INSERT INTO lamp_records (id, temple_id, category_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
-        [newId, templeId, cat.id, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
-      );
+              [newId, templeId, cat.id, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
+            );
       await revalidateTemple();
       return { success: true, id: newId };
-    }
   });
 }
 export async function checkLampNotifications() { return { hasNotification: false }; }
@@ -6183,26 +5337,17 @@ export async function saveLampCategory(data: any) {
   const id = data.id;
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      if (id) {
-        const idx = (await jsonStore.find('lamp_categories')).findIndex(c => c.id === id);
-        if (idx > -1) (await jsonStore.find('lamp_categories'))[idx] = { ...(await jsonStore.find('lamp_categories'))[idx], ...data, templeId };
-      } else {
-        await jsonStore.createRecord('lamp_categories', { id: `cat-${Date.now()}`, ...data, totalSlots: data.totalSlots || 500, templeId });
-      }
-    } else {
-      if (id) {
-        await client.query(
-          'UPDATE lamp_categories SET name = $1, description = $2, duration_days = $3, total_slots = $4, price = $5, precautions = $8 WHERE id = $6 AND temple_id = $7',
-          [data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, id, templeId, data.precautions || '']
-        );
-      } else {
-        await client.query(
-          'INSERT INTO lamp_categories (id, temple_id, name, description, duration_days, total_slots, price, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-          [`cat-${Date.now()}`, templeId, data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, data.precautions || '']
-        );
-      }
-    }
+    if (id) {
+              await client.query(
+                'UPDATE lamp_categories SET name = $1, description = $2, duration_days = $3, total_slots = $4, price = $5, precautions = $8 WHERE id = $6 AND temple_id = $7',
+                [data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, id, templeId, data.precautions || '']
+              );
+            } else {
+              await client.query(
+                'INSERT INTO lamp_categories (id, temple_id, name, description, duration_days, total_slots, price, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [`cat-${Date.now()}`, templeId, data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, data.precautions || '']
+              );
+            }
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6211,15 +5356,9 @@ export async function saveLampCategory(data: any) {
 export async function deleteLampCategory(id: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const hasRecords = (await jsonStore.find('lamp_records')).some(r => r.categoryId === id);
-      if (hasRecords) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
-      await jsonStore.atomicWrite('lamp_categories', (data) => data.filter(c => c.id !== id));
-    } else {
-      const hasRecords = await client.query('SELECT 1 FROM lamp_records WHERE category_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
-      if (hasRecords.rowCount && hasRecords.rowCount > 0) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' }; 
+    const hasRecords = await client.query('SELECT 1 FROM lamp_records WHERE category_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
+      if (hasRecords.rowCount && hasRecords.rowCount > 0) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' };
       await client.query('DELETE FROM lamp_categories WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    }
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6236,31 +5375,20 @@ export type QueueEvent = any;
 export async function fetchQueueEvents() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const allQueueTix = await jsonStore.find('queue_tickets');
-      return (await jsonStore.find('queue_events')).filter(e => !e.templeId || e.templeId === templeId).map(evt => {
-        const participantCount = allQueueTix.filter(t => t.eventId === evt.id && t.status === 'Queuing').length;
-        return { ...evt, participantCount };
-      });
-    } else {
-      await client.query(`CREATE TABLE IF NOT EXISTS queue_events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), start_time VARCHAR(50), end_time VARCHAR(50), location VARCHAR(255), service_type VARCHAR(255), price INTEGER, max_capacity INTEGER, status VARCHAR(50))`);
+    await client.query(`CREATE TABLE IF NOT EXISTS queue_events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), start_time VARCHAR(50), end_time VARCHAR(50), location VARCHAR(255), service_type VARCHAR(255), price INTEGER, max_capacity INTEGER, status VARCHAR(50))`);
       const res = await client.query('SELECT * FROM queue_events WHERE temple_id = $1 ORDER BY date DESC, start_time DESC', [templeId]);
-      
       const counts = await client.query('SELECT event_id, COUNT(*) as count FROM queue_tickets WHERE temple_id = $1 AND status = \'Queuing\' GROUP BY event_id', [templeId]);
       const countMap = counts.rows.reduce((acc, r) => ({...acc, [r.event_id]: parseInt(r.count)}), {});
-      
       return res.rows.map(r => ({
-        id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time,
-        location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status,
-        participantCount: countMap[r.id] || 0
-      }));
-    }
+              id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time,
+              location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status,
+              participantCount: countMap[r.id] || 0
+            }));
   });
 }
 export async function fetchActiveQueues() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return (await jsonStore.find('queue_events')).filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId));
     const res = await client.query('SELECT * FROM queue_events WHERE status = \'Active\' AND temple_id = $1', [templeId]);
     return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time, location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status }));
   });
@@ -6269,7 +5397,6 @@ export async function fetchQueueDashboard(eventId?: string) {
   if (!eventId) return { tickets: [] };
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) return { tickets: (await jsonStore.find('queue_tickets')).filter(t => t.eventId === eventId) };
     const res = await client.query('SELECT * FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
     return { tickets: res.rows.map(r => ({
       id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title, phone: r.phone, guestName: r.guest_name,
@@ -6281,14 +5408,8 @@ export async function fetchQueueDashboard(eventId?: string) {
 export async function fetchActiveQueueCount(): Promise<number> {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const activeEventIds = (await jsonStore.find('queue_events')).filter(e => e.status === 'Active' && (!e.templeId || e.templeId === templeId)).map(e => e.id);
-      if (activeEventIds.length === 0) return 0;
-      return (await jsonStore.find('queue_tickets')).filter(t => activeEventIds?.includes(t.eventId) && t.status === 'Queuing').length;
-    } else {
-      const res = await client.query('SELECT COUNT(qt.id) as count FROM queue_tickets qt JOIN queue_events qe ON qt.event_id = qe.id WHERE qe.status = \'Active\' AND qt.status = \'Queuing\' AND qt.temple_id = $1', [templeId]);
+    const res = await client.query('SELECT COUNT(qt.id) as count FROM queue_tickets qt JOIN queue_events qe ON qt.event_id = qe.id WHERE qe.status = \'Active\' AND qt.status = \'Queuing\' AND qt.temple_id = $1', [templeId]);
       return parseInt(res.rows[0].count) || 0;
-    }
   });
 }
 
@@ -6298,12 +5419,8 @@ export async function createQueueEvent(data: any) {
     const todayStr = new Date().toISOString().split('T')[0];
     if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
 
-    if (!client) {
-      await jsonStore.createRecord('queue_events', { id: `qe-${Date.now()}`, ...data, templeId, status: 'Active' });
-    } else {
-      await client.query('INSERT INTO queue_events (id, temple_id, title, date, start_time, end_time, location, service_type, price, max_capacity, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Active']);
-    }
+    await client.query('INSERT INTO queue_events (id, temple_id, title, date, start_time, end_time, location, service_type, price, max_capacity, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+              [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Active']);
     await revalidateTemple();
     return { success: true };
   });
@@ -6313,15 +5430,8 @@ export async function updateQueueEvent(id: string, data: any) {
   const templeId = await getDynamicTempleId(); 
   return withTempleSession(templeId, false, async (client) => {
     try {
-      if (!client) {
-        const idx = (await jsonStore.find('queue_events')).findIndex(e => e.id === id);
-        if (idx !== -1) {
-          (await jsonStore.find('queue_events'))[idx] = { ...(await jsonStore.find('queue_events'))[idx], ...data };
-        }
-      } else {
-        await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
-          [data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, id, templeId]);
-      }
+      await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
+                  [data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, id, templeId]);
       await revalidateTemple();
       return { success: true };
     } catch (e: any) {
@@ -6332,21 +5442,11 @@ export async function updateQueueEvent(id: string, data: any) {
 export async function activateQueueEvent(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      await jsonStore.atomicWrite('queue_events', (data) => data.map((e: any) => {
-        if (e.id === id) {
-          return { ...e, status: e.status === 'Active' ? 'Draft' : 'Active' };
-        }
-        return e;
-      }));
-    } else {
-      // Toggle status between Active and Draft
-      const res = await client.query('SELECT status FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+    const res = await client.query('SELECT status FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
       if (res.rows.length > 0) {
-        const newStatus = res.rows[0].status === 'Active' ? 'Draft' : 'Active';
-        await client.query('UPDATE queue_events SET status = $1 WHERE id = $2 AND temple_id = $3', [newStatus, id, templeId]);
-      }
-    }
+              const newStatus = res.rows[0].status === 'Active' ? 'Draft' : 'Active';
+              await client.query('UPDATE queue_events SET status = $1 WHERE id = $2 AND temple_id = $3', [newStatus, id, templeId]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -6354,21 +5454,12 @@ export async function activateQueueEvent(id: string) {
 export async function deleteQueueEvent(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const hasTickets = (await jsonStore.find('queue_tickets')).some((t: any) => t.eventId === id && (!t.templeId || t.templeId === templeId));
-      if (hasTickets) {
-        await jsonStore.atomicWrite('queue_events', (data) => data.map((e: any) => e.id === id ? { ...e, status: 'Cancelled' } : e));
-      } else {
-        await jsonStore.atomicWrite('queue_events', (data) => data.filter((e: any) => !(e.id === id && (!e.templeId || e.templeId === templeId))));
-      }
-    } else {
-      const tRes = await client.query('SELECT 1 FROM queue_tickets WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
+    const tRes = await client.query('SELECT 1 FROM queue_tickets WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
       if (tRes.rowCount > 0) {
-        await client.query('UPDATE queue_events SET status = \'Cancelled\' WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      } else {
-        await client.query('DELETE FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      }
-    }
+              await client.query('UPDATE queue_events SET status = \'Cancelled\' WHERE id = $1 AND temple_id = $2', [id, templeId]);
+            } else {
+              await client.query('DELETE FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -6376,27 +5467,14 @@ export async function deleteQueueEvent(id: string) {
 export async function checkInWithQr(ticketId: string, eventId?: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const ticket = (await jsonStore.find('queue_tickets')).find(t => t.id === ticketId);
-      if (!ticket) return { success: false, error: '找不到票券' };
-      if (ticket.status !== 'Registered' && ticket.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
-      if (eventId && ticket.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
-
-      const qCount = (await jsonStore.find('queue_tickets')).filter(x => x.eventId === ticket.eventId && (x.status === 'Queuing' || x.status === 'Calling' || x.status === 'Completed')).length + 1;
-      ticket.status = 'Queuing';
-      ticket.actualOrder = qCount;
-      ticket.scannedAt = new Date().toLocaleTimeString();
-    } else {
-      const tRes = await client.query('SELECT * FROM queue_tickets WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
+    const tRes = await client.query('SELECT * FROM queue_tickets WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
       if (tRes.rowCount === 0) return { success: false, error: '找不到票券' };
       const t = tRes.rows[0];
       if (t.status !== 'Registered' && t.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
       if (eventId && t.event_id !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
-
       const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [t.event_id, templeId]);
       const actualOrder = parseInt(orderRes.rows[0].count) + 1;
       await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, ticketId]);
-    }
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6405,17 +5483,10 @@ export async function checkInWithQr(ticketId: string, eventId?: string) {
 export async function callNextInQueue(eventId: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.eventId === eventId && t.status === 'Calling' ? { ...t, status: 'Completed' } : t));
-      const nextTicket = (await jsonStore.find('queue_tickets')).slice().sort((a: any,b: any) => (a.actualOrder||999) - (b.actualOrder||999)).find(t => t.eventId === eventId && t.status === 'Queuing');
-      if (!nextTicket) return { error: 'NO_ONE_IN_QUEUE' };
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.id === nextTicket.id ? { ...t, status: 'Calling' } : t));
-    } else {
-      await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE event_id = $1 AND status = \'Calling\' AND temple_id = $2', [eventId, templeId]);
+    await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE event_id = $1 AND status = \'Calling\' AND temple_id = $2', [eventId, templeId]);
       const nextRes = await client.query('SELECT id FROM queue_tickets WHERE event_id = $1 AND status = \'Queuing\' AND temple_id = $2 ORDER BY actual_order ASC LIMIT 1', [eventId, templeId]);
       if (nextRes.rowCount === 0) return { error: 'NO_ONE_IN_QUEUE' };
       await client.query('UPDATE queue_tickets SET status = \'Calling\' WHERE id = $1', [nextRes.rows[0].id]);
-    }
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6424,11 +5495,7 @@ export async function callNextInQueue(eventId: string) {
 export async function completeQueueService(ticketId: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.id === ticketId ? { ...t, status: 'Completed' } : t));
-    } else {
-      await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
-    }
+    await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6437,11 +5504,7 @@ export async function completeQueueService(ticketId: string) {
 export async function updateQueueStatus(ticketId: string, status: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      await jsonStore.atomicWrite('queue_tickets', (data) => data.map((t: any) => t.id === ticketId ? { ...t, status } : t));
-    } else {
-      await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', [status, ticketId, templeId]);
-    }
+    await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', [status, ticketId, templeId]);
     await revalidateTemple();
     return { success: true }; 
   });
@@ -6451,50 +5514,25 @@ export async function registerGuestForQueue(eventId: string, data: { guestName: 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     let newTicket: any;
-    if (!client) {
-      const event = (await jsonStore.find('queue_events')).find(e => e.id === eventId);
-      if (!event) return { error: 'EVENT_NOT_FOUND' };
-      const eventTickets = (await jsonStore.find('queue_tickets')).filter(t => t.eventId === eventId);
-      if (event.maxCapacity && eventTickets.length >= event.maxCapacity) return { error: '活動預約已額滿！' };
-
-      const nextNumber = `A${(eventTickets.length + 1).toString().padStart(3, '0')}`;
-      newTicket = {
-        id: `t-${Date.now()}`,
-        eventId,
-        status: data.isOnline ? 'Registered' : 'Queuing', 
-        assignedNumber: nextNumber,
-        guestName: data.guestName,
-        phone: data.phone,
-        actualOrder: data.isOnline ? null : eventTickets.filter(t => t.status === 'Queuing' || t.status === 'Calling' || t.status === 'Completed').length + 1,
-        scannedAt: data.isOnline ? null : new Date().toLocaleTimeString()
-      };
-      await jsonStore.createRecord('queue_tickets', newTicket);
-      // (await jsonStore.find('queue_tickets')) synced
-    } else {
-      const evRes = await client.query('SELECT title, capacity FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
+    const evRes = await client.query('SELECT title, capacity FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
       if (evRes.rowCount === 0) return { error: 'EVENT_NOT_FOUND' };
       const ev = evRes.rows[0];
-      
       const ticketsRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
       const totalTickets = parseInt(ticketsRes.rows[0].count);
       if (ev.capacity && ev.capacity > 0 && totalTickets >= ev.capacity) return { error: '活動預約已額滿！' };
-
       const nextNumber = `A${(totalTickets + 1).toString().padStart(3, '0')}`;
       const newId = `t-${Date.now()}`;
-      
       let actualOrder = null;
       let scannedAt = null;
       if (!data.isOnline) {
-        const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [eventId, templeId]);
-        actualOrder = parseInt(orderRes.rows[0].count) + 1;
-        scannedAt = new Date().toLocaleTimeString();
-      }
-
+              const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [eventId, templeId]);
+              actualOrder = parseInt(orderRes.rows[0].count) + 1;
+              scannedAt = new Date().toLocaleTimeString();
+            }
       await client.query('INSERT INTO queue_tickets (id, event_id, temple_id, event_title, phone, guest_name, status, assigned_number, actual_order, scanned_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [newId, eventId, templeId, ev.title, data.phone, data.guestName, data.isOnline ? 'Registered' : 'Queuing', nextNumber, actualOrder, scannedAt, new Date().toISOString()]
-      );
+              [newId, eventId, templeId, ev.title, data.phone, data.guestName, data.isOnline ? 'Registered' : 'Queuing', nextNumber, actualOrder, scannedAt, new Date().toISOString()]
+            );
       newTicket = { id: newId };
-    }
     await revalidateTemple();
     return { success: true, ticket: newTicket };
   });
@@ -6554,43 +5592,27 @@ gStore.db_price_plans = db_price_plans;
 export async function fetchDistributorStats() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return {
-        totalNodes: 100,
-        usedNodes: (await getSafeJsonArray('temples')).length,
-        activeTemples: (await getSafeJsonArray('temples')).filter(t => t.status === 'Active').length,
-        totalRevenue: 1250000,
-        totalCommission: 187500,
-        activeSales: (await jsonStore.find('dist_sales')).length
-      };
-    } else {
-      const activeRes = await client.query('SELECT COUNT(*) as active_count FROM temples WHERE status = $1', ['Active']);
-      const totalRes = await client.query('SELECT COUNT(*) as total_count FROM temples');
-      const salesRes = await client.query('SELECT COUNT(*) as sales_count FROM distributor_sales');
-      
+    const activeRes = await client.query('SELECT COUNT(*) as active_count FROM "Temple" WHERE status = $1', ['Active']);
+      const totalRes = await client.query('SELECT COUNT(*) as total_count FROM "Temple"');
+      const salesRes = await client.query('SELECT COUNT(*) as sales_count FROM dist_sales');
       const activeCount = Number(activeRes.rows[0]?.active_count || 0);
       const totalTemples = Number(totalRes.rows[0]?.total_count || 0);
       const totalSales = Number(salesRes.rows[0]?.sales_count || 0);
-      
       return {
-        totalNodes: 100,
-        usedNodes: totalTemples,
-        activeTemples: activeCount,
-        totalRevenue: 1250000,
-        totalCommission: 187500,
-        activeSales: totalSales
-      };
-    }
+              totalNodes: 100,
+              usedNodes: totalTemples,
+              activeTemples: activeCount,
+              totalRevenue: 1250000,
+              totalCommission: 187500,
+              activeSales: totalSales
+            };
   });
 }
 
 export async function fetchPricePlans() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return [...db_price_plans];
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS price_plans (
           id VARCHAR(50) PRIMARY KEY,
           distributor_id VARCHAR(50),
@@ -6601,36 +5623,34 @@ export async function fetchPricePlans() {
           free_months INT DEFAULT 0
         )
       `);
-      
       const res = await client.query('SELECT * FROM price_plans');
       if ((res.rowCount ?? 0) === 0) {
-        await client.query(`
+              await client.query(`
           INSERT INTO price_plans (id, distributor_id, name, setup_fee, monthly_fee, is_free, free_months)
           VALUES 
             ('plan-1', 'dist-1', '基礎推廣方案', 12000, 3600, FALSE, 0),
             ('plan-2', 'dist-1', '免費推廣試用方案', 0, 3600, TRUE, 3)
         `);
-        const resRetry = await client.query('SELECT * FROM price_plans');
-        return resRetry.rows.map(r => ({
-          id: r.id,
-          distributorId: r.distributor_id,
-          name: r.name,
-          setupFee: r.setup_fee,
-          monthlyFee: r.monthly_fee,
-          isFree: r.is_free,
-          freeMonths: r.free_months
-        }));
-      }
+              const resRetry = await client.query('SELECT * FROM price_plans');
+              return resRetry.rows.map(r => ({
+                id: r.id,
+                distributorId: r.distributor_id,
+                name: r.name,
+                setupFee: r.setup_fee,
+                monthlyFee: r.monthly_fee,
+                isFree: r.is_free,
+                freeMonths: r.free_months
+              }));
+            }
       return res.rows.map(r => ({
-        id: r.id,
-        distributorId: r.distributor_id,
-        name: r.name,
-        setupFee: r.setup_fee,
-        monthlyFee: r.monthly_fee,
-        isFree: r.is_free,
-        freeMonths: r.free_months
-      }));
-    }
+              id: r.id,
+              distributorId: r.distributor_id,
+              name: r.name,
+              setupFee: r.setup_fee,
+              monthlyFee: r.monthly_fee,
+              isFree: r.is_free,
+              freeMonths: r.free_months
+            }));
   });
 }
 
@@ -6648,14 +5668,10 @@ export async function createPricePlan(plan: any) {
       freeMonths: Number(plan.freeMonths || 0)
     };
     
-    if (!client) {
-      db_price_plans.push(newP);
-    } else {
-      await client.query(`
+    await client.query(`
         INSERT INTO price_plans (id, distributor_id, name, setup_fee, monthly_fee, is_free, free_months)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
       `, [newId, 'dist-1', plan.name, Number(plan.setupFee || 0), Number(plan.monthlyFee || 0), Boolean(plan.isFree), Number(plan.freeMonths || 0)]);
-    }
     await revalidateTemple();
     return { success: true };
   });
@@ -6664,10 +5680,7 @@ export async function createPricePlan(plan: any) {
 export async function fetchTempleApplications() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return [...(await jsonStore.find('temple_applications'))];
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS temple_applications (
           id VARCHAR(50) PRIMARY KEY,
           temple_name VARCHAR(255) NOT NULL,
@@ -6680,20 +5693,18 @@ export async function fetchTempleApplications() {
           sales_id VARCHAR(50)
         )
       `);
-      
       const res = await client.query('SELECT * FROM temple_applications');
       return res.rows.map(r => ({
-        id: r.id,
-        templeName: r.temple_name,
-        contactPerson: r.contact_person,
-        contactPhone: r.contact_phone,
-        planId: r.plan_id,
-        setupFee: r.setup_fee,
-        monthlyFee: r.monthly_fee,
-        status: r.status,
-        salesId: r.sales_id
-      }));
-    }
+              id: r.id,
+              templeName: r.temple_name,
+              contactPerson: r.contact_person,
+              contactPhone: r.contact_phone,
+              planId: r.plan_id,
+              setupFee: r.setup_fee,
+              monthlyFee: r.monthly_fee,
+              status: r.status,
+              salesId: r.sales_id
+            }));
   });
 }
 
@@ -6704,35 +5715,15 @@ export async function submitTempleApplication(data: any) {
     let setupFee = 12000;
     let monthlyFee = 3600;
     
-    if (!client) {
-      const plan = db_price_plans.find((p: any) => p.id === data.planId);
-      if (plan) {
-        setupFee = plan.setupFee;
-        monthlyFee = plan.monthlyFee;
-      }
-      const newApp: TempleApplication = {
-        id: newId,
-        templeName: data.templeName,
-        contactPerson: data.contactPerson || '聯絡人',
-        contactPhone: data.contactPhone || '',
-        planId: data.planId,
-        setupFee,
-        monthlyFee,
-        status: 'Pending',
-        salesId: 'sales-1'
-      };
-      await jsonStore.createRecord('temple_applications', newApp);
-    } else {
-      const planRes = await client.query('SELECT * FROM price_plans WHERE id = $1', [data.planId]);
+    const planRes = await client.query('SELECT * FROM price_plans WHERE id = $1', [data.planId]);
       if ((planRes.rowCount ?? 0) > 0) {
-        setupFee = planRes.rows[0].setup_fee;
-        monthlyFee = planRes.rows[0].monthly_fee;
-      }
+              setupFee = planRes.rows[0].setup_fee;
+              monthlyFee = planRes.rows[0].monthly_fee;
+            }
       await client.query(`
         INSERT INTO temple_applications (id, temple_name, contact_person, contact_phone, plan_id, setup_fee, monthly_fee, status, sales_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [newId, data.templeName, data.contactPerson || '聯絡人', data.contactPhone || '', data.planId, setupFee, monthlyFee, 'Pending', 'sales-1']);
-    }
     await revalidateTemple();
     return { success: true };
   });
@@ -6741,58 +5732,23 @@ export async function submitTempleApplication(data: any) {
 export async function approveTempleApplication(appId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const appIdx = (await jsonStore.find('temple_applications')).findIndex(a => a.id === appId);
-      if (appIdx === -1) return { success: false, error: '找不到該筆開案申請' };
-      
-      (await jsonStore.find('temple_applications'))[appIdx].status = 'Approved';
-      const app = (await jsonStore.find('temple_applications'))[appIdx];
-      
-      const newTempleId = `temple-${Date.now()}`;
-      await jsonStore.createRecord('temples', {
-        id: newTempleId,
-        templeName: app.templeName,
-        city: '台北市',
-        status: 'Active',
-        sales_id: app.salesId,
-        setup_fee: app.setupFee,
-        monthly_rent: app.monthlyFee,
-        payment_cycle: 'Monthly'
-      });
-      
-      await jsonStore.createRecord('temple_storages', {
-        id: `ts-${Date.now()}`,
-        templeId: newTempleId,
-        templeName: app.templeName,
-        city: '台北市',
-        usedBytes: 0,
-        quotaGb: 5,
-        planName: '免費 5GB 空間'
-      });
-    } else {
-      const appRes = await client.query('SELECT * FROM temple_applications WHERE id = $1', [appId]);
+    const appRes = await client.query('SELECT * FROM temple_applications WHERE id = $1', [appId]);
       if ((appRes.rowCount ?? 0) === 0) return { success: false, error: '找不到該筆開案申請' };
       const app = appRes.rows[0];
-      
       await client.query('UPDATE temple_applications SET status = $1 WHERE id = $2', ['Approved', appId]);
-      
       const newTempleId = `temple-${Date.now()}`;
       await client.query(`
         INSERT INTO temples (id, temple_name, city, status, sales_id, setup_fee, monthly_rent, payment_cycle)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [newTempleId, app.temple_name, '台北市', 'Active', app.sales_id, app.setup_fee, app.monthly_fee, 'Monthly']);
-      
       await client.query(`
         INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
         VALUES ($1, $2, $3, $4, $5)
       `, [newTempleId, 0, 5368709120, '標準免費空間', '台北市']);
-
-      // 建立宮廟預設主管理員帳號
       await client.query(`
         INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [`p-${Date.now()}`, newTempleId, app.contact_person || '管理員', 'TempleAdmin', app.contact_phone || 'admin', app.contact_phone || '0000', app.contact_phone || 'admin', 'Active']);
-    }
     await revalidateTemple();
     return { success: true };
   });
@@ -6856,10 +5812,7 @@ export async function createNotification(title: string, content: string, sendTim
 export async function fetchTempleNotifications(): Promise<TempleNotification[]> {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return [...(await jsonStore.find('temple_notifications'))].filter((n: any) => !n.templeId || n.templeId === templeId).sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (
           id VARCHAR(50) NOT NULL,
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
@@ -6872,13 +5825,12 @@ export async function fetchTempleNotifications(): Promise<TempleNotification[]> 
       `);
       const res = await client.query('SELECT * FROM temple_notifications WHERE temple_id = $1 ORDER BY send_time DESC', [templeId]);
       return res.rows.map(r => ({
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        sendTime: r.send_time instanceof Date ? r.send_time.toISOString() : r.send_time,
-        createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
-      }));
-    }
+              id: r.id,
+              title: r.title,
+              content: r.content,
+              sendTime: r.send_time instanceof Date ? r.send_time.toISOString() : r.send_time,
+              createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
+            }));
   });
 }
 
@@ -6893,12 +5845,7 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     const now = new Date();
-    if (!client) {
-      return (await jsonStore.find('temple_notifications'))
-        .filter(n => (!n.templeId || n.templeId === templeId) && new Date(n.sendTime).getTime() <= now.getTime())
-        .sort((a, b) => new Date(b.sendTime).getTime() - new Date(a.sendTime).getTime());
-    } else {
-      await client.query(`
+    await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (
           id VARCHAR(50) NOT NULL,
           temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
@@ -6910,17 +5857,16 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
         )
       `);
       const res = await client.query(
-        'SELECT * FROM temple_notifications WHERE temple_id = $1 AND send_time <= $2 ORDER BY send_time DESC',
-        [templeId, now.toISOString()]
-      );
+              'SELECT * FROM temple_notifications WHERE temple_id = $1 AND send_time <= $2 ORDER BY send_time DESC',
+              [templeId, now.toISOString()]
+            );
       return res.rows.map(r => ({
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        sendTime: r.send_time instanceof Date ? r.send_time.toISOString() : r.send_time,
-        createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
-      }));
-    }
+              id: r.id,
+              title: r.title,
+              content: r.content,
+              sendTime: r.send_time instanceof Date ? r.send_time.toISOString() : r.send_time,
+              createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
+            }));
   });
 }
 
@@ -7213,10 +6159,6 @@ export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS
 export async function fetchAuditLogs() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      return (await jsonStore.find('audit_logs')).filter(log => log.templeId === templeId || !log.templeId);
-    }
-    
     try {
       await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
         id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
@@ -7238,7 +6180,7 @@ export async function getTempleBasicInfo(templeId?: string) {
     let t = null;
     if (client) {
       try {
-        const res = await client.query('SELECT * FROM temples WHERE id = $1', [tId]);
+        const res = await client.query('SELECT * FROM "Temple" WHERE id = $1', [tId]);
         if (res.rowCount && res.rowCount > 0) {
           const row = res.rows[0];
           t = {
@@ -7289,7 +6231,7 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
           if (tName) { sets.push(`temple_name = $${sets.length + 1}`); params.push(tName); }
           if (tCity) { sets.push(`city = $${sets.length + 1}`); params.push(tCity); }
           params.push(tId);
-          await client.query(`UPDATE temples SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
+          await client.query(`UPDATE "Temple" SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
         }
       } catch(e) {}
     }
@@ -7369,7 +6311,7 @@ export async function fetchDistributorFinancials(distId: string) {
 
     let bills: any[] = [];
     if (templeIds.length > 0) {
-      const billsRes = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) ORDER BY created_at DESC", [templeIds], () => null) as any;
+      const billsRes = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = ANY($1::varchar[]) ORDER BY created_at DESC", [templeIds], () => null) as any;
       bills = billsRes?.rows || [];
     }
     
@@ -7388,7 +6330,7 @@ export async function fetchDistributorFinancials(distId: string) {
       };
     });
 
-    const salesRes = await dbQuery("SELECT id, name FROM distributor_sales WHERE distributor_id = $1", [distId], () => null) as any;
+    const salesRes = await dbQuery("SELECT id, name FROM dist_sales WHERE \"distributorId\" = $1", [distId], () => null) as any;
     const salesIds = (salesRes?.rows || []).map((s: any) => s.id);
     
     let bonusRequests: any[] = [];
@@ -7416,11 +6358,11 @@ export async function fetchDistributorFinancials(distId: string) {
 export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
   try {
     const { dbQuery } = await import('@/db/db');
-    const salesRes = await dbQuery("SELECT * FROM distributor_sales WHERE distributor_id = $1", [distId], () => null) as any;
+    const salesRes = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distId], () => null) as any;
     const sales = salesRes?.rows || [];
 
     return await Promise.all(sales.map(async (s: any) => {
-      const templesRes = await dbQuery("SELECT * FROM temples WHERE sales_id = $1", [s.id], () => null) as any;
+      const templesRes = await dbQuery("SELECT * FROM \"Temple\" WHERE \"salesId\" = $1", [s.id], () => null) as any;
       const temples = templesRes?.rows || [];
       const templeIds = temples.map((t: any) => t.id);
       
@@ -7428,7 +6370,7 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
       let commission = 0;
 
       if (templeIds.length > 0) {
-        const billsRes = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
+        const billsRes = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
         let bills = billsRes?.rows || [];
         
         if (yearMonth) {
@@ -7487,7 +6429,7 @@ export async function fetchSuperAdminFinancials() {
   let templeBills: any[] = typeof gStore !== 'undefined' ? ((await jsonStore.find('temple_bills')) || (await jsonStore.find('temple_bills'))) : (await jsonStore.find('temple_bills'));
   try {
     const { dbQuery } = await import('@/db/db');
-    const res = await dbQuery("SELECT * FROM temple_bills", [], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
     const rows = res?.rows;
     if (rows) templeBills = rows;
   } catch(e) {}
@@ -7645,7 +6587,7 @@ export async function updateAccountStatus(id: string, role: string, status: 'Act
     const temple = (await getSafeJsonArray('temples')).find(t => t.id === id);
     if (temple) temple.status = status;
     // synced
-    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
+    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
   } else if (role === 'Distributor') {
     const dist = (await jsonStore.find('distributors')).find(d => d.id === id);
     if (dist) dist.status = status;
@@ -7667,15 +6609,15 @@ export async function transferTemples(templeIds: string[], targetId: string | nu
       if (targetRole === 'HQ') {
         temple.distributorId = null;
         temple.salesId = null;
-        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET sales_id = null WHERE id = $1', [tId]); } catch(e){}
+        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]); } catch(e){}
       } else if (targetRole === 'Distributor') {
         temple.distributorId = targetId;
         temple.salesId = null;
-        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET sales_id = null WHERE id = $1', [tId]); } catch(e){}
+        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]); } catch(e){}
       } else if (targetRole === 'SuperSales') {
         temple.distributorId = null;
         temple.salesId = targetId;
-        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE temples SET sales_id = $1 WHERE id = $2', [targetId, tId]); } catch(e){}
+        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET "salesId" = $1 WHERE id = $2', [targetId, tId]); } catch(e){}
       }
     }
   }
@@ -7695,17 +6637,6 @@ export async function confirmPaymentSuccess(orderId: string, method: string) {
 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      // In-memory fallback
-      const app = (await jsonStore.find('appointments')).find(a => a.id === parseInt(orderId) || a.id.toString() === orderId);
-      if (app) { app.paymentStatus = 'Paid'; app.paymentMethod = method; return true; }
-      const reg = (await jsonStore.find('event_registrations')).find(r => r.id === orderId);
-      if (reg) { reg.paymentStatus = 'Paid'; return true; }
-      const tix = (await jsonStore.find('queue_tickets')).find(t => t.id === orderId);
-      if (tix) { tix.paymentStatus = 'Paid'; return true; }
-      return false;
-    }
-    
     // Check appointments
     let res = await client.query('UPDATE appointments SET payment_status = , payment_method =  WHERE id =  RETURNING id', ['Paid', method, parseInt(orderId) || 0]);
     if (res.rowCount > 0) return true;
@@ -7725,47 +6656,18 @@ export async function confirmPaymentSuccess(orderId: string, method: string) {
 export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
+    if (recordType === 'Appointment') {
+              await client.query('UPDATE appointments SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+            }
       if (recordType === 'Lamp') {
-        const idx = (await jsonStore.find('lamp_records')).findIndex((r: any) => r.id === recordId);
-        if (idx > -1) {
-          (await jsonStore.find('lamp_records'))[idx].paymentStatus = 'Unpaid';
-        }
-      }
-      if (recordType === 'Appointment') {
-        const idx = (await jsonStore.find('appointments')).findIndex((r: any) => r.id.toString() === recordId.toString());
-        if (idx > -1) {
-          (await jsonStore.find('appointments'))[idx].paymentStatus = 'Unpaid';
-        }
-      }
+              await client.query('UPDATE lamp_records SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+            }
       if (recordType === 'Event') {
-        const idx = (await jsonStore.find('event_registrations')).findIndex((r: any) => r.id === recordId);
-        if (idx > -1) {
-          (await jsonStore.find('event_registrations'))[idx].paymentStatus = 'Unpaid';
-        }
-      }
+              await client.query('UPDATE event_registrations SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+            }
       if (recordType === 'Queue') {
-        if (typeof (await jsonStore.find('queue_tickets')) !== 'undefined') {
-          const idx = (await jsonStore.find('queue_tickets')).findIndex((r: any) => r.id === recordId);
-          if (idx > -1) {
-            (await jsonStore.find('queue_tickets'))[idx].paymentStatus = 'Unpaid';
-          }
-        }
-      }
-    } else {
-      if (recordType === 'Appointment') {
-        await client.query('UPDATE appointments SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-      }
-      if (recordType === 'Lamp') {
-        await client.query('UPDATE lamp_records SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-      }
-      if (recordType === 'Event') {
-        await client.query('UPDATE event_registrations SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-      }
-      if (recordType === 'Queue') {
-        await client.query('UPDATE queue_tickets SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-      }
-    }
+              await client.query('UPDATE queue_tickets SET payment_status = \'Unpaid\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+            }
     await revalidateTemple();
     return { success: true };
   });
@@ -7775,11 +6677,7 @@ export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Even
 export async function deleteGuestFile(fileId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-       // local memory array deletion handled similarly if gStore has it
-    } else {
-      await client.query('DELETE FROM guest_files WHERE id = $1 AND temple_id = $2', [fileId, templeId]);
-    }
+    await client.query('DELETE FROM guest_files WHERE id = $1 AND temple_id = $2', [fileId, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -7787,27 +6685,15 @@ export async function deleteGuestFile(fileId: string) {
 export async function activateLampRecord(recordId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const idx = (await jsonStore.find('lamp_records')).findIndex((r: any) => r.id === recordId);
-      if (idx > -1) {
-        (await jsonStore.find('lamp_records'))[idx].status = 'Active';
-        (await jsonStore.find('lamp_records'))[idx].startDate = new Date().toISOString().split('T')[0];
-        const expiry = new Date();
-        expiry.setDate(expiry.getDate() + ((await jsonStore.find('lamp_records'))[idx].durationDays || 365));
-        (await jsonStore.find('lamp_records'))[idx].expiryDate = expiry.toISOString().split('T')[0];
-      }
-    } else {
-      const record = await client.query('SELECT lamp_type, created_at FROM lamp_records WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
+    const record = await client.query('SELECT lamp_type, created_at FROM lamp_records WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
       let durationDays = 365;
       if (record.rowCount > 0) {
-         const cat = await client.query('SELECT duration_days FROM lamp_categories WHERE name = $1 AND temple_id = $2', [record.rows[0].lamp_type, templeId]);
-         if (cat.rowCount > 0) durationDays = cat.rows[0].duration_days || 365;
-      }
+               const cat = await client.query('SELECT duration_days FROM lamp_categories WHERE name = $1 AND temple_id = $2', [record.rows[0].lamp_type, templeId]);
+               if (cat.rowCount > 0) durationDays = cat.rows[0].duration_days || 365;
+            }
       const today = new Date();
       const expiry = new Date(today.getTime() + (durationDays * 24 * 60 * 60 * 1000));
       await client.query('UPDATE lamp_records SET status = \'Active\', created_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, today.toISOString()]);
-      // Note: the pg schema in createLampRecord only has created_at, not start_date or expiry_date. We just update created_at so the UI logic counts from today.
-    }
     await revalidateTemple();
     return { success: true };
   });
@@ -7816,14 +6702,7 @@ export async function activateLampRecord(recordId: string) {
 export async function deactivateLampRecord(recordId: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const idx = (await jsonStore.find('lamp_records')).findIndex((r: any) => r.id === recordId);
-      if (idx > -1) {
-        (await jsonStore.find('lamp_records'))[idx].status = 'Pending';
-      }
-    } else {
-      await client.query('UPDATE lamp_records SET status = \'Pending\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-    }
+    await client.query('UPDATE lamp_records SET status = \'Pending\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
     await revalidateTemple();
     return { success: true };
   });
@@ -7997,7 +6876,7 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
     try {
       const { dbQuery } = await import('@/db/db');
       await dbQuery(
-        `INSERT INTO temple_bills (id, temple_id, item_name, amount, due_date, status, payee_role, payee_id) VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
+        `INSERT INTO "TempleBill" (id, temple_id, "itemName", amount, "dueDate", status, "payeeRole", "payeeId") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
         [`BILL-AI-${Date.now()}`, templeId, 'AI 智能管家方案 - ' + plan.name, planPrice, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq'],
         () => null
       );
@@ -8026,7 +6905,7 @@ export async function fetchDataBridgeTree() {
 
   let pgSales: any[] = [];
   try {
-    const resSales = await dbQuery("SELECT * FROM distributor_sales", [], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) pgSales = resSales.rows;
   } catch (e) {}
   const allSalesMap = new Map();
@@ -8036,7 +6915,7 @@ export async function fetchDataBridgeTree() {
 
   let pgTemples: any[] = [];
   try {
-    const resTemples = await dbQuery("SELECT * FROM temples", [], () => null) as any;
+    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) pgTemples = resTemples.rows;
   } catch (e) {}
   const allTemplesMap = new Map();
@@ -8351,7 +7230,7 @@ export async function fetchSalesProfileById(salesId: string) {
     let account = '';
     let distributorId = '';
 
-    const resSales = await dbQuery("SELECT * FROM distributor_sales WHERE id = $1", [salesId], () => null) as any;
+    const resSales = await dbQuery("SELECT * FROM dist_sales WHERE id = $1", [salesId], () => null) as any;
     if (resSales && resSales.rowCount > 0) {
       name = resSales.rows[0].name;
       account = resSales.rows[0].account;
@@ -8386,7 +7265,7 @@ export async function fetchSalesProfileById(salesId: string) {
 export async function fetchTempleBills(templeId: string) {
   try {
     const { dbQuery } = await import('@/db/db');
-    const res = await dbQuery("SELECT * FROM temple_bills WHERE temple_id = $1 ORDER BY created_at DESC", [templeId], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1 ORDER BY created_at DESC", [templeId], () => null) as any;
     if (!res) throw new Error("No DB connection");
     const rows = res?.rows;
     return (rows || []).map((r: any) => ({
@@ -8421,7 +7300,7 @@ export async function uploadTempleBillReceipt(billId: string, imageUrl: string) 
       // (await jsonStore.find('temple_bills')) synced
     }
     const { dbQuery } = await import('@/db/db');
-    await dbQuery("UPDATE temple_bills SET status = 'PendingVerification', receipt_url = $1 WHERE id = $2", [imageUrl, billId]);
+    await dbQuery("UPDATE \"TempleBill\" SET status = 'PendingVerification', receipt_url = $1 WHERE id = $2", [imageUrl, billId]);
     return { success: true };
   } catch (e) {
     return { success: false };
@@ -8433,7 +7312,7 @@ export async function approveTempleBill(billId: string) {
       let rows: any = [];
       try {
         const { dbQuery } = await import('@/db/db');
-        const res = await dbQuery("UPDATE temple_bills SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
+        const res = await dbQuery("UPDATE \"TempleBill\" SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
         if (res && res.rows) rows = res.rows;
       } catch (err) {}
       
@@ -8540,7 +7419,7 @@ export async function toggleBillStatusSimple(billId: string, status: string) {
   try {
       try {
         const { dbQuery } = await import('@/db/db');
-        await dbQuery("UPDATE temple_bills SET status = $1 WHERE id = $2", [status, billId]);
+        await dbQuery("UPDATE \"TempleBill\" SET status = $1 WHERE id = $2", [status, billId]);
       } catch (err) {}
       
       const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
@@ -8582,7 +7461,7 @@ export async function toggleBillStatusSimple(billId: string, status: string) {
 export async function rejectTempleBill(billId: string) {
   try {
       const { dbQuery } = await import('@/db/db');
-      const { rows } = await dbQuery("UPDATE temple_bills SET status = 'PendingPayment', receipt_url = NULL WHERE id = $1 RETURNING temple_id", [billId]) as any;
+      const { rows } = await dbQuery("UPDATE \"TempleBill\" SET status = 'PendingPayment', receipt_url = NULL WHERE id = $1 RETURNING temple_id", [billId]) as any;
       
       const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
       if (bill) {
@@ -8634,7 +7513,7 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
   try {
     const { dbQuery } = await import('@/db/db');
     await dbQuery(
-      "UPDATE distributor_sales SET bank_code = $1, bank_name = $2, bank_account = $3 WHERE id = $4",
+      "UPDATE dist_sales SET bank_code = $1, bank_name = $2, bank_account = $3 WHERE id = $4",
       [bankInfo.bankCode || '', bankInfo.bankName || '', bankInfo.accountNumber || bankInfo.accountNo || '', salesId]
     );
     return { success: true };
@@ -8645,15 +7524,6 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
 
 export async function getLineConfig(templeId: string) {
   return withTempleSession(templeId, false, async (client) => {
-    if (!client) {
-      const t = (await getSafeJsonArray('temples')).find((x: any) => x.id === templeId);
-      return {
-        lineChannelToken: t?.lineChannelToken || '',
-        lineChannelSecret: t?.lineChannelSecret || '',
-        lineLoginClientId: t?.lineLoginClientId || '',
-        linePushEnabled: t?.linePushEnabled || false
-      };
-    }
     const res = await client.query(`
       SELECT line_channel_token, line_channel_secret, line_login_client_id, line_push_enabled 
       FROM temples WHERE id = $1
@@ -8671,17 +7541,6 @@ export async function getLineConfig(templeId: string) {
 
 export async function updateLineConfig(templeId: string, config: any) {
   return withTempleSession(templeId, true, async (client) => {
-    if (!client) {
-      const idx = (await getSafeJsonArray('temples')).findIndex((x: any) => x.id === templeId);
-      if (idx !== -1) {
-         const t = (await getSafeJsonArray('temples'))[idx];
-         t.lineChannelToken = config.lineChannelToken;
-         t.lineChannelSecret = config.lineChannelSecret;
-         t.lineLoginClientId = config.lineLoginClientId;
-         t.linePushEnabled = config.linePushEnabled;
-      }
-      return { success: true };
-    }
     await client.query(`
       UPDATE temples 
       SET line_channel_token = $1, line_channel_secret = $2, line_login_client_id = $3, line_push_enabled = $4
@@ -8739,14 +7598,6 @@ export async function sendLineMessage(templeId: string, lineUserId: string, mess
 export async function bindCustomerLine(templeId: string, phone: string, lineUserId: string) {
   return withTempleSession(templeId, false, async (client) => {
     let normPhone = phone.replace(/\D/g, '');
-    if (!client) {
-      const idx = (await jsonStore.find('guests')).findIndex((g: any) => g.phone === normPhone && g.templeId === templeId);
-      if (idx !== -1) {
-         (await jsonStore.find('guests'))[idx].lineUserId = lineUserId;
-         return { success: true };
-      }
-      return { success: false };
-    }
     await client.query(`UPDATE customers SET line_user_id = $1 WHERE phone = $2 AND temple_id = $3`, [lineUserId, normPhone, templeId]);
     return { success: true };
   });
