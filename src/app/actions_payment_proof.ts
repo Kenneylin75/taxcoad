@@ -3,6 +3,17 @@ import { revalidatePath } from "next/cache";
 import { withTempleSession } from "../db/db";
 import { getDynamicTempleId, revalidateTemple } from "./actions";
 
+export interface AdminNotificationRow {
+  id: string;
+  temple_id: string;
+  guest_id: string | null;
+  category: string;
+  message: string;
+  is_read: boolean;
+  link_path: string | null;
+  created_at: Date | string;
+}
+
 const gStore = globalThis as any;
 
 // Memory stores fallback
@@ -137,7 +148,7 @@ export async function getAdminNotifications() {
     } else {
       try {
           const res = await client.query(`SELECT * FROM admin_notifications WHERE temple_id = $1 ORDER BY created_at DESC`, [templeId]);
-          return JSON.parse(JSON.stringify(res.rows.map(r => ({
+          return JSON.parse(JSON.stringify((res.rows as AdminNotificationRow[]).map((r) => ({
             id: r.id,
             templeId: r.temple_id,
             guestId: r.guest_id,

@@ -3,7 +3,7 @@ import PublicQueueDisplay from "./PublicQueueDisplay";
 
 export default async function LiveQueuePage() {
   const events = (await fetchQueueEvents()) || [];
-  const activeEvent = events.find(e => e.status === 'Active');
+  const activeEvent = events.find((e: { id: string; status: string }) => e.status === 'Active');
   const dashboard = await fetchQueueDashboard(activeEvent?.id);
   
   return (

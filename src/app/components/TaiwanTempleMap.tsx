@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
+import L, { LatLngExpression, DivIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css';
 import 'leaflet-defaulticon-compatibility';
 
-const regionCoordinates: Record<string, [number, number]> = {
+const regionCoordinates: Record<string, LatLngExpression> = {
   '基隆': [25.1276, 121.7392],
   '台北': [25.0330, 121.5654],
   '新北': [25.0110, 121.4653],
@@ -28,7 +28,7 @@ const regionCoordinates: Record<string, [number, number]> = {
   '澎湖': [23.5711, 119.5793],
   '金門': [24.4492, 118.3771],
   '連江': [26.1505, 119.9334],
-  '其他': [23.6978, 120.9605],
+  '其他': [23.6978, 120.9605] as LatLngExpression,
 };
 
 interface MapProps {
@@ -55,7 +55,7 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
   return (
     <div className="w-full h-full rounded-[40px] overflow-hidden relative z-10 isolate" style={{ minHeight: '300px' }}>
       <MapContainer
-        center={[23.6978, 120.9605]} // 台灣中心
+        center={[23.6978, 120.9605] as LatLngExpression} // 台灣中心
         zoom={7}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', background: '#f8fafc' }} // Tailwind slate-50 色系
@@ -81,7 +81,7 @@ export default function TaiwanTempleMap({ distribution }: MapProps) {
             `,
             iconSize: [40, 40],
             iconAnchor: [20, 20],
-          });
+          }) as DivIcon;
 
           return (
             <Marker key={idx} position={position} icon={customIcon}>
