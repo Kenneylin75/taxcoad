@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { ensurePlatformTables } from '@/app/actions';
+
 
 export async function GET() {
   try {
-    await ensurePlatformTables();
+    
     
     // Fix existing bills in memory to point to admin200
     let count = 0;

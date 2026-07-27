@@ -31,7 +31,10 @@ model PricePlan {
 model Distributor {
   id           String   @id @default(cuid())
   name         String
-  status       String   @default("Active")
+  status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   contactName  String?  @map("contact_name")
   contactPhone String?  @map("contact_phone")
   email        String?
@@ -52,6 +55,9 @@ model DistributorSales {
   name          String
   phone         String?
   status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   role          String?
   account       String?
   password      String?
@@ -127,6 +133,9 @@ model Temple {
   address       String?
   phone         String?
   status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   distributorId String?
   salesId       String?
   planId        String?
@@ -224,7 +233,10 @@ model User {
   role        String
   templeId    String?
   phone       String?
-  status      String   @default("Active")
+  status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   permissions Json?
   avatar      String?
   createdAt   DateTime @default(now())
@@ -239,7 +251,10 @@ model Admin {
   account   String?
   password  String?
   role      String?
-  status    String   @default("Active")
+  status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -302,6 +317,9 @@ model Guest {
   email         String?
   password      String?
   status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -366,7 +384,10 @@ model Service {
   price                 Int      @default(0)
   duration              String?
   description           String?
-  status                String   @default("Active")
+  status        String   @default("Active")
+  setupFee      Int      @default(0)
+  monthlyRent   Int      @default(0)
+  paymentCycle  String   @default("Yearly")
   assignedStaff         Json?    @map("assigned_staff")
   color                 String?
   linkedFormId          String?  @map("linked_form_id")

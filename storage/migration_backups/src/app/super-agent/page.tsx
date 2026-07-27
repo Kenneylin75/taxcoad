@@ -1,1 +1,0 @@
-export default function SuperAgentPage() { return <h1>超級業務介面</h1>; }

@@ -1,0 +1,65 @@
+// migrated (await jsonStore.find('services')) to (await jsonStore.find('services'))
+// (await jsonStore.find('services')) synced
+// migrated (await jsonStore.find('print_templates')) to (await jsonStore.find('print_templates'))
+// migrated (await jsonStore.find('forms')) to (await jsonStore.find('forms'))
+// migrated (await jsonStore.find('queue_events')) to (await jsonStore.find('queue_events'))
+// migrated (await jsonStore.find('queue_tickets')) to (await jsonStore.find('queue_tickets'))
+    // (await jsonStore.find('audit_logs')) synced
+// migrated (await jsonStore.find('temple_payment_configs')) to (await jsonStore.find('temple_payment_configs'))
+// migrated (await jsonStore.find('lamp_categories')) to (await jsonStore.find('lamp_categories'))
+// migrated (await jsonStore.find('lamp_records')) to (await jsonStore.find('lamp_records'))
+// migrated (await jsonStore.find('service_settings_mock')) to (await jsonStore.find('service_settings_mock'))
+// migrated (await jsonStore.find('guest_files')) to (await jsonStore.find('guest_files'))
+// migrated (await jsonStore.find('event_registrations')) to (await jsonStore.find('event_registrations'))
+// migrated (await jsonStore.find('activities')) to (await jsonStore.find('activities'))
+// migrated (await jsonStore.find('deep_records')) to (await jsonStore.find('deep_records'))
+// migrated (await jsonStore.find('events')) to (await jsonStore.find('events'))
+// migrated (await jsonStore.find('distributors')) to (await jsonStore.find('distributors'))
+// migrated (await jsonStore.find('dist_sales')) to (await jsonStore.find('dist_sales'))
+// migrated (await jsonStore.find('sales_visits')) to (await jsonStore.find('sales_visits'))
+// migrated (await jsonStore.find('audit_logs')) to (await jsonStore.find('audit_logs'))
+// migrated (await jsonStore.find('tools')) to (await jsonStore.find('tools'))
+// migrated (await jsonStore.find('commissions')) to (await jsonStore.find('commissions'))
+// migrated (await jsonStore.find('admin_logs')) to (await jsonStore.find('admin_logs'))
+// migrated (await jsonStore.find('finance_records')) to finance_records
+// migrated (await jsonStore.find('sync_queue')) to (await jsonStore.find('sync_queue'))
+// migrated (await jsonStore.find('temple_storages')) to (await jsonStore.find('temple_storages'))
+// migrated (await jsonStore.find('temple_bills')) to temple_bills
+// migrated (await jsonStore.find('ai_api_models')) to (await jsonStore.find('ai_api_models'))
+// migrated (await jsonStore.find('temple_ai_usage')) to (await jsonStore.find('temple_ai_usage'))
+// migrated (await jsonStore.find('wallets')) to wallets
+// migrated (await jsonStore.readJson('super_sales_overrides')) to (await jsonStore.readJson('super_sales_overrides'))
+      // (await jsonStore.find('temple_bills')) synced
+    // (await jsonStore.find('distributors')) synced
+  // (await jsonStore.find('dist_sales')) synced
+  // (await jsonStore.find('dist_sales')) synced
+  // (await jsonStore.find('distributors')) synced
+  // (await jsonStore.find('distributors')) synced
+// migrated (await jsonStore.find('bonuses')) to bonuses
+// migrated (await jsonStore.find('withdrawals')) to withdrawals
+// migrated (await jsonStore.find('notifications')) to (await jsonStore.find('notifications'))
+// migrated (await jsonStore.find('password_resets')) to (await jsonStore.find('password_resets'))
+    // (await jsonStore.find('guest_files')) synced
+      // (await jsonStore.find('deep_records')) synced
+      // (await jsonStore.find('activities')) synced
+  // (await jsonStore.find('deep_records')) synced
+  // (await jsonStore.find('activities')) synced
+// migrated (await jsonStore.find('temple_applications')) to (await jsonStore.find('temple_applications'))
+// (await jsonStore.find('temple_applications')) synced
+// migrated (await jsonStore.find('temple_notifications')) to (await jsonStore.find('temple_notifications'))
+// (await jsonStore.find('temple_notifications')) synced
+    // (await jsonStore.find('temple_notifications')) synced
+  // (await jsonStore.find('ai_api_models')) synced
+  // (await jsonStore.find('temple_ai_usage')) synced
+    // (await jsonStore.find('temple_ai_usage')) synced
+    // (await jsonStore.find('temple_ai_usage')) synced
+  // (await jsonStore.find('temple_ai_usage')) synced
+  if (gStore) // (await jsonStore.find('audit_logs')) synced
+      // (await jsonStore.find('distributors')) synced
+    // (await jsonStore.find('distributors')) synced
+    // (await jsonStore.find('dist_sales')) synced
+      // (await jsonStore.find('temple_bills')) synced
+        // (await jsonStore.find('temple_bills')) synced
+              // (await jsonStore.find('temple_ai_usage')) synced
+        // (await jsonStore.find('temple_bills')) synced
+        // (await jsonStore.find('temple_bills')) synced

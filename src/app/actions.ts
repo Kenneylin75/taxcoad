@@ -1,28 +1,17 @@
 // @ts-nocheck
 "use server";
-import * as jsonStore from "@/lib/jsonStore";
-import { initializeStorage } from '@/lib/storageInit';
-let _isStorageInit = false;
-async function ensureStorage() {
-  if (!_isStorageInit) {
-    _isStorageInit = true;
-    await initializeStorage().catch(console.error);
-  }
-}
 
 export async function getSafeJsonArray(collection: string): Promise<any[]> {
-  await ensureStorage();
   try {
-    const data = await jsonStore.find(collection);
+    const data = await [];
     return Array.isArray(data) ? data : [];
   } catch (e) {
     return [];
   }
 }
 export async function getSafeJsonObject(collection: string): Promise<any> {
-  await ensureStorage();
   try {
-    const data = await jsonStore.find(collection);
+    const data = await [];
     return (data && !Array.isArray(data)) ? data : (Array.isArray(data) && data.length > 0 ? data[0] : {});
   } catch (e) {
     return {};
@@ -39,18 +28,18 @@ async function getRoleLabel(name: string): Promise<string> {
   if (!name) return '未知人員';
   
   // 1. Check DistSales (SuperSales / DistSales)
-  const sales = (await jsonStore.find('dist_sales')).find((s: any) => s.name === name);
+  const sales = (await []).find((s: any) => s.name === name);
   if (sales) {
     if (sales.role === 'SuperSales') return `超級業務 ${name}`;
     if (sales.role === 'DistSales') {
-      const dist = (await jsonStore.find('distributors')).find((d: any) => d.id === sales.distributorId);
+      const dist = (await []).find((d: any) => d.id === sales.distributorId);
       const distName = dist ? dist.name : '經銷商';
       return `${distName} 經銷業務 ${name}`;
     }
   }
 
   // 2. Check Distributor Admin
-  const distAdmin = (await jsonStore.find('distributors')).find((d: any) => d.name === name || d.contactName === name);
+  const distAdmin = (await []).find((d: any) => d.name === name || d.contactName === name);
   if (distAdmin) {
     return `經銷商 ${name}`;
   }
@@ -60,21 +49,15 @@ async function getRoleLabel(name: string): Promise<string> {
 }
 
 export async function revalidateTemple(templeId?: string) {
-  try {
-    const tId = templeId || await getDynamicTempleId();
+  const tId = templeId || await getDynamicTempleId();
     revalidatePath(`/${tId}`, 'layout');
     revalidatePath('/super-admin', 'layout');
     revalidatePath('/', 'layout');
-  } catch(e) {}
 }
 
 export async function setGuestTempleContext(templeId: string) {
-  try {
-    const store = await cookies();
+  const store = await cookies();
     store.set('templeId', templeId, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
-  } catch (e: any) {
-    // Silent fail if cookies can't be set
-  }
 }
 
 export async function getDynamicTempleId() {
@@ -89,7 +72,7 @@ export async function getDynamicTempleId() {
 export async function checkTempleSuspension(templeId?: string) {
   const tId = templeId || await getDynamicTempleId();
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1 AND status = 'Unpaid' AND \"dueDate\" < CURRENT_DATE", [tId], () => null) as any;
     const rows = res?.rows;
     return (rows && rows.length > 0);
@@ -126,9 +109,9 @@ const DEFAULT_SERVICES = [
 
 // Ensure core services are present and have correct colors, but DO NOT wipe other services
 for (const ds of DEFAULT_SERVICES) {
-  const existing = (await jsonStore.find('services')).find(s => s.id === ds.id);
+  const existing = (await []).find(s => s.id === ds.id);
   if (!existing) {
-    await jsonStore.createRecord('services', ds);
+    await null;
   } else {
     existing.color = ds.color; // Force update color for demo consistency
   }
@@ -229,9 +212,6 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
   let loggedInName = account;
   let assignedRole = "TempleAdmin";
   let loginStatus = "Active";
-
-  await ensurePlatformTables();
-
   const searchAccount = account.toLowerCase();
 
   if (targetTempleId) {
@@ -399,13 +379,10 @@ export async function checkAccountExists(account: string) {
   return exists;
   if (adminData.some((a: any) => (a.account || "").toLowerCase() === searchAccount)) return true;
   
-  try {
-    const resDist = await dbQuery("SELECT id FROM distributors WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
+  const resDist = await dbQuery("SELECT id FROM distributors WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
     if (resDist && resDist.rowCount > 0) return true;
-    
     const resSales = await dbQuery("SELECT id FROM dist_sales WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
     if (resSales && resSales.rowCount > 0) return true;
-  } catch(e) {}
   
   return false;
 }
@@ -525,7 +502,7 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
       timestamp: new Date().toISOString(),
       performedBy: 'System (Auto)'
     };
-    await jsonStore.createRecord('audit_logs', newLog);
+    await null;
     // (await jsonStore.find('audit_logs')) synced
   }
 }
@@ -835,7 +812,7 @@ export async function deletePrintTemplate(id: string) {
 
 export async function fetchForms() {
   const templeId = await getDynamicTempleId();
-  const current = (await jsonStore.find('forms')) || (await jsonStore.find('forms'));
+  const current = (await []) || (await []);
   const mine = current.filter((f: any) => f.templeId === templeId);
   return JSON.parse(JSON.stringify(mine));
 }
@@ -843,12 +820,12 @@ export async function fetchForms() {
 export async function saveForm(data: any) {
   const templeId = await getDynamicTempleId();
   const id = data.id;
-  const current = (await jsonStore.find('forms')) || (await jsonStore.find('forms'));
+  const current = (await []) || (await []);
   const exists = current.some((f: any) => f.id === id);
   if (exists) {
-    await jsonStore.atomicWrite('forms', (data) => data.map((f: any) => f.id === id ? { ...f, ...data } : f));
+    await null;
   } else {
-    await jsonStore.atomicWrite('forms', (data) => [...data, { id: id || Date.now().toString(), templeId, ...data }]);
+    await null;
   }
   // array synced manually
   await revalidateTemple();
@@ -921,7 +898,7 @@ export async function removeBatchSlots(ids: any[]) {
 
 // 9. 智能分析受影響預約
 export async function analyzeAffectedAppointments(staff: string, start: string, end: string) {
-  return (await jsonStore.find('appointments')).filter((app: any) => 
+  return (await []).filter((app: any) => 
     app.staff === staff && 
     app.date >= start && 
     app.date <= end
@@ -953,7 +930,7 @@ export interface TemplePaymentConfig {
 
 export async function fetchPaymentConfig() {
   const templeId = await getDynamicTempleId();
-  const config = (await jsonStore.find('temple_payment_configs')).find(c => c.templeId === templeId);
+  const config = (await []).find(c => c.templeId === templeId);
   if (config) {
     if (!config.cash) {
       config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
@@ -982,11 +959,11 @@ export async function fetchPaymentConfig() {
 
 export async function savePaymentConfig(data: TemplePaymentConfig) {
   const templeId = await getDynamicTempleId();
-  const idx = (await jsonStore.find('temple_payment_configs')).findIndex(c => c.templeId === templeId);
+  const idx = (await []).findIndex(c => c.templeId === templeId);
   if (idx > -1) {
-    (await jsonStore.find('temple_payment_configs'))[idx] = { ...data, templeId };
+    (await [])[idx] = { ...data, templeId };
   } else {
-    await jsonStore.createRecord('temple_payment_configs', { ...data, templeId });
+    await null;
   }
   await revalidateTemple();
     return { success: true };
@@ -1002,7 +979,7 @@ export async function fetchLampRecords() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
     await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
-    try { await client.query(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS category_id VARCHAR(50)`); } catch(e) {}
+    await client.query(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS category_id VARCHAR(50)`);
     const res = await client.query('SELECT * FROM lamp_records WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
     return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, categoryId: r.category_id, guestName: r.guest_name, phone: r.phone, lampType: r.lamp_type, amount: r.amount, status: r.status, createdAt: r.created_at, paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status }));
   });
@@ -1538,81 +1515,6 @@ export async function deleteEvent(id: string) {
 }
 
 // --- B2B SaaS 平台層資料表初始化 ---
-export async function ensurePlatformTables() {
-  await dbQuery(`
-    CREATE TABLE IF NOT EXISTS distributor_applications (
-      id VARCHAR(50) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      contact_name VARCHAR(255),
-      phone VARCHAR(50),
-      email VARCHAR(255),
-      tax_id VARCHAR(50),
-      address TEXT,
-      plan_id VARCHAR(50),
-      price INTEGER,
-      nodes INTEGER,
-      submitted_by VARCHAR(50),
-      status VARCHAR(50),
-      created_at VARCHAR(50),
-      account VARCHAR(255),
-      password VARCHAR(255),
-      expiration_date VARCHAR(50)
-    );
-  `);
-  await dbQuery(`
-    CREATE TABLE IF NOT EXISTS distributors (
-      id VARCHAR(50) PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      account VARCHAR(255) UNIQUE NOT NULL,
-      password VARCHAR(255) NOT NULL,
-      plan_id VARCHAR(50),
-      plan_name VARCHAR(255),
-      price INTEGER,
-      status VARCHAR(50),
-      quota INTEGER,
-      joined_at VARCHAR(50),
-      expiration_date VARCHAR(50)
-    );
-  `);
-  try {
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS plan_id VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS plan_name VARCHAR(255);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS price INTEGER;`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS quota INTEGER;`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS joined_at VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS expiration_date VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS creator_sales_id VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS phone VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS email VARCHAR(255);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS address VARCHAR(255);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS contact_name VARCHAR(100);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS tax_id VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS bank_code VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS bank_account VARCHAR(100);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);`);
-    await dbQuery(`ALTER TABLE distributors ADD COLUMN IF NOT EXISTS b2b_payment_config JSONB;`);
-    await dbQuery(`ALTER TABLE temple_bills ADD COLUMN IF NOT EXISTS payee_role VARCHAR(50);`);
-    await dbQuery(`ALTER TABLE temple_bills ADD COLUMN IF NOT EXISTS payee_id VARCHAR(100);`);
-    await dbQuery(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;`);
-    await dbQuery(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;`);
-    await dbQuery(`ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;`);
-  } catch(e) {}
-
-  await dbQuery(`
-    CREATE TABLE IF NOT EXISTS dist_sales (
-      id VARCHAR(50) PRIMARY KEY,
-      distributor_id VARCHAR(50),
-      name VARCHAR(255) NOT NULL,
-      account VARCHAR(255) UNIQUE NOT NULL,
-      password VARCHAR(255) NOT NULL,
-      role VARCHAR(50) NOT NULL,
-      status VARCHAR(50),
-      joined_at VARCHAR(50),
-      performance INTEGER DEFAULT 0
-    );
-  `);
-}
-
 // --- B2B SaaS 多租戶與經銷架構全域變數 ---
 // migrated (await jsonStore.find('distributors')) to (await jsonStore.find('distributors'))
 // migrated (await jsonStore.find('dist_sales')) to (await jsonStore.find('dist_sales'))
@@ -1726,9 +1628,9 @@ let db_distributor_applications: any[] = initGlobal('db_distributor_applications
 ]);
 
 
-export async function fetchAdminLogs() { return [...(await jsonStore.find('admin_logs'))].reverse(); }
+export async function fetchAdminLogs() { return [...(await [])].reverse(); }
 export async function logAdminAction(action: string, target: string) {
-  await jsonStore.createRecord('admin_logs', { id: `L-${Date.now()}`, user: 'System Admin', action, target, timestamp: new Date().toLocaleString() });
+  await null;
   return { success: true };
 }
 
@@ -1744,20 +1646,20 @@ export async function createAdminAccount(data: any) {
     return { success: false, error: '帳號已被註冊，請更換' };
   }
   const newAdmin = { id: `adm-${Date.now()}`, ...data, role: 'SuperAdmin' };
-  await jsonStore.createRecord('admins', newAdmin);
+  await null;
   await logAdminAction('CREATE_ADMIN', data.name);
   revalidatePath('/super-admin');
   return { success: true };
 }
 
 export async function fetchFinanceData() {
-  const incomes = (await jsonStore.find('finance_records')).filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
-  const expenses = (await jsonStore.find('finance_records')).filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
+  const incomes = (await []).filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
+  const expenses = (await []).filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
   return {
-    records: (await jsonStore.find('finance_records')),
+    records: (await []),
     summary: {
       totalRevenue: incomes,
-      totalCommission: (await jsonStore.find('finance_records')).filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
+      totalCommission: (await []).filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
       netProfit: incomes - expenses
     }
   };
@@ -1864,7 +1766,7 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
     await client.query(`
-        INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
+        INSERT INTO "TempleBill" (id, "templeId", type, "itemName", amount, "billingDate", "dueDate", status, "payeeRole", "payeeId", "timestamp")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       `, [
               `BILL-STORAGE-${Date.now()}`, templeId, 'StorageUpgrade', `雲端空間擴充方案 - ${plan.name} (${planId})`,
@@ -1881,7 +1783,7 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
     if (!plan) return { success: false, message: '找不到選定的AI方案' };
 
     await client.query(`
-        INSERT INTO temple_bills (id, temple_id, type, item_name, amount, billing_date, due_date, status, payee_role, payee_id, timestamp)
+        INSERT INTO "TempleBill" (id, "templeId", type, "itemName", amount, "billingDate", "dueDate", status, "payeeRole", "payeeId", "timestamp")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       `, [
               `BILL-AI-${Date.now()}`, templeId, 'AiUpgrade', `AI 生活助理 - ${plan.name} (${planId})`,
@@ -2059,7 +1961,7 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
   });
 }
 
-export async function fetchSyncQueue() { return [...(await jsonStore.find('sync_queue'))]; }
+export async function fetchSyncQueue() { return [...(await [])]; }
 
 export async function fetchSystemConfig() {
   const gStore = globalThis as any;
@@ -2067,15 +1969,13 @@ export async function fetchSystemConfig() {
   
   return withTempleSession(null, false, async (client) => {
     if (client) {
-      try {
-        await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
+      await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
         const res = await client.query(`SELECT value FROM system_config WHERE key = 'global'`);
         if (res.rowCount && res.rowCount > 0) {
-          config = res.rows[0].value;
-        } else {
-          await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1)`, [config]);
-        }
-      } catch (e) {}
+                  config = res.rows[0].value;
+                } else {
+                  await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1)`, [config]);
+                }
     }
     
     if (!config.b2bPayment || !config.b2bPayment.thirdParty) {
@@ -2097,18 +1997,16 @@ export async function fetchSystemConfig() {
 }
 
 export async function updateSystemConfig(data: any) {
-  const currentConfig = (await jsonStore.find('config')) || db_config;
+  const currentConfig = (await []) || db_config;
   const newConfig = { ...currentConfig, ...data };
   
-  await jsonStore.atomicWrite('config', () => newConfig);
+  await null;
   db_config = newConfig;
 
   await withTempleSession(null, false, async (client) => {
     if (client) {
-      try {
-        await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
+      await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
         await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [newConfig]);
-      } catch (e) {}
     }
   });
 
@@ -2122,29 +2020,27 @@ export async function updateSystemConfig(data: any) {
 
 // --- 經銷業務 (Dist-Sales) ---
 export async function fetchFreeApplications(distId?: string) { 
-  let list = [...(await getSafeJsonArray('temples'))];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let list = [...(await [])];
+  /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"createdAt\" DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
-      list = res.rows.map((r: any) => ({
-        ...r,
-        id: r.id,
-        templeName: r.temple_name,
-        city: r.city,
-        status: r.status,
-        salesId: r.sales_id,
-        distributorId: r.distributor_id,
-        setupFee: r.setup_fee,
-        monthlyRent: r.monthly_rent,
-        paymentCycle: r.payment_cycle,
-        createdAt: r.created_at
-      }));
-    }
-  } catch (e) {}
+          list = res.rows.map((r: any) => ({
+            ...r,
+            id: r.id,
+            templeName: r.temple_name,
+            city: r.city,
+            status: r.status,
+            salesId: r.sales_id,
+            distributorId: r.distributor_id,
+            setupFee: r.setup_fee,
+            monthlyRent: r.monthly_rent,
+            paymentCycle: r.payment_cycle,
+            createdAt: r.created_at
+          }));
+        }
 
   if (distId) {
-     const allSales2 = await jsonStore.find('dist_sales');
+     const allSales2 = await [];
      list = list.filter((t: any) => {
         if (t.distributorId !== distId) return false;
         const sales = allSales2.find(s => s.id === t.salesId);
@@ -2203,7 +2099,7 @@ export async function generateInitialBills(newTemple: any) {
 
     const storagePlanId = newTemple.cloudStorage;
     if (storagePlanId && storagePlanId.startsWith('SP-')) {
-       const plan = (await jsonStore.find('storage_plans'))?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
+       const plan = (await [])?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
        if (plan) {
          const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
          if (storageFee > 0) {
@@ -2225,11 +2121,11 @@ export async function generateInitialBills(newTemple: any) {
     }
 
     try {
-      const { dbQuery } = await import('@/db/db');
+      /* removed duplicate import */
       for (const newBill of billsToInsert) {
-        const exists = (await jsonStore.find('temple_bills')).find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
+        const exists = (await []).find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
         if (!exists) {
-          await jsonStore.createRecord('temple_bills', newBill);
+          await null;
           await dbQuery(
             "INSERT INTO \"TempleBill\" (id, temple_id, \"itemName\", amount, \"dueDate\", status, \"payeeRole\", \"payeeId\") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)",
             [newBill.id, newTemple.id, newBill.type, newBill.amount, newBill.dueDate, newBill.payeeRole, newBill.payeeId]
@@ -2254,10 +2150,10 @@ export async function submitFreeAccountApplication(data: any) {
   
   const status = (role === 'distributor' || role === 'super-admin' || role === 'dist-sales') ? 'Active' : 'Pending';
 
-  const sales = (await jsonStore.find('dist_sales')).find(s => s.name === data.submittedBy);
+  const sales = (await []).find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
-  const templeNo = (await getSafeJsonArray('temples')).length + 1;
+  const templeNo = (await []).length + 1;
 
       const newTemple = {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
@@ -2281,13 +2177,13 @@ export async function submitFreeAccountApplication(data: any) {
         new Date().toISOString(),
       paymentStatus: 'PendingPayment'
     };
-    await jsonStore.createRecord('temples', newTemple);
+    await null;
     // synced
 
     try {
-      const { dbQuery } = await import('@/db/db');
+      /* removed duplicate import */
       await dbQuery(
-        `INSERT INTO temples (id, temple_name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle)
+        `INSERT INTO "Temple" (id, name, city, status, "salesId", "distributorId", "setupFee", "monthlyRent", "paymentCycle")
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle]
       );
@@ -2308,7 +2204,7 @@ export async function submitFreeAccountApplication(data: any) {
 
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
   if (status === 'Active' && account && password) {
-    const pData = await jsonStore.find('personnel');
+    const pData = await [];
     const pId = `p-${Date.now()}`;
     pData.push({
       id: pId,
@@ -2319,12 +2215,12 @@ export async function submitFreeAccountApplication(data: any) {
       role: 'TempleAdmin',
       status: 'Active'
     });
-    await jsonStore.atomicWrite('personnel', () => pData);
+    await null;
     
     try {
-      const { dbQuery } = await import('@/db/db');
+      /* removed duplicate import */
       await dbQuery(
-        `INSERT INTO personnel (id, temple_id, name, account, password, role, status)
+        `INSERT INTO "User" (id, "templeId", name, account, password, role, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [pId, newTemple.id, data.templeName || '宮廟管理員', account, password, 'TempleAdmin', 'Active']
       );
@@ -2338,13 +2234,7 @@ export async function submitFreeAccountApplication(data: any) {
   }
   
   // Create Notification for Super Admin
-  await jsonStore.createRecord('notifications', {
-    id: `N-${Date.now()}`,
-    title: '新宮廟核定申請',
-    content: `${(await getRoleLabel(data.submittedBy))} 提報了「${newTemple.templeName}」開戶申請。`,
-    date: new Date().toISOString().split('T')[0],
-    isRead: false
-  });
+  await null;
 
   revalidatePath('/dist-sales');
   revalidatePath('/distributor');
@@ -2355,13 +2245,13 @@ export async function submitFreeAccountApplication(data: any) {
 }
 
 export async function approveTempleBySuperAdmin(id: string) {
-  const t = (await getSafeJsonArray('temples')).find(x => x.id === id);
+  const t = (await []).find(x => x.id === id);
    if (t) {
      t.status = 'Active';
      // synced
      await generateInitialBills(t);
      if (t.account && t.password) {
-       const pData = await jsonStore.find('personnel');
+       const pData = await [];
        // check if already exists
        if (!pData.some(p => p.account === t.account)) {
          pData.push({
@@ -2373,7 +2263,7 @@ export async function approveTempleBySuperAdmin(id: string) {
            role: 'TempleAdmin',
            status: 'Active'
          });
-         await jsonStore.atomicWrite('personnel', () => pData);
+         await null;
        }
      }
   }
@@ -2382,25 +2272,23 @@ export async function approveTempleBySuperAdmin(id: string) {
 }
 
 export async function rejectTempleBySuperAdmin(id: string) {
-  const idx = (await getSafeJsonArray('temples')).findIndex(x => x.id === id);
-  if (idx > -1) (await getSafeJsonArray('temples')).splice(idx, 1);
+  const idx = (await []).findIndex(x => x.id === id);
+  if (idx > -1) (await []).splice(idx, 1);
   revalidatePath('/super-admin');
   return { success: true };
 }
 
 export async function fetchPendingDistributors() {
   let pgApps: any[] = [];
-  try {
-    const res = await dbQuery("SELECT * FROM distributor_applications WHERE status = 'Pending'", [], () => null) as any;
+  const res = await dbQuery("SELECT * FROM distributor_applications WHERE status = 'Pending'", [], () => null) as any;
     if (res && res.rows) {
-      pgApps = res.rows.map((r: any) => ({
-        id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
-        taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
-        submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
-        password: r.password, expirationDate: r.expiration_date
-      }));
-    }
-  } catch(e) {}
+          pgApps = res.rows.map((r: any) => ({
+            id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
+            taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
+            submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
+            password: r.password, expirationDate: r.expiration_date
+          }));
+        }
 
   const allApps = new Map();
   db_distributor_applications.filter(a => a.status === 'Pending').forEach(a => allApps.set(a.id, a));
@@ -2412,37 +2300,35 @@ export async function fetchPendingDistributors() {
 export async function approveDistributorBySuperAdmin(id: string, overrideQuota?: number) {
   let app = db_distributor_applications.find(a => a.id === id);
   if (!app) {
-    try {
-      const res = await dbQuery("SELECT * FROM distributor_applications WHERE id = $1", [id], () => null) as any;
+    const res = await dbQuery("SELECT * FROM distributor_applications WHERE id = $1", [id], () => null) as any;
       if (res && res.rows && res.rows.length > 0) {
-        const r = res.rows[0];
-        app = {
-          id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
-          taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
-          submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
-          password: r.password, expirationDate: r.expiration_date
-        };
-      }
-    } catch(e) {}
+              const r = res.rows[0];
+              app = {
+                id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
+                taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
+                submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
+                password: r.password, expirationDate: r.expiration_date
+              };
+            }
   }
 
   if (app) {
     app.status = 'Active';
     const memApp = db_distributor_applications.find(a => a.id === id);
     if (memApp) memApp.status = 'Active';
-    try { await dbQuery("UPDATE distributor_applications SET status = 'Active' WHERE id = $1", [id]); } catch(e) {}
+    await dbQuery("UPDATE distributor_applications SET status = 'Active' WHERE id = $1", [id]);
     
     // 建立實際經銷商帳戶
     const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
     const plan = db_config.distributorPlans.find((p: any) => p.id === app.planId) || db_config.distributorPlans[0];
     
     // 反查業務員實際 ID
-    const actualSales = (await jsonStore.find('dist_sales')).find(s => s.name === app.submittedBy);
+    const actualSales = (await []).find(s => s.name === app.submittedBy);
     
     const accountName = app.account || app.name;
     
     // Prevent duplicate insertion in memory
-    const existingDist = (await jsonStore.find('distributors')).find(d => d.account === accountName);
+    const existingDist = (await []).find(d => d.account === accountName);
     if (existingDist) return { success: true };
 
     const newDist = {
@@ -2471,10 +2357,8 @@ export async function approveDistributorBySuperAdmin(id: string, overrideQuota?:
       }
     };
 
-    await jsonStore.createRecord('distributors', newDist);
+    await null;
     // (await jsonStore.find('distributors')) synced
-    
-    await ensurePlatformTables();
     try {
       await dbQuery(`
         INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date, creator_sales_id, phone, email, address, contact_name, tax_id, bank_code, bank_account, bank_name)
@@ -2496,7 +2380,7 @@ export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: s
     (app as any).rejectReason = rejectReason || '';
     (app as any).rejectedAt = new Date().toISOString();
   }
-  try { await dbQuery("UPDATE distributor_applications SET status = 'Rejected' WHERE id = $1", [id]); } catch(e) {}
+  await dbQuery("UPDATE distributor_applications SET status = 'Rejected' WHERE id = $1", [id]);
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
   return { success: true };
@@ -2504,15 +2388,9 @@ export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: s
 
 export async function updateSuperSalesCommission(salesName: string, rates: any) {
   console.log(`Updating rates for ${salesName}:`, rates);
-  (await jsonStore.readJson('super_sales_overrides'))[salesName] = rates;
+  (await [])[salesName] = rates;
   
-  await jsonStore.createRecord('notifications', {
-    id: `N-COMM-${Date.now()}`,
-    title: '佣金比例異動通知',
-    content: `您的個人分潤比例已由超級管理員調整，請至績效分頁查看。`,
-    date: new Date().toISOString().split('T')[0],
-    isRead: false
-  });
+  await null;
 
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
@@ -2520,19 +2398,17 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
 }
 
 export async function fetchSalesPerformance(salesName: string) { 
-  let listTemples = [...(await getSafeJsonArray('temples'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let listTemples = [...(await [])];
+  let listSales = [...(await [])];
+  /* removed duplicate import */
     const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
-      listTemples = resTemples.rows.map((r: any) => ({ ...r, status: r.status, salesId: r.sales_id }));
-    }
+          listTemples = resTemples.rows.map((r: any) => ({ ...r, status: r.status, salesId: r.sales_id }));
+        }
     const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
-      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, name: r.name, id: r.id }));
-    }
-  } catch(e) {}
+          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, name: r.name, id: r.id }));
+        }
 
   const sales = listSales.find(s => s.name === salesName);
   const myTemples = listTemples.filter(t => t.salesId === sales?.id);
@@ -2543,7 +2419,7 @@ export async function fetchSalesPerformance(salesName: string) {
 }
 
 export async function fetchVisitationRecords(salesName: string) { 
-  return (await jsonStore.find('sales_visits')).filter(v => v.salesName === salesName); 
+  return (await []).filter(v => v.salesName === salesName); 
 }
 
 export async function fetchAllAccountsForAdmin() {
@@ -2553,16 +2429,14 @@ export async function fetchAllAccountsForAdmin() {
   
   // 從 PostgreSQL 撈取系統管理員
   let pgAdmins: any[] = [];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     const resAdmins = await dbQuery("SELECT * FROM \"User\" WHERE role = 'Admin'", [], () => null) as any;
     if (resAdmins && resAdmins.rows) {
-      pgAdmins = resAdmins.rows;
-    }
-  } catch (e) {}
+          pgAdmins = resAdmins.rows;
+        }
 
   const allAdminsMap = new Map();
-  (await jsonStore.find('personnel')).forEach(p => {
+  (await []).forEach(p => {
     if (p.role === 'Admin') allAdminsMap.set(p.account, p);
   });
   pgAdmins.forEach(p => {
@@ -2574,15 +2448,13 @@ export async function fetchAllAccountsForAdmin() {
 
   // 從 PostgreSQL 取出所有的經銷商
   let pgDistributors: any[] = [];
-  try {
-    const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
+  const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
     if (resDist && resDist.rows) {
-      pgDistributors = resDist.rows;
-    }
-  } catch (e) {}
+          pgDistributors = resDist.rows;
+        }
 
   const allDistributorsMap = new Map();
-  (await jsonStore.find('distributors')).forEach(d => {
+  (await []).forEach(d => {
     allDistributorsMap.set(d.account, d);
   });
   pgDistributors.forEach(d => {
@@ -2595,18 +2467,16 @@ export async function fetchAllAccountsForAdmin() {
 
   // 從 PostgreSQL 取出所有的業務員
   let pgSales: any[] = [];
-  try {
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
+  const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
-      pgSales = resSales.rows;
-    }
-  } catch (e) {}
+          pgSales = resSales.rows;
+        }
 
   const allSalesMap = new Map();
-  (await jsonStore.find('dist_sales')).forEach(s => allSalesMap.set(s.account, s));
+  (await []).forEach(s => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
-  const superOverrides = await jsonStore.readJson('super_sales_overrides');
+  const superOverrides = await [];
   for (const s of Array.from(allSalesMap.values()) as any[]) {
     if (s.role === 'SuperSales') {
       const overrides = superOverrides[s.name];
@@ -2615,8 +2485,8 @@ export async function fetchAllAccountsForAdmin() {
     }
   }
   
-  const templePromises = (await getSafeJsonArray('temples')).map(async t => {
-    const personnel = (await jsonStore.find('personnel')).find(p => p.templeId === t.id);
+  const templePromises = (await []).map(async t => {
+    const personnel = (await []).find(p => p.templeId === t.id);
     const creatorInfo = await getTempleCreatorInfo(t.id);
     return { 
       ...t,
@@ -2638,18 +2508,16 @@ export async function fetchAllAccountsForAdmin() {
 
 export async function fetchSuperSalesAccounts() {
   let pgSales: any[] = [];
-  try {
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
+  const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
-      pgSales = resSales.rows;
-    }
-  } catch (e) {}
+          pgSales = resSales.rows;
+        }
   
   const allSalesMap = new Map();
-  (await jsonStore.find('dist_sales')).forEach(s => allSalesMap.set(s.account, s));
+  (await []).forEach(s => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
-  const superOverrides = await jsonStore.readJson('super_sales_overrides');
+  const superOverrides = await [];
   return Array.from(allSalesMap.values()).filter((s: any) => s.role === 'SuperSales').map(ss => ({
     ...ss,
     rates: superOverrides[ss.name] || db_config.defaultSuperSalesRates
@@ -2658,16 +2526,12 @@ export async function fetchSuperSalesAccounts() {
 
 
 export async function addVisitationRecord(data: any) { 
-  await jsonStore.createRecord('sales_visits', {
-    id: `visit-${Date.now()}`,
-    ...data,
-    timestamp: new Date().toISOString()
-  });
+  await null;
   revalidatePath('/dist-sales');
   return { success: true }; 
 }
 
-export async function fetchSalesTools() { return [...(await jsonStore.find('tools'))]; }
+export async function fetchSalesTools() { return [...(await [])]; }
 export async function uploadTool(formData: FormData) {
   const type = formData.get('type') as string;
   const title = formData.get('title') as string;
@@ -2695,7 +2559,7 @@ export async function uploadTool(formData: FormData) {
   }
 
   const uploadedAt = new Date().toISOString().split('T')[0];
-  await jsonStore.createRecord('tools', { id: 'tool-' + Date.now(), uploadedAt, type, title, category, thumbnail, url });
+  await null;
   
   const { revalidatePath } = require('next/cache');
   revalidatePath('/super-admin');
@@ -2723,25 +2587,21 @@ export async function createDistributorSales(distId: string, data: any) {
     status: 'Active'
   };
   
-  await jsonStore.createRecord('dist_sales', newSales);
+  await null;
   // (await jsonStore.find('dist_sales')) synced
-
-  await ensurePlatformTables();
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     await dbQuery(`
       INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
     `, [newSales.id, distId, name, account, password, 'DistSales', 'Active', newSales.joinedAt]);
-  } catch(e) {}
 
   return { success: true, data: newSales };
 }
 export async function deleteTool(toolId: string) {
-  const idx = (await jsonStore.find('tools')).findIndex((t: any) => t.id === toolId);
+  const idx = (await []).findIndex((t: any) => t.id === toolId);
   if (idx > -1) {
-    (await jsonStore.find('tools')).splice(idx, 1);
+    (await []).splice(idx, 1);
     revalidatePath('/super-admin');
     revalidatePath('/distributor');
     revalidatePath('/dist-sales');
@@ -2753,23 +2613,20 @@ export async function deleteTool(toolId: string) {
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
 export async function fetchDistributorCapacity(distId?: string) { 
-  let listTemples = [...(await getSafeJsonArray('temples'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listTemples = [...(await [])];
+  let listSales = [...(await [])];
 
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
-      listTemples = resTemples.rows.map((r: any) => ({
-        ...r, distributorId: r.distributor_id, salesId: r.sales_id
-      }));
-    }
-
+          listTemples = resTemples.rows.map((r: any) => ({
+            ...r, distributorId: r.distributor_id, salesId: r.sales_id
+          }));
+        }
     const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
-      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
-    }
-  } catch (e) {}
+          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
+        }
 
   const used = distId ? listTemples.filter(t => {
      if (t.distributorId !== distId) return false;
@@ -2831,8 +2688,6 @@ export async function submitDistributorApplication(data: any) {
     expirationDate: expirationDate.toISOString().split('T')[0]
   };
   db_distributor_applications.push(newApp);
-
-  await ensurePlatformTables();
   try {
     await dbQuery(`
       INSERT INTO distributor_applications (id, name, contact_name, phone, email, tax_id, address, plan_id, price, nodes, submitted_by, status, created_at, account, password, expiration_date)
@@ -2846,13 +2701,7 @@ export async function submitDistributorApplication(data: any) {
     console.error("Failed to insert distributor_application:", e);
   }
 
-  await jsonStore.createRecord('notifications', {
-    id: `N-DIST-${Date.now()}`,
-    title: '新經銷商授權申請',
-    content: `${(await getRoleLabel(data.submittedBy))} 提交了「${data.name}」的經銷授權申請案。`,
-    date: new Date().toISOString().split('T')[0],
-    isRead: false
-  });
+  await null;
 
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
@@ -2860,19 +2709,17 @@ export async function submitDistributorApplication(data: any) {
 }
 
 export async function fetchSuperSalesProfile(salesId: string) {
-  let listSales = [...(await jsonStore.find('dist_sales'))];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let listSales = [...(await [])];
+  /* removed duplicate import */
     const resSales = await dbQuery("SELECT * FROM dist_sales WHERE id = $1", [salesId], () => null) as any;
     if (resSales && resSales.rows && resSales.rows.length > 0) {
-       const r = resSales.rows[0];
-       listSales = [{ ...r, role: r.role, bankInfo: { bankCode: r.bank_code, accountNumber: r.bank_account, bankName: r.bank_name } }];
-    }
-  } catch(e) {}
+           const r = resSales.rows[0];
+           listSales = [{ ...r, role: r.role, bankInfo: { bankCode: r.bank_code, accountNumber: r.bank_account, bankName: r.bank_name } }];
+        }
   
-  const salesPerson = listSales.find(s => s.id === salesId) || listSales[0] || (await jsonStore.find('dist_sales'))[0];
+  const salesPerson = listSales.find(s => s.id === salesId) || listSales[0] || (await [])[0];
   const name = salesPerson?.name || '超級精英業務';
-  const commissionRates = salesPerson?.commissionRules || (await jsonStore.readJson('super_sales_overrides'))[name] || db_config.defaultSuperSalesRates;
+  const commissionRates = salesPerson?.commissionRules || (await [])[name] || db_config.defaultSuperSalesRates;
   return {
     name: name,
     rank: '超級精英業務',
@@ -2887,7 +2734,7 @@ export async function fetchSuperSalesProfile(salesId: string) {
 }
 
 export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bankName: string, accountName: string, accountNumber: string }) {
-  const salesPerson = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+  const salesPerson = (await []).find(s => s.id === salesId);
   if (salesPerson) {
     salesPerson.bankInfo = bankInfo;
     revalidatePath('/super-sales/[salesId]', 'page');
@@ -2898,7 +2745,7 @@ export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bank
 }
 
 export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: string, email: string }) {
-  const salesPerson = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+  const salesPerson = (await []).find(s => s.id === salesId);
   if (salesPerson) {
     salesPerson.phone = data.phone;
     salesPerson.email = data.email;
@@ -2910,42 +2757,38 @@ export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: 
 }
 
 export async function fetchSuperSalesRegistry(salesId: string) {
-  let listTemples = [...(await getSafeJsonArray('temples'))];
-  let listDistributors = [...(await jsonStore.find('distributors'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
+  let listTemples = [...(await [])];
+  let listDistributors = [...(await [])];
+  let listSales = [...(await [])];
 
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
-      listTemples = resTemples.rows.map((r: any) => ({
-        ...r,
-        status: r.status,
-        templeName: r.temple_name,
-        salesId: r.sales_id,
-        distributorId: r.distributor_id,
-        monthlyRent: r.monthly_rent,
-        setupFee: r.setup_fee,
-        paymentCycle: r.payment_cycle,
-        timestamp: r.created_at
-      }));
-    }
-
+          listTemples = resTemples.rows.map((r: any) => ({
+            ...r,
+            status: r.status,
+            templeName: r.temple_name,
+            salesId: r.sales_id,
+            distributorId: r.distributor_id,
+            monthlyRent: r.monthly_rent,
+            setupFee: r.setup_fee,
+            paymentCycle: r.payment_cycle,
+            timestamp: r.created_at
+          }));
+        }
     const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
     if (resDist && resDist.rows) {
-      listDistributors = resDist.rows.map((r: any) => ({
-        ...r,
-        creatorSalesId: r.creator_sales_id,
-        salesId: r.creator_sales_id,
-        planId: r.plan_id
-      }));
-    }
-
+          listDistributors = resDist.rows.map((r: any) => ({
+            ...r,
+            creatorSalesId: r.creator_sales_id,
+            salesId: r.creator_sales_id,
+            planId: r.plan_id
+          }));
+        }
     const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
-      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
-    }
-  } catch (e) {}
+          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
+        }
 
   const sales = listSales.find(s => s.id === salesId);
   const name = sales?.name;
@@ -3001,12 +2844,10 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     };
   });
 
-  const pendingTempleCount = (await jsonStore.find('temple_applications')).filter(a => a.submittedBy === name && a.status === 'Pending').length;
+  const pendingTempleCount = (await []).filter(a => a.submittedBy === name && a.status === 'Pending').length;
   let pgPendingDistCount = 0;
-  try {
-    const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name], () => null) as any;
+  const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name], () => null) as any;
     if (res && res.rows && res.rows.length > 0) pgPendingDistCount = parseInt(res.rows[0].count);
-  } catch(e) {}
 
   const memPendingDistCount = db_distributor_applications.filter(a => a.submittedBy === name && a.status === 'Pending').length;
   const pendingDistCount = Math.max(pgPendingDistCount, memPendingDistCount);
@@ -3044,42 +2885,23 @@ export async function createSuperSalesAccount(data: any) {
     joinedAt: new Date().toISOString().split('T')[0]
   };
   
-  await jsonStore.createRecord('dist_sales', {
-    id,
-    name: data.name,
-    account: safeAccount,
-    password: (data.password || '').trim(),
-    phone: data.phone,
-    email: data.email,
-    bankInfo: {
-      bankName: data.bankName,
-      accountName: data.accountName,
-      accountNumber: data.accountNumber
-    },
-    role: 'SuperSales',
-    commissionRules: commissionRates
-  });
+  await null;
 
-  (await jsonStore.readJson('super_sales_overrides'))[data.name] = commissionRates;
+  (await [])[data.name] = commissionRates;
   // (await jsonStore.find('dist_sales')) synced
 
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     await dbQuery(`
       INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
     `, [id, null, data.name, safeAccount, (data.password || '').trim(), 'SuperSales', 'Active', newAccount.joinedAt]);
-  } catch(e) {}
-
-  await ensurePlatformTables();
-
   revalidatePath('/super-admin');
   return { success: true, id };
 }
 
 export async function updateDistributorQuota(distId: string, newQuota: number) {
-  const dist = (await jsonStore.find('distributors')).find((d: any) => d.id === distId || d.account === distId);
+  const dist = (await []).find((d: any) => d.id === distId || d.account === distId);
   if (dist) {
     dist.quota = newQuota;
     dist.customNodes = newQuota;
@@ -3143,7 +2965,7 @@ export async function createDistributorAccount(data: any) {
     creatorSalesId: 'SuperAdmin'
   };
   
-  await jsonStore.createRecord('distributors', newDist);
+  await null;
   
   db_distributor_applications.push({
     id: `DAPP-${id}`,
@@ -3159,8 +2981,6 @@ export async function createDistributorAccount(data: any) {
   });
   
   // (await jsonStore.find('distributors')) synced
-
-  await ensurePlatformTables();
   try {
     await dbQuery(`
       INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date, creator_sales_id, phone, email, address, contact_name, tax_id, bank_code, bank_account, bank_name)
@@ -3183,7 +3003,7 @@ export async function createTempleAccount(data: any) {
   const creatorRole = reqRole;
   const creatorId = currentUser.name;
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
-    const templeNo = (await getSafeJsonArray('temples')).length + 1;
+    const templeNo = (await []).length + 1;
   const { paymentCycle, ...rest } = data;
   
   const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || db_config.fixedMonthlyRent);
@@ -3209,7 +3029,7 @@ export async function createTempleAccount(data: any) {
       new Date(Date.now() + (5 * 24 * 60 * 60 * 1000)).toISOString()
   };
   
-  await jsonStore.createRecord('temples', newTemple);
+  await null;
   // synced
   
   // Initialize temple storage immediately to prevent overriding
@@ -3221,7 +3041,7 @@ export async function createTempleAccount(data: any) {
       pName = '無限免費方案';
   } else if (newTemple.cloudStorage) {
      if (newTemple.cloudStorage.startsWith('SP-')) {
-         const p = (await jsonStore.find('storage_plans'))?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
+         const p = (await [])?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
          if (p) { qGB = p.sizeGb; pName = p.name; }
      } else {
          qGB = parseInt(newTemple.cloudStorage) || 5;
@@ -3238,11 +3058,11 @@ export async function createTempleAccount(data: any) {
     planName: pName
   };
   
-  await jsonStore.createRecord('temple_storages', newStorage);
+  await null;
   
   // Create personnel account for login
   if (data.account && data.password) {
-    const pData = await jsonStore.find('personnel');
+    const pData = await [];
     pData.push({
       id: `p-${Date.now()}`,
       templeId: id,
@@ -3252,29 +3072,23 @@ export async function createTempleAccount(data: any) {
       role: 'TempleAdmin',
       status: 'Active'
     });
-    await jsonStore.atomicWrite('personnel', () => pData);
+    await null;
   }
-
-  await ensurePlatformTables();
-  try {
-      const { dbQuery } = await import('@/db/db');
-      await dbQuery(`
-        INSERT INTO temples (id, temple_name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle)
+  /* removed duplicate import */
+    await dbQuery(`
+        INSERT INTO "Temple" (id, name, city, status, "salesId", "distributorId", "setupFee", "monthlyRent", "paymentCycle")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [id, newTemple.templeName, newTemple.city || '台北市', 'Active', newTemple.salesId, newTemple.distributorId || null, newTemple.setupFee || 0, newTemple.monthlyRent, newTemple.paymentCycle]);
-      
-      await dbQuery(`
+    await dbQuery(`
         INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
         VALUES ($1, $2, $3, $4, $5)
       `, [id, 0, newStorage.quotaGb * 1024 * 1024 * 1024, newStorage.planName, '台北市']);
-      
-      if (data.account && data.password) {
-        await dbQuery(`
-          INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status)
+    if (data.account && data.password) {
+            await dbQuery(`
+          INSERT INTO "User" (id, "templeId", name, role, account, phone, password, status)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `, [`p-${Date.now()}`, id, data.name || '宮廟管理員', 'TempleAdmin', data.account, data.account, data.password, 'Active']);
-      }
-  } catch(e) {}
+          }
 
     // Deduct quota if Distributor/Sales
     const { cookies } = require("next/headers");
@@ -3284,7 +3098,7 @@ export async function createTempleAccount(data: any) {
   
     if (currentRole === 'Distributor' || currentRole === 'DistSales') {
       if (currentRole === 'Distributor') {
-        const dist = (await jsonStore.find('distributors')).find((d: any) => d.account === accountStr);
+        const dist = (await []).find((d: any) => d.account === accountStr);
         if (dist) {
            if (dist.quota <= 0) return { success: false, message: '配額已耗盡，無法開設新宮廟' };
            dist.quota -= 1;
@@ -3308,18 +3122,18 @@ export async function createTempleAccount(data: any) {
 
 export async function fetchAggregatedAnalytics(targetYear?: string) {
   const currentYear = targetYear || new Date().getFullYear().toString();
-  const totalTemples = (await getSafeJsonArray('temples')).length;
-  const activeTemples = (await getSafeJsonArray('temples')).filter(t => t.status === 'Active').length;
-  const totalDistributors = (await jsonStore.find('distributors')).length;
-  const totalSuperSales = (await jsonStore.find('dist_sales')).filter(s => s.role === 'SuperSales').length;
+  const totalTemples = (await []).length;
+  const activeTemples = (await []).filter(t => t.status === 'Active').length;
+  const totalDistributors = (await []).length;
+  const totalSuperSales = (await []).filter(s => s.role === 'SuperSales').length;
   
-  const monthlyRevenue = (await jsonStore.find('temple_bills')).filter(b => b.status === 'Paid').reduce((sum, b) => sum + Number(b.amount || 0), 0);
+  const monthlyRevenue = (await []).filter(b => b.status === 'Paid').reduce((sum, b) => sum + Number(b.amount || 0), 0);
   const regionCounts: Record<string, number> = {};
   const majorRegions = [
     '基隆', '台北', '新北', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', 
     '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'
   ];
-  (await getSafeJsonArray('temples')).forEach(t => {
+  (await []).forEach(t => {
     if (t.status !== 'Active') return;
     
     let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
@@ -3333,7 +3147,7 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
 
   const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
   
-  const _allTemplesForStats = await getSafeJsonArray("temples");
+  const _allTemplesForStats = await [];
   const growthTrend = Array.from({ length: 12 }).map((_, i) => {
     const month = String(i + 1).padStart(2, '0');
     const prefix = `${currentYear}-${month}`;
@@ -3357,43 +3171,38 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
 
 
 export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
-  let listTemples = [...(await getSafeJsonArray('temples'))];
-  let listSales = [...(await jsonStore.find('dist_sales'))];
-  let listBills = [...(await jsonStore.find('temple_bills'))];
-  let listWithdrawals = [...((await jsonStore.find('withdrawals')) || [])];
+  let listTemples = [...(await [])];
+  let listSales = [...(await [])];
+  let listBills = [...(await [])];
+  let listWithdrawals = [...((await []) || [])];
 
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) {
-      listTemples = resTemples.rows.map((r: any) => ({
-        ...r,
-        status: r.status,
-        templeName: r.temple_name,
-        salesId: r.sales_id,
-        distributorId: r.distributor_id,
-        monthlyRent: r.monthly_rent,
-        setupFee: r.setup_fee,
-        paymentCycle: r.payment_cycle,
-        timestamp: r.created_at
-      }));
-    }
-
+          listTemples = resTemples.rows.map((r: any) => ({
+            ...r,
+            status: r.status,
+            templeName: r.temple_name,
+            salesId: r.sales_id,
+            distributorId: r.distributor_id,
+            monthlyRent: r.monthly_rent,
+            setupFee: r.setup_fee,
+            paymentCycle: r.payment_cycle,
+            timestamp: r.created_at
+          }));
+        }
     const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) {
-      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
-    }
-
+          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
+        }
     const resBills = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
     if (resBills && resBills.rows) {
-      listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
-    }
-
+          listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
+        }
     const resWD = await dbQuery("SELECT * FROM \"Withdrawal\"", [], () => null) as any;
     if (resWD && resWD.rows) {
-      listWithdrawals = resWD.rows.map((r: any) => ({ ...r, salesName: r.sales_name, status: r.status, amount: r.amount }));
-    }
-  } catch (e) {}
+          listWithdrawals = resWD.rows.map((r: any) => ({ ...r, salesName: r.sales_name, status: r.status, amount: r.amount }));
+        }
 
   const sales = listSales.find(s => s.id === salesId);
   const salesName = sales?.name;
@@ -3413,7 +3222,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   let totalRevenue = 0;
   const records: any[] = [];
   
-  const overrides = salesName ? (await jsonStore.readJson('super_sales_overrides'))[salesName] : null;
+  const overrides = salesName ? (await [])[salesName] : null;
   const rules = sales?.commissionRules || overrides || db_config.defaultSuperSalesRates;
   const setupRate = rules.templeSetupRate ?? rules.setupFeePercent ?? 20;
   const rentY1 = rules.templeRentRates?.[0] ?? rules.rentYear1Percent ?? 15;
@@ -3476,7 +3285,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   });
   
   // 3. 手動獎金覆寫 (Bonus Overrides)
-  const myBonuses = (await jsonStore.find('bonuses')).filter(b => b.salesName === salesName);
+  const myBonuses = (await []).filter(b => b.salesName === salesName);
   myBonuses.forEach(b => {
     totalEarned += b.amount;
     records.push({
@@ -3490,21 +3299,19 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     });
   });
   
-  let myWithdrawals = (await jsonStore.find('withdrawals')).filter(w => w.salesName === salesName);
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let myWithdrawals = (await []).filter(w => w.salesName === salesName);
+  /* removed duplicate import */
     const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
     const myBonusRequests = (rows || []).map((r: any) => ({
-      id: r.id,
-      salesName: r.sales_name,
-      amount: r.amount,
-      date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
-      status: r.status,
-      receiptUrl: r.receipt_url,
-      method: r.method
-    }));
+          id: r.id,
+          salesName: r.sales_name,
+          amount: r.amount,
+          date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
+          status: r.status,
+          receiptUrl: r.receipt_url,
+          method: r.method
+        }));
     myWithdrawals = [...myWithdrawals, ...myBonusRequests];
-  } catch (e) { }
   
   const pendingRequests = myWithdrawals.filter(w => w.status === 'Pending' || w.status === '審核中');
   const calculatedTotalWithdrawn = myWithdrawals.filter(w => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').reduce((acc, curr) => acc + curr.amount, 0);
@@ -3583,12 +3390,10 @@ export async function addSalesMember(data: any) {
     },
     ...data 
   };
-  await jsonStore.createRecord('dist_sales', newSales);
-
-  await ensurePlatformTables();
+  await null;
   try {
     await dbQuery(`
-      INSERT INTO distributor_sales (id, distributor_id, name, account, password, role, status, joined_at)
+      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT DO NOTHING
     `, [newSales.id, newSales.distributorId, newSales.name || '未命名業務員', newSales.account, newSales.password, newSales.role, newSales.status, newSales.joinedAt]);
@@ -3600,14 +3405,12 @@ export async function addSalesMember(data: any) {
 }
 export async function fetchDistributorTeam(distributorId: string) {
   let pgSales: any[] = [];
-  try {
-    const res = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
+  const res = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
     if (res && res.rows) {
-      pgSales = res.rows;
-    }
-  } catch (e) {}
+          pgSales = res.rows;
+        }
 
-  const memSales = (await jsonStore.find('dist_sales')).filter(s => s.distributorId === distributorId);
+  const memSales = (await []).filter(s => s.distributorId === distributorId);
   const salesMap = new Map();
   memSales.forEach(s => salesMap.set(s.id, s));
   pgSales.forEach(s => salesMap.set(s.id, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
@@ -3616,7 +3419,7 @@ export async function fetchDistributorTeam(distributorId: string) {
 }
 export async function fetchDistributorTemples(distributorId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const query = `
       SELECT t.* 
       FROM temples t
@@ -3629,8 +3432,8 @@ export async function fetchDistributorTemples(distributorId: string) {
     
     // Fallback to memory
     if (temples.length === 0) {
-      const allDistSales = await jsonStore.find('dist_sales');
-      temples = (await getSafeJsonArray('temples')).filter(t => {
+      const allDistSales = await [];
+      temples = (await []).filter(t => {
          if (t.distributorId !== distributorId) return false;
          const sales = allDistSales.find(s => s.id === t.salesId);
          if (sales && sales.role === 'SuperSales') return false;
@@ -3638,7 +3441,7 @@ export async function fetchDistributorTemples(distributorId: string) {
       });
     }
     
-    const discountRate = (await jsonStore.find('config'))?.yearlyDiscountRate || 20;
+    const discountRate = (await [])?.yearlyDiscountRate || 20;
     return temples.map((t: any) => {
        const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
        return { ...t, templeName: t.temple_name || t.name, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
@@ -3648,20 +3451,18 @@ export async function fetchDistributorTemples(distributorId: string) {
   }
 }
 export async function fetchDistributorVisits(distributorId: string) {
-  let listSales = [...(await jsonStore.find('dist_sales'))];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let listSales = [...(await [])];
+  /* removed duplicate import */
     const resSales = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
     if (resSales && resSales.rows) {
-      listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
-    }
-  } catch(e) {}
+          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
+        }
   const teamIds = listSales.filter(s => s.distributorId === distributorId).map(s => s.name);
-  return (await jsonStore.find('sales_visits')).filter(v => teamIds?.includes(v.salesName));
+  return (await []).filter(v => teamIds?.includes(v.salesName));
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const query = `
       SELECT t.* 
       FROM temples t
@@ -3715,20 +3516,18 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
   }
 }
 export async function approveTempleByDistributor(templeId: string) {
-  const t = (await getSafeJsonArray('temples')).find(x => x.id === templeId);
+  const t = (await []).find(x => x.id === templeId);
   if (t) {
     t.status = 'Active';
     const gStore = globalThis as any;
     // synced
     
-    try {
-      const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
       await dbQuery(`UPDATE "Temple" SET status = 'Active' WHERE id = $1`, [templeId]);
-    } catch (e) {}
     
     await generateInitialBills(t);
     if (t.account && t.password) {
-      const pData = await jsonStore.find('personnel');
+      const pData = await [];
       const newPersonId = `p-${Date.now()}`;
       if (!pData.some((p:any) => p.account === t.account)) {
         pData.push({
@@ -3740,13 +3539,13 @@ export async function approveTempleByDistributor(templeId: string) {
           role: 'TempleAdmin',
           status: 'Active'
         });
-        await jsonStore.atomicWrite('personnel', () => pData);
+        await null;
         
         // Ensure insertion into PostgreSQL
         try {
-          const { dbQuery } = await import('@/db/db');
+          /* removed duplicate import */
           await dbQuery(
-            `INSERT INTO personnel (id, temple_id, name, account, password, role, status)
+            `INSERT INTO "User" (id, "templeId", name, account, password, role, status)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT (id, temple_id) DO NOTHING`,
             [newPersonId, templeId, t.templeName || '宮廟管理員', t.account, t.password, 'TempleAdmin', 'Active'],
@@ -3763,7 +3562,7 @@ export async function approveTempleByDistributor(templeId: string) {
   return { success: true };
 }
 export async function rejectTempleByDistributor(templeId: string) { 
-  await jsonStore.deleteRecord('temples', templeId);
+  await null;
   revalidatePath('/distributor');
   revalidatePath('/dist-sales');
   return { success: true }; 
@@ -3805,14 +3604,14 @@ export async function fetchComplexAnalyticsData() {
     }
   };
 
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  (await []).forEach((a: any) => {
     if (a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid' && a.status !== 'Cancelled') {
       addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0, a.templeId);
     }
   });
 
-  const allLampCats = await jsonStore.find('lamp_categories');
-  (await jsonStore.find('lamp_records')).forEach((r: any) => {
+  const allLampCats = await [];
+  (await []).forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
@@ -3823,19 +3622,19 @@ export async function fetchComplexAnalyticsData() {
     }
   });
 
-  (await jsonStore.find('event_registrations')).forEach((r: any) => {
+  (await []).forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0, r.templeId);
     }
   });
 
-  (await jsonStore.find('queue_tickets')).forEach((t: any) => {
+  (await []).forEach((t: any) => {
     if (t.paymentStatus === 'Paid' || t.status === 'Paid') {
       addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(t.price || 0) || 0, t.templeId);
     }
   });
 
-  (await jsonStore.find('deep_records')).forEach((r: any) => {
+  (await []).forEach((r: any) => {
     if ((r.id.startsWith('MERIT-') || r.serviceType?.includes('功德')) && (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid')) {
       let amt = 0;
       if (r.values && r.values['金額']) {
@@ -3858,7 +3657,7 @@ export async function fetchComplexAnalyticsData() {
   
   let totalGuests = 0;
 
-  (await jsonStore.find('guests')).forEach((g: any) => {
+  (await []).forEach((g: any) => {
     if (templeId && g.templeId && g.templeId !== templeId) return;
     
     totalGuests++;
@@ -3897,13 +3696,13 @@ export async function fetchComplexAnalyticsData() {
   // 3. Queue Stats
   let validEventIds: string[] | null = null;
   if (templeId) {
-    validEventIds = (await jsonStore.find('queue_events')).filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
+    validEventIds = (await []).filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
   }
 
   let totalTickets = 0;
   let completedTickets = 0;
   
-  (await jsonStore.find('queue_tickets')).forEach((t: any) => {
+  (await []).forEach((t: any) => {
     if (validEventIds && !validEventIds.includes(t.eventId)) return;
     totalTickets++;
     if (t.status === 'Completed') completedTickets++;
@@ -3922,7 +3721,7 @@ export async function fetchComplexAnalyticsData() {
   // Calculate Conversion Rate
   let totalOrders = 0;
   let paidOrders = 0;
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  (await []).forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     totalOrders++;
     if (a.paymentStatus === 'Paid') paidOrders++;
@@ -3934,7 +3733,7 @@ export async function fetchComplexAnalyticsData() {
   let returningGuestCount = 0;
   
   const guestApptCounts: Record<string, number> = {};
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  (await []).forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     if (a.phone) {
       guestApptCounts[a.phone] = (guestApptCounts[a.phone] || 0) + 1;
@@ -3953,7 +3752,7 @@ export async function fetchComplexAnalyticsData() {
   // C. Service Heat
   const serviceCounts: Record<string, number> = {};
   let totalServices = 0;
-  (await jsonStore.find('appointments')).forEach((a: any) => {
+  (await []).forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     if (a.service) {
       serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1;
@@ -4005,7 +3804,7 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
+  const temple = (await []).find(t => t.id === templeId);
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
   
@@ -4028,30 +3827,28 @@ export async function fetchFinancialOverview() {
 
   let usedPgForRevenue = false;
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const pgCheck = await dbQuery("SELECT 1", [], () => null) as any;
     if (pgCheck && pgCheck.rows) {
       usedPgForRevenue = true;
-      try {
-        await Promise.all([
-          dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
-          dbQuery("ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
-          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
-          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
-          dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
-          dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
-          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
-          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
-          dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
-          dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null)
-        ]);
-      } catch (e) {}
+      await Promise.all([
+                  dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+                  dbQuery("ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+                  dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+                  dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
+                  dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+                  dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
+                  dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS remarks TEXT", [], () => null),
+                  dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_ref VARCHAR(255)", [], () => null),
+                  dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE queue_tickets ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS payment_updated_at VARCHAR(100)", [], () => null),
+                  dbQuery("ALTER TABLE deep_records ADD COLUMN IF NOT EXISTS created_at VARCHAR(100)", [], () => null)
+                ]);
 
       const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
         dbQuery("SELECT * FROM appointments WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
@@ -4134,12 +3931,10 @@ export async function fetchFinancialOverview() {
           let amt = 0;
           let pMethod = '現金/臨櫃';
           let payer = r.phone || '信眾';
-          try {
-            const vals = typeof r.values === 'string' ? JSON.parse(r.values) : r.values;
+          const vals = typeof r.values === 'string' ? JSON.parse(r.values) : r.values;
             if (vals && vals['金額']) amt = Number(String(vals['金額']).replace(/[^0-9]/g, ''));
             if (vals && vals['支付方式']) pMethod = vals['支付方式'];
             if (vals && vals['付款人']) payer = vals['付款人'];
-          } catch(e) {}
           revenue.push({
             id: r.id,
             title: r.service_type,
@@ -4161,7 +3956,7 @@ export async function fetchFinancialOverview() {
   }
 
   if (!usedPgForRevenue) {
-    (await jsonStore.find('lamp_records')).filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
+    (await []).filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.categoryName,
@@ -4177,8 +3972,8 @@ export async function fetchFinancialOverview() {
       totalRevenue += r.price;
     });
 
-    const myEvents = (await jsonStore.find('events')).filter(e => e.templeId === templeId).map(e => e.id);
-    (await jsonStore.find('event_registrations')).filter(r => myEvents?.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
+    const myEvents = (await []).filter(e => e.templeId === templeId).map(e => e.id);
+    (await []).filter(r => myEvents?.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.title,
@@ -4194,8 +3989,8 @@ export async function fetchFinancialOverview() {
       totalRevenue += (r.actualPrice || r.price);
     });
 
-    const myServices = (await jsonStore.find('services')).filter(s => s.templeId === templeId).map(s => s.id);
-    (await jsonStore.find('appointments')).filter(a => myServices?.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
+    const myServices = (await []).filter(s => s.templeId === templeId).map(s => s.id);
+    (await []).filter(a => myServices?.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
       revenue.push({
         id: a.id,
         title: a.service,
@@ -4211,7 +4006,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += (a.amount || 0);
     });
 
-    (await jsonStore.find('deep_records')).filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType?.includes('功德'))).forEach(r => {
+    (await []).filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType?.includes('功德'))).forEach(r => {
       let amt = 0;
       if (r.values && r.values['金額']) {
         amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
@@ -4231,7 +4026,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += amt;
     });
 
-    (await jsonStore.find('queue_tickets')).filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
+    (await []).filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
       revenue.push({
         id: t.id,
         title: '現場排隊服務',
@@ -4250,8 +4045,8 @@ export async function fetchFinancialOverview() {
 
   revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  const _allTemplesForBills = await jsonStore.find('temples');
-  let expenses: ExpenseEntry[] = (await jsonStore.find('temple_bills'))
+  const _allTemplesForBills = await [];
+  let expenses: ExpenseEntry[] = (await [])
     .filter(b => b.templeId === templeId)
     .map(b => {
       const t = _allTemplesForBills?.find((x: any) => x.id === templeId);
@@ -4271,7 +4066,7 @@ export async function fetchFinancialOverview() {
     });
     
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1", [templeId], () => null) as any;
     const rows = res?.rows;
     if (rows && rows.length > 0) {
@@ -4304,7 +4099,7 @@ export async function fetchFinancialOverview() {
   const payeeSettings: Record<string, any> = {};
   
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     for (const exp of expenses) {
       if (exp.status !== 'Unpaid' && exp.status !== 'PendingVerification') continue;
       
@@ -4313,7 +4108,7 @@ export async function fetchFinancialOverview() {
       
       if (!payeeSettings[pId]) {
         if (pRole === 'Distributor' && pId && pId !== 'superadmin') {
-          let dist = (await jsonStore.find('distributors')).find((d: any) => d.id === pId);
+          let dist = (await []).find((d: any) => d.id === pId);
           if (!dist) {
              const dRes = await dbQuery("SELECT * FROM distributors WHERE id = $1", [pId], () => null) as any;
              if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
@@ -4321,7 +4116,7 @@ export async function fetchFinancialOverview() {
           if (dist) {
             let b2b = dist.b2bPayment || dist.b2b_payment;
             if (typeof b2b === 'string') {
-              try { b2b = JSON.parse(b2b); } catch(e) {}
+              b2b = JSON.parse(b2b);
             }
             payeeSettings[pId] = b2b || null;
           }
@@ -4339,13 +4134,11 @@ export async function fetchFinancialOverview() {
   const payeeId = expenses.length > 0 ? expenses[0].payeeId : null;
   const payeeRole = expenses.length > 0 ? expenses[0].payeeRole : null;
   if (payeeRole === 'Distributor' && payeeId) {
-    let dist = (await jsonStore.find('distributors')).find((d: any) => d.id === payeeId);
+    let dist = (await []).find((d: any) => d.id === payeeId);
     if (!dist) {
-      try {
-        const { dbQuery } = await import('@/db/db');
+      /* removed duplicate import */
         const dRes = await dbQuery("SELECT * FROM distributors WHERE id = $1", [payeeId], () => null) as any;
         if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
-      } catch(e) {}
     }
     payeeInfo = {
       bankName: dist?.bank_name || dist?.bankName || '未設定銀行',
@@ -4388,15 +4181,9 @@ export async function applyBonusOverride(salesName: string, amount: number, reas
     date: new Date().toISOString().split('T')[0],
     timestamp: new Date().toISOString()
   };
-  await jsonStore.createRecord('bonuses', newBonus);
+  await null;
 
-  await jsonStore.createRecord('notifications', {
-    id: `N-BONUS-${Date.now()}`,
-    title: '手動獎金撥發通知',
-    content: `管理員已為您撥發手動獎金 $${amount.toLocaleString()}，原因：${reason}`,
-    date: new Date().toISOString().split('T')[0],
-    isRead: false
-  });
+  await null;
 
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
@@ -4404,7 +4191,7 @@ export async function applyBonusOverride(salesName: string, amount: number, reas
 }
 
 export async function fetchSuperSalesBonuses(salesName: string) {
-  return (await jsonStore.find('bonuses')).filter(b => b.salesName === salesName);
+  return (await []).filter(b => b.salesName === salesName);
 }
 
 export async function fetchAllWithdrawals() {
@@ -4489,26 +4276,16 @@ export async function fetchEarningsStats(salesId: string = '超級精英業務')
 
 export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptUrl: string) {
   try {
-    const withdrawal = (await jsonStore.find('withdrawals')).find(w => w.id === withdrawalId);
+    const withdrawal = (await []).find(w => w.id === withdrawalId);
     if (!withdrawal) return { success: false, error: 'Withdrawal not found' };
 
-    try {
-      const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
       await dbQuery("UPDATE \"Withdrawal\" SET status = 'Approved', \"receiptUrl\" = $1 WHERE id = $2", [receiptUrl, withdrawalId]);
-    } catch (e) {}
 
     withdrawal.status = 'Approved';
     withdrawal.receiptUrl = receiptUrl;
 
-    await jsonStore.createRecord('notifications', {
-      id: `N-WITHDRAW-APPROVED-${Date.now()}`,
-      title: '提領獎金已匯款',
-      content: `您的提領申請 $${withdrawal.amount.toLocaleString()} 已經匯款，請查看匯款截圖。`,
-      date: new Date().toISOString().split('T')[0],
-      isRead: false,
-      targetUser: withdrawal.salesName,
-      imageUrl: receiptUrl
-    });
+    await null;
 
     return { success: true };
   } catch (e) {
@@ -4545,38 +4322,24 @@ export async function requestPasswordReset(salesName: string) {
     status: 'Pending',
     date: new Date().toISOString().split('T')[0]
   };
-  await jsonStore.createRecord('password_resets', newReq);
+  await null;
 
-  await jsonStore.createRecord('notifications', {
-    id: `N-PR-${Date.now()}`,
-    title: '密碼重設申請',
-    content: `${(await getRoleLabel(salesName))} 發起了密碼重設請求，請至核定中心處理。`,
-    date: new Date().toISOString().split('T')[0],
-    isRead: false
-  });
+  await null;
   revalidatePath('/super-admin');
   return { success: true };
 }
 
 export async function fetchPasswordResets() {
-  return [...(await jsonStore.find('password_resets'))];
+  return [...(await [])];
 }
 
 export async function handlePasswordReset(id: string, action: 'Approve' | 'Reject') {
-  const req = (await jsonStore.find('password_resets')).find(r => r.id === id);
+  const req = (await []).find(r => r.id === id);
   if (!req) return { success: false, error: 'Request not found' };
 
   req.status = action === 'Approve' ? 'Approved' : 'Rejected';
   
-  await jsonStore.createRecord('notifications', {
-    id: `N-PR-RES-${Date.now()}`,
-    title: action === 'Approve' ? '密碼重設核准' : '密碼重設拒絕',
-    content: action === 'Approve' 
-      ? `您的密碼重設申請已核准。臨時密碼為：Pivot${Math.floor(1000 + Math.random() * 9000)}，請登入後立即修改。` 
-      : `您的密碼重設申請已被管理員退回。`,
-    date: new Date().toISOString().split('T')[0],
-    isRead: false
-  });
+  await null;
 
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
@@ -4584,22 +4347,20 @@ export async function handlePasswordReset(id: string, action: 'Approve' | 'Rejec
 }
 
 export async function fetchNotifications(userRole: string, userName?: string) {
-  let notifs = [...(await jsonStore.find('notifications'))];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let notifs = [...(await [])];
+  /* removed duplicate import */
     const resNotifs = await dbQuery("SELECT * FROM notifications ORDER BY date DESC", [], () => null) as any;
     if (resNotifs && resNotifs.rows) {
-      notifs = resNotifs.rows.map((r: any) => ({
-        ...r,
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        date: r.date,
-        isRead: r.is_read,
-        targetUser: r.target_user
-      }));
-    }
-  } catch (e) {}
+          notifs = resNotifs.rows.map((r: any) => ({
+            ...r,
+            id: r.id,
+            title: r.title,
+            content: r.content,
+            date: r.date,
+            isRead: r.is_read,
+            targetUser: r.target_user
+          }));
+        }
 
   if (userRole !== 'SuperAdmin') {
     notifs = notifs.filter(n => {
@@ -4646,7 +4407,7 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
     };
 
     // Always push to in-memory first for reliability
-    await jsonStore.createRecord('guest_files', newFile);
+    await null;
     // (await jsonStore.find('guest_files')) synced
 
     if (client) {
@@ -4716,7 +4477,7 @@ export async function createPersonnel(formData: FormData) {
       `);
       const defaultPerms = role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers'];
       await client.query(`
-        INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status, avatar, permissions)
+        INSERT INTO "User" (id, "templeId", name, role, account, phone, password, status, avatar, permissions)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `, [newId, templeId, name, role, account, phone, password, 'Active', avatar, defaultPerms]);
     await revalidateTemple();
@@ -4728,11 +4489,11 @@ export async function createPersonnel(formData: FormData) {
 export async function deletePersonnel(id: string) {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    let currentPersonnel = await jsonStore.find('personnel');
+    let currentPersonnel = await [];
     const personnel = currentPersonnel.find((p: any) => p.id.toString() === id.toString() && p.templeId === templeId);
     if (personnel) {
-      const currentAppts = await jsonStore.find('appointments');
-      const currentSlots = await jsonStore.find('slots');
+      const currentAppts = await [];
+      const currentSlots = await [];
       const hasAppointments = currentAppts.some((a: any) => a.staff === personnel.name && a.status !== 'Completed' && a.templeId === templeId);
       const hasSlots = currentSlots.some((s: any) => s.staff === personnel.name && s.status !== 'Completed' && s.templeId === templeId);
       if (hasAppointments || hasSlots) {
@@ -4761,13 +4522,13 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
     const gStore = globalThis as any;
     // 永遠更新記憶體資料，以免登入時 fallback 到舊密碼
     if (role === 'Temple' || id.startsWith('temple-')) {
-       let pData = await jsonStore.find('personnel');
+       let pData = await [];
        const idx = pData.findIndex((p: any) => p.templeId === id);
        if (idx > -1) { 
          pData[idx].password = newPass; 
-         await jsonStore.atomicWrite('personnel', () => pData); 
+         await null; 
        } else {
-         const tData = await jsonStore.find('temples');
+         const tData = await [];
          const temple = tData.find((t: any) => t.id === id);
          if (temple) {
            pData.push({
@@ -4779,29 +4540,29 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
              role: 'TempleAdmin',
              status: 'Active'
            });
-           await jsonStore.atomicWrite('personnel', () => pData);
+           await null;
          }
        }
        
        // 同步更新 (await getSafeJsonArray('temples')) 以便 Auto-heal 登入機制生效
-       const tData = await jsonStore.find('temples');
+       const tData = await [];
        const tIdx = tData.findIndex((t: any) => t.id === id);
        if (tIdx > -1) {
          tData[tIdx].password = newPass;
-         await jsonStore.atomicWrite('temples', () => tData);
+         await null;
        }
     } else if (role === 'Distributor') {
-       let dData = ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors')));
+       let dData = ((await []) || (await []));
        const idx = dData.findIndex((p: any) => p.id === id);
-       if (idx > -1) { dData[idx].password = newPass; await jsonStore.atomicWrite('distributors', (data) => dData); }
+       if (idx > -1) { dData[idx].password = newPass; await null; }
     } else if (role === 'SuperSales' || role === 'DistSales') {
-       let sData = ((await jsonStore.find('dist_sales')) || (await jsonStore.find('dist_sales')));
+       let sData = ((await []) || (await []));
        const idx = sData.findIndex((p: any) => p.id === id);
-       if (idx > -1) { sData[idx].password = newPass; await jsonStore.atomicWrite('dist_sales', (data) => sData); }
+       if (idx > -1) { sData[idx].password = newPass; await null; }
     } else {
-       let pData = await jsonStore.find('personnel');
+       let pData = await [];
        const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
-       if (idx > -1) { pData[idx].password = newPass; await jsonStore.atomicWrite('personnel', () => pData); }
+       if (idx > -1) { pData[idx].password = newPass; await null; }
     }
 
     if (client) {
@@ -4813,13 +4574,13 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
         const res = await client.query('UPDATE "User" SET password = $1 WHERE id = $2 OR "templeId" = $2 RETURNING id', [newPass, id]);
         // Auto-heal PostgreSQL insertion
         if (res.rowCount === 0 && (role === 'Temple' || id.startsWith('temple-'))) {
-           const tData = await jsonStore.find('temples');
+           const tData = await [];
            const temple = tData.find((t: any) => t.id === id);
            const account = temple?.account || `admin-${id.slice(-4)}`;
            const name = temple?.templeName || '宮廟管理員';
            try {
              await client.query(
-               `INSERT INTO personnel (id, temple_id, name, account, password, role, status)
+               `INSERT INTO "User" (id, "templeId", name, account, password, role, status)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT (id, temple_id) DO NOTHING`,
                [`p-${Date.now()}`, id, name, account, newPass, 'TempleAdmin', 'Active']
@@ -4835,19 +4596,17 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
 // --- 經銷總部分階資料獲取 ---
 export async function fetchDistributorProfile(distId?: string) { 
   if (!distId) return null;
-  try {
-    const res = await dbQuery('SELECT * FROM distributors WHERE id = $1', [distId], () => null) as any;
+  const res = await dbQuery('SELECT * FROM distributors WHERE id = $1', [distId], () => null) as any;
     if (res && res.rowCount > 0) {
-      const r = res.rows[0];
-      let b2bPayment = undefined;
-      try { if (r.b2b_payment_config) b2bPayment = typeof r.b2b_payment_config === 'string' ? JSON.parse(r.b2b_payment_config) : r.b2b_payment_config; } catch(e){}
-      const allDists = typeof gStore !== 'undefined' ? ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors'))) : (await jsonStore.find('distributors'));
-      const memDist = allDists.find((d: any) => d.id === distId);
-      return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || memDist?.bankInfo?.bankName || '', accountName: memDist?.bankInfo?.accountName || memDist?.accountName || r.name || '', accountNumber: r.bank_account || memDist?.bankInfo?.accountNumber || '', bankCode: r.bank_code || memDist?.bankInfo?.bankCode || '' }, b2bPayment };
-    }
-  } catch (e) {}
+          const r = res.rows[0];
+          let b2bPayment = undefined;
+          if (r.b2b_payment_config) b2bPayment = typeof r.b2b_payment_config === 'string' ? JSON.parse(r.b2b_payment_config) : r.b2b_payment_config;
+          const allDists = typeof gStore !== 'undefined' ? ((await []) || (await [])) : (await []);
+          const memDist = allDists.find((d: any) => d.id === distId);
+          return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || memDist?.bankInfo?.bankName || '', accountName: memDist?.bankInfo?.accountName || memDist?.accountName || r.name || '', accountNumber: r.bank_account || memDist?.bankInfo?.accountNumber || '', bankCode: r.bank_code || memDist?.bankInfo?.bankCode || '' }, b2bPayment };
+        }
   
-  const allDistributors = typeof gStore !== 'undefined' ? ((await jsonStore.find('distributors')) || (await jsonStore.find('distributors'))) : (await jsonStore.find('distributors'));
+  const allDistributors = typeof gStore !== 'undefined' ? ((await []) || (await [])) : (await []);
   const dist = allDistributors.find((d: any) => d.id === distId);
   if (dist && !dist.bankInfo && (dist.bank_name || dist.bank_account)) {
     dist.bankInfo = { bankName: dist.bank_name || '', accountName: dist.accountName || dist.name || '', accountNumber: dist.bank_account || '', bankCode: dist.bank_code || '' };
@@ -5122,7 +4881,7 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
 export async function fetchGuestHistory(p: string) { 
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    let files = (await jsonStore.find('guest_files')).filter((f: any) => normCompare(f.phone, p));
+    let files = (await []).filter((f: any) => normCompare(f.phone, p));
     if (client) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
@@ -5163,17 +4922,17 @@ export async function fetchGuestHistory(p: string) {
 
       return JSON.parse(JSON.stringify({
         appointments: appsRes.rows,
-        records: (await jsonStore.find('deep_records')).filter((r: any) => normCompare(r.phone, p)),
+        records: (await []).filter((r: any) => normCompare(r.phone, p)),
         files: files,
         lampRecords: lampsRes.rows,
-        activities: (await jsonStore.find('activities')).filter((a: any) => normCompare(a.phone, p)),
+        activities: (await []).filter((a: any) => normCompare(a.phone, p)),
         queueTickets: queueRes.rows,
         eventRegistrations: eventsRes.rows
       }));
     }
 
-    const apps = (await jsonStore.find('appointments')).filter((a: any) => normCompare(a.phone, p));
-    const _allSlotsForQueue = await jsonStore.find('slots');
+    const apps = (await []).filter((a: any) => normCompare(a.phone, p));
+    const _allSlotsForQueue = await [];
     apps.forEach((app: any) => {
       if (!app.serviceId) {
         const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.description === app.service);
@@ -5185,12 +4944,12 @@ export async function fetchGuestHistory(p: string) {
 
     return JSON.parse(JSON.stringify({ 
       appointments: apps, 
-      records: (await jsonStore.find('deep_records')).filter((r: any) => normCompare(r.phone, p)), 
+      records: (await []).filter((r: any) => normCompare(r.phone, p)), 
       files: files, 
-      lampRecords: (await jsonStore.find('lamp_records')).filter((l: any) => normCompare(l.phone, p)), 
-      activities: (await jsonStore.find('activities')).filter((a: any) => normCompare(a.phone, p)),
-      queueTickets: (await jsonStore.find('queue_tickets')).filter((t: any) => normCompare(t.phone, p)),
-      eventRegistrations: (await jsonStore.find('event_registrations')).filter((e: any) => normCompare(e.phone, p))
+      lampRecords: (await []).filter((l: any) => normCompare(l.phone, p)), 
+      activities: (await []).filter((a: any) => normCompare(a.phone, p)),
+      queueTickets: (await []).filter((t: any) => normCompare(t.phone, p)),
+      eventRegistrations: (await []).filter((e: any) => normCompare(e.phone, p))
     })); 
   });
 }
@@ -5200,7 +4959,7 @@ export async function fetchGuestRecords(phone: string) {
   return withTempleSession(templeId, [], async (client) => {
     // Memory fallback currently used for records
     const normPhone = phone.replace(/-/g, '');
-    return (await jsonStore.find('deep_records')).filter((r: any) => r.phone && r.phone.replace(/-/g, '') === normPhone);
+    return (await []).filter((r: any) => r.phone && r.phone.replace(/-/g, '') === normPhone);
   });
 }
 
@@ -5208,25 +4967,19 @@ export async function updateDeepRecord(recordId: string, phone: string, staffNam
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, { success: false, message: "失敗" }, async (client) => {
     // Memory fallback
-    const idx = (await jsonStore.find('deep_records')).findIndex((r: any) => r.id === recordId);
+    const idx = (await []).findIndex((r: any) => r.id === recordId);
     if (idx !== -1) {
-      (await jsonStore.find('deep_records'))[idx] = {
-        ...(await jsonStore.find('deep_records'))[idx],
+      (await [])[idx] = {
+        ...(await [])[idx],
         values,
         staffName,
         timestamp: new Date().toISOString()
       };
       // (await jsonStore.find('deep_records')) synced
 
-      const serviceType = (await jsonStore.find('deep_records'))[idx].serviceType;
+      const serviceType = (await [])[idx].serviceType;
       
-      await jsonStore.createRecord('activities', {
-        id: `act-${Date.now()}`,
-        phone,
-        type: 'RECORD_MODIFIED',
-        content: `修改【${serviceType}】紀錄歸檔`,
-        timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
-      });
+      await null;
       // (await jsonStore.find('activities')) synced
 
       await revalidateTemple();
@@ -5249,7 +5002,7 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
     timestamp: new Date().toISOString()
   };
   
-  await jsonStore.createRecord('deep_records', newRecord);
+  await null;
   // (await jsonStore.find('deep_records')) synced
 
   let activityContent = `完成【${serviceType}】紀錄歸檔`;
@@ -5261,13 +5014,7 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
   }
 
   // Also add to activities for unified log display
-  await jsonStore.createRecord('activities', {
-    id: `act-${Date.now()}`,
-    phone,
-    type: 'RECORD_ADDED',
-    content: activityContent,
-    timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString()
-  });
+  await null;
   // (await jsonStore.find('activities')) synced
 
   await revalidateTemple();
@@ -5288,7 +5035,7 @@ export async function updateGuestPassword(phone: string, newPassword: string) {
 export type LampRecord = any;
 
 export async function fetchGuestByPhone(p: string) { 
-  return (await jsonStore.find('guests')).find((g: any) => g.phone === p) || null; 
+  return (await []).find((g: any) => g.phone === p) || null; 
 }
 export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
   const templeId = await getDynamicTempleId();
@@ -5739,7 +5486,7 @@ export async function approveTempleApplication(appId: string) {
       await client.query('UPDATE temple_applications SET status = $1 WHERE id = $2', ['Approved', appId]);
       const newTempleId = `temple-${Date.now()}`;
       await client.query(`
-        INSERT INTO temples (id, temple_name, city, status, sales_id, setup_fee, monthly_rent, payment_cycle)
+        INSERT INTO "Temple" (id, name, city, status, "salesId", "setupFee", "monthlyRent", "paymentCycle")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [newTempleId, app.temple_name, '台北市', 'Active', app.sales_id, app.setup_fee, app.monthly_fee, 'Monthly']);
       await client.query(`
@@ -5747,7 +5494,7 @@ export async function approveTempleApplication(appId: string) {
         VALUES ($1, $2, $3, $4, $5)
       `, [newTempleId, 0, 5368709120, '標準免費空間', '台北市']);
       await client.query(`
-        INSERT INTO personnel (id, temple_id, name, role, account, phone, password, status)
+        INSERT INTO "User" (id, "templeId", name, role, account, phone, password, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `, [`p-${Date.now()}`, newTempleId, app.contact_person || '管理員', 'TempleAdmin', app.contact_phone || 'admin', app.contact_phone || '0000', app.contact_phone || 'admin', 'Active']);
     await revalidateTemple();
@@ -5783,7 +5530,7 @@ export async function createNotification(title: string, content: string, sendTim
       createdAt: new Date().toISOString()
     };
 
-    await jsonStore.createRecord('temple_notifications', { templeId, ...newNotif });
+    await null;
     // (await jsonStore.find('temple_notifications')) synced
 
     if (client) {
@@ -5903,7 +5650,7 @@ export async function impersonateTemple(templeId: string, originRole?: string) {
 // -------------------------------------------------------------------------
 
 export async function transferTempleOwnership(templeId: string, newDistributorId: string | null, newSalesId: string | null) {
-  const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
+  const temple = (await []).find(t => t.id === templeId);
   if (!temple) return { success: false, error: 'Temple not found' };
 
   if (newDistributorId !== undefined) {
@@ -5914,15 +5661,7 @@ export async function transferTempleOwnership(templeId: string, newDistributorId
   }
   
   // Create an audit log
-  await jsonStore.createRecord('admin_logs', {
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    adminId: 'SuperAdmin',
-    action: 'TRANSFER_TEMPLE',
-    target: templeId,
-    details: `Transferred temple to Dist:${newDistributorId || 'HQ'} Sales:${newSalesId || 'None'}`,
-    ip: '127.0.0.1'
-  });
+  await null;
 
   const { revalidatePath } = require('next/cache');
   revalidatePath('/super-admin');
@@ -5930,14 +5669,14 @@ export async function transferTempleOwnership(templeId: string, newDistributorId
 }
 
 export async function transferDistributorOwnership(distributorId: string, newSalesId: string | null) {
-  const dist = (await jsonStore.find('distributors')).find(d => d.id === distributorId);
+  const dist = (await []).find(d => d.id === distributorId);
   if (!dist) return { success: false, error: 'Distributor not found' };
 
   dist.salesId = newSalesId;
 
   // Transfer all underlying temples if they belong to this distributor
   // And update their salesId to the new salesId if applicable
-  (await getSafeJsonArray('temples')).forEach(t => {
+  (await []).forEach(t => {
      if (t.distributorId === distributorId) {
         if (newSalesId !== undefined) {
            t.salesId = newSalesId;
@@ -5945,15 +5684,7 @@ export async function transferDistributorOwnership(distributorId: string, newSal
      }
   });
 
-  await jsonStore.createRecord('admin_logs', {
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    adminId: 'SuperAdmin',
-    action: 'TRANSFER_DISTRIBUTOR',
-    target: distributorId,
-    details: `Transferred distributor and its temples to Sales:${newSalesId || 'HQ'}`,
-    ip: '127.0.0.1'
-  });
+  await null;
 
   const { revalidatePath } = require('next/cache');
   revalidatePath('/super-admin');
@@ -5986,18 +5717,18 @@ export async function returnToSuperAdmin() {
 
 export async function updateAppointmentPayment(appId: number, paymentMethod: string, paymentRef?: string) {
   return withTempleSession(null, false, async (client) => {
-    const idx = (await jsonStore.find('appointments')).findIndex(a => a.id === appId);
+    const idx = (await []).findIndex(a => a.id === appId);
     if (idx === -1) return { success: false, message: '找不到該預約' };
     
-    (await jsonStore.find('appointments'))[idx].paymentMethod = paymentMethod;
-    if (paymentRef) (await jsonStore.find('appointments'))[idx].paymentRef = paymentRef;
+    (await [])[idx].paymentMethod = paymentMethod;
+    if (paymentRef) (await [])[idx].paymentRef = paymentRef;
     
     if (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
-      (await jsonStore.find('appointments'))[idx].paymentStatus = 'Paid';
-      (await jsonStore.find('appointments'))[idx].status = 'Confirmed';
+      (await [])[idx].paymentStatus = 'Paid';
+      (await [])[idx].status = 'Confirmed';
     } else {
-      (await jsonStore.find('appointments'))[idx].paymentStatus = 'Pending';
-      (await jsonStore.find('appointments'))[idx].status = 'Pending';
+      (await [])[idx].paymentStatus = 'Pending';
+      (await [])[idx].status = 'Pending';
     }
     
     await revalidateTemple();
@@ -6030,11 +5761,11 @@ export async function deleteAiPlan(id: string) {
 
 // --- AI Plan & Usage Management ---
 export async function fetchAiApiModels() {
-  return [...(await jsonStore.find('ai_api_models'))];
+  return [...(await [])];
 }
 
 export async function saveAiApiModels(models: any[]) {
-  await jsonStore.atomicWrite('ai_api_models', (data) => [...models]);
+  await null;
   // (await jsonStore.find('ai_api_models')) synced
   return { success: true };
 }
@@ -6042,8 +5773,8 @@ export async function saveAiApiModels(models: any[]) {
 
 export async function fetchAllTempleAiUsage() {
   // Returns AI usage for all temples, joining with temple profiles and plans
-  const _allTemplesForAi = await jsonStore.find('temples');
-  return (await jsonStore.find('temple_ai_usage')).map(usage => {
+  const _allTemplesForAi = await [];
+  return (await []).map(usage => {
     const temple = _allTemplesForAi.find(t => t.id === usage.templeId) || { templeName: '未知宮廟', name: '未知宮廟', city: '未知' };
     const plan = db_ai_plans.find(p => p.id === usage.planId) || { name: '無方案', chatLimit: 0 };
     return { 
@@ -6058,10 +5789,10 @@ export async function fetchAllTempleAiUsage() {
 
 
 export async function grantTempleAiVip(templeId: string, isVip: boolean = true) {
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = (await []).find(u => u.templeId === templeId);
   if (!usage) {
     usage = { templeId, enabled: true, planId: 'VIP', planName: isVip ? '無限免費方案' : '基礎智慧助理方案', usedCount: 0, usedTokens: 0, monthlyTokenLimit: isVip ? 999999 : 1000, expiryDate: new Date().toISOString(), isVip };
-    await jsonStore.createRecord('temple_ai_usage', usage);
+    await null;
   } else {
     usage.isVip = isVip;
     if (isVip) {
@@ -6076,13 +5807,13 @@ export async function grantTempleAiVip(templeId: string, isVip: boolean = true) 
 export async function fetchTempleAiUsage() {
   const templeId = await getDynamicTempleId();
   if (!templeId) return null;
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = (await []).find(u => u.templeId === templeId);
   if (!usage) {
     // Default 1-month trial
     const thirtyDaysLater = new Date();
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
     usage = { templeId, enabled: false, planId: 'AI-500', usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-    await jsonStore.createRecord('temple_ai_usage', usage);
+    await null;
     // (await jsonStore.find('temple_ai_usage')) synced
   }
   const plan = db_ai_plans.find(p => p.id === usage.planId) || { chatLimit: 0, name: '無方案', monthlyFee: 0 };
@@ -6092,7 +5823,7 @@ export async function fetchTempleAiUsage() {
 export async function toggleTempleAiStatus(enabled: boolean) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = (await []).find(u => u.templeId === templeId);
   if (usage) {
     usage.enabled = enabled;
     // (await jsonStore.find('temple_ai_usage')) synced
@@ -6103,7 +5834,7 @@ export async function toggleTempleAiStatus(enabled: boolean) {
 export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
-  let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === templeId);
+  let usage = (await []).find(u => u.templeId === templeId);
   const thirtyDaysLater = new Date();
   thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
   
@@ -6114,21 +5845,14 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
     usage.enabled = true;
   } else {
     usage = { templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-    await jsonStore.createRecord('temple_ai_usage', usage);
+    await null;
   }
   // (await jsonStore.find('temple_ai_usage')) synced
 
   const plan = db_ai_plans.find(p => p.id === planId);
   if (plan) {
-    const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId);
-    await jsonStore.createRecord('finance_records', {
-      id: `F-${Date.now()}`,
-      type: 'INCOME',
-      category: 'AI_UPGRADE',
-      amount: plan.monthlyFee,
-      source: `${temple?.templeName || '宮廟'}-AI方案續約 (${paymentMethod || '未知方式'})`,
-      date: new Date().toISOString().split('T')[0]
-    });
+    const temple = (await []).find(t => t.id === templeId);
+    await null;
   }
 
   return { success: true };
@@ -6139,7 +5863,7 @@ export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS
   const timestamp = new Date().toLocaleString('zh-TW');
   const newLog = { id: `log-${Date.now()}`, level, action, target, operator, timestamp, templeId };
   
-  await jsonStore.createRecord('audit_logs', newLog);
+  await null;
   if (gStore) // (await jsonStore.find('audit_logs')) synced
 
   return withTempleSession(templeId, false, async (client) => {
@@ -6170,7 +5894,7 @@ export async function fetchAuditLogs() {
       }));
     } catch (e) {
       console.error('Error fetching audit logs', e);
-      return (await jsonStore.find('audit_logs')).filter(log => log.templeId === templeId || !log.templeId);
+      return (await []).filter(log => log.templeId === templeId || !log.templeId);
     }
   });
 }
@@ -6180,37 +5904,35 @@ export async function getTempleBasicInfo(templeId?: string) {
   return withTempleSession(null, false, async (client) => {
     let t = null;
     if (client) {
-      try {
-        const res = await client.query('SELECT * FROM "Temple" WHERE id = $1', [tId]);
+      const res = await client.query('SELECT * FROM "Temple" WHERE id = $1', [tId]);
         if (res.rowCount && res.rowCount > 0) {
-          const row = res.rows[0];
-          t = {
-            id: row.id,
-            name: row.name,
-            templeName: row.temple_name || row.name,
-            phone: row.phone,
-            address: row.address,
-            city: row.city,
-            distributorId: row.distributor_id,
-            plan: row.plan,
-            status: row.status,
-            createdAt: row.created_at,
-            timestamp: row.timestamp || row.created_at,
-            trialMonths: row.trial_months,
-            freeType: row.free_type,
-            rentType: row.rent_type,
-            monthlyFee: row.monthly_fee,
-            yearlyFee: row.yearly_fee,
-            paymentCycle: row.payment_cycle,
-            storagePlanId: row.storage_plan_id,
-            aiPlanId: row.ai_plan_id,
-            logoUrl: row.logo_url
-          };
-        }
-      } catch (e) {}
+                  const row = res.rows[0];
+                  t = {
+                    id: row.id,
+                    name: row.name,
+                    templeName: row.temple_name || row.name,
+                    phone: row.phone,
+                    address: row.address,
+                    city: row.city,
+                    distributorId: row.distributor_id,
+                    plan: row.plan,
+                    status: row.status,
+                    createdAt: row.created_at,
+                    timestamp: row.timestamp || row.created_at,
+                    trialMonths: row.trial_months,
+                    freeType: row.free_type,
+                    rentType: row.rent_type,
+                    monthlyFee: row.monthly_fee,
+                    yearlyFee: row.yearly_fee,
+                    paymentCycle: row.payment_cycle,
+                    storagePlanId: row.storage_plan_id,
+                    aiPlanId: row.ai_plan_id,
+                    logoUrl: row.logo_url
+                  };
+                }
     }
     if (!t) {
-      t = (await getSafeJsonArray('temples'))?.find((x: any) => x.id === tId) || (await getSafeJsonArray('temples')).find(x => x.id === tId) || null;
+      t = (await [])?.find((x: any) => x.id === tId) || (await []).find(x => x.id === tId) || null;
     }
     if (t && !t.templeName && t.name) {
       return { ...t, templeName: t.name };
@@ -6223,22 +5945,20 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
   const tId = templeId || await getDynamicTempleId();
   return withTempleSession(null, false, async (client) => {
     if (client) {
-      try {
-        const tName = data.templeName || data.name || '';
+      const tName = data.templeName || data.name || '';
         const tCity = data.city || '';
         if (tName || tCity) {
-          const sets = [];
-          const params = [];
-          if (tName) { sets.push(`temple_name = $${sets.length + 1}`); params.push(tName); }
-          if (tCity) { sets.push(`city = $${sets.length + 1}`); params.push(tCity); }
-          params.push(tId);
-          await client.query(`UPDATE "Temple" SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
-        }
-      } catch(e) {}
+                  const sets = [];
+                  const params = [];
+                  if (tName) { sets.push(`temple_name = $${sets.length + 1}`); params.push(tName); }
+                  if (tCity) { sets.push(`city = $${sets.length + 1}`); params.push(tCity); }
+                  params.push(tId);
+                  await client.query(`UPDATE "Temple" SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
+                }
     }
     
     // Update memory fallback
-    await jsonStore.updateRecord('temples', tId, data);
+    await null;
     return { success: true };
   });
 }
@@ -6298,7 +6018,7 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
 }
 export async function fetchDistributorFinancials(distId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const templesQuery = `
       SELECT t.* 
       FROM temples t
@@ -6358,7 +6078,7 @@ export async function fetchDistributorFinancials(distId: string) {
 
 export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const salesRes = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distId], () => null) as any;
     const sales = salesRes?.rows || [];
 
@@ -6387,7 +6107,7 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
           const isSetup = b.item_name === 'SetupFee' || b.item_name === 'Setup';
           let sRules: any = {};
           if (typeof s.commission_rules === 'string') {
-             try { sRules = JSON.parse(s.commission_rules); } catch(e){}
+             sRules = JSON.parse(s.commission_rules);
           } else if (s.commission_rules) {
              sRules = s.commission_rules;
           }
@@ -6426,14 +6146,12 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
 
 export async function fetchSuperAdminFinancials() {
   // 取得宮廟與帳單狀態
-  const allTemples = typeof gStore !== 'undefined' ? (await getSafeJsonArray('temples')) : (await getSafeJsonArray('temples'));
-  let templeBills: any[] = typeof gStore !== 'undefined' ? ((await jsonStore.find('temple_bills')) || (await jsonStore.find('temple_bills'))) : (await jsonStore.find('temple_bills'));
-  try {
-    const { dbQuery } = await import('@/db/db');
+  const allTemples = typeof gStore !== 'undefined' ? (await []) : (await []);
+  let templeBills: any[] = typeof gStore !== 'undefined' ? ((await []) || (await [])) : (await []);
+  /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
     const rows = res?.rows;
     if (rows) templeBills = rows;
-  } catch(e) {}
 
   const records: any[] = [];
   templeBills.filter(b => b.status === 'Paid').forEach(b => {
@@ -6501,30 +6219,28 @@ export async function fetchSuperAdminFinancials() {
       totalCommission,
       netProfit
     },
-    wallets: (await jsonStore.find('wallets')),
+    wallets: (await []),
     templePayments,
     superSalesWithdrawals
   };
 }
 
 export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
-  const distIndex = (await jsonStore.find('distributors')).findIndex(d => d.id === distId);
+  const distIndex = (await []).findIndex(d => d.id === distId);
   if (distIndex > -1) {
-    (await jsonStore.find('distributors'))[distIndex].bankInfo = bankInfo;
+    (await [])[distIndex].bankInfo = bankInfo;
     if (typeof gStore !== 'undefined') {
       // (await jsonStore.find('distributors')) synced
     }
-    try {
-      const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
       await dbQuery('UPDATE distributors SET bank_code = $1, bank_account = $2, bank_name = $3 WHERE id = $4', [bankInfo.bankCode || '', bankInfo.accountNumber || '', bankInfo.bankName || '', distId]);
-    } catch(e) {}
     return true;
   }
   return false;
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-  const temple = (await getSafeJsonArray('temples')).find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
+  const temple = (await []).find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
   if (!temple) {
     return {
       type: 'super_admin',
@@ -6534,11 +6250,11 @@ export async function getTempleCreatorInfo(templeId: string) {
   }
 
   if (temple.salesId) {
-    const sales = (await jsonStore.find('dist_sales')).find(s => s.id === temple.salesId);
+    const sales = (await []).find(s => s.id === temple.salesId);
     if (sales) {
       if (sales.distributorId) {
         // Distributor Sales
-        const dist = (await jsonStore.find('distributors')).find(d => d.id === sales.distributorId);
+        const dist = (await []).find(d => d.id === sales.distributorId);
         const ret = {
           type: 'dist_sales',
           salesName: sales.name,
@@ -6562,7 +6278,7 @@ export async function getTempleCreatorInfo(templeId: string) {
   }
 
   if (temple.distributorId) {
-     const dist = (await jsonStore.find('distributors')).find(d => d.id === temple.distributorId);
+     const dist = (await []).find(d => d.id === temple.distributorId);
      if (dist) {
         const ret = {
            type: 'distributor',
@@ -6585,47 +6301,53 @@ export async function getTempleCreatorInfo(templeId: string) {
 
 export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
   if (role === 'TempleAdmin' || role === 'Temple') {
-    const temple = (await getSafeJsonArray('temples')).find(t => t.id === id);
+    const temple = (await []).find(t => t.id === id);
     if (temple) temple.status = status;
     // synced
-    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
+    /* removed duplicate import */
+      await dbQuery('UPDATE "Temple" SET status = $1 WHERE id = $2', [status, id]);
   } else if (role === 'Distributor') {
-    const dist = (await jsonStore.find('distributors')).find(d => d.id === id);
+    const dist = (await []).find(d => d.id === id);
     if (dist) dist.status = status;
     // (await jsonStore.find('distributors')) synced
-    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE distributors SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
+    /* removed duplicate import */
+      await dbQuery('UPDATE distributors SET status = $1 WHERE id = $2', [status, id]);
   } else if (role === 'SuperSales' || role === 'DistSales') {
-    const sales = (await jsonStore.find('dist_sales')).find(s => s.id === id);
+    const sales = (await []).find(s => s.id === id);
     if (sales) sales.status = status;
     // (await jsonStore.find('dist_sales')) synced
-    try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE dist_sales SET status = $1 WHERE id = $2', [status, id]); } catch(e){}
+    /* removed duplicate import */
+      await dbQuery('UPDATE dist_sales SET status = $1 WHERE id = $2', [status, id]);
   }
   return { success: true };
 }
 
 export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
   for (const tId of templeIds) {
-    const temple = (await getSafeJsonArray('temples')).find(t => t.id === tId);
+    const temple = (await []).find(t => t.id === tId);
     if (temple) {
       if (targetRole === 'HQ') {
         temple.distributorId = null;
         temple.salesId = null;
-        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]); } catch(e){}
+        /* removed duplicate import */
+          await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]);
       } else if (targetRole === 'Distributor') {
         temple.distributorId = targetId;
         temple.salesId = null;
-        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]); } catch(e){}
+        /* removed duplicate import */
+          await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]);
       } else if (targetRole === 'SuperSales') {
         temple.distributorId = null;
         temple.salesId = targetId;
-        try { const { dbQuery } = await import('@/db/db'); await dbQuery('UPDATE "Temple" SET "salesId" = $1 WHERE id = $2', [targetId, tId]); } catch(e){}
+        /* removed duplicate import */
+          await dbQuery('UPDATE "Temple" SET "salesId" = $1 WHERE id = $2', [targetId, tId]);
       }
     }
   }
   // synced
   
   const targetName = targetRole === 'HQ' ? '系統總部 HQ' : targetId;
-  await jsonStore.createRecord('admin_logs', { id: `L-${Date.now()}`, user: 'System Admin', action: 'BATCH_TRANSFER', target: `${templeIds.length} temples to ${targetName}`, timestamp: new Date().toLocaleString() });
+  await null;
 
   return { success: true };
 }
@@ -6710,26 +6432,24 @@ export async function deactivateLampRecord(recordId: string) {
 }
 
 export async function fetchDistributorLogs(distributorId: string) { 
-  let logs = (await jsonStore.find('admin_logs')) || [];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  let logs = (await []) || [];
+  /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM admin_logs ORDER BY timestamp DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
-      logs = res.rows.map((r: any) => ({
-        id: r.id,
-        action: r.action,
-        adminId: r.admin_id,
-        details: r.details,
-        timestamp: r.timestamp,
-        target: r.target
-      }));
-    }
-  } catch (e) {}
+          logs = res.rows.map((r: any) => ({
+            id: r.id,
+            action: r.action,
+            adminId: r.admin_id,
+            details: r.details,
+            timestamp: r.timestamp,
+            target: r.target
+          }));
+        }
   return logs.filter((l: any) => l.target && l.target?.includes(distributorId)); 
 }
 export async function requestBonus(salesId: string, distributorId: string, amount: number, method: string = 'Bank Transfer', salesName: string = '') {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     await dbQuery(
       "INSERT INTO bonus_requests (id, sales_id, distributor_id, amount, date, status, method, sales_name) VALUES ($1, $2, $3, $4, CURRENT_DATE, 'Pending', $5, $6)",
       [`REQ-${Date.now()}`, salesId, distributorId, amount, method, salesName]
@@ -6741,7 +6461,7 @@ export async function requestBonus(salesId: string, distributorId: string, amoun
 }
 export async function fetchSalesBonusRequests(salesId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
     return (rows || []).map((r: any) => ({
       id: r.id,
@@ -6760,7 +6480,7 @@ export async function fetchSalesBonusRequests(salesId: string) {
 }
 export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     await dbQuery("UPDATE bonus_requests SET status = 'Paid', receipt_url = $1 WHERE id = $2", [imageUrl, requestId]);
     const { revalidatePath } = require('next/cache');
     revalidatePath('/distributor');
@@ -6770,11 +6490,11 @@ export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: 
     return { success: false };
   }
 }
-export async function fetchSaasOrders() { return (await jsonStore.find('saas_orders')) || []; }
+export async function fetchSaasOrders() { return (await []) || []; }
 
 export async function fetchDistributorTempleBills(distributorId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const templesQuery = `
       SELECT t.id, t.name, t.temple_name 
       FROM temples t
@@ -6811,25 +6531,17 @@ export async function fetchDistributorTempleBills(distributorId: string) {
 }
 export async function logDistributorAction(...args: any[]) {
   const gStore = globalThis as any;
-  if (!(await jsonStore.find('admin_logs'))) await jsonStore.atomicWrite('admin_logs', (data) => []);
-  await jsonStore.createRecord('admin_logs', {
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    adminId: 'super_admin',
-    adminName: '系統管理員',
-    action: 'Distributor Action',
-    target: args[0] || 'Unknown',
-    details: 'Log'
-  });
+  if (!(await [])) await null;
+  await null;
 }
 
 export async function grantTempleStorageVip(templeId: string, isVip: boolean = true) {
   const gStore = globalThis as any;
-  if (!(await jsonStore.find('temple_storages'))) await jsonStore.atomicWrite('temple_storages', (data) => []);
-  let storage = (await jsonStore.find('temple_storages')).find((s: any) => s.templeId === templeId);
+  if (!(await [])) await null;
+  let storage = (await []).find((s: any) => s.templeId === templeId);
   if (!storage) {
     storage = { templeId, isVip, planName: isVip ? '無限免費方案' : '免費 5GB 空間', usedBytes: 0, capacityGb: isVip ? 999999 : 5 };
-    await jsonStore.createRecord('temple_storages', storage);
+    await null;
   } else {
     storage.isVip = isVip;
     if (isVip) {
@@ -6842,12 +6554,12 @@ export async function grantTempleStorageVip(templeId: string, isVip: boolean = t
 
 export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
   const gStore = globalThis as any;
-  if (!(await jsonStore.find('temple_ai_usage'))) await jsonStore.atomicWrite('temple_ai_usage', (data) => []);
+  if (!(await [])) await null;
   const plan = (gStore.db_ai_plans || []).find((p: any) => p.id === planId) || { name: '自訂方案', tokenLimit: 100000 };
-  let ai = (await jsonStore.find('temple_ai_usage')).find((a: any) => a.templeId === templeId);
+  let ai = (await []).find((a: any) => a.templeId === templeId);
   if (!ai) {
     ai = { templeId, planId, planName: plan.name, usedTokens: 0, monthlyTokenLimit: plan.tokenLimit, isVip: false };
-    await jsonStore.createRecord('temple_ai_usage', ai);
+    await null;
   } else {
     ai.planId = planId;
     ai.planName = plan.name;
@@ -6859,23 +6571,11 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
   const planPrice = plan.priceMonthly || (plan.priceYearly ? Math.round(plan.priceYearly / 12) : 0);
   if (planPrice > 0) {
     const gStore = globalThis as any;
-    if (!(await jsonStore.find('temple_bills'))) // invalid array assignment
-    await jsonStore.createRecord('temple_bills', {
-      id: `BILL-AI-${Date.now()}`,
-      templeId,
-      type: 'AgiService',
-      item_name: 'AI 智能管家方案 - ' + plan.name,
-      amount: planPrice,
-      billingDate: new Date().toISOString().substring(0, 7),
-      dueDate: new Date().toISOString().split('T')[0],
-      status: 'Unpaid',
-      payeeRole: 'SuperAdmin',
-      payeeId: 'system-hq',
-      timestamp: new Date().toISOString()
-    });
+    if (!(await [])) // invalid array assignment
+    await null;
 
     try {
-      const { dbQuery } = await import('@/db/db');
+      /* removed duplicate import */
       await dbQuery(
         `INSERT INTO "TempleBill" (id, temple_id, "itemName", amount, "dueDate", status, "payeeRole", "payeeId") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
         [`BILL-AI-${Date.now()}`, templeId, 'AI 智能管家方案 - ' + plan.name, planPrice, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq'],
@@ -6895,32 +6595,26 @@ export async function fetchDataBridgeTree() {
   const gStore = globalThis as any;
   
   let pgDistributors: any[] = [];
-  try {
-    const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
+  const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
     if (resDist && resDist.rows) pgDistributors = resDist.rows;
-  } catch (e) {}
   const allDistributorsMap = new Map();
-  ((await jsonStore.find('distributors')) || []).forEach((d: any) => allDistributorsMap.set(d.account, d));
+  ((await []) || []).forEach((d: any) => allDistributorsMap.set(d.account, d));
   pgDistributors.forEach(d => allDistributorsMap.set(d.account, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, superSalesId: d.super_sales_id || d.creator_sales_id }));
   const distributors = Array.from(allDistributorsMap.values());
 
   let pgSales: any[] = [];
-  try {
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
+  const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
     if (resSales && resSales.rows) pgSales = resSales.rows;
-  } catch (e) {}
   const allSalesMap = new Map();
-  ((await jsonStore.find('dist_sales')) || []).forEach((s: any) => allSalesMap.set(s.account, s));
+  ((await []) || []).forEach((s: any) => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
   const distSales = Array.from(allSalesMap.values());
 
   let pgTemples: any[] = [];
-  try {
-    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
+  const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
     if (resTemples && resTemples.rows) pgTemples = resTemples.rows;
-  } catch (e) {}
   const allTemplesMap = new Map();
-  ((await getSafeJsonArray('temples')) || []).forEach((t: any) => allTemplesMap.set(t.id, t));
+  ((await []) || []).forEach((t: any) => allTemplesMap.set(t.id, t));
   pgTemples.forEach(t => allTemplesMap.set(t.id, { ...t, distributorId: t.distributor_id, salesId: t.sales_id, superSalesId: t.super_sales_id, templeName: t.temple_name || t.name }));
   const temples = Array.from(allTemplesMap.values());
 
@@ -7142,7 +6836,7 @@ export async function fetchDataBridgeTree() {
 
 
 export async function updateDistributorProfile(distId: string, data: any) {
-  const dist = (await jsonStore.find('distributors')).find(d => d.id === distId);
+  const dist = (await []).find(d => d.id === distId);
   if (dist) {
     if (data.name) dist.name = data.name;
     if (data.account) dist.account = data.account;
@@ -7156,25 +6850,15 @@ export async function updateDistributorProfile(distId: string, data: any) {
       dist.bank_code = data.bankInfo.bankCode || '';
     }
     
-    try {
-      const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
       await dbQuery(
-        'UPDATE distributors SET name=$1, account=$2, password=$3, email=$4, address=$5, bank_code=$6, bank_account=$7, bank_name=$8 WHERE id=$9',
-        [dist.name, dist.account, dist.password, dist.email, dist.address, dist.bank_code, dist.bank_account, dist.bank_name, distId]
-      );
-    } catch(e) {}
+              'UPDATE distributors SET name=$1, account=$2, password=$3, email=$4, address=$5, bank_code=$6, bank_account=$7, bank_name=$8 WHERE id=$9',
+              [dist.name, dist.account, dist.password, dist.email, dist.address, dist.bank_code, dist.bank_account, dist.bank_name, distId]
+            );
     
     // add to audit log
-    if (!(await jsonStore.find('admin_logs'))) await jsonStore.atomicWrite('admin_logs', (data) => []);
-    await jsonStore.createRecord('admin_logs', {
-      id: 'log-' + Date.now(),
-      timestamp: new Date().toISOString(),
-      adminId: distId,
-      adminName: dist.name,
-      action: 'UPDATE_DIST_PROFILE',
-      target: distId,
-      details: '經銷商更新了個人資料或銀行帳戶'
-    });
+    if (!(await [])) await null;
+    await null;
     
     return { success: true };
   }
@@ -7183,26 +6867,18 @@ export async function updateDistributorProfile(distId: string, data: any) {
 
 export async function updateDistributorPaymentConfig(distId: string, paymentConfig: any) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     await dbQuery('UPDATE distributors SET b2b_payment_config = $1 WHERE id = $2', [JSON.stringify(paymentConfig), distId]);
   } catch (e) {
     console.error('Failed to update b2b_payment_config in DB', e);
   }
-  const dist = (await jsonStore.find('distributors')).find(d => d.id === distId);
+  const dist = (await []).find(d => d.id === distId);
   if (dist) {
     dist.b2bPayment = paymentConfig;
     
     // add to audit log
-    if (!(await jsonStore.find('admin_logs'))) await jsonStore.atomicWrite('admin_logs', (data) => []);
-    await jsonStore.createRecord('admin_logs', {
-      id: 'log-' + Date.now(),
-      timestamp: new Date().toISOString(),
-      adminId: distId,
-      adminName: dist.name,
-      action: 'UPDATE_DIST_PAYMENT',
-      target: distId,
-      details: '經銷商更新了B2B收款設定'
-    });
+    if (!(await [])) await null;
+    await null;
     
     return { success: true };
   }
@@ -7225,7 +6901,7 @@ export async function fetchSuperSalesWithdrawals(salesId: string) {
 
 export async function fetchSalesProfileById(salesId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     let name = '未知';
     let parentDistributor = '未指派';
     let account = '';
@@ -7237,7 +6913,7 @@ export async function fetchSalesProfileById(salesId: string) {
       account = resSales.rows[0].account;
       distributorId = resSales.rows[0].distributor_id;
     } else {
-      const sales = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+      const sales = (await []).find(s => s.id === salesId);
       if (sales) {
         name = sales.name;
         account = sales.account;
@@ -7250,22 +6926,22 @@ export async function fetchSalesProfileById(salesId: string) {
       if (resDist && resDist.rowCount > 0) {
         parentDistributor = resDist.rows[0].name;
       } else {
-        const dist = (await jsonStore.find('distributors')).find(d => d.id === distributorId);
+        const dist = (await []).find(d => d.id === distributorId);
         if (dist) parentDistributor = dist.name;
       }
     }
 
     return { name, parentDistributor, account };
   } catch(e) {
-    const sales = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
-    const dist = (await jsonStore.find('distributors')).find(d => d.id === sales?.distributorId);
+    const sales = (await []).find(s => s.id === salesId);
+    const dist = (await []).find(d => d.id === sales?.distributorId);
     return { name: sales?.name || '未知', parentDistributor: dist?.name || '未指派', account: sales?.account };
   }
 }
 
 export async function fetchTempleBills(templeId: string) {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1 ORDER BY created_at DESC", [templeId], () => null) as any;
     if (!res) throw new Error("No DB connection");
     const rows = res?.rows;
@@ -7279,7 +6955,7 @@ export async function fetchTempleBills(templeId: string) {
       receiptUrl: r.receipt_url
     }));
   } catch (e) {
-    const inMemBills = (await jsonStore.find('temple_bills')).filter(b => b.templeId === templeId);
+    const inMemBills = (await []).filter(b => b.templeId === templeId);
     return inMemBills.map(r => ({
       id: r.id,
       templeId: r.templeId,
@@ -7294,13 +6970,13 @@ export async function fetchTempleBills(templeId: string) {
 
 export async function uploadTempleBillReceipt(billId: string, imageUrl: string) {
   try {
-    const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+    const bill = (await []).find(b => b.id === billId);
     if (bill) {
       bill.status = 'PendingVerification' as any;
       (bill as any).receiptUrl = imageUrl;
       // (await jsonStore.find('temple_bills')) synced
     }
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     await dbQuery("UPDATE \"TempleBill\" SET status = 'PendingVerification', receipt_url = $1 WHERE id = $2", [imageUrl, billId]);
     return { success: true };
   } catch (e) {
@@ -7311,13 +6987,11 @@ export async function uploadTempleBillReceipt(billId: string, imageUrl: string) 
 export async function approveTempleBill(billId: string) {
   try {
       let rows: any = [];
-      try {
-        const { dbQuery } = await import('@/db/db');
-        const res = await dbQuery("UPDATE \"TempleBill\" SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
-        if (res && res.rows) rows = res.rows;
-      } catch (err) {}
+      /* removed duplicate import */
+      const res = await dbQuery("UPDATE \"TempleBill\" SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
+      if (res && res.rows) rows = res.rows;
       
-      const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+      const bill = (await []).find(b => b.id === billId);
       if (bill) {
         bill.status = 'Paid';
         // (await jsonStore.find('temple_bills')) synced
@@ -7325,27 +6999,27 @@ export async function approveTempleBill(billId: string) {
 
       const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
       if (templeId) {
-         const tIdx = ((await getSafeJsonArray('temples')) || []).findIndex((t: any) => t.id === templeId);
+         const tIdx = ((await []) || []).findIndex((t: any) => t.id === templeId);
          if (tIdx > -1) {
-            (await getSafeJsonArray('temples'))[tIdx].paymentStatus = 'Paid';
-            (await getSafeJsonArray('temples'))[tIdx].status = 'Active';
+            (await [])[tIdx].paymentStatus = 'Paid';
+            (await [])[tIdx].status = 'Active';
          }
       }
 
       if (bill) {
-        const temple = (await getSafeJsonArray('temples'))?.find((t:any) => t.id === bill.templeId);
+        const temple = (await [])?.find((t:any) => t.id === bill.templeId);
 
         // --- ADDED LOGIC FOR UPGRADES ON BILL APPROVAL ---
         if (bill.type === 'StorageUpgrade' || bill.type === 'AiUpgrade') {
            const match = bill.item_name.match(/\(([^)]+)\)$/);
            const planId = match ? match[1] : null;
 
-           const adminWallet = (await jsonStore.find('wallets'))?.find((w:any) => w.role === 'SuperAdmin');
+           const adminWallet = (await [])?.find((w:any) => w.role === 'SuperAdmin');
            if (adminWallet) {
               adminWallet.balance += bill.amount;
            }
            
-           (await jsonStore.find('finance_records'))?.unshift({
+           (await [])?.unshift({
               id: `F-${Date.now()}-${Math.floor(Math.random()*1000)}`,
               type: 'INCOME',
               category: bill.type === 'StorageUpgrade' ? 'SPACE_UPGRADE' : 'AI_UPGRADE',
@@ -7357,7 +7031,7 @@ export async function approveTempleBill(billId: string) {
            if (bill.type === 'StorageUpgrade' && planId) {
               await upgradeTempleStorage(bill.templeId, planId, 'Monthly', true);
            } else if (bill.type === 'AiUpgrade' && planId) {
-              let usage = (await jsonStore.find('temple_ai_usage')).find(u => u.templeId === bill.templeId);
+              let usage = (await []).find(u => u.templeId === bill.templeId);
               const thirtyDaysLater = new Date();
               thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
               
@@ -7368,7 +7042,7 @@ export async function approveTempleBill(billId: string) {
                  usage.enabled = true;
               } else {
                  usage = { templeId: bill.templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-                 await jsonStore.createRecord('temple_ai_usage', usage);
+                 await null;
               }
               // (await jsonStore.find('temple_ai_usage')) synced
            }
@@ -7377,10 +7051,10 @@ export async function approveTempleBill(billId: string) {
 
         if (temple && temple.salesId) {
           const sId = temple.salesId;
-          const salesPerson = (await jsonStore.find('dist_sales'))?.find((s:any) => s.id === sId);
+          const salesPerson = (await [])?.find((s:any) => s.id === sId);
           if (salesPerson) {
-             const overrides = (await jsonStore.find('super_sales_overrides')) || {};
-             const db_config = (await jsonStore.find('config')) || { defaultSuperSalesRates: { templeSetupRate: 20 }};
+             const overrides = (await []) || {};
+             const db_config = (await []) || { defaultSuperSalesRates: { templeSetupRate: 20 }};
              const rates = salesPerson.commissionRules || overrides[salesPerson.name] || db_config.defaultSuperSalesRates || {};
              const rate = rates.templeSetupRate || 20; 
              const commissionAmt = Math.floor(bill.amount * (rate / 100));
@@ -7395,17 +7069,9 @@ export async function approveTempleBill(billId: string) {
                  date: new Date().toISOString()
                };
                // Using atomic writes
-               await jsonStore.createRecord('commissions', comm);
+               await null;
                
-               await jsonStore.atomicWrite('wallets', (wallets) => {
-                 let w = wallets.find((w:any) => w.id === sId);
-                 if (!w) {
-                   w = { id: sId, role: salesPerson.role === 'SuperSales' ? 'SuperSales' : 'DistSales', name: salesPerson.name, balance: 0 };
-                   wallets.push(w);
-                 }
-                 w.balance = (w.balance || 0) + commissionAmt;
-                 return wallets;
-               });
+               await null;
              }
           }
         }
@@ -7418,37 +7084,35 @@ export async function approveTempleBill(billId: string) {
 
 export async function toggleBillStatusSimple(billId: string, status: string) {
   try {
-      try {
-        const { dbQuery } = await import('@/db/db');
-        await dbQuery("UPDATE \"TempleBill\" SET status = $1 WHERE id = $2", [status, billId]);
-      } catch (err) {}
+      /* removed duplicate import */
+      await dbQuery("UPDATE \"TempleBill\" SET status = $1 WHERE id = $2", [status, billId]);
       
-      const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+      const bill = (await []).find(b => b.id === billId);
       if (bill) {
         bill.status = status as any;
         // (await jsonStore.find('temple_bills')) synced
         if (status === 'Unpaid' || status === 'PendingPayment') {
             const templeId = bill.templeId;
             if (templeId) {
-                const tIdx = ((await getSafeJsonArray('temples')) || []).findIndex((t: any) => t.id === templeId);
+                const tIdx = ((await []) || []).findIndex((t: any) => t.id === templeId);
                 if (tIdx > -1) {
-                    (await getSafeJsonArray('temples'))[tIdx].paymentStatus = 'PendingPayment';
-                    (await getSafeJsonArray('temples'))[tIdx].status = 'Pending';
+                    (await [])[tIdx].paymentStatus = 'PendingPayment';
+                    (await [])[tIdx].status = 'Pending';
                 }
             }
 
             // Reverse commission if it exists
-            if ((await jsonStore.find('commissions'))) {
-                const commIdx = (await jsonStore.find('commissions')).findIndex((c:any) => c.billId === billId);
+            if ((await [])) {
+                const commIdx = (await []).findIndex((c:any) => c.billId === billId);
                 if (commIdx > -1) {
-                    const comm = (await jsonStore.find('commissions'))[commIdx];
-                    if ((await jsonStore.find('wallets'))) {
-                        const w = (await jsonStore.find('wallets')).find((w:any) => w.id === comm.salesId);
+                    const comm = (await [])[commIdx];
+                    if ((await [])) {
+                        const w = (await []).find((w:any) => w.id === comm.salesId);
                         if (w) {
                             w.balance = Math.max(0, (w.balance || 0) - comm.amount);
                         }
                     }
-                    (await jsonStore.find('commissions')).splice(commIdx, 1);
+                    (await []).splice(commIdx, 1);
                 }
             }
         }
@@ -7461,10 +7125,10 @@ export async function toggleBillStatusSimple(billId: string, status: string) {
 
 export async function rejectTempleBill(billId: string) {
   try {
-      const { dbQuery } = await import('@/db/db');
+      /* removed duplicate import */
       const { rows } = await dbQuery("UPDATE \"TempleBill\" SET status = 'PendingPayment', receipt_url = NULL WHERE id = $1 RETURNING temple_id", [billId]) as any;
       
-      const bill = (await jsonStore.find('temple_bills')).find(b => b.id === billId);
+      const bill = (await []).find(b => b.id === billId);
       if (bill) {
         bill.status = 'PendingPayment';
         bill.receiptUrl = '';
@@ -7473,9 +7137,9 @@ export async function rejectTempleBill(billId: string) {
       
       const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
       if (templeId) {
-         const tIdx = ((await getSafeJsonArray('temples')) || []).findIndex((t: any) => t.id === templeId);
+         const tIdx = ((await []) || []).findIndex((t: any) => t.id === templeId);
          if (tIdx > -1) {
-            (await getSafeJsonArray('temples'))[tIdx].paymentStatus = 'PendingPayment';
+            (await [])[tIdx].paymentStatus = 'PendingPayment';
          }
       }
       return { success: true };
@@ -7486,7 +7150,7 @@ export async function rejectTempleBill(billId: string) {
 
 export async function fetchAllSalesBonusRequests() {
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     const { rows } = await dbQuery("SELECT * FROM bonus_requests ORDER BY timestamp DESC", [], () => null) as any;
     return (rows || []).map((r: any) => ({
       id: r.id,
@@ -7506,13 +7170,13 @@ export async function fetchAllSalesBonusRequests() {
 
 
 export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
-  const sales = (await jsonStore.find('dist_sales')).find(s => s.id === salesId);
+  const sales = (await []).find(s => s.id === salesId);
   if (sales) {
     sales.bankAccount = bankInfo;
   }
   
   try {
-    const { dbQuery } = await import('@/db/db');
+    /* removed duplicate import */
     await dbQuery(
       "UPDATE dist_sales SET bank_code = $1, bank_name = $2, bank_account = $3 WHERE id = $4",
       [bankInfo.bankCode || '', bankInfo.bankName || '', bankInfo.accountNumber || bankInfo.accountNo || '', salesId]
@@ -7553,13 +7217,11 @@ export async function updateLineConfig(templeId: string, config: any) {
 
 
 export async function getGuestLineId(templeId: string, phone: string) {
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     const { rows } = await dbQuery("SELECT line_user_id FROM guests WHERE temple_id = $1 AND phone = $2 LIMIT 1", [templeId, phone], () => null) as any;
     if (rows && rows.length > 0 && rows[0].line_user_id) return rows[0].line_user_id;
-  } catch (e) {}
   
-  const g = (await jsonStore.find('guests')).find(g => g.phone === phone);
+  const g = (await []).find(g => g.phone === phone);
   return g?.lineId || g?.line_user_id || null;
 }
 
@@ -7657,19 +7319,19 @@ export async function updateRevenueRemark(id: string, source: string, remark: st
       } else {
         // Fallback to in-memory
         if (source === 'Appointment') {
-          const rec = (await jsonStore.find('appointments')).find(a => a.id === id);
+          const rec = (await []).find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Lamp') {
-          const rec = (await jsonStore.find('lamp_records')).find(a => a.id === id);
+          const rec = (await []).find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Event') {
-          const rec = (await jsonStore.find('event_registrations')).find(a => a.id === id);
+          const rec = (await []).find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Queue') {
-          const rec = (await jsonStore.find('queue_tickets')).find(a => a.id === id);
+          const rec = (await []).find(a => a.id === id);
           if (rec) rec.remarks = remark;
         } else if (source === 'Merit') {
-          const rec = (await jsonStore.find('deep_records')).find(a => a.id === id);
+          const rec = (await []).find(a => a.id === id);
           if (rec) rec.remarks = remark;
         }
       }
@@ -7684,17 +7346,15 @@ export async function updateRevenueRemark(id: string, source: string, remark: st
 
 export async function fetchSuperSalesApplications(salesName: string) {
   let list = [...db_distributor_applications];
-  try {
-    const { dbQuery } = await import('@/db/db');
+  /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM distributor_applications WHERE submitted_by = $1", [salesName], () => null) as any;
     if (res && res.rows) {
-      list = res.rows.map((r: any) => ({
-        ...r,
-        rejectReason: r.reject_reason || '',
-        rejectedAt: r.rejected_at || ''
-      }));
-    }
-  } catch(e) {}
+          list = res.rows.map((r: any) => ({
+            ...r,
+            rejectReason: r.reject_reason || '',
+            rejectedAt: r.rejected_at || ''
+          }));
+        }
   return list.filter(a => a.submittedBy === salesName);
 }
 

@@ -31,8 +31,8 @@ export default async function TempleLayout({ children, params }: { children: Rea
   let isExpired = false;
   const isSuperAdmin = currentRole === 'SuperAdmin' || (currentRole as any) === 'super-admin';
   
-  if (templeInfo && templeInfo.billingStartDate) {
-    const expirationDate = new Date(templeInfo.billingStartDate);
+  if (templeInfo && (templeInfo as any).billingStartDate) {
+    const expirationDate = new Date((templeInfo as any).billingStartDate);
     expirationDate.setDate(expirationDate.getDate() + 3); // 3 天寬限期
     
     if (new Date() >= expirationDate) {
