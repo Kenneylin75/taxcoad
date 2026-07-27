@@ -1,103 +1,83 @@
 const { Project, SyntaxKind } = require('ts-morph');
 
 const project = new Project();
-project.addSourceFileAtPath('src/app/actions.ts');
-const sourceFile = project.getSourceFile('src/app/actions.ts');
+project.addSourceFilesAtPaths("src/**/*.ts");
+project.addSourceFilesAtPaths("src/**/*.tsx");
 
-console.log('Parsing actions.ts...');
+const replacements = [
+  // Personnel -> "User"
+  { regex: /\bpersonnel\b/g, check: /FROM|JOIN|INTO|UPDATE/i, replacement: (match, fullStr) => fullStr.replace(/\bpersonnel\b/g, '"User"') },
+  { regex: /\btemple_id\b/g, check: /"User"/i, replacement: (match, fullStr) => fullStr.replace(/\btemple_id\b/g, '"templeId"') },
+  { regex: /\bcreated_at\b/g, check: /"User"/i, replacement: (match, fullStr) => fullStr.replace(/\bcreated_at\b/g, '"createdAt"') },
+  { regex: /\bupdated_at\b/g, check: /"User"/i, replacement: (match, fullStr) => fullStr.replace(/\bupdated_at\b/g, '"updatedAt"') },
 
-// 1. Fix dbQuery calls (remove the fallback argument)
-const callExpressions = sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression);
-let dbQueryCount = 0;
-for (const callExpr of callExpressions) {
-    const expr = callExpr.getExpression();
-    if (expr.getText() === 'dbQuery') {
-        const args = callExpr.getArguments();
-        if (args.length === 3) {
-            callExpr.removeArgument(2);
-            dbQueryCount++;
+  // Temples -> "Temple"
+  { regex: /\btemples\b/g, check: /FROM|JOIN|INTO|UPDATE/i, replacement: (match, fullStr) => fullStr.replace(/\btemples\b/g, '"Temple"') },
+  { regex: /\btemple_name\b/g, check: /"Temple"/i, replacement: (match, fullStr) => fullStr.replace(/\btemple_name\b/g, 'name') },
+  { regex: /\bdistributor_id\b/g, check: /"Temple"/i, replacement: (match, fullStr) => fullStr.replace(/\bdistributor_id\b/g, '"distributorId"') },
+  { regex: /\bsales_id\b/g, check: /"Temple"/i, replacement: (match, fullStr) => fullStr.replace(/\bsales_id\b/g, '"salesId"') },
+  { regex: /\bplan_id\b/g, check: /"Temple"/i, replacement: (match, fullStr) => fullStr.replace(/\bplan_id\b/g, '"planId"') },
+  { regex: /\bcreated_at\b/g, check: /"Temple"/i, replacement: (match, fullStr) => fullStr.replace(/\bcreated_at\b/g, '"createdAt"') },
+  { regex: /\bupdated_at\b/g, check: /"Temple"/i, replacement: (match, fullStr) => fullStr.replace(/\bupdated_at\b/g, '"updatedAt"') },
+  { regex: /,\s*setup_fee,\s*monthly_rent,\s*payment_cycle/g, check: /"Temple"/i, replacement: () => '' },
+  { regex: /,\s*\$7,\s*\$8,\s*\$9/g, check: /"Temple"/i, replacement: () => '' },
+
+  // distributor_sales -> dist_sales
+  { regex: /\bdistributor_sales\b/g, check: /FROM|JOIN|INTO|UPDATE/i, replacement: (match, fullStr) => fullStr.replace(/\bdistributor_sales\b/g, 'dist_sales') },
+  
+  // temple_bills -> "TempleBill"
+  { regex: /\btemple_bills\b/g, check: /FROM|JOIN|INTO|UPDATE/i, replacement: (match, fullStr) => fullStr.replace(/\btemple_bills\b/g, '"TempleBill"') },
+  { regex: /\btemple_id\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\btemple_id\b/g, '"templeId"') },
+  { regex: /\bitem_name\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bitem_name\b/g, '"itemName"') },
+  { regex: /\bbilling_date\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bbilling_date\b/g, '"billingDate"') },
+  { regex: /\bdue_date\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bdue_date\b/g, '"dueDate"') },
+  { regex: /\bpayee_role\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bpayee_role\b/g, '"payeeRole"') },
+  { regex: /\bpayee_id\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bpayee_id\b/g, '"payeeId"') },
+  { regex: /\bcreated_at\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bcreated_at\b/g, '"createdAt"') },
+  { regex: /\bupdated_at\b/g, check: /"TempleBill"/i, replacement: (match, fullStr) => fullStr.replace(/\bupdated_at\b/g, '"updatedAt"') },
+
+  // withdrawals -> "Withdrawal"
+  { regex: /\bwithdrawals\b/g, check: /FROM|JOIN|INTO|UPDATE/i, replacement: (match, fullStr) => fullStr.replace(/\bwithdrawals\b/g, '"Withdrawal"') },
+  { regex: /\bsales_name\b/g, check: /"Withdrawal"/i, replacement: (match, fullStr) => fullStr.replace(/\bsales_name\b/g, '"salesName"') },
+  { regex: /\breceipt_url\b/g, check: /"Withdrawal"/i, replacement: (match, fullStr) => fullStr.replace(/\breceipt_url\b/g, '"receiptUrl"') },
+];
+
+let changedFiles = 0;
+
+project.getSourceFiles().forEach(sourceFile => {
+  let changed = false;
+  
+  const stringLiterals = sourceFile.getDescendantsOfKind(SyntaxKind.StringLiteral);
+  const noSubstitutionTemplateLiterals = sourceFile.getDescendantsOfKind(SyntaxKind.NoSubstitutionTemplateLiteral);
+  const templateExpressions = sourceFile.getDescendantsOfKind(SyntaxKind.TemplateExpression);
+
+  const allStrings = [...stringLiterals, ...noSubstitutionTemplateLiterals, ...templateExpressions];
+
+  allStrings.forEach(node => {
+    let text = node.getText();
+    if (text.match(/SELECT|INSERT|UPDATE|DELETE|FROM|JOIN|INTO/i)) {
+      let originalText = text;
+      
+      for (let pass = 0; pass < 3; pass++) {
+        for (const rule of replacements) {
+          if (rule.check.test(text) && rule.regex.test(text)) {
+            text = rule.replacement(text, text);
+          }
         }
-    }
-}
-console.log(`Fixed ${dbQueryCount} dbQuery calls.`);
+      }
 
-// 2. Fix the specific malformed SQL strings
-const stringLiterals = sourceFile.getDescendantsOfKind(SyntaxKind.StringLiteral);
-let sqlCount = 0;
-for (const stringLiteral of stringLiterals) {
-    let text = stringLiteral.getLiteralText();
-    if (text.includes('UPDATE appointments SET payment_status = , payment_method = WHERE id = RETURNING id')) {
-        stringLiteral.setLiteralValue(text.replace(
-            'UPDATE appointments SET payment_status = , payment_method = WHERE id = RETURNING id',
-            'UPDATE appointments SET payment_status = $1, payment_method = $2 WHERE id = $3 RETURNING id'
-        ));
-        sqlCount++;
-    } else if (text.includes('UPDATE queue_tickets SET payment_status = WHERE id = RETURNING id')) {
-         stringLiteral.setLiteralValue(text.replace(
-            'UPDATE queue_tickets SET payment_status = WHERE id = RETURNING id',
-            'UPDATE queue_tickets SET payment_status = $1 WHERE id = $2 RETURNING id'
-        ));
-        sqlCount++;
+      if (text !== originalText) {
+        node.replaceWithText(text);
+        changed = true;
+      }
     }
-}
-console.log(`Fixed ${sqlCount} malformed SQL strings.`);
+  });
 
-// 3. Strip jsonStore fallback blocks.
-// We will look for `if (!client)` statements and replace them.
-const ifStatements = sourceFile.getDescendantsOfKind(SyntaxKind.IfStatement);
-let ifCount = 0;
-for (const ifStmt of ifStatements) {
-    const expr = ifStmt.getExpression();
-    if (expr.getText() === '!client') {
-        const elseStatement = ifStmt.getElseStatement();
-        if (elseStatement) {
-            // Replace the entire if (!client) { ... } else { ... } with just the else block's contents
-            if (elseStatement.getKind() === SyntaxKind.Block) {
-                // If the else is a block, we unwrap its statements
-                const elseText = elseStatement.getChildSyntaxList().getText();
-                ifStmt.replaceWithText(elseText);
-            } else {
-                // Else is a single statement
-                ifStmt.replaceWithText(elseStatement.getText());
-            }
-            ifCount++;
-        } else {
-            // It's just an `if (!client) return ...`
-            ifStmt.remove();
-            ifCount++;
-        }
-    }
-}
-console.log(`Removed ${ifCount} if (!client) blocks.`);
+  if (changed) {
+    sourceFile.saveSync();
+    console.log(`Updated SQL in ${sourceFile.getFilePath()}`);
+    changedFiles++;
+  }
+});
 
-// 4. Also find and remove variables named 'gStore' and references to it
-const varDecls = sourceFile.getDescendantsOfKind(SyntaxKind.VariableDeclaration);
-for (const varDecl of varDecls) {
-    if (varDecl.getName() === 'gStore') {
-        const statement = varDecl.getFirstAncestorByKind(SyntaxKind.VariableStatement);
-        if (statement) statement.remove();
-    }
-    if (varDecl.getName() === 'pData') {
-        const initializer = varDecl.getInitializer();
-        if (initializer && initializer.getText().includes('jsonStore.find')) {
-            const statement = varDecl.getFirstAncestorByKind(SyntaxKind.VariableStatement);
-            if (statement) statement.remove();
-        }
-    }
-}
-
-// 5. Delete jsonStore import
-const importDecls = sourceFile.getDescendantsOfKind(SyntaxKind.ImportDeclaration);
-for (const importDecl of importDecls) {
-    const moduleSpecifier = importDecl.getModuleSpecifierValue();
-    if (moduleSpecifier === '@/lib/jsonStore') {
-        importDecl.remove();
-    }
-    if (moduleSpecifier === '@/app/actions') {
-        // sometimes imported getSafeJsonArray from self
-        importDecl.remove();
-    }
-}
-
-sourceFile.saveSync();
-console.log('Saved actions.ts!');
+console.log(`\nCompleted! Modified ${changedFiles} files.`);

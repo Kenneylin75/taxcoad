@@ -127,11 +127,11 @@ model Temple {
   address       String?
   phone         String?
   status        String   @default("Active")
-  distributorId String?  @map("distributor_id")
-  salesId       String?  @map("sales_id")
-  planId        String?  @map("plan_id")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  distributorId String?
+  salesId       String?
+  planId        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   plan        PricePlan?   @relation(fields: [planId], references: [id])
@@ -156,8 +156,6 @@ model Temple {
   syncQueues          SyncQueue[]
   financeRecords      FinanceRecord[]
   templeNotifications TempleNotification[]
-
-  @@map("temples")
 }
 
 model TempleApplication {
@@ -172,19 +170,21 @@ model TempleApplication {
 }
 
 model TempleBill {
-  id        String   @id @default(cuid())
-  templeId  String   @map("temple_id")
-  type      String?
-  itemName  String?  @map("item_name")
-  amount    Int      @default(0)
-  status    String   @default("Unpaid")
-  dueDate   String?  @map("due_date")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  templeId    String
+  type        String?
+  itemName    String?
+  amount      Int      @default(0)
+  status      String   @default("Unpaid")
+  dueDate     String?
+  billingDate String?
+  payeeRole   String?
+  payeeId     String?
+  timestamp   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   temple Temple @relation(fields: [templeId], references: [id])
-
-  @@map("temple_bills")
 }
 
 model StoragePlan {
@@ -222,17 +222,15 @@ model User {
   password    String?
   name        String
   role        String
-  templeId    String?  @map("temple_id")
+  templeId    String?
   phone       String?
   status      String   @default("Active")
   permissions Json?
   avatar      String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   temple Temple? @relation(fields: [templeId], references: [id])
-
-  @@map("personnel")
 }
 
 model Admin {
@@ -738,14 +736,15 @@ model Bonus {
 }
 
 model Withdrawal {
-  id        String   @id @default(cuid())
-  userId    String?  @map("user_id")
-  amount    Int      @default(0)
-  status    String   @default("Pending")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("withdrawals")
+  id         String   @id @default(cuid())
+  userId     String?
+  salesName  String?
+  amount     Int      @default(0)
+  status     String   @default("Pending")
+  date       String?
+  receiptUrl String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Notification {
