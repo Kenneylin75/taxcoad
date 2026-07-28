@@ -542,7 +542,7 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
       newId = insRes.rows[0].id;
       await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
           PRIMARY KEY (temple_id, phone),
           name VARCHAR(255) NOT NULL,
@@ -839,7 +839,7 @@ export async function fetchPersonnel() {
     await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           name VARCHAR(255) NOT NULL,
           role VARCHAR(255) NOT NULL,
           account VARCHAR(255) NOT NULL,
@@ -1076,7 +1076,7 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
 
     await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
           PRIMARY KEY (temple_id, phone),
           name VARCHAR(255) NOT NULL,
@@ -1161,7 +1161,7 @@ export async function askAgiAssistant(q: string, h: number) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS ai_chat_logs (
           id SERIAL PRIMARY KEY,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
           user_query TEXT NOT NULL,
           ai_reply TEXT NOT NULL,
@@ -1183,7 +1183,7 @@ export async function fetchAiChatLogs() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS ai_chat_logs (
         id SERIAL PRIMARY KEY,
-        temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+        temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
         phone VARCHAR(50) NOT NULL,
         user_query TEXT NOT NULL,
         ai_reply TEXT NOT NULL,
@@ -1225,7 +1225,7 @@ export async function fetchServiceSettings() {
   return withTempleSession(templeId, false, async (client) => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS temple_settings (
-        temple_id VARCHAR(50) PRIMARY KEY REFERENCES temples(id) ON DELETE CASCADE,
+        temple_id VARCHAR(50) PRIMARY KEY REFERENCES "Temple"(id) ON DELETE CASCADE,
         settings JSONB NOT NULL DEFAULT '{}'::jsonb
       )
     `);
@@ -1252,7 +1252,7 @@ export async function fetchGuestFiles(phone: string) {
     await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL ,
           url TEXT NOT NULL,
           type VARCHAR(50) NOT NULL,
@@ -1702,7 +1702,7 @@ export async function updateStoragePlans(plans: any[]) {
     await client.query('DELETE FROM storage_plans');
       for (const p of plans) {
               await client.query(
-                'INSERT INTO storage_plans (size_gb, price_monthly, price_yearly) VALUES ($1, $2, $3, $4)',
+                'INSERT INTO storage_plans (size_gb, price_monthly, price_yearly) VALUES ($1, $2, $3)',
                 [p.sizeGb, p.priceMonthly, p.priceYearly]
               );
             }
@@ -1742,7 +1742,7 @@ export async function fetchTempleStorages() {
       const res = await client.query(`
         SELECT ts.*, t.temple_name 
         FROM temple_storages ts 
-        JOIN temples t ON ts.temple_id = t.id
+        JOIN "Temple" t ON ts.temple_id = t.id
       `);
       return res.rows.map(r => ({
               id: r.id.toString(),
@@ -2022,7 +2022,7 @@ export async function updateSystemConfig(data: any) {
 export async function fetchFreeApplications(distId?: string) { 
   let list = [...(await [])];
   /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"createdAt\" DESC", [], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"created_at\" DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
           list = res.rows.map((r: any) => ({
             ...r,
@@ -3422,7 +3422,7 @@ export async function fetchDistributorTemples(distributorId: string) {
     /* removed duplicate import */
     const query = `
       SELECT t.* 
-      FROM temples t
+      FROM "Temple" t
       LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
       WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
         AND (ds.role IS NULL OR ds.role != 'SuperSales')
@@ -3465,7 +3465,7 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
     /* removed duplicate import */
     const query = `
       SELECT t.* 
-      FROM temples t
+      FROM "Temple" t
       LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
       WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
         AND t.status = 'Active' 
@@ -4198,15 +4198,15 @@ export async function fetchAllWithdrawals() {
   return withTempleSession(null, true, async (client) => {
     const query = `
       SELECT w.*, wal.role as wallet_role 
-      FROM withdrawals w
-      LEFT JOIN wallets wal ON w.sales_name = wal.name
-      ORDER BY w.created_at DESC
+      FROM "Withdrawal" w
+      LEFT JOIN wallets wal ON w."salesName" = wal.name
+      ORDER BY w."createdAt" DESC
     `;
     const res = await client.query(query);
     
     const allWithdrawals = res.rows.map((r: any) => ({
       id: r.id,
-      salesName: r.sales_name,
+      salesName: r.salesName || r.sales_name,
       amount: r.amount,
       status: r.status,
       receiptUrl: r.receipt_url || r.receiptUrl,
@@ -4249,7 +4249,7 @@ export async function updateServiceSettings(settings: any) {
   return withTempleSession(templeId, false, async (client) => {
     await client.query(`
       CREATE TABLE IF NOT EXISTS temple_settings (
-        temple_id VARCHAR(50) PRIMARY KEY REFERENCES temples(id) ON DELETE CASCADE,
+        temple_id VARCHAR(50) PRIMARY KEY REFERENCES "Temple"(id) ON DELETE CASCADE,
         settings JSONB NOT NULL DEFAULT '{}'::jsonb
       )
     `);
@@ -4414,7 +4414,7 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
       await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL ,
           url TEXT NOT NULL,
           type VARCHAR(50) NOT NULL,
@@ -4463,7 +4463,7 @@ export async function createPersonnel(formData: FormData) {
     await client.query(`
         CREATE TABLE IF NOT EXISTS personnel (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           name VARCHAR(255) NOT NULL,
           role VARCHAR(255) NOT NULL,
           account VARCHAR(255) NOT NULL,
@@ -4737,7 +4737,7 @@ export async function searchGuestsByNameOrPhone(query: string) {
   return withTempleSession(templeId, false, async (client) => {
     await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
           PRIMARY KEY (temple_id, phone),
           name VARCHAR(255) NOT NULL,
@@ -4780,7 +4780,7 @@ export async function checkGuestProfile(phone: string) {
   return withTempleSession(templeId, false, async (client) => {
     await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
           PRIMARY KEY (temple_id, phone),
           name VARCHAR(255) NOT NULL,
@@ -4821,7 +4821,7 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
     
     await client.query(`
         CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL,
           PRIMARY KEY (temple_id, phone),
           name VARCHAR(255) NOT NULL,
@@ -4886,7 +4886,7 @@ export async function fetchGuestHistory(p: string) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS guest_files (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           phone VARCHAR(50) NOT NULL ,
           url TEXT NOT NULL,
           type VARCHAR(50) NOT NULL,
@@ -5537,7 +5537,7 @@ export async function createNotification(title: string, content: string, sendTim
       await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           title VARCHAR(255) NOT NULL,
           content TEXT NOT NULL,
           send_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -5563,7 +5563,7 @@ export async function fetchTempleNotifications(): Promise<TempleNotification[]> 
     await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           title VARCHAR(255) NOT NULL,
           content TEXT NOT NULL,
           send_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -5596,7 +5596,7 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
     await client.query(`
         CREATE TABLE IF NOT EXISTS temple_notifications (
           id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES temples(id) ON DELETE CASCADE,
+          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
           title VARCHAR(255) NOT NULL,
           content TEXT NOT NULL,
           send_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -6021,7 +6021,7 @@ export async function fetchDistributorFinancials(distId: string) {
     /* removed duplicate import */
     const templesQuery = `
       SELECT t.* 
-      FROM temples t
+      FROM "Temple" t
       LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
       WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
         AND (ds.role IS NULL OR ds.role != 'SuperSales')
@@ -6497,7 +6497,7 @@ export async function fetchDistributorTempleBills(distributorId: string) {
     /* removed duplicate import */
     const templesQuery = `
       SELECT t.id, t.name, t.temple_name 
-      FROM temples t
+      FROM "Temple" t
       LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
       WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
         AND (ds.role IS NULL OR ds.role != 'SuperSales')
@@ -6509,7 +6509,7 @@ export async function fetchDistributorTempleBills(distributorId: string) {
     if (templeIds.length === 0) return [];
 
     const billsQuery = `
-      SELECT * FROM temple_bills 
+      SELECT * FROM "TempleBill" 
       WHERE temple_id = ANY($1::varchar[]) OR payee_id = $2
       ORDER BY created_at DESC
     `;
@@ -7191,7 +7191,7 @@ export async function getLineConfig(templeId: string) {
   return withTempleSession(templeId, false, async (client) => {
     const res = await client.query(`
       SELECT line_channel_token, line_channel_secret, line_login_client_id, line_push_enabled 
-      FROM temples WHERE id = $1
+      FROM "Temple" WHERE id = $1
     `, [templeId]);
     if (res.rows.length === 0) return { lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false };
     const r = res.rows[0];
