@@ -2183,14 +2183,14 @@ export async function submitFreeAccountApplication(data: any) {
     try {
       /* removed duplicate import */
       await dbQuery(
-        `INSERT INTO "Temple" (id, name, city, status, "salesId", "distributorId", "setupFee", "monthlyRent", "paymentCycle")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle]
+        `INSERT INTO "Temple" (id, name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle, account, password)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle, newTemple.account, newTemple.password]
       );
       await dbQuery(
-        `INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [newTemple.id, 0, 5368709120, '標準免費空間', newTemple.city || '台北市']
+        `INSERT INTO temple_storages (id, temple_id, used_bytes)
+         VALUES ($1, $2, $3)`,
+        [`ts-${Date.now()}`, newTemple.id, 0]
       );
     } catch (e) {
       console.error("Failed to insert new temple into postgres", e);
