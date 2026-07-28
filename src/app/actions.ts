@@ -4199,8 +4199,8 @@ export async function fetchAllWithdrawals() {
     const query = `
       SELECT w.*, wal.role as wallet_role 
       FROM "Withdrawal" w
-      LEFT JOIN wallets wal ON w."salesName" = wal.name
-      ORDER BY w."createdAt" DESC
+      LEFT JOIN wallets wal ON w.sales_name = wal.name
+      ORDER BY w.created_at DESC
     `;
     const res = await client.query(query);
     
