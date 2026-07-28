@@ -2485,13 +2485,20 @@ export async function fetchAllAccountsForAdmin() {
     }
   }
   
-  const templePromises = (await []).map(async t => {
-    const personnel = (await []).find(p => p.templeId === t.id);
+  let pgTemples: any[] = [];
+  const resTemples = await dbQuery('SELECT * FROM "Temple"', [], () => null) as any;
+  if (resTemples && resTemples.rows) {
+    pgTemples = resTemples.rows;
+  }
+  
+  const templePromises = pgTemples.map(async t => {
+    let personnelRes = await dbQuery('SELECT account FROM "User" WHERE temple_id = $1', [t.id], () => null) as any;
+    let personnel = personnelRes?.rows?.[0];
     const creatorInfo = await getTempleCreatorInfo(t.id);
     return { 
       ...t,
       id: t.id, 
-      name: t.name || t.templeName || '未知宮廟', 
+      name: t.name || t.temple_name || '未知宮廟', 
       role: 'Temple', 
       account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
       status: t.status || 'Active',
