@@ -2183,13 +2183,13 @@ export async function submitFreeAccountApplication(data: any) {
     try {
       /* removed duplicate import */
       await dbQuery(
-        `INSERT INTO "Temple" (id, name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle, account, password)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        `INSERT INTO "Temple" (id, name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle, account, password, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), now())`,
         [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle, newTemple.account, newTemple.password]
       );
       await dbQuery(
-        `INSERT INTO temple_storages (id, temple_id, used_bytes)
-         VALUES ($1, $2, $3)`,
+        `INSERT INTO temple_storages (id, temple_id, used_bytes, created_at, updated_at)
+         VALUES ($1, $2, $3, now(), now())`,
         [`ts-${Date.now()}`, newTemple.id, 0]
       );
     } catch (e) {
@@ -2220,8 +2220,8 @@ export async function submitFreeAccountApplication(data: any) {
     try {
       /* removed duplicate import */
       await dbQuery(
-        `INSERT INTO "User" (id, "templeId", name, account, password, role, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO "User" (id, temple_id, name, account, password, role, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())`,
         [pId, newTemple.id, data.templeName || '宮廟管理員', account, password, 'TempleAdmin', 'Active']
       );
     } catch (e) {
