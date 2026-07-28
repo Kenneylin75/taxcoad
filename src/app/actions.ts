@@ -3430,7 +3430,7 @@ export async function fetchDistributorTemples(distributorId: string) {
     const query = `
       SELECT t.* 
       FROM "Temple" t
-      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
+      LEFT JOIN dist_sales ds ON t.sales_id = ds.id
       WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
         AND (ds.role IS NULL OR ds.role != 'SuperSales')
     `;
