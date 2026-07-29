@@ -798,27 +798,6 @@ export async function markAppointmentAsPaid(appointmentId: number) {
 
 
 // 4. 抓取預約紀錄
-export async function syncExpiredLamps(templeId: string) {
-  try {
-    await prisma.lampRecord.updateMany({
-      where: { templeId, status: 'Active', expiryDate: { lt: new Date() } },
-      data: { status: 'Expired' }
-    });
-  } catch (e) {
-    console.error('syncExpiredLamps error:', e);
-  }
-}
-
-export async function fetchLampRecords() {
-  const templeId = await getDynamicTempleId();
-  if (templeId) {
-    await syncExpiredLamps(templeId);
-  }
-  return withTempleSession(templeId, true, async (client) => {
-    return [];
-  });
-}
-
 export async function fetchAppointments() {
 
       try {
