@@ -1,5 +1,6 @@
 // @ts-nocheck
 "use server";
+import prisma from '@/lib/prisma';
 
 export async function getSafeJsonArray(collection: string): Promise<any[]> {
   try {
@@ -1964,59 +1965,57 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
 export async function fetchSyncQueue() { return [...(await [])]; }
 
 export async function fetchSystemConfig() {
-  const gStore = globalThis as any;
-  let config = gStore.db_config || db_config;
-  
-  return withTempleSession(null, false, async (client) => {
-    if (client) {
-      await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
-        const res = await client.query(`SELECT value FROM system_config WHERE key = 'global'`);
-        if (res.rowCount && res.rowCount > 0) {
-                  config = res.rows[0].value;
-                } else {
-                  await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1)`, [config]);
-                }
+  try {
+    const config = await prisma.systemConfig.findUnique({ where: { key: 'global' } });
+    if (config && config.value) {
+      return config.value as any;
     }
-    
-    if (!config.b2bPayment || !config.b2bPayment.thirdParty) {
-      config.b2bPayment = {
+    const defaultConfig = {
+      fixedMonthlyRent: 3600,
+      yearlyDiscountRate: 20,
+      defaultSuperSalesRates: { distributorAuthRate: 15, templeSetupRate: 10, templeSetupType: 'percent', templeRentRates: [15, 12, 10] },
+      distributorPlans: [
+        { id: 'PLAN-A', name: '基礎體驗版', price: 1600000, durationYears: 2, nodes: 100, color: 'indigo' },
+        { id: 'PLAN-B', name: '標準專業版', price: 3200000, durationYears: 4, nodes: 250, color: 'emerald' },
+        { id: 'PLAN-C', name: '企業無限制', price: 8000000, durationYears: 10, nodes: 1000, color: 'slate' }
+      ],
+      b2bPayment: {
         thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
         linePay: { enabled: false, channelId: '', channelSecret: '' },
-        customTransfer: { enabled: true, bankCode: '808', accountName: '天成科技股份有限公司', accountNo: '808-1234-5678-901' },
-        serviceMapping: {
-          'new-temple': ['customTransfer'],
-          'monthly-rent': ['thirdParty', 'customTransfer'],
-          'distributor-auth': ['customTransfer']
-        }
-      };
-      gStore.db_config = config;
-    }
-    
-    return { ...config };
-  });
+        customTransfer: { enabled: true, bankCode: '808', accountName: '天樞科技股份有限公司', accountNo: '808-1234-5678-901' },
+        serviceMapping: { 'new-temple': ['customTransfer'], 'monthly-rent': ['thirdParty', 'customTransfer'], 'distributor-auth': ['customTransfer'] }
+      }
+    };
+    await prisma.systemConfig.upsert({
+      where: { key: 'global' },
+      update: { value: defaultConfig },
+      create: { key: 'global', value: defaultConfig }
+    });
+    return defaultConfig as any;
+  } catch (error) {
+    console.error('fetchSystemConfig error:', error);
+    return {};
+  }
 }
 
 export async function updateSystemConfig(data: any) {
-  const currentConfig = (await []) || db_config;
-  const newConfig = { ...currentConfig, ...data };
-  
-  await null;
-  db_config = newConfig;
-
-  await withTempleSession(null, false, async (client) => {
-    if (client) {
-      await client.query(`CREATE TABLE IF NOT EXISTS system_config (key VARCHAR PRIMARY KEY, value JSONB)`);
-        await client.query(`INSERT INTO system_config (key, value) VALUES ('global', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, [newConfig]);
-    }
-  });
-
-  await logAdminAction('UPDATE_CONFIG', 'System Parameters');
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
-  return { success: true };
+  try {
+    const currentConfig = await fetchSystemConfig();
+    const newConfig = { ...currentConfig, ...data };
+    await prisma.systemConfig.upsert({
+      where: { key: 'global' },
+      update: { value: newConfig },
+      create: { key: 'global', value: newConfig }
+    });
+    const { revalidatePath } = require('next/cache');
+    revalidatePath('/super-admin');
+    revalidatePath('/super-sales');
+    return { success: true };
+  } catch (error) {
+    console.error('updateSystemConfig error:', error);
+    return { success: false, error: String(error) };
+  }
 }
-
-
 
 // --- 經銷業務 (Dist-Sales) ---
 export async function fetchFreeApplications(distId?: string) { 

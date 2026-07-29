@@ -40,6 +40,14 @@ model Distributor {
   email        String?
   account      String?
   password     String?
+  address      String?
+  bankCode     String?  @map("bank_code")
+  bankAccount  String?  @map("bank_account")
+  bankName     String?  @map("bank_name")
+  b2bPayment   Json?    @map("b2b_payment_config")
+  quota        Int?     @default(100)
+  nodes        Int?     @default(100)
+  customNodes  Int?     @default(100) @map("custom_nodes")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -61,6 +69,9 @@ model DistributorSales {
   role          String?
   account       String?
   password      String?
+  bankAccount   Json?    @map("bank_account_info")
+  commissionRules Json?  @map("commission_rules")
+  joinedAt      String?  @map("joined_at")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -126,6 +137,7 @@ model SuperSalesOverride {
 model Temple {
   id            String   @id @default(cuid())
   name          String
+  templeName    String?  @map("temple_name")
   account       String?
   password      String?
   region        String?
@@ -133,14 +145,15 @@ model Temple {
   address       String?
   phone         String?
   status        String   @default("Active")
-  setupFee      Int      @default(0)
-  monthlyRent   Int      @default(0)
-  paymentCycle  String   @default("Yearly")
-  distributorId String?
-  salesId       String?
-  planId        String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  setupFee      Int      @default(0) @map("setup_fee")
+  monthlyRent   Int      @default(0) @map("monthly_rent")
+  paymentCycle  String   @default("Yearly") @map("payment_cycle")
+  distributorId String?  @map("distributor_id")
+  salesId       String?  @map("sales_id")
+  superSalesId  String?  @map("super_sales_id")
+  planId        String?  @map("plan_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   plan        PricePlan?   @relation(fields: [planId], references: [id])
@@ -180,40 +193,43 @@ model TempleApplication {
 
 model TempleBill {
   id          String   @id @default(cuid())
-  templeId    String
+  templeId    String   @map("temple_id")
   type        String?
-  itemName    String?
+  itemName    String?  @map("item_name")
   amount      Int      @default(0)
   status      String   @default("Unpaid")
-  dueDate     String?
-  billingDate String?
-  payeeRole   String?
-  payeeId     String?
+  dueDate     String?  @map("due_date")
+  billingDate String?  @map("billing_date")
+  payeeRole   String?  @map("payee_role")
+  payeeId     String?  @map("payee_id")
   timestamp   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 }
 
 model StoragePlan {
-  id            String   @id @default(cuid())
-  name          String
-  capacityBytes BigInt   @default(0) @map("capacity_bytes")
-  price         Int      @default(0)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(cuid())
+  sizeGb       Int      @map("size_gb")
+  priceMonthly Int      @map("price_monthly")
+  priceYearly  Int      @map("price_yearly")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("storage_plans")
 }
 
 model TempleStorage {
-  id        String   @id @default(cuid())
-  templeId  String   @map("temple_id")
-  usedBytes BigInt   @default(0) @map("used_bytes")
-  planId    String?  @map("plan_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  templeId       String   @map("temple_id") @unique
+  usedBytes      BigInt   @default(0) @map("used_bytes")
+  allocatedBytes BigInt   @default(5368709120) @map("allocated_bytes")
+  planName       String?  @map("plan_name")
+  city           String?
+  planId         String?  @map("plan_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -231,16 +247,16 @@ model User {
   password    String?
   name        String
   role        String
-  templeId    String?
+  templeId    String?  @map("temple_id")
   phone       String?
   status        String   @default("Active")
-  setupFee      Int      @default(0)
-  monthlyRent   Int      @default(0)
-  paymentCycle  String   @default("Yearly")
+  setupFee      Int      @default(0) @map("setup_fee")
+  monthlyRent   Int      @default(0) @map("monthly_rent")
+  paymentCycle  String   @default("Yearly") @map("payment_cycle")
   permissions Json?
   avatar      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
 }
@@ -686,6 +702,11 @@ model TempleAiUsage {
   tokensUsed Int      @default(0) @map("tokens_used")
   queryCount Int      @default(0) @map("query_count")
   month      String?
+  enabled    Boolean  @default(true)
+  planId     String?  @map("plan_id")
+  usedCount  Int      @default(0) @map("used_count")
+  expiryDate DateTime? @map("expiry_date")
+  isVip      Boolean  @default(false) @map("is_vip")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -738,6 +759,8 @@ model Tool {
 model Wallet {
   id        String   @id @default(cuid())
   ownerId   String?  @map("owner_id")
+  name      String?
+  role      String?
   balance   Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -758,14 +781,14 @@ model Bonus {
 
 model Withdrawal {
   id         String   @id @default(cuid())
-  userId     String?
-  salesName  String?
+  userId     String?  @map("user_id")
+  salesName  String?  @map("sales_name")
   amount     Int      @default(0)
   status     String   @default("Pending")
   date       String?
-  receiptUrl String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  receiptUrl String?  @map("receipt_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 }
 
 model Notification {
@@ -818,4 +841,17 @@ model PasswordReset {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("password_resets")
+}
+
+model SalesTool {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  category  String
+  thumbnail String?
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sales_tools")
 }

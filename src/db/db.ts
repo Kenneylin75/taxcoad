@@ -1,4 +1,7 @@
 import { Pool, PoolClient } from 'pg';
+import prisma from '../lib/prisma';
+
+export { prisma };
 
 const connectionString = process.env.DATABASE_URL;
 
