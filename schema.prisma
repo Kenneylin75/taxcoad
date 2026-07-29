@@ -162,6 +162,7 @@ model Temple {
   guests              Guest[]
   appointments        Appointment[]
   events              Event[]
+  eventRegistrations  EventRegistration[]
   lampCategories      LampCategory[]
   lampRecords         LampRecord[]
   queueEvents         QueueEvent[]
@@ -637,6 +638,7 @@ model EventRegistration {
 
   event Event? @relation(fields: [eventId], references: [id])
   guest Guest? @relation(fields: [guestId], references: [id])
+  temple Temple? @relation(fields: [templeId], references: [id])
 
   @@map("event_registrations")
 }

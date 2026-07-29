@@ -1532,20 +1532,43 @@ export async function fetchGuestFiles(phone: string) {
 // migrated (await jsonStore.find('event_registrations')) to (await jsonStore.find('event_registrations'))
 
 export async function fetchEventRegistrationsByEventId(eventId: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`CREATE TABLE IF NOT EXISTS event_registrations (id VARCHAR(50) PRIMARY KEY, event_id VARCHAR(50), temple_id VARCHAR(50), title VARCHAR(255), phone VARCHAR(50), guest_name VARCHAR(255), price INTEGER, payment_status VARCHAR(50), actual_price INTEGER, timestamp VARCHAR(50))`);
-    const res = await client.query('SELECT * FROM event_registrations WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
-    return res.rows.map(r => ({ id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone, guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status, actualPrice: r.actual_price, timestamp: r.timestamp }));
-  });
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+    const records = await prisma.eventRegistration.findMany({
+      where: { eventId, templeId },
+      orderBy: { createdAt: 'desc' }
+    });
+    return records.map(r => ({
+      id: r.id,
+      eventId: r.eventId,
+      templeId: r.templeId,
+      phone: r.phone,
+      guestName: r.guestName,
+      price: r.actualPrice,
+      paymentStatus: r.paymentStatus,
+      actualPrice: r.actualPrice,
+      timestamp: r.createdAt.toISOString()
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function markRegistrationAsPaid(registrationId: string, actualPrice: number) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE event_registrations SET payment_status = $1, actual_price = $2 WHERE id = $3 AND temple_id = $4', ['Paid', actualPrice, registrationId, templeId]);
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    await prisma.eventRegistration.updateMany({
+      where: { id: registrationId, templeId },
+      data: { paymentStatus: 'Paid', actualPrice }
+    });
     await revalidateTemple();
     return { success: true };
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 // migrated (await jsonStore.find('activities')) to (await jsonStore.find('activities'))
 // migrated (await jsonStore.find('deep_records')) to (await jsonStore.find('deep_records'))
@@ -1572,8 +1595,8 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
         const templeId = await getDynamicTempleId();
         if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
         
-        const ev = await prisma.event.findUnique({
-          where: { id: String(id) },
+        const ev = await prisma.event.findFirst({
+          where: { id: String(id), templeId: templeId! },
           include: { registrations: true }
         });
         if (!ev) return { success: false };
@@ -1874,8 +1897,8 @@ export async function saveEvent(fd: FormData) {
         if (!templeId) return { success: false };
 
         if (id) {
-          await prisma.event.update({
-            where: { id },
+          await prisma.event.updateMany({
+            where: { id, templeId },
             data: {
               title, date, location, price, capacity, status, imageUrl, description
             }
@@ -1906,8 +1929,8 @@ export async function deleteEvent(id: string) {
         
         if (regCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
         
-        await prisma.event.delete({
-          where: { id }
+        await prisma.event.deleteMany({
+          where: { id, templeId: templeId! }
         });
         
         await revalidateTemple();
