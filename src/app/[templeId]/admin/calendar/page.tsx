@@ -173,7 +173,7 @@ export default function CalendarPage() {
       setSearchPhone(payload.phone);
       setIsAddingNewGuest(false);
     } else {
-      alert("❌ " + (res.error || "建立失敗，請重試。"));
+      alert("❌ " + ((res as any).error || "建立失敗，請重試。"));
     }
   };
 

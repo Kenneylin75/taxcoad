@@ -390,92 +390,113 @@ export async function checkAccountExists(account: string) {
 
 // 1. 抓取排班
 export async function fetchAvailableSlots() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS slots (
-        id SERIAL PRIMARY KEY,
-        temple_id VARCHAR(50) NOT NULL,
-        date VARCHAR(50),
-        time VARCHAR(50),
-        staff VARCHAR(255),
-        description TEXT,
-        location VARCHAR(255),
-        bound_service_id VARCHAR(50),
-        price INTEGER DEFAULT 0,
-        status VARCHAR(50) DEFAULT 'Available',
-        guest_name VARCHAR(255)
-      )
-    `);
-    const res = await client.query('SELECT * FROM slots WHERE temple_id = $1 ORDER BY date, time', [templeId]);
-    return res.rows.map(r => ({
-      id: r.id,
-      date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
-      time: r.time,
-      staff: r.staff,
-      description: r.description,
-      location: r.location,
-      bound_service_id: r.bound_service_id,
-      price: r.price,
-      status: r.status,
-      guestName: r.guest_name
-    }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        const slots = await prisma.slot.findMany({
+          where: { templeId },
+          orderBy: [{ date: 'asc' }, { time: 'asc' }]
+        });
+        return slots.map(r => ({
+          id: r.id,
+          date: r.date,
+          time: r.time,
+          staff: r.staff,
+          description: r.description,
+          location: r.location,
+          bound_service_id: r.boundServiceId,
+          price: r.price,
+          status: r.status,
+          guestName: r.guestName
+        }));
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 
 // 2. 批量建立排班
 export async function createSlot(data: any) {
-  let datesStr = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
-  if (data instanceof FormData) {
-    datesStr = data.get("dates") as string || data.get("date") as string;
-    time = data.get("time") as string;
-    staff = data.get("staff") as string;
-    description = data.get("description") as string;
-    location = data.get("location") as string;
-    bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
-    price = Number(data.get("price")) || 0;
-  } else {
-    datesStr = data.dates || data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
-  }
-  if (!datesStr) return { success: false, message: "無效的日期" };
-  const dateList = datesStr?.includes(',') ? datesStr.split(",") : [datesStr];
-  const templeId = await getDynamicTempleId();
 
-  return withTempleSession(templeId, false, async (client) => {
-    for (const date of dateList) {
-              await client.query(
-                'INSERT INTO slots (temple_id, date, time, staff, description, location, bound_service_id, price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                [templeId, date, time, staff, description, location, bound_service_id, price, 'Available']
-              );
-            }
-    await revalidateTemple();
-    return { success: true, count: dateList.length };
-  });
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return { success: false };
+        
+        let datesStr = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
+        if (data instanceof FormData) {
+          datesStr = data.get("dates") as string || data.get("date") as string;
+          time = data.get("time") as string;
+          staff = data.get("staff") as string;
+          description = data.get("description") as string;
+          location = data.get("location") as string;
+          bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
+          price = Number(data.get("price")) || 0;
+        } else {
+          datesStr = data.dates || data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
+        }
+        
+        if (!datesStr) return { success: false, message: "無效的日期" };
+        const dateList = datesStr?.includes(',') ? datesStr.split(",") : [datesStr];
+        
+        const createData = dateList.map(date => ({
+          templeId,
+          date,
+          time,
+          staff,
+          description,
+          location,
+          boundServiceId: bound_service_id,
+          price,
+          status: 'Available'
+        }));
+        
+        await prisma.slot.createMany({ data: createData });
+        await revalidateTemple();
+        return { success: true, count: dateList.length };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function updateSlot(id: number, data: any) {
-  let date = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
-  if (data instanceof FormData) {
-    date = data.get("date") as string;
-    time = data.get("time") as string;
-    staff = data.get("staff") as string;
-    description = data.get("description") as string;
-    location = data.get("location") as string;
-    bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
-    price = Number(data.get("price")) || 0;
-  } else {
-    date = data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
-  }
 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(
-              'UPDATE slots SET date = $1, time = $2, staff = $3, description = $4, location = $5, bound_service_id = $6, price = $7 WHERE id = $8 AND temple_id = $9',
-              [date, time, staff, description, location, bound_service_id, price, id, templeId]
-            );
-    await revalidateTemple();
-    return { success: true };
-  });
+      try {
+        const templeId = await getDynamicTempleId();
+        let date = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
+        
+        if (data instanceof FormData) {
+          date = data.get("date") as string;
+          time = data.get("time") as string;
+          staff = data.get("staff") as string;
+          description = data.get("description") as string;
+          location = data.get("location") as string;
+          bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
+          price = Number(data.get("price")) || 0;
+        } else {
+          date = data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
+        }
+        
+        await prisma.slot.updateMany({
+          where: { id: String(id), templeId: templeId! },
+          data: {
+            date,
+            time,
+            staff,
+            description,
+            location,
+            boundServiceId: bound_service_id,
+            price
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // 3.5 信眾預約動作
@@ -509,114 +530,153 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
 }
 
 export async function bookAppointment(slotId: number, guestName: string, phone: string, paymentMethod?: string, paymentRef?: string, amount?: number) {
-  const templeId = await getDynamicTempleId();
-  if (await checkTempleSuspension(templeId)) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
-  return withTempleSession(templeId, false, async (client) => {
-    let newId = Date.now();
-    const slotRes = await client.query('SELECT * FROM slots WHERE id = $1', [slotId]);
-      if ((slotRes.rowCount ?? 0) === 0) return { success: false, message: "找不到該時段" };
-      const slot = slotRes.rows[0];
-      if (slot.status === 'Booked') return { success: false, message: "該時段已被預約" };
-      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', guestName, slotId]);
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS appointments (
-          id SERIAL PRIMARY KEY,
-          temple_id VARCHAR(50) NOT NULL,
-          date VARCHAR(50),
-          time VARCHAR(50),
-          staff VARCHAR(255),
-          guest_name VARCHAR(255),
-          service VARCHAR(255),
-          service_id VARCHAR(50),
-          status VARCHAR(50) DEFAULT 'Pending',
-          phone VARCHAR(255),
-          payment_method VARCHAR(50),
-          payment_ref VARCHAR(255),
-          payment_status VARCHAR(50) DEFAULT 'Pending',
-          amount INTEGER DEFAULT 0
-        )
-      `);
-      const insRes = await client.query(
-              'INSERT INTO appointments (temple_id, date, time, staff, guest_name, service, service_id, status, phone, payment_method, payment_ref, payment_status, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id',
-              [templeId, slot.date, slot.time, slot.staff, guestName, slot.description || '日常預約', slot.bound_service_id || null, 'Confirmed', phone, paymentMethod || null, paymentRef || null, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : 'Pending', amount || 0]
-            );
-      newId = insRes.rows[0].id;
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          PRIMARY KEY (temple_id, phone),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          password VARCHAR(255),
-          address TEXT,
-          birthday VARCHAR(50),
-          lunar_birthday VARCHAR(255),
-          birth_hour VARCHAR(50),
-          line_id VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'Active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      const normPhone = normalizePhone(phone);
-      const guestCheck = await client.query('SELECT 1 FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1', [normPhone]);
-      if ((guestCheck.rowCount ?? 0) === 0) {
-              await client.query(`
-          INSERT INTO guests (temple_id, phone, name, status)
-          VALUES ($1, $2, $3, $4)
-          ON CONFLICT (temple_id, phone) DO NOTHING
-        `, [templeId, phone, guestName, 'Active']);
-            }
 
-    await revalidateTemple();
-    return { success: true, id: newId };
-  });
+      try {
+        const templeId = await getDynamicTempleId();
+        if (await checkTempleSuspension(templeId)) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
+        
+        const slot = await prisma.slot.findUnique({ where: { id: String(slotId) } });
+        if (!slot) return { success: false, message: "找不到該時段" };
+        if (slot.status === 'Booked') return { success: false, message: "該時段已被預約" };
+        
+        await prisma.slot.update({
+          where: { id: String(slotId) },
+          data: { status: 'Booked', guestName }
+        });
+        
+        const paymentStatus = (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') ? 'Paid' : 'Pending';
+        const amountVal = amount || 0;
+        
+        const newApp = await prisma.appointment.create({
+          data: {
+            templeId: templeId!,
+            date: slot.date,
+            time: slot.time,
+            staff: slot.staff,
+            guestName,
+            service: slot.description || '日常預約',
+            serviceId: slot.boundServiceId || null,
+            status: 'Confirmed',
+            phone,
+            paymentMethod: paymentMethod || null,
+            paymentRef: paymentRef || null,
+            paymentStatus,
+            amount: amountVal
+          }
+        });
+        
+        const normPhone = normalizePhone(phone);
+        await prisma.guest.upsert({
+          where: { phone: normPhone },
+          update: {},
+          create: {
+            templeId,
+            phone: normPhone,
+            name: guestName,
+            status: 'Active'
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true, id: newApp.id };
+      } catch(e) {
+        console.error(e);
+        return { success: false, message: '預約失敗' };
+      }
 }
 
 export async function cancelAppointment(appId: number) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
-      if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
-      const app = appRes.rows[0];
-      await client.query('UPDATE appointments SET status = $1 WHERE id = $2', ['Cancelled', appId]);
-      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
-              ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const app = await prisma.appointment.findFirst({
+          where: { id: String(appId), templeId: templeId! }
+        });
+        
+        if (!app) return { success: false, message: '找不到該預約' };
+        
+        await prisma.appointment.update({
+          where: { id: app.id },
+          data: { status: 'Cancelled' }
+        });
+        
+        await prisma.slot.updateMany({
+          where: {
+            date: app.date,
+            time: app.time,
+            staff: app.staff,
+            templeId: templeId!,
+            status: 'Booked'
+          },
+          data: {
+            status: 'Available',
+            guestName: null
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function rescheduleSingleAppointment(appointmentId: number, newSlotId: number) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    let guestName = "";
-    let oldTimeStr = "";
-    let newTimeStr = "";
 
-    const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appointmentId, templeId]);
-      if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
-      const app = appRes.rows[0];
-      guestName = app.guest_name;
-      oldTimeStr = `${app.date} ${app.time}`;
-      const slotRes = await client.query('SELECT * FROM slots WHERE id = $1 AND temple_id = $2', [newSlotId, templeId]);
-      if (slotRes.rowCount === 0) return { success: false, message: '找不到新選擇的時段' };
-      const newSlot = slotRes.rows[0];
-      if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
-      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6 AND status = $7', 
-              ['Available', null, app.date, app.time, app.staff, templeId, 'Booked']);
-      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', app.guest_name, newSlotId]);
-      await client.query('UPDATE appointments SET date = $1, time = $2, staff = $3, service_id = $4 WHERE id = $5', 
-              [newSlot.date, newSlot.time, newSlot.staff, newSlot.bound_service_id, appointmentId]);
-      newTimeStr = `${newSlot.date} ${newSlot.time}`;
-
-    const content = `親愛的信眾 ${guestName} 您好，您原本預約的 ${oldTimeStr} 時段，已由宮廟方為您手動改期至 ${newTimeStr}。造成不便敬請見諒，如有疑問請洽宮廟管理員。`;
-    await createNotification('【系統通知】您的預約已改期', content, new Date().toISOString());
-    await logSystemEvent('INFO', '預約單筆改期', `將預約 ${appointmentId} 改至時段 ${newSlotId}`, '系統管理員', templeId);
-
-    await revalidateTemple();
-    return { success: true };
-  });
+      try {
+        const templeId = await getDynamicTempleId();
+        
+        const app = await prisma.appointment.findFirst({
+          where: { id: String(appointmentId), templeId: templeId! }
+        });
+        if (!app) return { success: false, message: '找不到該預約' };
+        
+        const newSlot = await prisma.slot.findFirst({
+          where: { id: String(newSlotId), templeId: templeId! }
+        });
+        if (!newSlot) return { success: false, message: '找不到新選擇的時段' };
+        if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
+        
+        const oldTimeStr = `${app.date} ${app.time}`;
+        const newTimeStr = `${newSlot.date} ${newSlot.time}`;
+        
+        await prisma.slot.updateMany({
+          where: {
+            date: app.date,
+            time: app.time,
+            staff: app.staff,
+            templeId: templeId!,
+            status: 'Booked'
+          },
+          data: { status: 'Available', guestName: null }
+        });
+        
+        await prisma.slot.update({
+          where: { id: newSlot.id },
+          data: { status: 'Booked', guestName: app.guestName }
+        });
+        
+        await prisma.appointment.update({
+          where: { id: app.id },
+          data: {
+            date: newSlot.date,
+            time: newSlot.time,
+            staff: newSlot.staff,
+            serviceId: newSlot.boundServiceId
+          }
+        });
+        
+        const content = `親愛的信眾 ${app.guestName} 您好，您原本預約的 ${oldTimeStr} 時段，已由宮廟方為您手動改期至 ${newTimeStr}。造成不便敬請見諒，如有疑問請洽宮廟管理員。`;
+        await createNotification('【系統通知】您的預約已改期', content, new Date().toISOString());
+        await logSystemEvent('INFO', '預約單筆改期', `將預約 ${appointmentId} 改至時段 ${newSlotId}`, '系統管理員', templeId!);
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function cancelServiceRecord(recordId: string, type: string) {
@@ -648,84 +708,120 @@ export async function cancelServiceRecord(recordId: string, type: string) {
 }
 
 export async function modifyAppointment(appId: number, newSlotId: number) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const appRes = await client.query('SELECT * FROM appointments WHERE id = $1 AND temple_id = $2', [appId, templeId]);
-      if (appRes.rowCount === 0) return { success: false, message: '找不到該預約' };
-      const app = appRes.rows[0];
-      const slotRes = await client.query('SELECT * FROM slots WHERE id = $1 AND temple_id = $2', [newSlotId, templeId]);
-      if (slotRes.rowCount === 0) return { success: false, message: '找不到新時段' };
-      const newSlot = slotRes.rows[0];
-      if (newSlot.status === 'Booked') return { success: false, message: '新時段已被預約' };
-      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6', 
-              ['Available', null, app.date, app.time, app.staff, templeId]);
-      await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE id = $3', ['Booked', app.guest_name, newSlotId]);
-      await client.query('UPDATE appointments SET date = $1, time = $2, staff = $3 WHERE id = $4', [newSlot.date, newSlot.time, newSlot.staff, appId]);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        
+        const app = await prisma.appointment.findFirst({
+          where: { id: String(appId), templeId: templeId! }
+        });
+        if (!app) return { success: false, message: '找不到該預約' };
+        
+        const newSlot = await prisma.slot.findFirst({
+          where: { id: String(newSlotId), templeId: templeId! }
+        });
+        if (!newSlot) return { success: false, message: '找不到新選擇的時段' };
+        if (newSlot.status === 'Booked') return { success: false, message: '新時段已被預約' };
+        
+        await prisma.slot.updateMany({
+          where: {
+            date: app.date,
+            time: app.time,
+            staff: app.staff,
+            templeId: templeId!,
+            status: 'Booked'
+          },
+          data: { status: 'Available', guestName: null }
+        });
+        
+        await prisma.slot.update({
+          where: { id: newSlot.id },
+          data: { status: 'Booked', guestName: app.guestName }
+        });
+        
+        await prisma.appointment.update({
+          where: { id: app.id },
+          data: {
+            date: newSlot.date,
+            time: newSlot.time,
+            staff: newSlot.staff
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // 3.5 標記預約為已到場
 export async function markAppointmentAsArrived(appointmentId: number) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Arrived', appointmentId, templeId]);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.appointment.updateMany({
+          where: { id: String(appointmentId), templeId: templeId! },
+          data: { status: 'Arrived' }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // 3.6 標記預約為已付款
 export async function markAppointmentAsPaid(appointmentId: number) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query("UPDATE appointments SET status = 'Paid' WHERE id = $1 AND temple_id = $2", [appointmentId, templeId]);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.appointment.updateMany({
+          where: { id: String(appointmentId), templeId: templeId! },
+          data: { status: 'Paid' }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 
 // 4. 抓取預約紀錄
 export async function fetchAppointments() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS appointments (
-          id SERIAL PRIMARY KEY,
-          temple_id VARCHAR(50) NOT NULL,
-          date VARCHAR(50),
-          time VARCHAR(50),
-          staff VARCHAR(255),
-          guest_name VARCHAR(255),
-          service VARCHAR(255),
-          service_id VARCHAR(50),
-          status VARCHAR(50) DEFAULT 'Pending',
-          phone VARCHAR(255),
-          payment_method VARCHAR(50),
-          payment_ref VARCHAR(255),
-          payment_status VARCHAR(50) DEFAULT 'Pending',
-          amount INTEGER DEFAULT 0
-        )
-      `);
-      const res = await client.query('SELECT * FROM appointments WHERE temple_id = $1 ORDER BY date, time', [templeId]);
-      return res.rows.map(r => ({
-              id: r.id,
-              date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
-              time: r.time,
-              staff: r.staff,
-              guestName: r.guest_name,
-              service: r.service,
-              serviceId: r.service_id,
-              status: r.status,
-              phone: r.phone,
-              paymentMethod: r.payment_method,
-              paymentRef: r.payment_ref,
-              paymentStatus: r.payment_status,
-              amount: r.amount
-            }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        
+        const apps = await prisma.appointment.findMany({
+          where: { templeId },
+          orderBy: [{ date: 'asc' }, { time: 'asc' }]
+        });
+        
+        return apps.map(r => ({
+          id: r.id,
+          date: r.date,
+          time: r.time,
+          staff: r.staff,
+          guestName: r.guestName,
+          service: r.service,
+          serviceId: r.serviceId,
+          status: r.status,
+          phone: r.phone,
+          paymentMethod: r.paymentMethod,
+          paymentRef: r.paymentRef,
+          paymentStatus: r.paymentStatus,
+          amount: r.amount
+        }));
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 
 // 5. 抓取與儲存服務項目
@@ -877,24 +973,37 @@ export async function fetchStaff() {
 
 // 8. 刪除單個時段
 export async function removeSingleSlot(id: any) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.slot.deleteMany({
+          where: { id: String(id), templeId: templeId! }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // 8.1 批次刪除多個時段
 export async function removeBatchSlots(ids: any[]) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    for (const id of ids) {
-              await client.query('DELETE FROM slots WHERE id = $1 AND temple_id = $2', [id, templeId]);
-            }
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.slot.deleteMany({
+          where: {
+            id: { in: ids.map(String) },
+            templeId: templeId!
+          }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // 9. 智能分析受影響預約
@@ -977,25 +1086,45 @@ export async function executeEmergencyReschedule(formData: FormData) {
 
 // --- 其餘輔助函式 ---
 export async function fetchLampRecords() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`CREATE TABLE IF NOT EXISTS lamp_records (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), guest_name VARCHAR(255), phone VARCHAR(50), lamp_type VARCHAR(255), amount INTEGER, status VARCHAR(50), created_at VARCHAR(50), payment_method VARCHAR(50), payment_ref VARCHAR(255), payment_status VARCHAR(50))`);
-    await client.query(`ALTER TABLE lamp_records ADD COLUMN IF NOT EXISTS category_id VARCHAR(50)`);
-    const res = await client.query('SELECT * FROM lamp_records WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, categoryId: r.category_id, guestName: r.guest_name, phone: r.phone, lampType: r.lamp_type, amount: r.amount, status: r.status, createdAt: r.created_at, paymentMethod: r.payment_method, paymentRef: r.payment_ref, paymentStatus: r.payment_status }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const records = await prisma.lampRecord.findMany({
+          where: { templeId: templeId! },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        return records.map(r => ({
+          id: r.id,
+          templeId: r.templeId,
+          categoryId: r.categoryId,
+          guestName: r.guestName,
+          phone: r.phone,
+          lampType: r.categoryName || '',
+          amount: r.actualPrice,
+          status: r.status,
+          createdAt: r.createdAt.toISOString(),
+          paymentMethod: r.paymentMethod,
+          paymentRef: r.paymentProofUrl,
+          paymentStatus: r.paymentStatus
+        }));
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 // migrated (await jsonStore.find('lamp_categories')) to (await jsonStore.find('lamp_categories'))
 export async function fetchLampCategories() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`CREATE TABLE IF NOT EXISTS lamp_categories (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), name VARCHAR(255), price INTEGER, description TEXT, color VARCHAR(50), is_active BOOLEAN DEFAULT true, type VARCHAR(50))`);
-    await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS duration_days INTEGER DEFAULT 365`);
-    await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS total_slots INTEGER DEFAULT 500`);
-    await client.query(`ALTER TABLE lamp_categories ADD COLUMN IF NOT EXISTS precautions TEXT`);
-    const res = await client.query('SELECT * FROM lamp_categories WHERE temple_id = $1', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price, description: r.description, durationDays: r.duration_days, totalSlots: r.total_slots, precautions: r.precautions, color: r.color, isActive: r.is_active, type: r.type }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        return await prisma.lampCategory.findMany({
+          where: { templeId: templeId! }
+        });
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 // migrated (await jsonStore.find('lamp_records')) to (await jsonStore.find('lamp_records'))
 export async function createLightingOrder(fd: FormData) { 
@@ -1319,56 +1448,72 @@ export async function verifyQueueTicket(eventId: any, phone: string) {
   });
 }
 export async function registerForEvent(id: any, phone: string, n: string, pr: number, paymentMethod?: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
-    
-    const pStatus = paymentMethod === 'Cash' || !paymentMethod ? (pr > 0 ? 'Pending' : 'Unpaid') : 'Paid';
 
-    let newId = '';
-    const evRes = await client.query('SELECT title, enrolled, capacity FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      if (evRes.rowCount === 0) return { success: false };
-      const ev = evRes.rows[0];
-      if (ev.capacity > 0 && ev.enrolled >= ev.capacity) return { success: false, message: '名額已滿' };
-      newId = `REG-${Date.now()}`;
-      await client.query('UPDATE events SET enrolled = enrolled + 1 WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      await client.query('INSERT INTO event_registrations (id, event_id, temple_id, title, phone, guest_name, price, payment_status, actual_price, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-              [newId, id, templeId, ev.title, phone, n, pr, pStatus, pr > 0 ? pr : 0, new Date().toISOString().replace('T', ' ').split('.')[0]]
-            );
-    await revalidateTemple();
-    return { success: true, id: newId };
-  });
+      try {
+        const templeId = await getDynamicTempleId();
+        if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
+        
+        const ev = await prisma.event.findUnique({
+          where: { id: String(id) },
+          include: { registrations: true }
+        });
+        if (!ev) return { success: false };
+        
+        if (ev.capacity > 0 && ev.registrations.length >= ev.capacity) return { success: false, message: '名額已滿' };
+        
+        const pStatus = paymentMethod === 'Cash' || !paymentMethod ? (pr > 0 ? 'Pending' : 'Unpaid') : 'Paid';
+        const newId = `REG-${Date.now()}`;
+        
+        await prisma.eventRegistration.create({
+          data: {
+            id: newId,
+            eventId: ev.id,
+            templeId: templeId!,
+            phone,
+            guestName: n,
+            actualPrice: pr > 0 ? pr : 0,
+            paymentStatus: pStatus
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true, id: newId };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function fetchGuestRegistrations(p: any) {
-  const templeId = await getDynamicTempleId();
-  const normPhone = (p || '').replace(/[- ]/g, '');
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS event_registrations (
-          id VARCHAR(50) PRIMARY KEY,
-          event_id VARCHAR(50),
-          temple_id VARCHAR(50),
-          title VARCHAR(255),
-          phone VARCHAR(50),
-          guest_name VARCHAR(255),
-          price INTEGER,
-          payment_status VARCHAR(50),
-          actual_price INTEGER,
-          timestamp VARCHAR(50)
-        )
-      `);
-      const res = await client.query(`
-        SELECT * FROM event_registrations 
-        WHERE REPLACE(REPLACE(phone, '-', ''), ' ', '') = REPLACE(REPLACE($1, '-', ''), ' ', '')
-        AND temple_id = $2
-        ORDER BY timestamp DESC
-      `, [normPhone, templeId]);
-      return res.rows.map(r => ({
-              id: r.id, eventId: r.event_id, templeId: r.temple_id, title: r.title, phone: r.phone,
-              guestName: r.guest_name, price: r.price, paymentStatus: r.payment_status,
-              actualPrice: r.actual_price, timestamp: r.timestamp
-            }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const normPhone = normalizePhone(p || '');
+        
+        const regs = await prisma.eventRegistration.findMany({
+          where: {
+            templeId: templeId!,
+            phone: normPhone
+          },
+          include: { event: true },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        return regs.map(r => ({
+          id: r.id,
+          eventId: r.eventId,
+          templeId: r.templeId,
+          title: (r as any).title || r.event?.title,
+          phone: r.phone,
+          guestName: r.guestName,
+          price: r.event?.price || 0,
+          paymentStatus: r.paymentStatus,
+          actualPrice: r.actualPrice,
+          timestamp: r.createdAt.toISOString()
+        }));
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
 }
 export async function fetchGuestQueueTickets(p: any) {
   const templeId = await getDynamicTempleId();
@@ -1456,63 +1601,107 @@ export type EventItem = { id: string; title: string; date: string; location: str
 // migrated (await jsonStore.find('events')) to (await jsonStore.find('events'))
 
 export async function fetchEvents() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`CREATE TABLE IF NOT EXISTS events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), location VARCHAR(255), price INTEGER, status VARCHAR(50), capacity INTEGER, enrolled INTEGER DEFAULT 0, image_url TEXT)`);
-    await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS description TEXT`);
-    await client.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS precautions TEXT`);
-    const res = await client.query('SELECT * FROM events WHERE temple_id = $1', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, location: r.location, price: r.price, status: r.status, capacity: r.capacity, enrolled: r.enrolled, imageUrl: r.image_url, description: r.description, precautions: r.precautions }));
-  });
-}
-export async function saveEvent(fd: FormData) { 
-  const id = fd.get('id') as string;
-  const title = fd.get('title') as string;
-  const date = fd.get('date') as string;
-  const location = fd.get('location') as string;
-  const price = Number(fd.get('price')) || 0;
-  const capacity = Number(fd.get('capacity')) || 0;
-  const status = (fd.get('status') as any) || 'Draft';
-  const description = fd.get('description') as string || '';
-  const precautions = fd.get('precautions') as string || '';
-  let imageUrl = fd.get('imageUrl') as string;
-  const imageFile = fd.get('imageFile') as File | null;
-  
-  if (imageFile && imageFile.size > 0) {
-    const fs = require('fs');
-    const path = require('path');
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-    
-    const ext = imageFile.name.split('.').pop() || 'jpg';
-    const filename = `evt-${Date.now()}.${ext}`;
-    const filePath = path.join(uploadsDir, filename);
-    const arrayBuffer = await imageFile.arrayBuffer();
-    fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-    imageUrl = `/uploads/${filename}`;
-  }
-  
-  const templeId = await getDynamicTempleId();
+    try {
+    const templeId = await getDynamicTempleId();
+    const events = await prisma.event.findMany({
+      where: { templeId: templeId! },
+      include: { registrations: true }
+    });
 
-  return withTempleSession(templeId, false, async (client) => {
-    if (id) {
-              await client.query('UPDATE events SET title = $1, date = $2, location = $3, price = $4, capacity = $5, status = $6, image_url = $7, description = $8, precautions = $9 WHERE id = $10 AND temple_id = $11', [title, date, location, price, capacity, status, imageUrl, description, precautions, id, templeId]);
-            } else {
-              await client.query('INSERT INTO events (id, temple_id, title, date, location, price, capacity, status, enrolled, image_url, description, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11)', [`ev-${Date.now()}`, templeId, title, date, location, price, capacity, status, imageUrl, description, precautions]);
+    return events.map(r => ({
+      id: r.id,
+      templeId: r.templeId,
+      title: r.title,
+      date: r.date || '',
+      location: r.location || '',
+      price: r.price,
+      status: r.status,
+      capacity: r.capacity,
+      enrolled: r.registrations.length,
+      imageUrl: r.imageUrl || '',
+      description: r.description || '',
+      precautions: (r as any).precautions
+    }));
+    } catch (e) {
+    console.error(e);
+    return [];
+    }
+}
+export async function saveEvent(fd: FormData) {
+
+      try {
+        const id = fd.get('id') as string;
+        const title = fd.get('title') as string;
+        const date = fd.get('date') as string;
+        const location = fd.get('location') as string;
+        const price = Number(fd.get('price')) || 0;
+        const capacity = Number(fd.get('capacity')) || 0;
+        const status = (fd.get('status') as any) || 'Draft';
+        const description = fd.get('description') as string || '';
+        const precautions = fd.get('precautions') as string || '';
+        let imageUrl = fd.get('imageUrl') as string;
+        const imageFile = fd.get('imageFile') as File | null;
+        
+        if (imageFile && imageFile.size > 0) {
+          const fs = require('fs');
+          const path = require('path');
+          const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+          
+          const ext = imageFile.name.split('.').pop() || 'jpg';
+          const filename = `evt-${Date.now()}.${ext}`;
+          const filePath = path.join(uploadsDir, filename);
+          const arrayBuffer = await imageFile.arrayBuffer();
+          fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+          imageUrl = `/uploads/${filename}`;
+        }
+        
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return { success: false };
+
+        if (id) {
+          await prisma.event.update({
+            where: { id },
+            data: {
+              title, date, location, price, capacity, status, imageUrl, description
             }
-    await revalidateTemple();
-    return { success: true };
-  });
+          });
+        } else {
+          await prisma.event.create({
+            data: {
+              id: `ev-${Date.now()}`,
+              templeId,
+              title, date, location, price, capacity, status, imageUrl, description
+            }
+          });
+        }
+        await revalidateTemple();
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function deleteEvent(id: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const regCheck = await client.query('SELECT 1 FROM event_registrations WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
-      if (regCheck.rowCount && regCheck.rowCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
-      await client.query('DELETE FROM events WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    await revalidateTemple();
-    return { success: true }; 
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const regCount = await prisma.eventRegistration.count({
+          where: { eventId: id, templeId: templeId! }
+        });
+        
+        if (regCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
+        
+        await prisma.event.delete({
+          where: { id }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // --- B2B SaaS 平台層資料表初始化 ---
@@ -1697,16 +1886,22 @@ export async function fetchB2BPaymentConfig(templeId: string) {
 
 // --- STORAGE & BILLING APIS ---
 export async function fetchStoragePlans() {
-  return withTempleSession(null, true, async (client) => {
-    const res = await client.query('SELECT * FROM storage_plans ORDER BY size_gb');
-    return res.rows.map(r => ({
-      id: r.id.toString(),
-      name: `${r.size_gb}GB 雲端空間`,
-      sizeGb: r.size_gb,
-      priceMonthly: r.price_monthly,
-      priceYearly: r.price_yearly
-    }));
-  });
+
+      try {
+        const plans = await prisma.storagePlan.findMany({
+          orderBy: { sizeGb: 'asc' }
+        });
+        return plans.map(r => ({
+          id: r.id,
+          name: `${r.sizeGb}GB 雲端空間`,
+          sizeGb: r.sizeGb,
+          priceMonthly: r.priceMonthly,
+          priceYearly: r.priceYearly
+        }));
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
 }
 
 export async function updateStoragePlans(plans: any[]) {
@@ -1724,48 +1919,47 @@ export async function updateStoragePlans(plans: any[]) {
 }
 
 export async function fetchTempleStorages() {
-  return withTempleSession(null, true, async (client) => {
-    const templesRes = await client.query('SELECT * FROM "Temple"');
-      for (const t of templesRes.rows) {
-              const check = await client.query('SELECT * FROM temple_storages WHERE temple_id = $1', [t.id]);
-              if ((check.rowCount ?? 0) === 0) {
-                const cloudStorage = t.cloud_storage;
-                const isVip = t.plan === 'Unlimited Node' || t.plan === 'Free' || t.plan === '免費' || cloudStorage?.includes('無限') || cloudStorage === 'Free' || cloudStorage === '免費' || !cloudStorage;
-                let qGB = 5;
-                let pName = '免費 5GB 空間';
-                if (isVip) {
-                    qGB = 999999;
-                    pName = '無限免費方案';
-                } else if (cloudStorage) {
-                   if (cloudStorage.startsWith('SP-')) {
-                       const p = db_storage_plans.find(x => x.id === cloudStorage);
-                       if (p) { qGB = p.sizeGb; pName = p.name; }
-                   } else {
-                       qGB = parseInt(cloudStorage) || 5;
-                       pName = `${qGB}GB`;
-                   }
-                }
-                await client.query(
-                  'INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) VALUES ($1, $2, $3, $4, $5)',
-                  [t.id, 0, qGB * 1024 * 1024 * 1024, pName, t.city || '台北市']
-                );
-              }
+
+      try {
+        const temples = await prisma.temple.findMany();
+        for (const t of temples) {
+          const isVip = t.planId === 'Unlimited Node' || t.planId === 'Free' || t.planId === '免費';
+          let qGB = 5;
+          let pName = '免費 5GB 空間';
+          if (isVip) {
+              qGB = 999999;
+              pName = '無限免費方案';
+          }
+          await prisma.templeStorage.upsert({
+            where: { templeId: t.id },
+            update: {},
+            create: {
+              templeId: t.id,
+              usedBytes: 0,
+              allocatedBytes: BigInt(qGB) * BigInt(1024 * 1024 * 1024),
+              planName: pName,
+              city: t.city || '台北市'
             }
-      const res = await client.query(`
-        SELECT ts.*, t.temple_name 
-        FROM temple_storages ts 
-        JOIN "Temple" t ON ts.temple_id = t.id
-      `);
-      return res.rows.map(r => ({
-              id: r.id.toString(),
-              templeId: r.temple_id,
-              templeName: r.temple_name,
-              city: r.city,
-              usedBytes: Number(r.used_bytes),
-              quotaGb: Number(r.allocated_bytes) / (1024 * 1024 * 1024),
-              planName: r.plan_name
-            }));
-  });
+          });
+        }
+        
+        const storages = await prisma.templeStorage.findMany({
+          include: { temple: true }
+        });
+        
+        return storages.map(r => ({
+          id: r.id,
+          templeId: r.templeId,
+          templeName: r.temple?.templeName || r.temple?.name,
+          city: r.city,
+          usedBytes: Number(r.usedBytes),
+          quotaGb: Number(r.allocatedBytes) / (1024 * 1024 * 1024),
+          planName: r.planName
+        }));
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
 }
 
 export async function requestTempleStorageUpgrade(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly') {
@@ -4235,25 +4429,35 @@ export async function rejectWithdrawal(id: string) {
   });
 }
 
-export async function updateServiceSettings(settings: any) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS temple_settings (
-        temple_id VARCHAR(50) PRIMARY KEY REFERENCES "Temple"(id) ON DELETE CASCADE,
-        settings JSONB NOT NULL DEFAULT '{}'::jsonb
-      )
-    `);
-    
-    const res = await client.query('SELECT 1 FROM temple_settings WHERE temple_id = $1', [templeId]);
-    if (res.rowCount > 0) {
-      await client.query('UPDATE temple_settings SET settings = $1 WHERE temple_id = $2', [JSON.stringify(settings), templeId]);
-    } else {
-      await client.query('INSERT INTO temple_settings (temple_id, settings) VALUES ($1, $2)', [templeId, JSON.stringify(settings)]);
-    }
-    await revalidateTemple();
-    return { success: true };
-  });
+export async function updateServiceSettings(settings: any) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return { success: false };
+        
+        const existing = await prisma.serviceSetting.findFirst({
+          where: { templeId }
+        });
+        
+        if (existing) {
+          await prisma.serviceSetting.update({
+            where: { id: existing.id },
+            data: { pushConfigs: settings }
+          });
+        } else {
+          await prisma.serviceSetting.create({
+            data: {
+              templeId,
+              pushConfigs: settings
+            }
+          });
+        }
+        
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function fetchEarningsStats(salesId: string = '超級精英業務') { 
@@ -4657,165 +4861,128 @@ export type GuestRecord = any;
 export type LampCategory = any;
 
 export async function fetchGuests() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query('SELECT * FROM guests WHERE temple_id = $1 ORDER BY created_at DESC', [templeId]);
-      return JSON.parse(JSON.stringify(res.rows.map(r => ({
-              id: r.id, templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email,
-              address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday,
-              birthHour: r.birth_hour, lineId: r.line_id, status: r.status,
-              createdAt: r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : r.created_at
-            }))));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        
+        const guests = await prisma.guest.findMany({
+          where: { templeId },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        return guests.map(r => ({
+          id: r.id,
+          templeId: r.templeId,
+          phone: r.phone,
+          name: r.name,
+          email: r.email,
+          address: r.address,
+          birthday: r.birthday,
+          lunarBirthday: r.lunarBirthday,
+          birthHour: r.birthHour,
+          lineId: r.lineId,
+          status: r.status,
+          createdAt: r.createdAt.toISOString().split('T')[0]
+        }));
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 export async function searchGuestsByNameOrPhone(query: string) {
-  if (!query) return [];
-  const normalizedQuery = query.trim().toLowerCase();
-  
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          PRIMARY KEY (temple_id, phone),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          password VARCHAR(255),
-          address TEXT,
-          birthday VARCHAR(50),
-          lunar_birthday VARCHAR(255),
-          birth_hour VARCHAR(50),
-          line_id VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'Active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      const res = await client.query(`
-        SELECT * FROM guests 
-        WHERE LOWER(name) LIKE $1 
-        OR REPLACE(phone, '-', '') LIKE $2
-        ORDER BY created_at DESC
-      `, [`%${normalizedQuery}%`, `%${normalizePhone()}%`]);
-      return res.rows.map(r => ({
-              phone: r.phone,
-              name: r.name,
-              email: r.email || '',
-              password: r.password || '',
-              address: r.address || '',
-              birthday: r.birthday || '',
-              lunarBirthday: r.lunar_birthday || '',
-              birthHour: r.birth_hour || '',
-              lineId: r.line_id || '',
-              status: r.status || 'Active',
-              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
-            }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        
+        const guests = await prisma.guest.findMany({
+          where: {
+            templeId,
+            OR: [
+              { name: { contains: query } },
+              { phone: { contains: query } }
+            ]
+          }
+        });
+        return guests;
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 
 export async function checkGuestProfile(phone: string) {
-  const normPhone = normalizePhone(phone);
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          PRIMARY KEY (temple_id, phone),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          password VARCHAR(255),
-          address TEXT,
-          birthday VARCHAR(50),
-          lunar_birthday VARCHAR(255),
-          birth_hour VARCHAR(50),
-          line_id VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'Active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1', [normPhone]);
-      if ((res.rowCount ?? 0) === 0) return null;
-      const r = res.rows[0];
-      return {
-              phone: r.phone,
-              name: r.name,
-              email: r.email || '',
-              password: r.password || '',
-              address: r.address || '',
-              birthday: r.birthday || '',
-              lunarBirthday: r.lunar_birthday || '',
-              birthHour: r.birth_hour || '',
-              lineId: r.line_id || '',
-              status: r.status || 'Active',
-              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=B91C1C&color=fff`
-            };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return null;
+        return await prisma.guest.findFirst({
+          where: { phone, templeId }
+        });
+      } catch(e) {
+        console.error(e);
+        return null;
+      }
 }
 
-export async function createOrUpdateGuest(d: any, originalPhone?: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const lookupPhone = originalPhone || d.phone;
-    
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          PRIMARY KEY (temple_id, phone),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          password VARCHAR(255),
-          address TEXT,
-          birthday VARCHAR(50),
-          lunar_birthday VARCHAR(255),
-          birth_hour VARCHAR(50),
-          line_id VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'Active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      if (originalPhone && originalPhone !== d.phone) {
-              const conflictRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, d.phone]);
-              if ((conflictRes.rowCount ?? 0) > 0) {
-                return { success: false, error: "此手機號碼已被其他信眾檔案使用！" };
-              }
-            }
-      const checkRes = await client.query('SELECT 1 FROM guests WHERE temple_id = $1 AND phone = $2', [templeId, lookupPhone]);
-      if ((checkRes.rowCount ?? 0) > 0) {
-              // Update! COALESCE($9, line_id) ensures that if the frontend doesn't provide a lineId, the existing one in the DB is not overwritten by null.
-              await client.query(`
-          UPDATE guests 
-          SET phone = $1, name = $2, email = $3, password = $4, address = $5, birthday = $6, lunar_birthday = $7, birth_hour = $8, line_id = COALESCE($9, line_id), status = $10
-          WHERE temple_id = $11 AND phone = $12
-        `, [
-                d.phone, d.name, d.email || null, d.password || null, d.address || null,
-                d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active',
-                templeId, lookupPhone
-              ]);
-              
-              if (lookupPhone !== d.phone) {
-                 await client.query('UPDATE appointments SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-                 await client.query('UPDATE lamp_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-                 await client.query('UPDATE event_registrations SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-                 await client.query('UPDATE queue_tickets SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-                 await client.query('UPDATE deep_records SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-                 await client.query('UPDATE activities SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-                 await client.query('UPDATE guest_files SET phone = $1 WHERE temple_id = $2 AND phone = $3', [d.phone, templeId, lookupPhone]);
-              }
-            } else {
-              // Insert!
-              await client.query(`
-          INSERT INTO guests (temple_id, phone, name, email, password, address, birthday, lunar_birthday, birth_hour, line_id, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        `, [
-                templeId, d.phone, d.name, d.email || null, d.password || null, d.address || null,
-                d.birthday || null, d.lunarBirthday || null, d.birthHour || null, d.lineId || null, d.status || 'Active'
-              ]);
-            }
-    await revalidateTemple();
-    return { success: true }; 
-  });
+export async function createOrUpdateGuest(d: any, originalPhone?: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return { success: false };
+        
+        let d = data;
+        if (data instanceof FormData) {
+          d = {
+            phone: data.get('phone') as string,
+            name: data.get('name') as string,
+            email: data.get('email') as string,
+            password: data.get('password') as string,
+            address: data.get('address') as string,
+            birthday: data.get('birthday') as string,
+            lunarBirthday: data.get('lunarBirthday') as string,
+            birthHour: data.get('birthHour') as string,
+            lineId: data.get('lineId') as string,
+            status: data.get('status') as string || 'Active'
+          };
+        }
+        
+        const normPhone = normalizePhone(d.phone);
+        await prisma.guest.upsert({
+          where: { phone: normPhone },
+          update: {
+            name: d.name,
+            email: d.email || null,
+            password: d.password || null,
+            address: d.address || null,
+            birthday: d.birthday || null,
+            lunarBirthday: d.lunarBirthday || null,
+            birthHour: d.birthHour || null,
+            lineId: d.lineId || null,
+            status: d.status || 'Active'
+          },
+          create: {
+            templeId,
+            phone: normPhone,
+            name: d.name,
+            email: d.email || null,
+            password: d.password || null,
+            address: d.address || null,
+            birthday: d.birthday || null,
+            lunarBirthday: d.lunarBirthday || null,
+            birthHour: d.birthHour || null,
+            lineId: d.lineId || null,
+            status: d.status || 'Active'
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function fetchGuestHistory(p: string) {
 
@@ -4914,12 +5081,19 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
 export async function fetchAllFilesByDate() { return []; }
 export async function setFilePrivacy() { return { success: true }; }
 export async function updateGuestPassword(phone: string, newPassword: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const normPhone = normalizePhone(phone);
-    await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [newPassword, normPhone, templeId]);
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const normPhone = normalizePhone(phone);
+        await prisma.guest.updateMany({
+          where: { phone: normPhone, templeId: templeId! },
+          data: { password: newPassword }
+        });
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 // --- 點燈管理 (Lamps) 相關 mock 函式與型別 ---
@@ -4958,60 +5132,107 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
     return { success: true };
   });
 }
-export async function createLampRecord(data: any) { 
-  let phone = ''; let categoryId = ''; let guestName = ''; let notice = ''; let paymentMethod = ''; let paymentRef = '';
-  if (data instanceof FormData) {
-    phone = data.get('phone') as string; categoryId = data.get('categoryId') as string; guestName = data.get('guestName') as string; notice = data.get('notice') as string; paymentMethod = data.get('paymentMethod') as string || 'Cash'; paymentRef = data.get('paymentRef') as string || '';
-  } else {
-    phone = data.phone; categoryId = data.categoryId; guestName = data.guestName; notice = data.notice; paymentMethod = data.paymentMethod || 'Cash'; paymentRef = data.paymentRef || '';
-  }
+export async function createLampRecord(data: any) {
 
-  const templeId = await getDynamicTempleId();
+      try {
+        const templeId = await getDynamicTempleId();
+        let phone = ''; let categoryId = ''; let guestName = ''; let notice = ''; let paymentMethod = ''; let paymentRef = '';
+        
+        if (data instanceof FormData) {
+          phone = data.get('phone') as string; categoryId = data.get('categoryId') as string; guestName = data.get('guestName') as string; notice = data.get('notice') as string; paymentMethod = data.get('paymentMethod') as string || 'Cash'; paymentRef = data.get('paymentRef') as string || '';
+        } else {
+          phone = data.phone; categoryId = data.categoryId; guestName = data.guestName; notice = data.notice; paymentMethod = data.paymentMethod || 'Cash'; paymentRef = data.paymentRef || '';
+        }
 
-  return withTempleSession(templeId, false, async (client) => {
-    let cat: any = null;
-    const catRes = await client.query('SELECT name, price FROM lamp_categories WHERE id = $1 AND temple_id = $2', [categoryId, templeId]);
-      if (catRes.rowCount === 0) return { success: false, error: '未找到燈種類別' };
-      cat = catRes.rows[0];
-      const today = new Date();
-      const newId = `LMP-${Date.now()}`;
-      await client.query('INSERT INTO lamp_records (id, temple_id, category_id, guest_name, phone, lamp_type, amount, status, created_at, payment_method, payment_ref, payment_status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
-              [newId, templeId, cat.id, guestName, phone, cat.name, cat.price, 'Pending', today.toISOString(), paymentMethod, paymentRef, paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi' ? 'Paid' : (paymentMethod === 'transfer' || paymentMethod === 'customQR' ? 'Pending' : 'Unpaid')]
-            );
-      await revalidateTemple();
-      return { success: true, id: newId };
-  });
+        const cat = await prisma.lampCategory.findFirst({
+          where: { id: categoryId, templeId: templeId! }
+        });
+        
+        if (!cat) return { success: false, error: '未找到燈種類別' };
+        
+        const newId = `LMP-${Date.now()}`;
+        const paymentStatus = (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') ? 'Paid' : ((paymentMethod === 'transfer' || paymentMethod === 'customQR') ? 'Pending' : 'Unpaid');
+        
+        await prisma.lampRecord.create({
+          data: {
+            id: newId,
+            templeId: templeId!,
+            categoryId: cat.id,
+            categoryName: cat.name,
+            guestName,
+            phone,
+            actualPrice: cat.price,
+            status: 'Pending',
+            paymentMethod,
+            paymentProofUrl: paymentRef,
+            paymentStatus,
+            remarks: notice
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true, id: newId };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function checkLampNotifications() { return { hasNotification: false }; }
-export async function saveLampCategory(data: any) { 
-  const id = data.id;
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    if (id) {
-              await client.query(
-                'UPDATE lamp_categories SET name = $1, description = $2, duration_days = $3, total_slots = $4, price = $5, precautions = $8 WHERE id = $6 AND temple_id = $7',
-                [data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, id, templeId, data.precautions || '']
-              );
-            } else {
-              await client.query(
-                'INSERT INTO lamp_categories (id, temple_id, name, description, duration_days, total_slots, price, precautions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                [`cat-${Date.now()}`, templeId, data.name, data.description || '', data.durationDays || 365, data.totalSlots || 500, data.price || 0, data.precautions || '']
-              );
+export async function saveLampCategory(data: any) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (data.id) {
+          await prisma.lampCategory.update({
+            where: { id: data.id },
+            data: {
+              name: data.name,
+              description: data.description || '',
+              durationDays: data.durationDays || 365,
+              totalSlots: data.totalSlots || 500,
+              price: data.price || 0,
+              precautions: data.precautions || ''
             }
-    await revalidateTemple();
-    return { success: true }; 
-  });
+          });
+        } else {
+          await prisma.lampCategory.create({
+            data: {
+              id: `cat-${Date.now()}`,
+              templeId: templeId!,
+              name: data.name,
+              description: data.description || '',
+              durationDays: data.durationDays || 365,
+              totalSlots: data.totalSlots || 500,
+              price: data.price || 0,
+              precautions: data.precautions || ''
+            }
+          });
+        }
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
-export async function deleteLampCategory(id: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const hasRecords = await client.query('SELECT 1 FROM lamp_records WHERE category_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
-      if (hasRecords.rowCount && hasRecords.rowCount > 0) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' };
-      await client.query('DELETE FROM lamp_categories WHERE id = $1 AND temple_id = $2', [id, templeId]);
-    await revalidateTemple();
-    return { success: true }; 
-  });
+export async function deleteLampCategory(id: string) {
+
+      try {
+        const hasRecords = await prisma.lampRecord.findFirst({
+          where: { categoryId: id }
+        });
+        
+        if (hasRecords) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' };
+        
+        await prisma.lampCategory.delete({ where: { id } });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function renewLampRecord(id: string) { return { success: true }; }
 
@@ -5023,169 +5244,319 @@ export type QueueEvent = any;
 // Removed redundant initialization block
 
 export async function fetchQueueEvents() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`CREATE TABLE IF NOT EXISTS queue_events (id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), title VARCHAR(255), date VARCHAR(50), start_time VARCHAR(50), end_time VARCHAR(50), location VARCHAR(255), service_type VARCHAR(255), price INTEGER, max_capacity INTEGER, status VARCHAR(50))`);
-      const res = await client.query('SELECT * FROM queue_events WHERE temple_id = $1 ORDER BY date DESC, start_time DESC', [templeId]);
-      const counts = await client.query('SELECT event_id, COUNT(*) as count FROM queue_tickets WHERE temple_id = $1 AND status = \'Queuing\' GROUP BY event_id', [templeId]);
-      const countMap = counts.rows.reduce((acc, r) => ({...acc, [r.event_id]: parseInt(r.count)}), {});
-      return res.rows.map(r => ({
-              id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time,
-              location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status,
-              participantCount: countMap[r.id] || 0
-            }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const events = await prisma.queueEvent.findMany({
+          where: { templeId: templeId! },
+          orderBy: [{ date: 'desc' }, { startTime: 'desc' }],
+          include: { tickets: { where: { status: 'Queuing' } } }
+        });
+        
+        return events.map(r => ({
+          id: r.id,
+          templeId: r.templeId,
+          title: r.title,
+          date: r.date,
+          startTime: r.startTime,
+          endTime: r.endTime,
+          location: r.location,
+          serviceType: r.serviceType,
+          price: r.price,
+          maxCapacity: r.maxCapacity,
+          status: r.status,
+          participantCount: r.tickets.length
+        }));
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 export async function fetchActiveQueues() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query('SELECT * FROM queue_events WHERE status = \'Active\' AND temple_id = $1', [templeId]);
-    return res.rows.map(r => ({ id: r.id, templeId: r.temple_id, title: r.title, date: r.date, startTime: r.start_time, endTime: r.end_time, location: r.location, serviceType: r.service_type, price: r.price, maxCapacity: r.max_capacity, status: r.status }));
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const events = await prisma.queueEvent.findMany({
+          where: { templeId: templeId!, status: 'Active' }
+        });
+        return events.map(r => ({
+          id: r.id, templeId: r.templeId, title: r.title, date: r.date, startTime: r.startTime, endTime: r.endTime,
+          location: r.location, serviceType: r.serviceType, price: r.price, maxCapacity: r.maxCapacity, status: r.status
+        }));
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 export async function fetchQueueDashboard(eventId?: string) {
-  if (!eventId) return { tickets: [] };
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query('SELECT * FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
-    return { tickets: res.rows.map(r => ({
-      id: r.id, eventId: r.event_id, templeId: r.temple_id, eventTitle: r.event_title, phone: r.phone, guestName: r.guest_name,
-      status: r.status, assignedNumber: r.assigned_number, createdAt: r.created_at, scannedAt: r.scanned_at, actualOrder: r.actual_order
-    })) };
-  });
+
+      try {
+        if (!eventId) return { tickets: [] };
+        const templeId = await getDynamicTempleId();
+        
+        const tickets = await prisma.queueTicket.findMany({
+          where: { eventId, templeId: templeId! }
+        });
+        
+        return {
+          tickets: tickets.map(r => ({
+            id: r.id, eventId: r.eventId, templeId: r.templeId, eventTitle: (r as any).eventTitle, phone: r.phone, guestName: r.guestName,
+            status: r.status, assignedNumber: r.displayNum, createdAt: r.createdAt.toISOString(), scannedAt: (r as any).scannedAt, actualOrder: r.actualOrder
+          }))
+        };
+      } catch (e) {
+        console.error(e);
+        return { tickets: [] };
+      }
 }
 // 獲取當前活動以掃碼正在排隊的人數
 export async function fetchActiveQueueCount(): Promise<number> {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query('SELECT COUNT(qt.id) as count FROM queue_tickets qt JOIN queue_events qe ON qt.event_id = qe.id WHERE qe.status = \'Active\' AND qt.status = \'Queuing\' AND qt.temple_id = $1', [templeId]);
-      return parseInt(res.rows[0].count) || 0;
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const count = await prisma.queueTicket.count({
+          where: {
+            templeId: templeId!,
+            status: 'Queuing',
+            queueEvent: { status: 'Active' }
+          }
+        });
+        return count;
+      } catch(e) {
+        console.error(e);
+        return 0;
+      }
 }
 
-export async function createQueueEvent(data: any) { 
-  const templeId = await getDynamicTempleId(); 
-  return withTempleSession(templeId, false, async (client) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
+export async function createQueueEvent(data: any) {
 
-    await client.query('INSERT INTO queue_events (id, temple_id, title, date, start_time, end_time, location, service_type, price, max_capacity, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-              [`qe-${Date.now()}`, templeId, data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, 'Active']);
-    await revalidateTemple();
-    return { success: true };
-  });
+      try {
+        const templeId = await getDynamicTempleId();
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
+        
+        await prisma.queueEvent.create({
+          data: {
+            id: `qe-${Date.now()}`,
+            templeId: templeId!,
+            title: data.title,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            location: data.location,
+            serviceType: data.serviceType,
+            price: data.price,
+            maxCapacity: data.maxCapacity,
+            status: 'Active'
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e: any) {
+        console.error(e);
+        return { success: false, error: e.message };
+      }
 }
 
-export async function updateQueueEvent(id: string, data: any) { 
-  const templeId = await getDynamicTempleId(); 
-  return withTempleSession(templeId, false, async (client) => {
-    try {
-      await client.query('UPDATE queue_events SET title = $1, date = $2, start_time = $3, end_time = $4, location = $5, service_type = $6, price = $7, max_capacity = $8 WHERE id = $9 AND temple_id = $10',
-                  [data.title, data.date, data.startTime, data.endTime, data.location, data.serviceType, data.price, data.maxCapacity, id, templeId]);
-      await revalidateTemple();
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message };
-    }
-  });
+export async function updateQueueEvent(id: string, data: any) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.queueEvent.update({
+          where: { id },
+          data: {
+            title: data.title,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            location: data.location,
+            serviceType: data.serviceType,
+            price: data.price,
+            maxCapacity: data.maxCapacity
+          }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e: any) {
+        console.error(e);
+        return { success: false, error: e.message };
+      }
 }
 export async function activateQueueEvent(id: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query('SELECT status FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      if (res.rows.length > 0) {
-              const newStatus = res.rows[0].status === 'Active' ? 'Draft' : 'Active';
-              await client.query('UPDATE queue_events SET status = $1 WHERE id = $2 AND temple_id = $3', [newStatus, id, templeId]);
-            }
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const qe = await prisma.queueEvent.findUnique({ where: { id } });
+        if (qe) {
+          await prisma.queueEvent.update({
+            where: { id },
+            data: { status: qe.status === 'Active' ? 'Draft' : 'Active' }
+          });
+        }
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function deleteQueueEvent(id: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const tRes = await client.query('SELECT 1 FROM queue_tickets WHERE event_id = $1 AND temple_id = $2 LIMIT 1', [id, templeId]);
-      if (tRes.rowCount > 0) {
-              await client.query('UPDATE queue_events SET status = \'Cancelled\' WHERE id = $1 AND temple_id = $2', [id, templeId]);
-            } else {
-              await client.query('DELETE FROM queue_events WHERE id = $1 AND temple_id = $2', [id, templeId]);
-            }
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const tickets = await prisma.queueTicket.count({ where: { eventId: id } });
+        if (tickets > 0) {
+          await prisma.queueEvent.update({
+            where: { id },
+            data: { status: 'Cancelled' }
+          });
+        } else {
+          await prisma.queueEvent.delete({ where: { id } });
+        }
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
-export async function checkInWithQr(ticketId: string, eventId?: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const tRes = await client.query('SELECT * FROM queue_tickets WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
-      if (tRes.rowCount === 0) return { success: false, error: '找不到票券' };
-      const t = tRes.rows[0];
-      if (t.status !== 'Registered' && t.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
-      if (eventId && t.event_id !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
-      const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [t.event_id, templeId]);
-      const actualOrder = parseInt(orderRes.rows[0].count) + 1;
-      await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, ticketId]);
-    await revalidateTemple();
-    return { success: true }; 
-  });
+export async function checkInWithQr(ticketId: string, eventId?: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const t = await prisma.queueTicket.findUnique({ where: { id: ticketId } });
+        if (!t) return { success: false, error: '找不到票券' };
+        if (t.status !== 'Registered' && t.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
+        if (eventId && t.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
+        
+        const count = await prisma.queueTicket.count({
+          where: {
+            eventId: t.eventId,
+            templeId: templeId!,
+            status: { notIn: ['Pending', 'Registered'] }
+          }
+        });
+        
+        await prisma.queueTicket.update({
+          where: { id: ticketId },
+          data: {
+            status: 'Queuing',
+            actualOrder: count + 1
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false, error: '系統錯誤' };
+      }
 }
 
-export async function callNextInQueue(eventId: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE event_id = $1 AND status = \'Calling\' AND temple_id = $2', [eventId, templeId]);
-      const nextRes = await client.query('SELECT id FROM queue_tickets WHERE event_id = $1 AND status = \'Queuing\' AND temple_id = $2 ORDER BY actual_order ASC LIMIT 1', [eventId, templeId]);
-      if (nextRes.rowCount === 0) return { error: 'NO_ONE_IN_QUEUE' };
-      await client.query('UPDATE queue_tickets SET status = \'Calling\' WHERE id = $1', [nextRes.rows[0].id]);
-    await revalidateTemple();
-    return { success: true }; 
-  });
+export async function callNextInQueue(eventId: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.queueTicket.updateMany({
+          where: { eventId, status: 'Calling', templeId: templeId! },
+          data: { status: 'Completed' }
+        });
+        
+        const nextT = await prisma.queueTicket.findFirst({
+          where: { eventId, status: 'Queuing', templeId: templeId! },
+          orderBy: { actualOrder: 'asc' }
+        });
+        
+        if (!nextT) return { error: 'NO_ONE_IN_QUEUE' };
+        
+        await prisma.queueTicket.update({
+          where: { id: nextT.id },
+          data: { status: 'Calling' }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { error: '系統錯誤' };
+      }
 }
 
-export async function completeQueueService(ticketId: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE queue_tickets SET status = \'Completed\' WHERE id = $1 AND temple_id = $2', [ticketId, templeId]);
-    await revalidateTemple();
-    return { success: true }; 
-  });
+export async function completeQueueService(ticketId: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.queueTicket.update({
+          where: { id: ticketId },
+          data: { status: 'Completed' }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
-export async function updateQueueStatus(ticketId: string, status: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', [status, ticketId, templeId]);
-    await revalidateTemple();
-    return { success: true }; 
-  });
+export async function updateQueueStatus(ticketId: string, status: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.queueTicket.update({
+          where: { id: ticketId },
+          data: { status }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function registerGuestForQueue(eventId: string, data: { guestName: string, phone: string, isOnline?: boolean }) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    let newTicket: any;
-    const evRes = await client.query('SELECT title, capacity FROM queue_events WHERE id = $1 AND temple_id = $2', [eventId, templeId]);
-      if (evRes.rowCount === 0) return { error: 'EVENT_NOT_FOUND' };
-      const ev = evRes.rows[0];
-      const ticketsRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND temple_id = $2', [eventId, templeId]);
-      const totalTickets = parseInt(ticketsRes.rows[0].count);
-      if (ev.capacity && ev.capacity > 0 && totalTickets >= ev.capacity) return { error: '活動預約已額滿！' };
-      const nextNumber = `A${(totalTickets + 1).toString().padStart(3, '0')}`;
-      const newId = `t-${Date.now()}`;
-      let actualOrder = null;
-      let scannedAt = null;
-      if (!data.isOnline) {
-              const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status NOT IN (\'Pending\', \'Registered\') AND temple_id = $2', [eventId, templeId]);
-              actualOrder = parseInt(orderRes.rows[0].count) + 1;
-              scannedAt = new Date().toLocaleTimeString();
-            }
-      await client.query('INSERT INTO queue_tickets (id, event_id, temple_id, event_title, phone, guest_name, status, assigned_number, actual_order, scanned_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-              [newId, eventId, templeId, ev.title, data.phone, data.guestName, data.isOnline ? 'Registered' : 'Queuing', nextNumber, actualOrder, scannedAt, new Date().toISOString()]
-            );
-      newTicket = { id: newId };
-    await revalidateTemple();
-    return { success: true, ticket: newTicket };
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        const ev = await prisma.queueEvent.findUnique({
+          where: { id: eventId },
+          include: { tickets: true }
+        });
+        
+        if (!ev) return { error: 'EVENT_NOT_FOUND' };
+        if (ev.maxCapacity > 0 && ev.tickets.length >= ev.maxCapacity) return { error: '活動預約已額滿！' };
+        
+        const nextNumber = `A${(ev.tickets.length + 1).toString().padStart(3, '0')}`;
+        
+        let actualOrder = 0;
+        if (!data.isOnline) {
+          const activeCount = await prisma.queueTicket.count({
+            where: { eventId, templeId: templeId!, status: { notIn: ['Pending', 'Registered'] } }
+          });
+          actualOrder = activeCount + 1;
+        }
+        
+        const newId = `t-${Date.now()}`;
+        await prisma.queueTicket.create({
+          data: {
+            id: newId,
+            eventId,
+            templeId: templeId!,
+            phone: data.phone,
+            guestName: data.guestName,
+            status: data.isOnline ? 'Registered' : 'Queuing',
+            displayNum: nextNumber,
+            actualOrder
+          }
+        });
+        
+        await revalidateTemple();
+        return { success: true, ticket: { id: newId } };
+      } catch(e) {
+        console.error(e);
+        return { error: '系統錯誤' };
+      }
 }
 
 // --- 財務與結算 (Billing) 相關 mock 函式與型別 ---
@@ -5756,26 +6127,27 @@ export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
 }
 
 export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS', action: string, target: string, operator: string, templeIdOverride?: string) {
-  const templeId = templeIdOverride || await getDynamicTempleId();
-  const timestamp = new Date().toLocaleString('zh-TW');
-  const newLog = { id: `log-${Date.now()}`, level, action, target, operator, timestamp, templeId };
-  
-  await null;
-  if (gStore) // (await jsonStore.find('audit_logs')) synced
 
-  return withTempleSession(templeId, false, async (client) => {
-    if (client) {
       try {
-        await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
-          id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
-        )`);
-        await client.query(
-          'INSERT INTO audit_logs (id, temple_id, level, action, target, operator, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [newLog.id, templeId, level, action, target, operator, timestamp]
-        );
-      } catch (e) { console.error('Error logging system event', e); }
-    }
-  });
+        const templeId = templeIdOverride || await getDynamicTempleId();
+        const timestamp = new Date().toLocaleString('zh-TW');
+        
+        await prisma.auditLog.create({
+          data: {
+            id: `log-${Date.now()}`,
+            action: `[${level}] ${action}`,
+            details: `Target: ${target}`,
+            operator,
+            timestamp,
+            performedBy: operator
+          }
+        });
+        
+        return { success: true };
+      } catch (e) {
+        console.error('Error logging system event', e);
+        return { success: false };
+      }
 }
 
 export async function fetchAuditLogs() {
@@ -5810,25 +6182,31 @@ export async function getTempleBasicInfo(templeId?: string) {
 }
 
 export async function updateTempleBasicInfo(data: any, templeId?: string) {
-  const tId = templeId || await getDynamicTempleId();
-  return withTempleSession(null, false, async (client) => {
-    if (client) {
-      const tName = data.templeName || data.name || '';
-        const tCity = data.city || '';
-        if (tName || tCity) {
-                  const sets = [];
-                  const params = [];
-                  if (tName) { sets.push(`temple_name = $${sets.length + 1}`); params.push(tName); }
-                  if (tCity) { sets.push(`city = $${sets.length + 1}`); params.push(tCity); }
-                  params.push(tId);
-                  await client.query(`UPDATE "Temple" SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
-                }
-    }
-    
-    // Update memory fallback
-    await null;
-    return { success: true };
-  });
+
+      try {
+        const tId = templeId || await getDynamicTempleId();
+        if (!tId) return { success: false };
+        
+        const updateData: any = {};
+        if (data.templeName || data.name) updateData.templeName = data.templeName || data.name;
+        if (data.city) updateData.city = data.city;
+        if (data.address) updateData.address = data.address;
+        if (data.phone) updateData.phone = data.phone;
+        
+        if (Object.keys(updateData).length > 0) {
+          await prisma.temple.update({
+            where: { id: tId },
+            data: updateData
+          });
+        }
+        
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/[templeId]/admin/settings', 'page');
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 
@@ -6225,29 +6603,40 @@ export async function deleteGuestFile(fileId: string) {
   });
 }
 export async function activateLampRecord(recordId: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const record = await client.query('SELECT lamp_type, created_at FROM lamp_records WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-      let durationDays = 365;
-      if (record.rowCount > 0) {
-               const cat = await client.query('SELECT duration_days FROM lamp_categories WHERE name = $1 AND temple_id = $2', [record.rows[0].lamp_type, templeId]);
-               if (cat.rowCount > 0) durationDays = cat.rows[0].duration_days || 365;
-            }
-      const today = new Date();
-      const expiry = new Date(today.getTime() + (durationDays * 24 * 60 * 60 * 1000));
-      await client.query('UPDATE lamp_records SET status = \'Active\', created_at = $3 WHERE id = $1 AND temple_id = $2', [recordId, templeId, today.toISOString()]);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const record = await prisma.lampRecord.findUnique({
+          where: { id: recordId },
+          include: { category: true }
+        });
+        if (!record) return { success: false };
+        
+        await prisma.lampRecord.update({
+          where: { id: recordId },
+          data: { status: 'Active', createdAt: new Date() }
+        });
+        
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function deactivateLampRecord(recordId: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE lamp_records SET status = \'Pending\' WHERE id = $1 AND temple_id = $2', [recordId, templeId]);
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        await prisma.lampRecord.update({
+          where: { id: recordId },
+          data: { status: 'Pending' }
+        });
+        await revalidateTemple();
+        return { success: true };
+      } catch(e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function fetchDistributorLogs(distributorId: string) {
