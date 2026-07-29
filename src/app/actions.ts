@@ -1615,7 +1615,7 @@ export async function fetchEvents() {
       date: r.date || '',
       location: r.location || '',
       price: r.price,
-      status: r.status,
+      status: r.status as "Active" | "Completed" | "Draft",
       capacity: r.capacity,
       enrolled: r.registrations.length,
       imageUrl: r.imageUrl || '',
@@ -4926,7 +4926,7 @@ export async function checkGuestProfile(phone: string) {
       }
 }
 
-export async function createOrUpdateGuest(d: any, originalPhone?: string) {
+export async function createOrUpdateGuest(data: any, originalPhone?: string) {
 
       try {
         const templeId = await getDynamicTempleId();
@@ -5552,7 +5552,7 @@ export async function registerGuestForQueue(eventId: string, data: { guestName: 
         });
         
         await revalidateTemple();
-        return { success: true, ticket: { id: newId } };
+        return { success: true, ticket: { id: newId, assignedNumber: nextNumber } };
       } catch(e) {
         console.error(e);
         return { error: '系統錯誤' };
