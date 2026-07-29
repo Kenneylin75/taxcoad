@@ -1831,14 +1831,27 @@ export async function fetchAdminLogs() {
       }
 }
 export async function logAdminAction(action: string, target: string) {
-  await null;
+  try {
+    const user = await getCurrentUser();
+    await prisma.adminLog.create({
+      data: {
+        adminName: user?.name || 'System Admin',
+        performedBy: user?.name || 'System Admin',
+        action,
+        target,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (e) {
+    console.error("Failed to log admin action:", e);
+  }
   return { success: true };
 }
 
 export async function downloadAdminLogsCsv() {
   const logs = await fetchAdminLogs();
   const header = "ID,User,Action,Target,Timestamp\n";
-  const rows = logs.map(l => `${l.id},${l.user},${l.action},${l.target},${l.timestamp}`).join("\n");
+  const rows = logs.map((l: any) => `${l.id},${l.adminName || l.performedBy || 'Unknown'},${l.action},${l.target},${l.timestamp}`).join("\n");
   return header + rows;
 }
 
@@ -1846,8 +1859,22 @@ export async function createAdminAccount(data: any) {
   if (data.account && await checkAccountExists(data.account)) {
     return { success: false, error: '帳號已被註冊，請更換' };
   }
-  const newAdmin = { id: `adm-${Date.now()}`, ...data, role: 'SuperAdmin' };
-  await null;
+  const id = `adm-${Date.now()}`;
+  try {
+    await prisma.user.create({
+      data: {
+        id,
+        name: data.name,
+        account: data.account,
+        password: data.password || '123456',
+        role: 'Admin',
+        status: 'Active'
+      }
+    });
+  } catch (e) {
+    console.error("DB Insert Error for admin:", e);
+    return { success: false, error: String(e) };
+  }
   await logAdminAction('CREATE_ADMIN', data.name);
   revalidatePath('/super-admin');
   return { success: true };
@@ -1870,18 +1897,21 @@ export async function fetchFinanceData() {
 // B2B 收款設定 (B2B Payment Configurations)
 // ==========================================
 export async function fetchB2BPaymentConfig(templeId: string) {
-  return withTempleSession(templeId, true, async (client) => {
-    let distributorId = null;
-    const res = await client.query('SELECT "distributorId" FROM "Temple" WHERE id = $1', [templeId]);
-      distributorId = res.rows[0]?.distributor_id;
+  try {
+    const temple = await prisma.temple.findUnique({ where: { id: templeId } });
+    const distributorId = temple?.distributorId;
 
     if (distributorId) {
-      return null;
+      const dist = await prisma.distributor.findUnique({ where: { id: distributorId } });
+      return dist?.b2bPayment || null;
     } else {
       const sysConfig = await fetchSystemConfig();
       return sysConfig?.b2bPayment || db_config.b2bPayment || null;
     }
-  });
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }
 
 // --- STORAGE & BILLING APIS ---
@@ -2517,53 +2547,34 @@ export async function fetchPendingDistributors() {
 }
 
 export async function approveDistributorBySuperAdmin(id: string, overrideQuota?: number) {
-
       try {
-        const app = await prisma.distributorApplication.findUnique({ where: { id } });
-        if (app) {
-          await prisma.distributorApplication.update({
-            where: { id },
-            data: { status: 'Active' }
-          });
+        const res = await dbQuery("SELECT * FROM distributor_applications WHERE id = $1", [id], () => null) as any;
+        if (!res || !res.rows || res.rows.length === 0) return { success: false };
+        const app = res.rows[0];
 
-          const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-          let actualSalesId = app.submittedBy;
-          if (actualSalesId) {
-             const sales = await prisma.distributorSales.findFirst({ where: { name: actualSalesId } });
-             if (sales) actualSalesId = sales.id;
+        await dbQuery("UPDATE distributor_applications SET status = 'Active' WHERE id = $1", [id], () => null);
+
+        const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        
+        const newQuota = overrideQuota !== undefined ? overrideQuota : Number(app.nodes || 100);
+
+        await prisma.distributor.create({
+          data: {
+            id: distId,
+            name: app.name || '',
+            account: app.account || app.name,
+            password: app.password || 'pivot2026',
+            status: 'Active',
+            quota: newQuota,
+            nodes: newQuota,
+            customNodes: newQuota,
+            contactName: app.contact_name || '',
+            contactPhone: app.phone || '',
+            email: app.email || '',
+            address: app.address || ''
           }
-          
-          const newQuota = overrideQuota !== undefined ? overrideQuota : Number(app.nodes || 100);
+        });
 
-          await prisma.distributor.upsert({
-            where: { account: app.account || app.name },
-            update: { status: 'Active' },
-            create: {
-              id: distId,
-              name: app.name,
-              account: app.account || app.name,
-              password: app.password || 'pivot2026',
-              planId: app.planId || 'PLAN-A',
-              planName: '標準代理方案',
-              price: Number(app.price || 0),
-              status: 'Active',
-              quota: newQuota,
-              nodes: newQuota,
-              customNodes: newQuota,
-              joinedAt: new Date().toISOString().split('T')[0],
-              expirationDate: app.expirationDate || '',
-              creatorSalesId: actualSalesId || '',
-              phone: app.phone || '',
-              email: app.email || '',
-              address: app.address || '',
-              contactName: app.contactName || '',
-              taxId: app.taxId || '',
-              bankCode: '',
-              bankAccount: '',
-              bankName: ''
-            }
-          });
-        }
         const { revalidatePath } = require('next/cache');
         revalidatePath('/super-admin');
         return { success: true };
@@ -2663,7 +2674,18 @@ export async function fetchAllAccountsForAdmin() {
     allDistributorsMap.set(d.account, d);
   });
   pgDistributors.forEach(d => {
-    allDistributorsMap.set(d.account, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, phone: d.phone, email: d.email, address: d.address, contactName: d.contact_name, taxId: d.tax_id });
+    allDistributorsMap.set(d.account, { 
+      ...d, 
+      planId: d.plan_id || 'DEFAULT', 
+      planName: d.plan_name || '經銷專案', 
+      joinedAt: d.joined_at || (d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : '未知'), 
+      creatorSalesId: d.creator_sales_id || 'SuperAdmin', 
+      phone: d.contact_phone || d.phone || '', 
+      email: d.email || '', 
+      address: d.address || '', 
+      contactName: d.contact_name || '', 
+      taxId: d.tax_id || '' 
+    });
   });
   
   Array.from(allDistributorsMap.values()).forEach(d => {
@@ -2703,9 +2725,10 @@ export async function fetchAllAccountsForAdmin() {
     return { 
       ...t,
       id: t.id, 
-      name: t.name || t.temple_name || '未知宮廟', 
+      name: t.temple_name || t.name || '未知宮廟', 
       role: 'Temple', 
       account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
+      templePhone: t.phone,
       status: t.status || 'Active',
       creatorInfo: creatorInfo
     };
@@ -2791,29 +2814,36 @@ export async function createDistributorSales(distId: string, data: any) {
     return { success: false, error: '帳號已被使用，請更換其他帳號' };
   }
   const { name, phone, account, password, setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate } = data;
-  const newSales = {
-    id: 'dist-sales-' + Date.now(),
-    name,
-    phone,
-    account,
-    password,
-    distributorId: distId,
-    role: 'DistSales',
-    commissionRates: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate },
-    joinedAt: new Date().toISOString().split('T')[0],
-    status: 'Active'
-  };
-  
-  await null;
-  // (await jsonStore.find('dist_sales')) synced
-  /* removed duplicate import */
-    await dbQuery(`
-      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
-    `, [newSales.id, distId, name, account, password, 'DistSales', 'Active', newSales.joinedAt]);
+  const newSalesId = 'dist-sales-' + Date.now();
+  const joinedAt = new Date().toISOString().split('T')[0];
 
-  return { success: true, data: newSales };
+  try {
+    await prisma.distributorSales.upsert({
+      where: { account },
+      update: {
+        password,
+        status: 'Active',
+        phone
+      },
+      create: {
+        id: newSalesId,
+        distributorId: distId,
+        name,
+        account,
+        password,
+        phone,
+        role: 'DistSales',
+        status: 'Active',
+        joinedAt,
+        commissionRules: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate }
+      }
+    });
+  } catch (e) {
+    console.error("DB Insert Error for dist_sales:", e);
+    return { success: false, error: String(e) };
+  }
+
+  return { success: true, data: { id: newSalesId } };
 }
 export async function deleteTool(toolId: string) {
   const idx = [].findIndex((t: any) => t.id === toolId);
@@ -3169,14 +3199,29 @@ export async function createDistributorAccount(data: any) {
     date: new Date().toISOString().split('T')[0]
   });
   
-  // (await jsonStore.find('distributors')) synced
   try {
-    await dbQuery(`
-      INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date, creator_sales_id, phone, email, address, contact_name, tax_id, bank_code, bank_account, bank_name)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-    `, [newDist.id, newDist.name, newDist.account, newDist.password, newDist.planId, newDist.planName, newDist.price, newDist.status, Number(data.customNodes) || 100, newDist.joinedAt, newDist.expirationDate, newDist.creatorSalesId, newDist.phone, newDist.email, newDist.address, newDist.contactName, newDist.taxId, newDist.bankInfo?.bankCode || '', newDist.bankInfo?.accountNumber || '', newDist.bankInfo?.bankName || '']);
+    await prisma.distributor.create({
+      data: {
+        id: newDist.id,
+        name: newDist.name,
+        account: newDist.account,
+        password: newDist.password,
+        status: newDist.status,
+        quota: Number(data.customNodes) || 100,
+        nodes: Number(data.customNodes) || 100,
+        customNodes: Number(data.customNodes) || 100,
+        contactName: newDist.contactName,
+        contactPhone: newDist.phone,
+        email: newDist.email,
+        address: newDist.address,
+        bankCode: newDist.bankInfo?.bankCode || '',
+        bankAccount: newDist.bankInfo?.accountNumber || '',
+        bankName: newDist.bankInfo?.bankName || ''
+      }
+    });
   } catch (e) {
     console.error("DB Insert Error for distributor:", e);
+    return { success: false, error: String(e) };
   }
 
   revalidatePath('/super-admin');
@@ -3265,9 +3310,24 @@ export async function createTempleAccount(data: any) {
   }
   /* removed duplicate import */
     await dbQuery(`
-        INSERT INTO "Temple" (id, name, city, status, "salesId", "distributorId", "setupFee", "monthlyRent", "paymentCycle")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [id, newTemple.templeName, newTemple.city || '台北市', 'Active', newTemple.salesId, newTemple.distributorId || null, newTemple.setupFee || 0, newTemple.monthlyRent, newTemple.paymentCycle]);
+        INSERT INTO "Temple" (id, name, temple_name, account, region, city, address, phone, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `, [
+        id, 
+        newTemple.templeName || '未知宮廟', 
+        newTemple.templeName || '未知宮廟',
+        data.account || null,
+        data.region || null,
+        newTemple.city || '台北市', 
+        data.address || null,
+        data.phone || null,
+        'Active', 
+        newTemple.salesId || null, 
+        newTemple.distributorId || null, 
+        newTemple.setupFee || 0, 
+        newTemple.monthlyRent || 0, 
+        newTemple.paymentCycle || 'Monthly'
+      ]);
     await dbQuery(`
         INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
         VALUES ($1, $2, $3, $4, $5)
@@ -4405,28 +4465,47 @@ export async function fetchAllWithdrawals() {
 }
 
 export async function approveWithdrawal(id: string, receiptUrl?: string) { 
-  return withTempleSession(null, true, async (client) => {
+  try {
+    const data: any = { status: 'Approved' };
     if (receiptUrl) {
-      await client.query("UPDATE \"Withdrawal\" SET status = 'Approved', \"receiptUrl\" = $1 WHERE id = $2", [receiptUrl, id]);
-    } else {
-      await client.query("UPDATE \"Withdrawal\" SET status = 'Approved' WHERE id = $1", [id]);
+      data.receiptUrl = receiptUrl;
     }
+    await prisma.withdrawal.update({
+      where: { id },
+      data
+    });
+    const { revalidatePath } = require('next/cache');
     revalidatePath('/super-admin');
     return { success: true }; 
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function rejectWithdrawal(id: string) { 
-  return withTempleSession(null, true, async (client) => {
-    const wRes = await client.query('SELECT * FROM "Withdrawal" WHERE id = $1', [id]);
-    if ((wRes.rowCount ?? 0) > 0) {
-      const w = wRes.rows[0];
-      await client.query("UPDATE \"Withdrawal\" SET status = 'Rejected' WHERE id = $1", [id]);
-      await client.query("UPDATE wallets SET balance = balance + $1 WHERE name = $2", [w.amount, w.sales_name]);
+  try {
+    const w = await prisma.withdrawal.findUnique({ where: { id } });
+    if (w) {
+      await prisma.withdrawal.update({
+        where: { id },
+        data: { status: 'Rejected' }
+      });
+      // Refund wallet
+      if (w.salesName && w.amount) {
+        await prisma.wallet.updateMany({
+          where: { name: w.salesName },
+          data: { balance: { increment: w.amount } }
+        });
+      }
     }
+    const { revalidatePath } = require('next/cache');
     revalidatePath('/super-admin');
     return { success: true }; 
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function updateServiceSettings(settings: any) {
@@ -6014,25 +6093,58 @@ export async function updateAppointmentPayment(appId: number, paymentMethod: str
 }
 
 export async function fetchAiPlans() {
-  return [...db_ai_plans];
+  try {
+    return await prisma.aiPlan.findMany();
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export async function saveAiPlan(plan: any) {
-  const existing = db_ai_plans.find(p => p.id === plan.id);
-  if (existing) {
-    Object.assign(existing, plan);
-  } else {
-    db_ai_plans.push({ id: `AI-${Date.now()}`, ...plan });
+  try {
+    if (plan.id && !plan.id.startsWith('AI-')) {
+      await prisma.aiPlan.upsert({
+        where: { id: plan.id },
+        update: {
+          name: plan.name,
+          price: Number(plan.price) || 0,
+          features: plan.features
+        },
+        create: {
+          name: plan.name,
+          price: Number(plan.price) || 0,
+          features: plan.features
+        }
+      });
+    } else {
+      await prisma.aiPlan.create({
+        data: {
+          name: plan.name,
+          price: Number(plan.price) || 0,
+          features: plan.features
+        }
+      });
+    }
+    const { revalidatePath } = require('next/cache');
+    revalidatePath('/super-admin');
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
   }
-  return { success: true };
 }
 
 export async function deleteAiPlan(id: string) {
-  const index = db_ai_plans.findIndex(p => p.id === id);
-  if (index > -1) {
-    db_ai_plans.splice(index, 1);
+  try {
+    await prisma.aiPlan.delete({ where: { id } });
+    const { revalidatePath } = require('next/cache');
+    revalidatePath('/super-admin');
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
   }
-  return { success: true };
 }
 
 
@@ -6048,9 +6160,25 @@ export async function fetchAiApiModels() {
 }
 
 export async function saveAiApiModels(models: any[]) {
-  await null;
-  // (await jsonStore.find('ai_api_models')) synced
-  return { success: true };
+  try {
+    await dbQuery('DELETE FROM ai_api_models');
+    for (const m of models) {
+      await prisma.aiApiModel.create({
+        data: {
+          name: m.name || '',
+          provider: m.provider || '',
+          version: m.version || '',
+          isDefault: Boolean(m.isDefault)
+        }
+      });
+    }
+    const { revalidatePath } = require('next/cache');
+    revalidatePath('/super-admin');
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 
@@ -6392,12 +6520,18 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
 
 export async function fetchSuperAdminFinancials() {
   // 取得宮廟與帳單狀態
-  const allTemples = typeof gStore !== 'undefined' ? [] : [];
-  let templeBills: any[] = typeof gStore !== 'undefined' ? ([] || []) : [];
-  /* removed duplicate import */
+  let allTemples: any[] = [];
+  try {
+    allTemples = await prisma.temple.findMany();
+  } catch (e) {
+    console.error(e);
+  }
+
+  let templeBills: any[] = [];
+  try {
     const res = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
-    const rows = res?.rows;
-    if (rows) templeBills = rows;
+    if (res && res.rows) templeBills = res.rows;
+  } catch(e) {}
 
   const records: any[] = [];
   templeBills.filter(b => b.status === 'Paid').forEach(b => {
@@ -6409,7 +6543,7 @@ export async function fetchSuperAdminFinancials() {
          type: 'INCOME',
          amount: Number(b.amount || 0),
          category: (b.item_name === 'SetupFee' || b.type === 'Setup') ? 'AUTH_FEE' : 'SYSTEM_FEE',
-         description: `${t?.templeName || '未知宮廟'} - ${b.item_name === 'SetupFee' || b.type === 'Setup' ? '開辦費' : '系統費用'}`
+         description: `${t?.templeName || t?.name || '未知宮廟'} - ${b.item_name === 'SetupFee' || b.type === 'Setup' ? '開辦費' : '系統費用'}`
       });
   });
 
