@@ -1428,7 +1428,7 @@ export default function SuperAdminClient({
                                               const res = await approveSuperSalesWithdrawal(w.id, proof);
 
                                               if (res && res.success === false) {
-                                                 alert('操作失敗: ' + res.error);
+                                                 alert('操作失敗: ' + (res as any).error);
                                                  target.innerText = originalText;
                                                  target.disabled = false;
                                                  return;

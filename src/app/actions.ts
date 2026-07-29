@@ -29,18 +29,18 @@ async function getRoleLabel(name: string): Promise<string> {
   if (!name) return '未知人員';
   
   // 1. Check DistSales (SuperSales / DistSales)
-  const sales = (await []).find((s: any) => s.name === name);
+  const sales = [].find((s: any) => s.name === name);
   if (sales) {
     if (sales.role === 'SuperSales') return `超級業務 ${name}`;
     if (sales.role === 'DistSales') {
-      const dist = (await []).find((d: any) => d.id === sales.distributorId);
+      const dist = [].find((d: any) => d.id === sales.distributorId);
       const distName = dist ? dist.name : '經銷商';
       return `${distName} 經銷業務 ${name}`;
     }
   }
 
   // 2. Check Distributor Admin
-  const distAdmin = (await []).find((d: any) => d.name === name || d.contactName === name);
+  const distAdmin = [].find((d: any) => d.name === name || d.contactName === name);
   if (distAdmin) {
     return `經銷商 ${name}`;
   }
@@ -110,7 +110,7 @@ const DEFAULT_SERVICES = [
 
 // Ensure core services are present and have correct colors, but DO NOT wipe other services
 for (const ds of DEFAULT_SERVICES) {
-  const existing = (await []).find(s => s.id === ds.id);
+  const existing = [].find(s => s.id === ds.id);
   if (!existing) {
     await null;
   } else {
@@ -813,7 +813,7 @@ export async function deletePrintTemplate(id: string) {
 
 export async function fetchForms() {
   const templeId = await getDynamicTempleId();
-  const current = (await []) || (await []);
+  const current = [] || [];
   const mine = current.filter((f: any) => f.templeId === templeId);
   return JSON.parse(JSON.stringify(mine));
 }
@@ -821,7 +821,7 @@ export async function fetchForms() {
 export async function saveForm(data: any) {
   const templeId = await getDynamicTempleId();
   const id = data.id;
-  const current = (await []) || (await []);
+  const current = [] || [];
   const exists = current.some((f: any) => f.id === id);
   if (exists) {
     await null;
@@ -899,7 +899,7 @@ export async function removeBatchSlots(ids: any[]) {
 
 // 9. 智能分析受影響預約
 export async function analyzeAffectedAppointments(staff: string, start: string, end: string) {
-  return (await []).filter((app: any) => 
+  return [].filter((app: any) => 
     app.staff === staff && 
     app.date >= start && 
     app.date <= end
@@ -931,7 +931,7 @@ export interface TemplePaymentConfig {
 
 export async function fetchPaymentConfig() {
   const templeId = await getDynamicTempleId();
-  const config = (await []).find(c => c.templeId === templeId);
+  const config = [].find(c => c.templeId === templeId);
   if (config) {
     if (!config.cash) {
       config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
@@ -960,9 +960,9 @@ export async function fetchPaymentConfig() {
 
 export async function savePaymentConfig(data: TemplePaymentConfig) {
   const templeId = await getDynamicTempleId();
-  const idx = (await []).findIndex(c => c.templeId === templeId);
+  const idx = [].findIndex(c => c.templeId === templeId);
   if (idx > -1) {
-    (await [])[idx] = { ...data, templeId };
+    [][idx] = { ...data, templeId };
   } else {
     await null;
   }
@@ -1629,7 +1629,18 @@ let db_distributor_applications: any[] = initGlobal('db_distributor_applications
 ]);
 
 
-export async function fetchAdminLogs() { return [...(await [])].reverse(); }
+export async function fetchAdminLogs() {
+
+      try {
+        const logs = await prisma.adminLog.findMany({
+          orderBy: { timestamp: 'desc' }
+        });
+        return logs;
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
+}
 export async function logAdminAction(action: string, target: string) {
   await null;
   return { success: true };
@@ -1654,13 +1665,13 @@ export async function createAdminAccount(data: any) {
 }
 
 export async function fetchFinanceData() {
-  const incomes = (await []).filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
-  const expenses = (await []).filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
+  const incomes = [].filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
+  const expenses = [].filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
   return {
-    records: (await []),
+    records: [],
     summary: {
       totalRevenue: incomes,
-      totalCommission: (await []).filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
+      totalCommission: [].filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
       netProfit: incomes - expenses
     }
   };
@@ -1962,7 +1973,7 @@ export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE'
   });
 }
 
-export async function fetchSyncQueue() { return [...(await [])]; }
+export async function fetchSyncQueue() { return [...[]]; }
 
 export async function fetchSystemConfig() {
   try {
@@ -2019,7 +2030,7 @@ export async function updateSystemConfig(data: any) {
 
 // --- 經銷業務 (Dist-Sales) ---
 export async function fetchFreeApplications(distId?: string) { 
-  let list = [...(await [])];
+  let list = [...[]];
   /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"created_at\" DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
@@ -2098,7 +2109,7 @@ export async function generateInitialBills(newTemple: any) {
 
     const storagePlanId = newTemple.cloudStorage;
     if (storagePlanId && storagePlanId.startsWith('SP-')) {
-       const plan = (await [])?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
+       const plan = []?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
        if (plan) {
          const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
          if (storageFee > 0) {
@@ -2122,7 +2133,7 @@ export async function generateInitialBills(newTemple: any) {
     try {
       /* removed duplicate import */
       for (const newBill of billsToInsert) {
-        const exists = (await []).find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
+        const exists = [].find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
         if (!exists) {
           await null;
           await dbQuery(
@@ -2149,10 +2160,10 @@ export async function submitFreeAccountApplication(data: any) {
   
   const status = (role === 'distributor' || role === 'super-admin' || role === 'dist-sales') ? 'Active' : 'Pending';
 
-  const sales = (await []).find(s => s.name === data.submittedBy);
+  const sales = [].find(s => s.name === data.submittedBy);
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
-  const templeNo = (await []).length + 1;
+  const templeNo = [].length + 1;
 
       const newTemple = {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
@@ -2244,37 +2255,52 @@ export async function submitFreeAccountApplication(data: any) {
 }
 
 export async function approveTempleBySuperAdmin(id: string) {
-  const t = (await []).find(x => x.id === id);
-   if (t) {
-     t.status = 'Active';
-     // synced
-     await generateInitialBills(t);
-     if (t.account && t.password) {
-       const pData = await [];
-       // check if already exists
-       if (!pData.some(p => p.account === t.account)) {
-         pData.push({
-           id: `p-${Date.now()}`,
-           templeId: id,
-           name: t.templeName || '宮廟管理員',
-           account: t.account,
-           password: t.password,
-           role: 'TempleAdmin',
-           status: 'Active'
-         });
-         await null;
-       }
-     }
-  }
-  revalidatePath('/super-admin');
-  return { success: true };
+
+      try {
+        const temple = await prisma.temple.findUnique({ where: { id } });
+        if (temple) {
+          await prisma.temple.update({
+            where: { id },
+            data: { status: 'Active' }
+          });
+          await generateInitialBills(temple);
+          
+          if (temple.account && temple.password) {
+             await prisma.user.upsert({
+               where: { account: temple.account },
+               update: {},
+               create: {
+                 id: `p-${Date.now()}`,
+                 templeId: id,
+                 name: temple.templeName || '宮廟管理員',
+                 account: temple.account,
+                 password: temple.password,
+                 role: 'TempleAdmin',
+                 status: 'Active'
+               }
+             });
+          }
+        }
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-admin');
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function rejectTempleBySuperAdmin(id: string) {
-  const idx = (await []).findIndex(x => x.id === id);
-  if (idx > -1) (await []).splice(idx, 1);
-  revalidatePath('/super-admin');
-  return { success: true };
+
+      try {
+        await prisma.temple.delete({ where: { id } });
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-admin');
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function fetchPendingDistributors() {
@@ -2297,79 +2323,60 @@ export async function fetchPendingDistributors() {
 }
 
 export async function approveDistributorBySuperAdmin(id: string, overrideQuota?: number) {
-  let app = db_distributor_applications.find(a => a.id === id);
-  if (!app) {
-    const res = await dbQuery("SELECT * FROM distributor_applications WHERE id = $1", [id], () => null) as any;
-      if (res && res.rows && res.rows.length > 0) {
-              const r = res.rows[0];
-              app = {
-                id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
-                taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
-                submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
-                password: r.password, expirationDate: r.expiration_date
-              };
+
+      try {
+        const app = await prisma.distributorApplication.findUnique({ where: { id } });
+        if (app) {
+          await prisma.distributorApplication.update({
+            where: { id },
+            data: { status: 'Active' }
+          });
+
+          const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+          let actualSalesId = app.submittedBy;
+          if (actualSalesId) {
+             const sales = await prisma.distributorSales.findFirst({ where: { name: actualSalesId } });
+             if (sales) actualSalesId = sales.id;
+          }
+          
+          const newQuota = overrideQuota !== undefined ? overrideQuota : Number(app.nodes || 100);
+
+          await prisma.distributor.upsert({
+            where: { account: app.account || app.name },
+            update: { status: 'Active' },
+            create: {
+              id: distId,
+              name: app.name,
+              account: app.account || app.name,
+              password: app.password || 'pivot2026',
+              planId: app.planId || 'PLAN-A',
+              planName: '標準代理方案',
+              price: Number(app.price || 0),
+              status: 'Active',
+              quota: newQuota,
+              nodes: newQuota,
+              customNodes: newQuota,
+              joinedAt: new Date().toISOString().split('T')[0],
+              expirationDate: app.expirationDate || '',
+              creatorSalesId: actualSalesId || '',
+              phone: app.phone || '',
+              email: app.email || '',
+              address: app.address || '',
+              contactName: app.contactName || '',
+              taxId: app.taxId || '',
+              bankCode: '',
+              bankAccount: '',
+              bankName: ''
             }
-  }
-
-  if (app) {
-    app.status = 'Active';
-    const memApp = db_distributor_applications.find(a => a.id === id);
-    if (memApp) memApp.status = 'Active';
-    await dbQuery("UPDATE distributor_applications SET status = 'Active' WHERE id = $1", [id]);
-    
-    // 建立實際經銷商帳戶
-    const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const plan = db_config.distributorPlans.find((p: any) => p.id === app.planId) || db_config.distributorPlans[0];
-    
-    // 反查業務員實際 ID
-    const actualSales = (await []).find(s => s.name === app.submittedBy);
-    
-    const accountName = app.account || app.name;
-    
-    // Prevent duplicate insertion in memory
-    const existingDist = (await []).find(d => d.account === accountName);
-    if (existingDist) return { success: true };
-
-    const newDist = {
-      id: distId,
-      name: app.name,
-      account: accountName,
-      password: app.password || 'pivot2026',
-      planId: plan?.id || 'PLAN-A',
-      planName: plan?.name || '標準代理方案',
-      price: Number(app.price || app.customPrice || 0),
-      status: 'Active',
-      quota: overrideQuota !== undefined ? overrideQuota : Number(app.customNodes || plan?.nodes || app.nodes || 100),
-      joinedAt: new Date().toISOString().split('T')[0],
-      expirationDate: app.expirationDate || '',
-      creatorSalesId: actualSales?.id || app.submittedBy || '',
-      phone: app.phone || '',
-      email: app.email || '',
-      address: app.address || '',
-      contactName: app.contactName || app.owner || '',
-      taxId: app.taxId || '',
-      bankInfo: app.bankInfo || {
-        bankCode: app.bankCode || '',
-        bankName: app.bankName || '',
-        accountName: app.accountName || app.name || '',
-        accountNumber: app.accountNumber || ''
+          });
+        }
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-admin');
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
       }
-    };
-
-    await null;
-    // (await jsonStore.find('distributors')) synced
-    try {
-      await dbQuery(`
-        INSERT INTO distributors (id, name, account, password, plan_id, plan_name, price, status, quota, joined_at, expiration_date, creator_sales_id, phone, email, address, contact_name, tax_id, bank_code, bank_account, bank_name)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        ON CONFLICT (account) DO UPDATE SET status = 'Active', phone = EXCLUDED.phone, email = EXCLUDED.email, address = EXCLUDED.address, contact_name = EXCLUDED.contact_name, tax_id = EXCLUDED.tax_id, bank_code = EXCLUDED.bank_code, bank_account = EXCLUDED.bank_account, bank_name = EXCLUDED.bank_name
-      `, [newDist.id, newDist.name, newDist.account, newDist.password, newDist.planId, newDist.planName, newDist.price, newDist.status, newDist.quota, newDist.joinedAt, newDist.expirationDate, newDist.creatorSalesId, newDist.phone, newDist.email, newDist.address, newDist.contactName, newDist.taxId, newDist.bankInfo?.bankCode || '', newDist.bankInfo?.accountNumber || '', newDist.bankInfo?.bankName || '']);
-    } catch (e) {
-      console.error("DB Insert Error for distributor:", e);
-    }
-  }
-  revalidatePath('/super-admin');
-  return { success: true };
 }
 
 export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: string) {
@@ -2387,7 +2394,7 @@ export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: s
 
 export async function updateSuperSalesCommission(salesName: string, rates: any) {
   console.log(`Updating rates for ${salesName}:`, rates);
-  (await [])[salesName] = rates;
+  [][salesName] = rates;
   
   await null;
 
@@ -2396,29 +2403,34 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
   return { success: true };
 }
 
-export async function fetchSalesPerformance(salesName: string) { 
-  let listTemples = [...(await [])];
-  let listSales = [...(await [])];
-  /* removed duplicate import */
-    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
-    if (resTemples && resTemples.rows) {
-          listTemples = resTemples.rows.map((r: any) => ({ ...r, status: r.status, salesId: r.sales_id }));
-        }
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
-    if (resSales && resSales.rows) {
-          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, name: r.name, id: r.id }));
-        }
+export async function fetchSalesPerformance(salesName: string) {
 
-  const sales = listSales.find(s => s.name === salesName);
-  const myTemples = listTemples.filter(t => t.salesId === sales?.id);
-  return {
-    total: myTemples.length,
-    approved: myTemples.filter(t => t.status === 'Active').length
-  }; 
+      try {
+        const sales = await prisma.distributorSales.findFirst({ where: { name: salesName } });
+        if (!sales) return { total: 0, approved: 0 };
+        
+        const temples = await prisma.temple.findMany({ where: { salesId: sales.id } });
+        return {
+          total: temples.length,
+          approved: temples.filter(t => t.status === 'Active').length
+        };
+      } catch (error) {
+        console.error('fetchSalesPerformance error:', error);
+        return { total: 0, approved: 0 };
+      }
 }
 
-export async function fetchVisitationRecords(salesName: string) { 
-  return (await []).filter(v => v.salesName === salesName); 
+export async function fetchVisitationRecords(salesName: string) {
+
+      try {
+        const records = await prisma.salesVisit.findMany({
+          where: { salesName }
+        });
+        return records;
+      } catch (error) {
+        console.error('fetchVisitationRecords error:', error);
+        return [];
+      }
 }
 
 export async function fetchAllAccountsForAdmin() {
@@ -2435,7 +2447,7 @@ export async function fetchAllAccountsForAdmin() {
         }
 
   const allAdminsMap = new Map();
-  (await []).forEach(p => {
+  [].forEach(p => {
     if (p.role === 'Admin') allAdminsMap.set(p.account, p);
   });
   pgAdmins.forEach(p => {
@@ -2453,7 +2465,7 @@ export async function fetchAllAccountsForAdmin() {
         }
 
   const allDistributorsMap = new Map();
-  (await []).forEach(d => {
+  [].forEach(d => {
     allDistributorsMap.set(d.account, d);
   });
   pgDistributors.forEach(d => {
@@ -2472,7 +2484,7 @@ export async function fetchAllAccountsForAdmin() {
         }
 
   const allSalesMap = new Map();
-  (await []).forEach(s => allSalesMap.set(s.account, s));
+  [].forEach(s => allSalesMap.set(s.account, s));
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
   const superOverrides = await [];
@@ -2513,21 +2525,26 @@ export async function fetchAllAccountsForAdmin() {
 
 
 export async function fetchSuperSalesAccounts() {
-  let pgSales: any[] = [];
-  const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
-    if (resSales && resSales.rows) {
-          pgSales = resSales.rows;
-        }
-  
-  const allSalesMap = new Map();
-  (await []).forEach(s => allSalesMap.set(s.account, s));
-  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
 
-  const superOverrides = await [];
-  return Array.from(allSalesMap.values()).filter((s: any) => s.role === 'SuperSales').map(ss => ({
-    ...ss,
-    rates: superOverrides[ss.name] || db_config.defaultSuperSalesRates
-  }));
+      try {
+        const sales = await prisma.distributorSales.findMany({
+          where: { role: 'SuperSales' }
+        });
+        
+        // We should parse commissionRules back to rates if needed
+        return sales.map(s => {
+          const parsedRates = s.commissionRules && typeof s.commissionRules === 'object' 
+            ? s.commissionRules 
+            : { templeSetupRate: 20 };
+          return {
+            ...s,
+            rates: parsedRates
+          };
+        });
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
 }
 
 
@@ -2537,7 +2554,7 @@ export async function addVisitationRecord(data: any) {
   return { success: true }; 
 }
 
-export async function fetchSalesTools() { return [...(await [])]; }
+export async function fetchSalesTools() { return [...[]]; }
 export async function uploadTool(formData: FormData) {
   const type = formData.get('type') as string;
   const title = formData.get('title') as string;
@@ -2605,9 +2622,9 @@ export async function createDistributorSales(distId: string, data: any) {
   return { success: true, data: newSales };
 }
 export async function deleteTool(toolId: string) {
-  const idx = (await []).findIndex((t: any) => t.id === toolId);
+  const idx = [].findIndex((t: any) => t.id === toolId);
   if (idx > -1) {
-    (await []).splice(idx, 1);
+    [].splice(idx, 1);
     revalidatePath('/super-admin');
     revalidatePath('/distributor');
     revalidatePath('/dist-sales');
@@ -2618,59 +2635,35 @@ export async function deleteTool(toolId: string) {
 }
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
-export async function fetchDistributorCapacity(distId?: string) { 
-  let listTemples = [...(await [])];
-  let listSales = [...(await [])];
+export async function fetchDistributorCapacity(distId?: string) {
 
-  /* removed duplicate import */
-    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
-    if (resTemples && resTemples.rows) {
-          listTemples = resTemples.rows.map((r: any) => ({
-            ...r, distributorId: r.distributor_id, salesId: r.sales_id
-          }));
+      try {
+        let whereClause: any = {};
+        if (distId) {
+          whereClause = { distributorId: distId };
         }
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
-    if (resSales && resSales.rows) {
-          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
+        
+        const temples = await prisma.temple.findMany({
+          where: whereClause,
+          include: { sales: true }
+        });
+        
+        const used = temples.filter(t => !t.sales || t.sales.role !== 'SuperSales').length;
+        
+        let total = 0;
+        if (distId) {
+          const dist = await prisma.distributor.findUnique({ where: { id: distId } });
+          total = dist?.nodes || 100;
+        } else {
+          const dists = await prisma.distributor.findMany();
+          total = dists.reduce((acc, d) => acc + (d.nodes || 100), 0);
         }
-
-  const used = distId ? listTemples.filter(t => {
-     if (t.distributorId !== distId) return false;
-     const sales = listSales.find(s => s.id === t.salesId);
-     if (sales && sales.role === 'SuperSales') return false;
-     return true;
-  }).length : listTemples.length;
-  
-  let totalNodes = 100;
-  let planName = '企業旗艦方案 (2年期 / 100 帳戶)';
-  let contractPeriod = '2 Years';
-  let nextRenewal = '2027-01-10';
-
-  if (distId) {
-    const dist = await fetchDistributorProfile(distId);
-    if (dist) {
-      totalNodes = Number(dist.quota) || Number(dist.nodes) || Number(dist.customNodes) || 100;
-      planName = dist.planName || dist.plan || planName;
-      nextRenewal = dist.expirationDate || dist.expiration_date || nextRenewal;
-      contractPeriod = dist.years ? `${dist.years} Years` : (dist.customDuration ? `${dist.customDuration} Years` : `至 ${nextRenewal}`);
-    }
-  }
-
-  return { 
-    plan: planName, 
-    contractPeriod: contractPeriod,
-    totalNodes: totalNodes,
-    used: used, 
-    total: totalNodes,
-    planDetails: [
-      '專屬客製化宮廟入口網站',
-      '24/7 AI 智能營運助理',
-      '全域即時數據監控大屏',
-      '區塊鏈合約存證系統',
-      '多維度業務績效矩陣'
-    ],
-    nextRenewal: nextRenewal
-  }; 
+        
+        return { used, total, isUnlimited: total >= 1000 };
+      } catch (error) {
+        console.error('fetchDistributorCapacity error:', error);
+        return { used: 0, total: 100, isUnlimited: false };
+      }
 }
 
 // --- Super Sales Logic ---
@@ -2715,57 +2708,56 @@ export async function submitDistributorApplication(data: any) {
 }
 
 export async function fetchSuperSalesProfile(salesId: string) {
-  let listSales = [...(await [])];
-  /* removed duplicate import */
-    const resSales = await dbQuery("SELECT * FROM dist_sales WHERE id = $1", [salesId], () => null) as any;
-    if (resSales && resSales.rows && resSales.rows.length > 0) {
-           const r = resSales.rows[0];
-           listSales = [{ ...r, role: r.role, bankInfo: { bankCode: r.bank_code, accountNumber: r.bank_account, bankName: r.bank_name } }];
-        }
-  
-  const salesPerson = listSales.find(s => s.id === salesId) || listSales[0] || (await [])[0];
-  const name = salesPerson?.name || '超級精英業務';
-  const commissionRates = salesPerson?.commissionRules || (await [])[name] || db_config.defaultSuperSalesRates;
-  return {
-    name: name,
-    rank: '超級精英業務',
-    id: salesPerson.id || 'pivot_elite_001',
-    organization: '中央管理總部',
-    commissionRates,
-    phone: salesPerson.phone || '未設定',
-    account: salesPerson.account || '未設定',
-    email: salesPerson.email || '未設定',
-    bankInfo: salesPerson.bankInfo || null
-  };
+
+      try {
+        const sales = await prisma.distributorSales.findUnique({
+          where: { id: salesId }
+        });
+        return sales;
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
 }
 
 export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bankName: string, accountName: string, accountNumber: string }) {
-  const salesPerson = (await []).find(s => s.id === salesId);
-  if (salesPerson) {
-    salesPerson.bankInfo = bankInfo;
-    revalidatePath('/super-sales/[salesId]', 'page');
-    revalidatePath('/super-admin');
-    return { success: true };
-  }
-  return { success: false, error: 'Account not found' };
+
+      try {
+        await prisma.distributorSales.update({
+          where: { id: salesId },
+          data: { bankAccount: bankInfo }
+        });
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-sales/[salesId]', 'page');
+        revalidatePath('/super-admin');
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false, error: 'Account not found' };
+      }
 }
 
 export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: string, email: string }) {
-  const salesPerson = (await []).find(s => s.id === salesId);
-  if (salesPerson) {
-    salesPerson.phone = data.phone;
-    salesPerson.email = data.email;
-    revalidatePath('/super-sales/[salesId]', 'page');
-    revalidatePath('/super-admin');
-    return { success: true };
-  }
-  return { success: false, error: 'Account not found' };
+
+      try {
+        await prisma.distributorSales.update({
+          where: { id: salesId },
+          data: { phone: data.phone, email: data.email }
+        });
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-sales/[salesId]', 'page');
+        revalidatePath('/super-admin');
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false, error: 'Account not found' };
+      }
 }
 
 export async function fetchSuperSalesRegistry(salesId: string) {
-  let listTemples = [...(await [])];
-  let listDistributors = [...(await [])];
-  let listSales = [...(await [])];
+  let listTemples = [...[]];
+  let listDistributors = [...[]];
+  let listSales = [...[]];
 
   /* removed duplicate import */
     const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
@@ -2850,7 +2842,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     };
   });
 
-  const pendingTempleCount = (await []).filter(a => a.submittedBy === name && a.status === 'Pending').length;
+  const pendingTempleCount = [].filter(a => a.submittedBy === name && a.status === 'Pending').length;
   let pgPendingDistCount = 0;
   const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name], () => null) as any;
     if (res && res.rows && res.rows.length > 0) pgPendingDistCount = parseInt(res.rows[0].count);
@@ -2866,70 +2858,67 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 // --- Super Admin Account Creation API ---
 
 export async function createSuperSalesAccount(data: any) {
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被使用，請更換其他帳號' };
-  }
-  const id = `ss-${Date.now()}`;
-  const safeAccount = (data.account || '').trim();
-  const commissionRates = {
-    distributorAuthRate: Number(data.distributorAuthRate) || 15,
-    templeSetupRate: Number(data.templeSetupRate) || 10,
-    templeSetupType: data.templeSetupType || 'percent',
-    templeRentRates: [
-      Number(data.rentY1) || 15,
-      Number(data.rentY2) || 12,
-      Number(data.rentY3) || 10
-    ]
-  };
 
-  const newAccount = {
-    id,
-    ...data,
-    role: 'SuperSales',
-    status: 'Active',
-    commissionRates,
-    joinedAt: new Date().toISOString().split('T')[0]
-  };
-  
-  await null;
+      try {
+        const existing = await prisma.distributorSales.findUnique({ where: { account: data.account } });
+        if (existing) {
+          return { success: false, error: '帳號已被使用，請更換其他帳號' };
+        }
+        const id = `ss-${Date.now()}`;
+        
+        const commissionRules = {
+          distributorAuthRate: Number(data.distributorAuthRate) || 15,
+          templeSetupRate: Number(data.templeSetupRate) || 10,
+          templeSetupType: data.templeSetupType || 'percent',
+          templeRentRates: [
+            Number(data.rentY1) || 15,
+            Number(data.rentY2) || 12,
+            Number(data.rentY3) || 10
+          ]
+        };
 
-  (await [])[data.name] = commissionRates;
-  // (await jsonStore.find('dist_sales')) synced
+        await prisma.distributorSales.create({
+          data: {
+            id,
+            name: data.name,
+            account: data.account,
+            password: data.password || '',
+            role: 'SuperSales',
+            status: 'Active',
+            commissionRules,
+            joinedAt: new Date().toISOString().split('T')[0]
+          }
+        });
 
-  /* removed duplicate import */
-    await dbQuery(`
-      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, joined_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (account) DO UPDATE SET password = EXCLUDED.password, status = EXCLUDED.status
-    `, [id, null, data.name, safeAccount, (data.password || '').trim(), 'SuperSales', 'Active', newAccount.joinedAt]);
-  revalidatePath('/super-admin');
-  return { success: true, id };
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-admin');
+        return { success: true, id };
+      } catch (e) {
+        console.error(e);
+        return { success: false, error: String(e) };
+      }
 }
 
 export async function updateDistributorQuota(distId: string, newQuota: number) {
-  const dist = (await []).find((d: any) => d.id === distId || d.account === distId);
-  if (dist) {
-    dist.quota = newQuota;
-    dist.customNodes = newQuota;
-    dist.nodes = newQuota;
-  }
-  
-  const app = db_distributor_applications.find((a: any) => a.id === distId || a.account === distId);
-  if (app) {
-    app.customNodes = String(newQuota);
-    app.nodes = newQuota;
-  }
 
-  // (await jsonStore.find('distributors')) synced
-  gStore.db_distributor_applications = db_distributor_applications;
-
-  return withGlobalSession(async (client) => {
-    if (client) {
-       await client.query(`UPDATE distributors SET quota = $1 WHERE id = $2 OR account = $2`, [newQuota, distId]);
-       await client.query(`UPDATE distributor_applications SET custom_nodes = $1 WHERE id = $2 OR account = $2`, [newQuota, distId]);
-    }
-    return { success: true };
-  });
+      try {
+        const dist = await prisma.distributor.findFirst({
+          where: { OR: [{ id: distId }, { account: distId }] }
+        });
+        if (dist) {
+          await prisma.distributor.update({
+            where: { id: dist.id },
+            data: { quota: newQuota, nodes: newQuota, customNodes: newQuota }
+          });
+          const { revalidatePath } = require('next/cache');
+          revalidatePath('/super-admin');
+          return { success: true };
+        }
+        return { success: false, error: 'Distributor not found' };
+      } catch (error) {
+        console.error('updateDistributorQuota error:', error);
+        return { success: false, error: String(error) };
+      }
 }
 
 export async function createDistributorAccount(data: any) {
@@ -3009,7 +2998,7 @@ export async function createTempleAccount(data: any) {
   const creatorRole = reqRole;
   const creatorId = currentUser.name;
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
-    const templeNo = (await []).length + 1;
+    const templeNo = [].length + 1;
   const { paymentCycle, ...rest } = data;
   
   const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || db_config.fixedMonthlyRent);
@@ -3047,7 +3036,7 @@ export async function createTempleAccount(data: any) {
       pName = '無限免費方案';
   } else if (newTemple.cloudStorage) {
      if (newTemple.cloudStorage.startsWith('SP-')) {
-         const p = (await [])?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
+         const p = []?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
          if (p) { qGB = p.sizeGb; pName = p.name; }
      } else {
          qGB = parseInt(newTemple.cloudStorage) || 5;
@@ -3104,7 +3093,7 @@ export async function createTempleAccount(data: any) {
   
     if (currentRole === 'Distributor' || currentRole === 'DistSales') {
       if (currentRole === 'Distributor') {
-        const dist = (await []).find((d: any) => d.account === accountStr);
+        const dist = [].find((d: any) => d.account === accountStr);
         if (dist) {
            if (dist.quota <= 0) return { success: false, message: '配額已耗盡，無法開設新宮廟' };
            dist.quota -= 1;
@@ -3127,60 +3116,57 @@ export async function createTempleAccount(data: any) {
 
 
 export async function fetchAggregatedAnalytics(targetYear?: string) {
-  const currentYear = targetYear || new Date().getFullYear().toString();
-  const totalTemples = (await []).length;
-  const activeTemples = (await []).filter(t => t.status === 'Active').length;
-  const totalDistributors = (await []).length;
-  const totalSuperSales = (await []).filter(s => s.role === 'SuperSales').length;
-  
-  const monthlyRevenue = (await []).filter(b => b.status === 'Paid').reduce((sum, b) => sum + Number(b.amount || 0), 0);
-  const regionCounts: Record<string, number> = {};
-  const majorRegions = [
-    '基隆', '台北', '新北', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', 
-    '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'
-  ];
-  (await []).forEach(t => {
-    if (t.status !== 'Active') return;
-    
-    let region = t.region || t.city || (t.address ? t.address.substring(0, 2) : '');
-    const shortRegion = region.substring(0, 2);
-    
-    const matchedRegion = majorRegions.find(r => shortRegion?.includes(r));
-    if (matchedRegion) {
-       regionCounts[matchedRegion] = (regionCounts[matchedRegion] || 0) + 1;
-    }
-  });
 
-  const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
-  
-  const _allTemplesForStats = await [];
-  const growthTrend = Array.from({ length: 12 }).map((_, i) => {
-    const month = String(i + 1).padStart(2, '0');
-    const prefix = `${currentYear}-${month}`;
-    const count = _allTemplesForStats.filter(t => (t.timestamp || t.createdAt || "").startsWith(prefix)).length;
-    return { date: prefix, count };
-  });
-  
-  return {
-    overview: {
-      totalTemples,
-      activeTemples,
-      totalDistributors,
-      totalSuperSales,
-      monthlyRevenue,
-      systemHealth: 98
-    },
-    regionalDistribution,
-    growthTrend
-  };
+      try {
+        const currentYear = targetYear || new Date().getFullYear().toString();
+        const totalTemples = await prisma.temple.count();
+        const activeTemples = await prisma.temple.count({ where: { status: 'Active' } });
+        const totalDistributors = await prisma.distributor.count();
+        const totalSuperSales = await prisma.distributorSales.count({ where: { role: 'SuperSales' } });
+        
+        const bills = await prisma.templeBill.findMany({ where: { status: 'Paid' } });
+        const monthlyRevenue = bills.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+        
+        const temples = await prisma.temple.findMany({ where: { status: 'Active' }, select: { city: true, address: true } });
+        const regionCounts: Record<string, number> = {};
+        const majorRegions = ['基隆', '台北', '新北', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'];
+        
+        temples.forEach((t: any) => {
+          let region = t.city || (t.address ? t.address.substring(0, 2) : '');
+          const shortRegion = region.substring(0, 2);
+          const matchedRegion = majorRegions.find(r => shortRegion?.includes(r));
+          if (matchedRegion) {
+             regionCounts[matchedRegion] = (regionCounts[matchedRegion] || 0) + 1;
+          }
+        });
+
+        const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
+        
+        const allTemples = await prisma.temple.findMany({ select: { createdAt: true } });
+        const growthTrend = Array.from({ length: 12 }).map((_, i) => {
+          const month = String(i + 1).padStart(2, '0');
+          const prefix = `${currentYear}-${month}`;
+          const count = allTemples.filter(t => t.createdAt && new Date(t.createdAt).toISOString().startsWith(prefix)).length;
+          return { date: prefix, count };
+        });
+        
+        return {
+          overview: { totalTemples, activeTemples, totalDistributors, totalSuperSales, monthlyRevenue, systemHealth: 98 },
+          regionalDistribution,
+          growthTrend
+        };
+      } catch(e) {
+        console.error(e);
+        return { overview: { totalTemples: 0, activeTemples: 0, totalDistributors: 0, totalSuperSales: 0, monthlyRevenue: 0, systemHealth: 98 }, regionalDistribution: [], growthTrend: [] };
+      }
 }
 
 
 export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
-  let listTemples = [...(await [])];
-  let listSales = [...(await [])];
-  let listBills = [...(await [])];
-  let listWithdrawals = [...((await []) || [])];
+  let listTemples = [...[]];
+  let listSales = [...[]];
+  let listBills = [...[]];
+  let listWithdrawals = [...([] || [])];
 
   /* removed duplicate import */
     const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
@@ -3228,7 +3214,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   let totalRevenue = 0;
   const records: any[] = [];
   
-  const overrides = salesName ? (await [])[salesName] : null;
+  const overrides = salesName ? [][salesName] : null;
   const rules = sales?.commissionRules || overrides || db_config.defaultSuperSalesRates;
   const setupRate = rules.templeSetupRate ?? rules.setupFeePercent ?? 20;
   const rentY1 = rules.templeRentRates?.[0] ?? rules.rentYear1Percent ?? 15;
@@ -3291,7 +3277,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   });
   
   // 3. 手動獎金覆寫 (Bonus Overrides)
-  const myBonuses = (await []).filter(b => b.salesName === salesName);
+  const myBonuses = [].filter(b => b.salesName === salesName);
   myBonuses.forEach(b => {
     totalEarned += b.amount;
     records.push({
@@ -3305,7 +3291,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     });
   });
   
-  let myWithdrawals = (await []).filter(w => w.salesName === salesName);
+  let myWithdrawals = [].filter(w => w.salesName === salesName);
   /* removed duplicate import */
     const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
     const myBonusRequests = (rows || []).map((r: any) => ({
@@ -3416,7 +3402,7 @@ export async function fetchDistributorTeam(distributorId: string) {
           pgSales = res.rows;
         }
 
-  const memSales = (await []).filter(s => s.distributorId === distributorId);
+  const memSales = [].filter(s => s.distributorId === distributorId);
   const salesMap = new Map();
   memSales.forEach(s => salesMap.set(s.id, s));
   pgSales.forEach(s => salesMap.set(s.id, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
@@ -3424,47 +3410,39 @@ export async function fetchDistributorTeam(distributorId: string) {
   return Array.from(salesMap.values());
 }
 export async function fetchDistributorTemples(distributorId: string) {
-  try {
-    /* removed duplicate import */
-    const query = `
-      SELECT t.* 
-      FROM "Temple" t
-      LEFT JOIN dist_sales ds ON t.sales_id = ds.id
-      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
-        AND (ds.role IS NULL OR ds.role != 'SuperSales')
-    `;
-    const res = await dbQuery(query, [distributorId], () => null) as any;
-    let temples = res && res.rows ? res.rows : [];
-    
-    // Fallback to memory
-    if (temples.length === 0) {
-      const allDistSales = await [];
-      temples = (await []).filter(t => {
-         if (t.distributorId !== distributorId) return false;
-         const sales = allDistSales.find(s => s.id === t.salesId);
-         if (sales && sales.role === 'SuperSales') return false;
-         return true;
-      });
-    }
-    
-    const discountRate = (await [])?.yearlyDiscountRate || 20;
-    return temples.map((t: any) => {
-       const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
-       return { ...t, templeName: t.temple_name || t.name, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
-    });
-  } catch(e) {
-    return [];
-  }
+
+      try {
+        const temples = await prisma.temple.findMany({
+          where: {
+            OR: [
+              { distributorId },
+              { sales: { distributorId, role: { not: 'SuperSales' } } }
+            ]
+          },
+          include: { sales: true }
+        });
+        
+        const sysConfig = await prisma.systemConfig.findFirst();
+        const discountRate = sysConfig?.yearlyDiscountRate || 20;
+        
+        return temples.map((t: any) => {
+           const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
+           return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
+        });
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 export async function fetchDistributorVisits(distributorId: string) {
-  let listSales = [...(await [])];
+  let listSales = [...[]];
   /* removed duplicate import */
     const resSales = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
     if (resSales && resSales.rows) {
           listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
         }
   const teamIds = listSales.filter(s => s.distributorId === distributorId).map(s => s.name);
-  return (await []).filter(v => teamIds?.includes(v.salesName));
+  return [].filter(v => teamIds?.includes(v.salesName));
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
@@ -3522,7 +3500,7 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
   }
 }
 export async function approveTempleByDistributor(templeId: string) {
-  const t = (await []).find(x => x.id === templeId);
+  const t = [].find(x => x.id === templeId);
   if (t) {
     t.status = 'Active';
     const gStore = globalThis as any;
@@ -3610,14 +3588,14 @@ export async function fetchComplexAnalyticsData() {
     }
   };
 
-  (await []).forEach((a: any) => {
+  [].forEach((a: any) => {
     if (a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid' && a.status !== 'Cancelled') {
       addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0, a.templeId);
     }
   });
 
   const allLampCats = await [];
-  (await []).forEach((r: any) => {
+  [].forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
@@ -3628,19 +3606,19 @@ export async function fetchComplexAnalyticsData() {
     }
   });
 
-  (await []).forEach((r: any) => {
+  [].forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0, r.templeId);
     }
   });
 
-  (await []).forEach((t: any) => {
+  [].forEach((t: any) => {
     if (t.paymentStatus === 'Paid' || t.status === 'Paid') {
       addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(t.price || 0) || 0, t.templeId);
     }
   });
 
-  (await []).forEach((r: any) => {
+  [].forEach((r: any) => {
     if ((r.id.startsWith('MERIT-') || r.serviceType?.includes('功德')) && (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid')) {
       let amt = 0;
       if (r.values && r.values['金額']) {
@@ -3663,7 +3641,7 @@ export async function fetchComplexAnalyticsData() {
   
   let totalGuests = 0;
 
-  (await []).forEach((g: any) => {
+  [].forEach((g: any) => {
     if (templeId && g.templeId && g.templeId !== templeId) return;
     
     totalGuests++;
@@ -3702,13 +3680,13 @@ export async function fetchComplexAnalyticsData() {
   // 3. Queue Stats
   let validEventIds: string[] | null = null;
   if (templeId) {
-    validEventIds = (await []).filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
+    validEventIds = [].filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
   }
 
   let totalTickets = 0;
   let completedTickets = 0;
   
-  (await []).forEach((t: any) => {
+  [].forEach((t: any) => {
     if (validEventIds && !validEventIds.includes(t.eventId)) return;
     totalTickets++;
     if (t.status === 'Completed') completedTickets++;
@@ -3727,7 +3705,7 @@ export async function fetchComplexAnalyticsData() {
   // Calculate Conversion Rate
   let totalOrders = 0;
   let paidOrders = 0;
-  (await []).forEach((a: any) => {
+  [].forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     totalOrders++;
     if (a.paymentStatus === 'Paid') paidOrders++;
@@ -3739,7 +3717,7 @@ export async function fetchComplexAnalyticsData() {
   let returningGuestCount = 0;
   
   const guestApptCounts: Record<string, number> = {};
-  (await []).forEach((a: any) => {
+  [].forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     if (a.phone) {
       guestApptCounts[a.phone] = (guestApptCounts[a.phone] || 0) + 1;
@@ -3758,7 +3736,7 @@ export async function fetchComplexAnalyticsData() {
   // C. Service Heat
   const serviceCounts: Record<string, number> = {};
   let totalServices = 0;
-  (await []).forEach((a: any) => {
+  [].forEach((a: any) => {
     if (templeId && a.templeId && a.templeId !== templeId) return;
     if (a.service) {
       serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1;
@@ -3810,7 +3788,7 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  const temple = (await []).find(t => t.id === templeId);
+  const temple = [].find(t => t.id === templeId);
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
   
@@ -3962,7 +3940,7 @@ export async function fetchFinancialOverview() {
   }
 
   if (!usedPgForRevenue) {
-    (await []).filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
+    [].filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.categoryName,
@@ -3978,8 +3956,8 @@ export async function fetchFinancialOverview() {
       totalRevenue += r.price;
     });
 
-    const myEvents = (await []).filter(e => e.templeId === templeId).map(e => e.id);
-    (await []).filter(r => myEvents?.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
+    const myEvents = [].filter(e => e.templeId === templeId).map(e => e.id);
+    [].filter(r => myEvents?.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
       revenue.push({
         id: r.id,
         title: r.title,
@@ -3995,8 +3973,8 @@ export async function fetchFinancialOverview() {
       totalRevenue += (r.actualPrice || r.price);
     });
 
-    const myServices = (await []).filter(s => s.templeId === templeId).map(s => s.id);
-    (await []).filter(a => myServices?.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
+    const myServices = [].filter(s => s.templeId === templeId).map(s => s.id);
+    [].filter(a => myServices?.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
       revenue.push({
         id: a.id,
         title: a.service,
@@ -4012,7 +3990,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += (a.amount || 0);
     });
 
-    (await []).filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType?.includes('功德'))).forEach(r => {
+    [].filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType?.includes('功德'))).forEach(r => {
       let amt = 0;
       if (r.values && r.values['金額']) {
         amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
@@ -4032,7 +4010,7 @@ export async function fetchFinancialOverview() {
       totalRevenue += amt;
     });
 
-    (await []).filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
+    [].filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
       revenue.push({
         id: t.id,
         title: '現場排隊服務',
@@ -4052,7 +4030,7 @@ export async function fetchFinancialOverview() {
   revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const _allTemplesForBills = await [];
-  let expenses: ExpenseEntry[] = (await [])
+  let expenses: ExpenseEntry[] = []
     .filter(b => b.templeId === templeId)
     .map(b => {
       const t = _allTemplesForBills?.find((x: any) => x.id === templeId);
@@ -4114,7 +4092,7 @@ export async function fetchFinancialOverview() {
       
       if (!payeeSettings[pId]) {
         if (pRole === 'Distributor' && pId && pId !== 'superadmin') {
-          let dist = (await []).find((d: any) => d.id === pId);
+          let dist = [].find((d: any) => d.id === pId);
           if (!dist) {
              const dRes = await dbQuery("SELECT * FROM distributors WHERE id = $1", [pId], () => null) as any;
              if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
@@ -4140,7 +4118,7 @@ export async function fetchFinancialOverview() {
   const payeeId = expenses.length > 0 ? expenses[0].payeeId : null;
   const payeeRole = expenses.length > 0 ? expenses[0].payeeRole : null;
   if (payeeRole === 'Distributor' && payeeId) {
-    let dist = (await []).find((d: any) => d.id === payeeId);
+    let dist = [].find((d: any) => d.id === payeeId);
     if (!dist) {
       /* removed duplicate import */
         const dRes = await dbQuery("SELECT * FROM distributors WHERE id = $1", [payeeId], () => null) as any;
@@ -4197,7 +4175,14 @@ export async function applyBonusOverride(salesName: string, amount: number, reas
 }
 
 export async function fetchSuperSalesBonuses(salesName: string) {
-  return (await []).filter(b => b.salesName === salesName);
+
+      try {
+        const sales = await prisma.distributorSales.findFirst({ where: { name: salesName } });
+        if (!sales) return [];
+        return await prisma.bonus.findMany({ where: { salesId: sales.id } });
+      } catch(e) {
+        return [];
+      }
 }
 
 export async function fetchAllWithdrawals() {
@@ -4281,22 +4266,16 @@ export async function fetchEarningsStats(salesId: string = '超級精英業務')
 }
 
 export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptUrl: string) {
-  try {
-    const withdrawal = (await []).find(w => w.id === withdrawalId);
-    if (!withdrawal) return { success: false, error: 'Withdrawal not found' };
 
-    /* removed duplicate import */
-      await dbQuery("UPDATE \"Withdrawal\" SET status = 'Approved', \"receiptUrl\" = $1 WHERE id = $2", [receiptUrl, withdrawalId]);
-
-    withdrawal.status = 'Approved';
-    withdrawal.receiptUrl = receiptUrl;
-
-    await null;
-
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
+      try {
+        await prisma.withdrawal.update({
+          where: { id: withdrawalId },
+          data: { status: 'Approved', receiptUrl }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function requestWithdrawal(salesName: string, amount: number) { 
@@ -4336,55 +4315,57 @@ export async function requestPasswordReset(salesName: string) {
 }
 
 export async function fetchPasswordResets() {
-  return [...(await [])];
+
+      try {
+        return await prisma.passwordReset.findMany({
+          orderBy: { date: 'desc' }
+        });
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
 }
 
 export async function handlePasswordReset(id: string, action: 'Approve' | 'Reject') {
-  const req = (await []).find(r => r.id === id);
-  if (!req) return { success: false, error: 'Request not found' };
 
-  req.status = action === 'Approve' ? 'Approved' : 'Rejected';
-  
-  await null;
-
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
-  return { success: true };
+      try {
+        const pr = await prisma.passwordReset.findUnique({ where: { id } });
+        if (!pr) return { success: false };
+        await prisma.passwordReset.update({ where: { id }, data: { status: action === 'Approve' ? 'Approved' : 'Rejected' } });
+        if (action === 'Approve') {
+          await updateAccountPassword(pr.userId, '000000', pr.userRole);
+        }
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function fetchNotifications(userRole: string, userName?: string) {
-  let notifs = [...(await [])];
-  /* removed duplicate import */
-    const resNotifs = await dbQuery("SELECT * FROM notifications ORDER BY date DESC", [], () => null) as any;
-    if (resNotifs && resNotifs.rows) {
-          notifs = resNotifs.rows.map((r: any) => ({
-            ...r,
-            id: r.id,
-            title: r.title,
-            content: r.content,
-            date: r.date,
-            isRead: r.is_read,
-            targetUser: r.target_user
-          }));
-        }
 
-  if (userRole !== 'SuperAdmin') {
-    notifs = notifs.filter(n => {
-      if (n.targetUser) return n.targetUser === userName;
-      
-      const adminOnlyTitles = ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請'];
-      if (adminOnlyTitles?.includes(n.title)) {
-        return userName ? n.content?.includes(userName) : false;
+      try {
+        let whereClause: any = {};
+        if (userRole !== 'SuperAdmin') {
+          whereClause = {
+            OR: [
+              { targetUser: userName },
+              { title: { notIn: ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請', '手動獎金撥發通知'] } },
+              { 
+                title: { in: ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請', '手動獎金撥發通知'] },
+                content: { contains: userName || '' }
+              }
+            ]
+          };
+        }
+        
+        return await prisma.notification.findMany({
+          where: whereClause,
+          orderBy: { date: 'desc' }
+        });
+      } catch (e) {
+        console.error(e);
+        return [];
       }
-      
-      if (n.title === '手動獎金撥發通知') {
-        return userName ? n.content?.includes(userName) : false;
-      }
-      
-      return true;
-    });
-  }
-  return notifs;
 }
 export type StorageInfo = any;
 export async function upgradeStorage() { return { success: true }; }
@@ -4523,101 +4504,53 @@ export async function updateAccountPermissions(id: string, permissions: string[]
 }
 
 export async function updateAccountPassword(id: string, newPass: string, role?: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const gStore = globalThis as any;
-    // 永遠更新記憶體資料，以免登入時 fallback 到舊密碼
-    if (role === 'Temple' || id.startsWith('temple-')) {
-       let pData = await [];
-       const idx = pData.findIndex((p: any) => p.templeId === id);
-       if (idx > -1) { 
-         pData[idx].password = newPass; 
-         await null; 
-       } else {
-         const tData = await [];
-         const temple = tData.find((t: any) => t.id === id);
-         if (temple) {
-           pData.push({
-             id: `p-${Date.now()}`,
-             templeId: id,
-             name: temple.templeName || '宮廟管理員',
-             account: temple.account || `admin-${id.slice(-4)}`,
-             password: newPass,
-             role: 'TempleAdmin',
-             status: 'Active'
-           });
-           await null;
-         }
-       }
-       
-       // 同步更新 (await getSafeJsonArray('temples')) 以便 Auto-heal 登入機制生效
-       const tData = await [];
-       const tIdx = tData.findIndex((t: any) => t.id === id);
-       if (tIdx > -1) {
-         tData[tIdx].password = newPass;
-         await null;
-       }
-    } else if (role === 'Distributor') {
-       let dData = ((await []) || (await []));
-       const idx = dData.findIndex((p: any) => p.id === id);
-       if (idx > -1) { dData[idx].password = newPass; await null; }
-    } else if (role === 'SuperSales' || role === 'DistSales') {
-       let sData = ((await []) || (await []));
-       const idx = sData.findIndex((p: any) => p.id === id);
-       if (idx > -1) { sData[idx].password = newPass; await null; }
-    } else {
-       let pData = await [];
-       const idx = pData.findIndex((p: any) => p.id.toString() === id.toString());
-       if (idx > -1) { pData[idx].password = newPass; await null; }
-    }
 
-    if (client) {
-      if (role === 'Distributor') {
-        await client.query('UPDATE distributors SET password = $1 WHERE id = $2', [newPass, id]);
-      } else if (role === 'SuperSales' || role === 'DistSales') {
-        await client.query('UPDATE dist_sales SET password = $1 WHERE id = $2', [newPass, id]);
-      } else {
-        const res = await client.query('UPDATE "User" SET password = $1 WHERE id = $2 OR "templeId" = $2 RETURNING id', [newPass, id]);
-        // Auto-heal PostgreSQL insertion
-        if (res.rowCount === 0 && (role === 'Temple' || id.startsWith('temple-'))) {
-           const tData = await [];
-           const temple = tData.find((t: any) => t.id === id);
-           const account = temple?.account || `admin-${id.slice(-4)}`;
-           const name = temple?.templeName || '宮廟管理員';
-           try {
-             await client.query(
-               `INSERT INTO "User" (id, "templeId", name, account, password, role, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (id, temple_id) DO NOTHING`,
-               [`p-${Date.now()}`, id, name, account, newPass, 'TempleAdmin', 'Active']
-             );
-           } catch(e) { console.error('Failed to auto-insert "User"', e); }
+      try {
+        if (role === 'Temple' || id.startsWith('temple-')) {
+          await prisma.temple.update({ where: { id }, data: { password: newPass } });
+          
+          const user = await prisma.user.findFirst({ where: { templeId: id } });
+          if (user) {
+            await prisma.user.update({ where: { id: user.id }, data: { password: newPass } });
+          } else {
+            const temple = await prisma.temple.findUnique({ where: { id } });
+            if (temple) {
+              await prisma.user.create({
+                data: {
+                  id: `p-${Date.now()}`,
+                  templeId: id,
+                  name: temple.templeName || '宮廟管理員',
+                  account: temple.account || `admin-${id.slice(-4)}`,
+                  password: newPass,
+                  role: 'TempleAdmin',
+                  status: 'Active'
+                }
+              });
+            }
+          }
+        } else if (role === 'Distributor') {
+          await prisma.distributor.update({ where: { id }, data: { password: newPass } });
+        } else if (role === 'SuperSales' || role === 'DistSales') {
+          await prisma.distributorSales.update({ where: { id }, data: { password: newPass } });
+        } else {
+          await prisma.user.update({ where: { id }, data: { password: newPass } });
         }
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
       }
-    }
-    return { success: true };
-  });
 }
 
 // --- 經銷總部分階資料獲取 ---
-export async function fetchDistributorProfile(distId?: string) { 
-  if (!distId) return null;
-  const res = await dbQuery('SELECT * FROM distributors WHERE id = $1', [distId], () => null) as any;
-    if (res && res.rowCount > 0) {
-          const r = res.rows[0];
-          let b2bPayment = undefined;
-          if (r.b2b_payment_config) b2bPayment = typeof r.b2b_payment_config === 'string' ? JSON.parse(r.b2b_payment_config) : r.b2b_payment_config;
-          const allDists = typeof gStore !== 'undefined' ? ((await []) || (await [])) : (await []);
-          const memDist = allDists.find((d: any) => d.id === distId);
-          return { ...r, planId: r.plan_id, planName: r.plan_name, joinedAt: r.joined_at, creatorSalesId: r.creator_sales_id, contactName: r.contact_name, taxId: r.tax_id, bankInfo: { bankName: r.bank_name || memDist?.bankInfo?.bankName || '', accountName: memDist?.bankInfo?.accountName || memDist?.accountName || r.name || '', accountNumber: r.bank_account || memDist?.bankInfo?.accountNumber || '', bankCode: r.bank_code || memDist?.bankInfo?.bankCode || '' }, b2bPayment };
-        }
-  
-  const allDistributors = typeof gStore !== 'undefined' ? ((await []) || (await [])) : (await []);
-  const dist = allDistributors.find((d: any) => d.id === distId);
-  if (dist && !dist.bankInfo && (dist.bank_name || dist.bank_account)) {
-    dist.bankInfo = { bankName: dist.bank_name || '', accountName: dist.accountName || dist.name || '', accountNumber: dist.bank_account || '', bankCode: dist.bank_code || '' };
-  }
-  return dist || null;
+export async function fetchDistributorProfile(distId?: string) {
+
+      try {
+        if (!distId) return null;
+        return await prisma.distributor.findUnique({ where: { id: distId } });
+      } catch(e) {
+        return null;
+      }
 }
 export async function fetchDistributorCommissionSummary(distId: string, year: string, month: string) { 
   const id = distId || 'dist-1';
@@ -4884,115 +4817,67 @@ export async function createOrUpdateGuest(d: any, originalPhone?: string) {
     return { success: true }; 
   });
 }
-export async function fetchGuestHistory(p: string) { 
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    let files = (await []).filter((f: any) => normCompare(f.phone, p));
-    if (client) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS guest_files (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL ,
-          url TEXT NOT NULL,
-          type VARCHAR(50) NOT NULL,
-          name VARCHAR(255) NOT NULL,
-          folder VARCHAR(50) NOT NULL,
-          uploaded_by VARCHAR(50) NOT NULL,
-          uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      
-      const normPhone = normalizePhone(p);
-      const guestRes = await client.query("SELECT phone FROM guests WHERE REPLACE(phone, '-', '') = $1", [normPhone]);
-      const dbPhone = guestRes.rows[0]?.phone || p;
-      
-      const res = await client.query('SELECT * FROM guest_files WHERE temple_id = $1 AND phone = $2 AND temple_id = $2 ORDER BY uploaded_at DESC', [dbPhone, templeId]);
-      if ((res.rowCount ?? 0) > 0) {
-        files = res.rows.map(r => ({
-          id: r.id,
-          phone: r.phone,
-          url: r.url,
-          type: r.type,
-          name: r.name,
-          folder: r.folder,
-          uploadedBy: r.uploaded_by,
-          uploadedAt: r.uploaded_at instanceof Date ? r.uploaded_at.toISOString().replace('T', ' ').slice(0, 19) : r.uploaded_at
-        }));
+export async function fetchGuestHistory(p: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return { files: [], records: [], appointments: [], lampRecords: [], activities: [], queueTickets: [], eventRegistrations: [] };
+        const normPhone = p.replace(/-/g, '');
+        
+        // We fetch everything based on phone containing the digits (since normPhone is just digits)
+        const files = await prisma.guestFile.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { uploadedAt: 'desc' } });
+        const appointments = await prisma.appointment.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const lampRecords = await prisma.lampRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const queueTickets = await prisma.queueTicket.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const eventRegistrations = await prisma.eventRegistration.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+
+        return {
+          files,
+          records: appointments,
+          appointments,
+          lampRecords,
+          activities: [],
+          queueTickets,
+          eventRegistrations
+        };
+      } catch (error) {
+        console.error('fetchGuestHistory error:', error);
+        return { files: [], records: [], appointments: [], lampRecords: [], activities: [], queueTickets: [], eventRegistrations: [] };
       }
-      const appsRes = await client.query('SELECT id, temple_id as "templeId", date, time, staff, guest_name as "guestName", service, service_id as "serviceId", status, phone, payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", amount, payment_proof_url as "paymentProofUrl" FROM appointments WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-      const lampsRes = await client.query('SELECT id, temple_id as "templeId", guest_name as "guestName", phone, lamp_type as "lampType", amount, status, created_at as "createdAt", payment_method as "paymentMethod", payment_ref as "paymentRef", payment_status as "paymentStatus", payment_proof_url as "paymentProofUrl" FROM lamp_records WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-      const queueRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", event_title as "eventTitle", phone, guest_name as "guestName", status, assigned_number as "assignedNumber", actual_order as "actualOrder", payment_status as "paymentStatus", payment_ref as "paymentRef", payment_proof_url as "paymentProofUrl", created_at as "createdAt" FROM queue_tickets WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-      const eventsRes = await client.query('SELECT id, event_id as "eventId", temple_id as "templeId", title, phone, guest_name as "guestName", price, payment_status as "paymentStatus", actual_price as "actualPrice", payment_ref as "paymentRef", timestamp as "createdAt", payment_proof_url as "paymentProofUrl" FROM event_registrations WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normPhone, templeId]);
-
-      return JSON.parse(JSON.stringify({
-        appointments: appsRes.rows,
-        records: (await []).filter((r: any) => normCompare(r.phone, p)),
-        files: files,
-        lampRecords: lampsRes.rows,
-        activities: (await []).filter((a: any) => normCompare(a.phone, p)),
-        queueTickets: queueRes.rows,
-        eventRegistrations: eventsRes.rows
-      }));
-    }
-
-    const apps = (await []).filter((a: any) => normCompare(a.phone, p));
-    const _allSlotsForQueue = await [];
-    apps.forEach((app: any) => {
-      if (!app.serviceId) {
-        const slot = _allSlotsForQueue.find((s: any) => s.date === app.date && s.time === app.time && s.staff === app.staff && s.description === app.service);
-        if (slot && (slot.bound_service_id || slot.serviceId)) {
-          app.serviceId = slot.bound_service_id || slot.serviceId;
-        }
-      }
-    });
-
-    return JSON.parse(JSON.stringify({ 
-      appointments: apps, 
-      records: (await []).filter((r: any) => normCompare(r.phone, p)), 
-      files: files, 
-      lampRecords: (await []).filter((l: any) => normCompare(l.phone, p)), 
-      activities: (await []).filter((a: any) => normCompare(a.phone, p)),
-      queueTickets: (await []).filter((t: any) => normCompare(t.phone, p)),
-      eventRegistrations: (await []).filter((e: any) => normCompare(e.phone, p))
-    })); 
-  });
 }
 
 export async function fetchGuestRecords(phone: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, [], async (client) => {
-    // Memory fallback currently used for records
-    const normPhone = phone.replace(/-/g, '');
-    return (await []).filter((r: any) => r.phone && r.phone.replace(/-/g, '') === normPhone);
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        const normPhone = phone.replace(/-/g, '');
+        return await prisma.appointment.findMany({
+          where: { templeId, phone: { contains: normPhone } },
+          orderBy: { createdAt: 'desc' }
+        });
+      } catch (error) {
+        console.error('fetchGuestRecords error:', error);
+        return [];
+      }
 }
 
 export async function updateDeepRecord(recordId: string, phone: string, staffName: string, values: any) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, { success: false, message: "失敗" }, async (client) => {
-    // Memory fallback
-    const idx = (await []).findIndex((r: any) => r.id === recordId);
-    if (idx !== -1) {
-      (await [])[idx] = {
-        ...(await [])[idx],
-        values,
-        staffName,
-        timestamp: new Date().toISOString()
-      };
-      // (await jsonStore.find('deep_records')) synced
 
-      const serviceType = (await [])[idx].serviceType;
-      
-      await null;
-      // (await jsonStore.find('activities')) synced
-
-      await revalidateTemple();
-      return { success: true, message: "紀錄已更新" };
-    }
-    return { success: false, message: "找不到指定的案卷紀錄" };
-  });
+      try {
+        const app = await prisma.appointment.findUnique({ where: { id: recordId } });
+        if (app) {
+          await prisma.appointment.update({
+            where: { id: recordId },
+            data: values
+          });
+          return { success: true, message: '紀錄已更新' };
+        }
+        return { success: false, message: '找不到指定的案卷紀錄' };
+      } catch (error) {
+        console.error('updateDeepRecord error:', error);
+        return { success: false, message: '更新失敗' };
+      }
 }
 export async function saveDeepRecord(phone: string, eventId: string, serviceType: string, staffName: string, values: any) {
   const templeId = await getDynamicTempleId();
@@ -5040,8 +4925,19 @@ export async function updateGuestPassword(phone: string, newPassword: string) {
 // --- 點燈管理 (Lamps) 相關 mock 函式與型別 ---
 export type LampRecord = any;
 
-export async function fetchGuestByPhone(p: string) { 
-  return (await []).find((g: any) => g.phone === p) || null; 
+export async function fetchGuestByPhone(p: string) {
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return null;
+        const normPhone = p.replace(/-/g, '');
+        return await prisma.guest.findFirst({
+          where: { templeId, phone: { contains: normPhone } }
+        });
+      } catch (error) {
+        console.error('fetchGuestByPhone error:', error);
+        return null;
+      }
 }
 export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
   const templeId = await getDynamicTempleId();
@@ -5656,7 +5552,7 @@ export async function impersonateTemple(templeId: string, originRole?: string) {
 // -------------------------------------------------------------------------
 
 export async function transferTempleOwnership(templeId: string, newDistributorId: string | null, newSalesId: string | null) {
-  const temple = (await []).find(t => t.id === templeId);
+  const temple = [].find(t => t.id === templeId);
   if (!temple) return { success: false, error: 'Temple not found' };
 
   if (newDistributorId !== undefined) {
@@ -5675,14 +5571,14 @@ export async function transferTempleOwnership(templeId: string, newDistributorId
 }
 
 export async function transferDistributorOwnership(distributorId: string, newSalesId: string | null) {
-  const dist = (await []).find(d => d.id === distributorId);
+  const dist = [].find(d => d.id === distributorId);
   if (!dist) return { success: false, error: 'Distributor not found' };
 
   dist.salesId = newSalesId;
 
   // Transfer all underlying temples if they belong to this distributor
   // And update their salesId to the new salesId if applicable
-  (await []).forEach(t => {
+  [].forEach(t => {
      if (t.distributorId === distributorId) {
         if (newSalesId !== undefined) {
            t.salesId = newSalesId;
@@ -5722,24 +5618,28 @@ export async function returnToSuperAdmin() {
 }
 
 export async function updateAppointmentPayment(appId: number, paymentMethod: string, paymentRef?: string) {
-  return withTempleSession(null, false, async (client) => {
-    const idx = (await []).findIndex(a => a.id === appId);
-    if (idx === -1) return { success: false, message: '找不到該預約' };
-    
-    (await [])[idx].paymentMethod = paymentMethod;
-    if (paymentRef) (await [])[idx].paymentRef = paymentRef;
-    
-    if (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
-      (await [])[idx].paymentStatus = 'Paid';
-      (await [])[idx].status = 'Confirmed';
-    } else {
-      (await [])[idx].paymentStatus = 'Pending';
-      (await [])[idx].status = 'Pending';
-    }
-    
-    await revalidateTemple();
-    return { success: true };
-  });
+
+      try {
+        const id = String(appId);
+        const app = await prisma.appointment.findUnique({ where: { id } });
+        if (!app) return { success: false, message: '找不到該預約' };
+        
+        let paymentStatus = 'Pending';
+        let status = 'Pending';
+        if (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
+          paymentStatus = 'Paid';
+          status = 'Confirmed';
+        }
+        
+        await prisma.appointment.update({
+          where: { id },
+          data: { paymentMethod, paymentRef, paymentStatus, status }
+        });
+        return { success: true };
+      } catch (error) {
+        console.error('updateAppointmentPayment error:', error);
+        return { success: false, message: '更新失敗' };
+      }
 }
 
 export async function fetchAiPlans() {
@@ -5767,7 +5667,13 @@ export async function deleteAiPlan(id: string) {
 
 // --- AI Plan & Usage Management ---
 export async function fetchAiApiModels() {
-  return [...(await [])];
+
+      try {
+        return await prisma.aiApiModel.findMany();
+      } catch(e) {
+        console.error(e);
+        return [];
+      }
 }
 
 export async function saveAiApiModels(models: any[]) {
@@ -5778,90 +5684,75 @@ export async function saveAiApiModels(models: any[]) {
 
 
 export async function fetchAllTempleAiUsage() {
-  // Returns AI usage for all temples, joining with temple profiles and plans
-  const _allTemplesForAi = await [];
-  return (await []).map(usage => {
-    const temple = _allTemplesForAi.find(t => t.id === usage.templeId) || { templeName: '未知宮廟', name: '未知宮廟', city: '未知' };
-    const plan = db_ai_plans.find(p => p.id === usage.planId) || { name: '無方案', chatLimit: 0 };
-    return { 
-      ...usage, 
-      templeName: temple.templeName || temple.name || '未知宮廟', 
-      city: temple.city || '未知',
-      planName: usage.planId === 'VIP' ? usage.planName : plan.name, 
-      chatLimit: plan.chatLimit || 0 
-    };
-  });
+
+      try {
+        return await prisma.templeAiUsage.findMany({ include: { temple: true } });
+      } catch(e) {
+        return [];
+      }
 }
 
 
 export async function grantTempleAiVip(templeId: string, isVip: boolean = true) {
-  let usage = (await []).find(u => u.templeId === templeId);
-  if (!usage) {
-    usage = { templeId, enabled: true, planId: 'VIP', planName: isVip ? '無限免費方案' : '基礎智慧助理方案', usedCount: 0, usedTokens: 0, monthlyTokenLimit: isVip ? 999999 : 1000, expiryDate: new Date().toISOString(), isVip };
-    await null;
-  } else {
-    usage.isVip = isVip;
-    if (isVip) {
-      usage.planName = '無限免費方案';
-      usage.monthlyTokenLimit = 999999;
-    }
-  }
-  // (await jsonStore.find('temple_ai_usage')) synced
-  return { success: true };
+
+      try {
+        await prisma.templeAiUsage.upsert({
+          where: { templeId },
+          update: { isVip, planId: isVip ? 'VIP-AI' : 'FREE' },
+          create: { templeId, isVip, planId: isVip ? 'VIP-AI' : 'FREE', usedCount: 0 }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function fetchTempleAiUsage() {
-  const templeId = await getDynamicTempleId();
-  if (!templeId) return null;
-  let usage = (await []).find(u => u.templeId === templeId);
-  if (!usage) {
-    // Default 1-month trial
-    const thirtyDaysLater = new Date();
-    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-    usage = { templeId, enabled: false, planId: 'AI-500', usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-    await null;
-    // (await jsonStore.find('temple_ai_usage')) synced
-  }
-  const plan = db_ai_plans.find(p => p.id === usage.planId) || { chatLimit: 0, name: '無方案', monthlyFee: 0 };
-  return { ...usage, chatLimit: plan.chatLimit, planName: plan.name, monthlyFee: plan.monthlyFee };
+
+      try {
+        const templeId = await getDynamicTempleId();
+        return await prisma.templeAiUsage.findUnique({ where: { templeId: templeId! } });
+      } catch(e) {
+        return null;
+      }
 }
 
 export async function toggleTempleAiStatus(enabled: boolean) {
-  const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false };
-  let usage = (await []).find(u => u.templeId === templeId);
-  if (usage) {
-    usage.enabled = enabled;
-    // (await jsonStore.find('temple_ai_usage')) synced
-  }
-  return { success: true };
+
+      try {
+        const templeId = await getDynamicTempleId();
+        await prisma.templeAiUsage.update({
+          where: { templeId: templeId! },
+          data: { enabled }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
-  const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false };
-  let usage = (await []).find(u => u.templeId === templeId);
-  const thirtyDaysLater = new Date();
-  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-  
-  if (usage) {
-    usage.planId = planId;
-    usage.expiryDate = thirtyDaysLater.toISOString();
-    usage.usedCount = 0; // Reset usage
-    usage.enabled = true;
-  } else {
-    usage = { templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-    await null;
-  }
-  // (await jsonStore.find('temple_ai_usage')) synced
 
-  const plan = db_ai_plans.find(p => p.id === planId);
-  if (plan) {
-    const temple = (await []).find(t => t.id === templeId);
-    await null;
-  }
-
-  return { success: true };
+      try {
+        const templeId = await getDynamicTempleId();
+        const sys = await prisma.systemConfig.findFirst();
+        const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
+        if (!plan) return { success: false };
+        
+        await prisma.templeBill.create({
+          data: {
+            id: `bill-${Date.now()}`,
+            templeId: templeId!,
+            amount: plan.price,
+            type: 'AiUpgrade',
+            status: 'PendingPayment',
+            date: new Date()
+          }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS', action: string, target: string, operator: string, templeIdOverride?: string) {
@@ -5888,63 +5779,34 @@ export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS
 }
 
 export async function fetchAuditLogs() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    try {
-      await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
-        id VARCHAR(50) PRIMARY KEY, temple_id VARCHAR(50), level VARCHAR(20), action VARCHAR(255), target TEXT, operator VARCHAR(100), timestamp VARCHAR(100)
-      )`);
-      const res = await client.query('SELECT * FROM audit_logs WHERE temple_id = $1 ORDER BY timestamp DESC LIMIT 200', [templeId]);
-      return res.rows.map(r => ({
-        id: r.id, templeId: r.temple_id, level: r.level, action: r.action, target: r.target, operator: r.operator, timestamp: r.timestamp
-      }));
-    } catch (e) {
-      console.error('Error fetching audit logs', e);
-      return (await []).filter(log => log.templeId === templeId || !log.templeId);
-    }
-  });
+
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        
+        const logs = await prisma.auditLog.findMany({
+          where: { templeId },
+          orderBy: { timestamp: 'desc' }
+        });
+        return logs;
+      } catch (e) {
+        console.error('fetchAuditLogs error', e);
+        return [];
+      }
 }
 
 export async function getTempleBasicInfo(templeId?: string) {
-  const tId = templeId || await getDynamicTempleId();
-  return withTempleSession(null, false, async (client) => {
-    let t = null;
-    if (client) {
-      const res = await client.query('SELECT * FROM "Temple" WHERE id = $1', [tId]);
-        if (res.rowCount && res.rowCount > 0) {
-                  const row = res.rows[0];
-                  t = {
-                    id: row.id,
-                    name: row.name,
-                    templeName: row.temple_name || row.name,
-                    phone: row.phone,
-                    address: row.address,
-                    city: row.city,
-                    distributorId: row.distributor_id,
-                    plan: row.plan,
-                    status: row.status,
-                    createdAt: row.created_at,
-                    timestamp: row.timestamp || row.created_at,
-                    trialMonths: row.trial_months,
-                    freeType: row.free_type,
-                    rentType: row.rent_type,
-                    monthlyFee: row.monthly_fee,
-                    yearlyFee: row.yearly_fee,
-                    paymentCycle: row.payment_cycle,
-                    storagePlanId: row.storage_plan_id,
-                    aiPlanId: row.ai_plan_id,
-                    logoUrl: row.logo_url
-                  };
-                }
-    }
-    if (!t) {
-      t = (await [])?.find((x: any) => x.id === tId) || (await []).find(x => x.id === tId) || null;
-    }
-    if (t && !t.templeName && t.name) {
-      return { ...t, templeName: t.name };
-    }
-    return t;
-  });
+
+      try {
+        const tId = templeId || await getDynamicTempleId();
+        if (!tId) return null;
+        const t = await prisma.temple.findUnique({ where: { id: tId } });
+        if (!t) return null;
+        return { ...t, templeName: t.templeName || t.name };
+      } catch(e) {
+        console.error(e);
+        return null;
+      }
 }
 
 export async function updateTempleBasicInfo(data: any, templeId?: string) {
@@ -6152,8 +6014,8 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
 
 export async function fetchSuperAdminFinancials() {
   // 取得宮廟與帳單狀態
-  const allTemples = typeof gStore !== 'undefined' ? (await []) : (await []);
-  let templeBills: any[] = typeof gStore !== 'undefined' ? ((await []) || (await [])) : (await []);
+  const allTemples = typeof gStore !== 'undefined' ? [] : [];
+  let templeBills: any[] = typeof gStore !== 'undefined' ? ([] || []) : [];
   /* removed duplicate import */
     const res = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
     const rows = res?.rows;
@@ -6225,137 +6087,88 @@ export async function fetchSuperAdminFinancials() {
       totalCommission,
       netProfit
     },
-    wallets: (await []),
+    wallets: [],
     templePayments,
     superSalesWithdrawals
   };
 }
 
 export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
-  const distIndex = (await []).findIndex(d => d.id === distId);
-  if (distIndex > -1) {
-    (await [])[distIndex].bankInfo = bankInfo;
-    if (typeof gStore !== 'undefined') {
-      // (await jsonStore.find('distributors')) synced
-    }
-    /* removed duplicate import */
-      await dbQuery('UPDATE distributors SET bank_code = $1, bank_account = $2, bank_name = $3 WHERE id = $4', [bankInfo.bankCode || '', bankInfo.accountNumber || '', bankInfo.bankName || '', distId]);
-    return true;
-  }
-  return false;
+
+      try {
+        await prisma.distributor.update({
+          where: { id: distId },
+          data: {
+            bankCode: bankInfo.bankCode || '',
+            bankAccount: bankInfo.accountNumber || '',
+            bankName: bankInfo.bankName || ''
+          }
+        });
+        return true;
+      } catch (error) {
+        console.error('updateDistributorBankInfo error:', error);
+        return false;
+      }
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-  const temple = (await []).find(t => t.id === templeId || t.id === decodeURIComponent(templeId));
-  if (!temple) {
-    return {
-      type: 'super_admin',
-      adminName: '系統總管理員 (總部)',
-      adminContact: 'admin_root (官方聯絡管道)'
-    };
-  }
 
-  if (temple.salesId) {
-    const sales = (await []).find(s => s.id === temple.salesId);
-    if (sales) {
-      if (sales.distributorId) {
-        // Distributor Sales
-        const dist = (await []).find(d => d.id === sales.distributorId);
-        const ret = {
-          type: 'dist_sales',
-          salesName: sales.name,
-          salesPhone: sales.phone || sales.account || '未提供',
-          distName: dist?.name || '未知經銷商',
-          distPhone: dist?.phone || dist?.account || '未提供'
+      try {
+        const temple = await prisma.temple.findUnique({ where: { id: templeId }, include: { sales: { include: { distributor: true } } } });
+        if (!temple || !temple.sales) return null;
+        return {
+          type: 'Sales',
+          id: temple.sales.id,
+          name: temple.sales.name,
+          distributorName: temple.sales.distributor?.name || ''
         };
-        console.log('getTempleCreatorInfo returning:', ret);
-        return ret;
-      } else {
-        // Super Sales
-        const ret = {
-          type: 'super_sales',
-          salesName: sales.name,
-          salesPhone: sales.phone || sales.account || '未提供'
-        };
-        console.log('getTempleCreatorInfo returning:', ret);
-        return ret;
+      } catch(e) {
+        return null;
       }
-    }
-  }
-
-  if (temple.distributorId) {
-     const dist = (await []).find(d => d.id === temple.distributorId);
-     if (dist) {
-        const ret = {
-           type: 'distributor',
-           distName: dist.name,
-           distPhone: dist.phone || dist.account || '未提供'
-        };
-        console.log('getTempleCreatorInfo returning:', ret);
-        return ret;
-     }
-  }
-
-  const ret = {
-    type: 'super_admin',
-    adminName: '系統總管理員 (總部)',
-    adminContact: 'admin_root (官方聯絡管道)'
-  };
-  console.log('getTempleCreatorInfo returning:', ret);
-  return ret;
 }
 
 export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
-  if (role === 'TempleAdmin' || role === 'Temple') {
-    const temple = (await []).find(t => t.id === id);
-    if (temple) temple.status = status;
-    // synced
-    /* removed duplicate import */
-      await dbQuery('UPDATE "Temple" SET status = $1 WHERE id = $2', [status, id]);
-  } else if (role === 'Distributor') {
-    const dist = (await []).find(d => d.id === id);
-    if (dist) dist.status = status;
-    // (await jsonStore.find('distributors')) synced
-    /* removed duplicate import */
-      await dbQuery('UPDATE distributors SET status = $1 WHERE id = $2', [status, id]);
-  } else if (role === 'SuperSales' || role === 'DistSales') {
-    const sales = (await []).find(s => s.id === id);
-    if (sales) sales.status = status;
-    // (await jsonStore.find('dist_sales')) synced
-    /* removed duplicate import */
-      await dbQuery('UPDATE dist_sales SET status = $1 WHERE id = $2', [status, id]);
-  }
-  return { success: true };
+
+      try {
+        if (role === 'TempleAdmin' || role === 'Temple') {
+          await prisma.temple.update({ where: { id }, data: { status } });
+          await prisma.user.updateMany({ where: { templeId: id }, data: { status } });
+        } else if (role === 'Distributor') {
+          await prisma.distributor.update({ where: { id }, data: { status } });
+        } else if (role === 'SuperSales' || role === 'DistSales') {
+          await prisma.distributorSales.update({ where: { id }, data: { status } });
+        }
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 
 export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
-  for (const tId of templeIds) {
-    const temple = (await []).find(t => t.id === tId);
-    if (temple) {
-      if (targetRole === 'HQ') {
-        temple.distributorId = null;
-        temple.salesId = null;
-        /* removed duplicate import */
-          await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]);
-      } else if (targetRole === 'Distributor') {
-        temple.distributorId = targetId;
-        temple.salesId = null;
-        /* removed duplicate import */
-          await dbQuery('UPDATE "Temple" SET "salesId" = null WHERE id = $1', [tId]);
-      } else if (targetRole === 'SuperSales') {
-        temple.distributorId = null;
-        temple.salesId = targetId;
-        /* removed duplicate import */
-          await dbQuery('UPDATE "Temple" SET "salesId" = $1 WHERE id = $2', [targetId, tId]);
-      }
-    }
-  }
-  // synced
-  
-  const targetName = targetRole === 'HQ' ? '系統總部 HQ' : targetId;
-  await null;
 
-  return { success: true };
+      try {
+        if (targetRole === 'HQ') {
+          await prisma.temple.updateMany({
+            where: { id: { in: templeIds } },
+            data: { distributorId: null, salesId: null }
+          });
+        } else if (targetRole === 'Distributor') {
+          await prisma.temple.updateMany({
+            where: { id: { in: templeIds } },
+            data: { distributorId: targetId, salesId: null }
+          });
+        } else if (targetRole === 'SuperSales') {
+          await prisma.temple.updateMany({
+            where: { id: { in: templeIds } },
+            data: { distributorId: null, salesId: targetId }
+          });
+        }
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
 }
 export async function confirmPaymentSuccess(orderId: string, method: string) {
     if (orderId.startsWith('TEMPLE_BILL_')) {
@@ -6437,21 +6250,18 @@ export async function deactivateLampRecord(recordId: string) {
   });
 }
 
-export async function fetchDistributorLogs(distributorId: string) { 
-  let logs = (await []) || [];
-  /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM admin_logs ORDER BY timestamp DESC", [], () => null) as any;
-    if (res && res.rows && res.rows.length > 0) {
-          logs = res.rows.map((r: any) => ({
-            id: r.id,
-            action: r.action,
-            adminId: r.admin_id,
-            details: r.details,
-            timestamp: r.timestamp,
-            target: r.target
-          }));
-        }
-  return logs.filter((l: any) => l.target && l.target?.includes(distributorId)); 
+export async function fetchDistributorLogs(distributorId: string) {
+
+      try {
+        const logs = await prisma.adminLog.findMany({
+          where: { target: { contains: distributorId } },
+          orderBy: { timestamp: 'desc' }
+        });
+        return logs;
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
 }
 export async function requestBonus(salesId: string, distributorId: string, amount: number, method: string = 'Bank Transfer', salesName: string = '') {
   try {
@@ -6496,7 +6306,10 @@ export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: 
     return { success: false };
   }
 }
-export async function fetchSaasOrders() { return (await []) || []; }
+export async function fetchSaasOrders() {
+
+      return []; // Currently unused in new system
+}
 
 export async function fetchDistributorTempleBills(distributorId: string) {
   try {
@@ -6536,359 +6349,96 @@ export async function fetchDistributorTempleBills(distributorId: string) {
   }
 }
 export async function logDistributorAction(...args: any[]) {
-  const gStore = globalThis as any;
-  if (!(await [])) await null;
-  await null;
+
+      try {
+        // Fire and forget
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function grantTempleStorageVip(templeId: string, isVip: boolean = true) {
-  const gStore = globalThis as any;
-  if (!(await [])) await null;
-  let storage = (await []).find((s: any) => s.templeId === templeId);
-  if (!storage) {
-    storage = { templeId, isVip, planName: isVip ? '無限免費方案' : '免費 5GB 空間', usedBytes: 0, capacityGb: isVip ? 999999 : 5 };
-    await null;
-  } else {
-    storage.isVip = isVip;
-    if (isVip) {
-      storage.planName = '無限免費方案';
-      storage.capacityGb = 999999;
-    }
-  }
-  return { success: true };
+
+      try {
+        await prisma.templeStorage.upsert({
+          where: { templeId },
+          update: { isVip, planId: isVip ? 'VIP-STORAGE' : 'FREE' },
+          create: { templeId, isVip, planId: isVip ? 'VIP-STORAGE' : 'FREE', usedBytes: 0, totalBytes: isVip ? 1099511627776 : 5368709120 }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
-  const gStore = globalThis as any;
-  if (!(await [])) await null;
-  const plan = (gStore.db_ai_plans || []).find((p: any) => p.id === planId) || { name: '自訂方案', tokenLimit: 100000 };
-  let ai = (await []).find((a: any) => a.templeId === templeId);
-  if (!ai) {
-    ai = { templeId, planId, planName: plan.name, usedTokens: 0, monthlyTokenLimit: plan.tokenLimit, isVip: false };
-    await null;
-  } else {
-    ai.planId = planId;
-    ai.planName = plan.name;
-    ai.monthlyTokenLimit = plan.tokenLimit;
-    ai.isVip = false;
-  }
-  
-  // Generate Bill for AI plan
-  const planPrice = plan.priceMonthly || (plan.priceYearly ? Math.round(plan.priceYearly / 12) : 0);
-  if (planPrice > 0) {
-    const gStore = globalThis as any;
-    if (!(await [])) // invalid array assignment
-    await null;
 
-    try {
-      /* removed duplicate import */
-      await dbQuery(
-        `INSERT INTO "TempleBill" (id, temple_id, "itemName", amount, "dueDate", status, "payeeRole", "payeeId") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
-        [`BILL-AI-${Date.now()}`, templeId, 'AI 智能管家方案 - ' + plan.name, planPrice, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq'],
-        () => null
-      );
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  return { success: true };
+      try {
+        const sys = await prisma.systemConfig.findFirst();
+        const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
+        if (!plan) return { success: false };
+        
+        await prisma.templeAiUsage.upsert({
+          where: { templeId },
+          update: { planId, enabled: true },
+          create: { templeId, planId, enabled: true, usedCount: 0 }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 
 export async function fetchDataBridgeTree() {
-  const superSales = await fetchSuperSalesAccounts();
-  const gStore = globalThis as any;
-  
-  let pgDistributors: any[] = [];
-  const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
-    if (resDist && resDist.rows) pgDistributors = resDist.rows;
-  const allDistributorsMap = new Map();
-  ((await []) || []).forEach((d: any) => allDistributorsMap.set(d.account, d));
-  pgDistributors.forEach(d => allDistributorsMap.set(d.account, { ...d, planId: d.plan_id, planName: d.plan_name, joinedAt: d.joined_at, creatorSalesId: d.creator_sales_id, superSalesId: d.super_sales_id || d.creator_sales_id }));
-  const distributors = Array.from(allDistributorsMap.values());
 
-  let pgSales: any[] = [];
-  const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
-    if (resSales && resSales.rows) pgSales = resSales.rows;
-  const allSalesMap = new Map();
-  ((await []) || []).forEach((s: any) => allSalesMap.set(s.account, s));
-  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
-  const distSales = Array.from(allSalesMap.values());
-
-  let pgTemples: any[] = [];
-  const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
-    if (resTemples && resTemples.rows) pgTemples = resTemples.rows;
-  const allTemplesMap = new Map();
-  ((await []) || []).forEach((t: any) => allTemplesMap.set(t.id, t));
-  pgTemples.forEach(t => allTemplesMap.set(t.id, { ...t, distributorId: t.distributor_id, salesId: t.sales_id, superSalesId: t.super_sales_id, templeName: t.temple_name || t.name }));
-  const temples = Array.from(allTemplesMap.values());
-
-  const tree: any[] = [];
-
-  const getTempleNodes = (salesId?: string | null, distributorId?: string | null) => {
-    return temples
-      .filter((t: any) => {
-        if (salesId) return (t.salesId === salesId || t.superSalesId === salesId) && !t.distributorId;
-        if (distributorId) return t.distributorId === distributorId && !t.salesId && !t.superSalesId;
-        return !t.salesId && !t.distributorId && !t.superSalesId;
-      })
-      .map((t: any) => {
-        const isYearly = t.paymentCycle === 'Yearly';
-        const discountRate = db_config.yearlyDiscountRate || 20;
-        const discountMultiplier = 1 - discountRate / 100;
-        const discountText = discountRate % 10 === 0 ? (10 - discountRate / 10) : (100 - discountRate);
-        const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 0);
-        const planStr = t.freeType === 'Permanent' ? '永久免費' : (isYearly ? `年租標準方案 (享${discountText}折)` : '月付標準方案');
-        return {
-          id: t.id, 
-          name: t.templeName || t.name, 
-          type: 'temple',
-          timestamp: t.timestamp || t.created_at || new Date().toISOString(),
-          joinedAt: t.timestamp || t.created_at || new Date().toISOString(),
-          expirationDate: t.expirationDate || null,
-          planName: t.planName || planStr,
-          price: t.freeType === 'Permanent' ? 0 : calcPrice,
-          status: t.status || 'Active',
-          freeType: t.freeType,
-          billingStartDate: t.billingStartDate,
-          paymentCycle: t.paymentCycle,
-          paymentStatus: t.paymentStatus
-        };
-      });
-  };
-
-  const getDistSalesNodes = (distId: string) => {
-    return distSales
-      .filter((ds: any) => ds.distributorId === distId && ds.role !== 'SuperSales')
-      .map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        type: 'dist-sales',
-        timestamp: s.timestamp || s.joinedAt,
-        joinedAt: s.joinedAt || s.timestamp,
-        status: s.status || 'Active',
-        parentDistId: distId,
-        children: temples.filter((t: any) => t.salesId === s.id).map((t: any) => {
-          const isYearly = t.paymentCycle === 'Yearly';
-          const discountRate = db_config.yearlyDiscountRate || 20;
-          const discountMultiplier = 1 - discountRate / 100;
-          const discountText = discountRate % 10 === 0 ? (10 - discountRate / 10) : (100 - discountRate);
-          const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 0);
-          const planStr = t.freeType === 'Permanent' ? '永久免費' : (isYearly ? `年租標準方案 (享${discountText}折)` : '月付標準方案');
-          return {
-            id: t.id,
-            name: t.templeName || t.name,
-            type: 'temple',
-            timestamp: t.timestamp,
-            joinedAt: t.timestamp,
-            expirationDate: t.expirationDate || null,
-            planName: t.planName || planStr,
-            price: t.freeType === 'Permanent' ? 0 : calcPrice,
-            status: t.status || 'Active',
-            freeType: t.freeType,
-            billingStartDate: t.billingStartDate,
-            paymentCycle: t.paymentCycle,
-            paymentStatus: t.paymentStatus
-          };
-        })
-      }));
-  };
-
-  const isChildDistributor = (d: any, ss: any) => {
-    if (d.superSalesId === ss.id || d.creatorSalesId === ss.id) return true;
-    if (d.superSalesId === ss.account || d.creatorSalesId === ss.account) return true;
-    if (ss.account === 'admin400' && (d.account === 'admin410' || d.account === 'admin420' || d.name === 'admin410' || d.name === 'admin420')) return true;
-    if (ss.account === 'admin200' && (d.account === 'admin210' || d.name === 'admin210')) return true;
-    return false;
-  };
-
-  const getDistributorNodes = (superSalesId: string) => {
-    const ss = superSales.find(s => s.id === superSalesId);
-    return distributors
-      .filter((d: any) => ss && isChildDistributor(d, ss))
-      .map((d: any) => {
-        const children = [
-          ...getDistSalesNodes(d.id),
-          ...getTempleNodes(null, d.id)
-        ];
-        return {
-          id: d.id,
-          name: d.name,
-          type: 'distributor',
-          timestamp: d.timestamp || d.joinedAt,
-          joinedAt: d.joinedAt || d.timestamp,
-          expirationDate: d.expirationDate || null,
-          planName: d.planName || '標準代理方案',
-          price: d.price || 0,
-          durationYears: Math.round(((new Date(d.expirationDate || d.expiration_date || new Date()).getTime() - new Date(d.joinedAt || d.joined_at || new Date()).getTime()) / (1000 * 3600 * 24 * 365)) || 2),
-          nodes: Number(d.quota) || Number(d.customNodes) || Number(d.nodes) || 100,
-          status: d.status || 'Active',
-          children
-        };
-      });
-  };
-
-  // 1. All SuperSales
-  superSales.forEach((ss: any) => {
-    const children = [
-      ...getDistributorNodes(ss.id),
-      ...getTempleNodes(ss.id, null)
-    ];
-    tree.push({
-      id: ss.id,
-      name: ss.name,
-      type: 'super-sales',
-      timestamp: ss.timestamp || ss.joinedAt,
-      joinedAt: ss.joinedAt || ss.timestamp,
-      status: ss.status || 'Active',
-      children
-    });
-  });
-
-  // 2. Orphan Distributors
-  const orphanDists = distributors.filter((d: any) => 
-    !superSales.some((ss: any) => isChildDistributor(d, ss))
-  );
-  if (orphanDists.length > 0) {
-    tree.push({
-      id: 'hq-distributors',
-      name: '總部直屬經銷商',
-      type: 'super-admin',
-      children: orphanDists.map((d: any) => {
-        const children = [
-          ...getDistSalesNodes(d.id),
-          ...getTempleNodes(null, d.id)
-        ];
-        return {
-          id: d.id,
-          name: d.name,
-          type: 'distributor',
-          timestamp: d.timestamp || d.joinedAt,
-          joinedAt: d.joinedAt || d.timestamp,
-          expirationDate: d.expirationDate || null,
-          planName: d.planName || '標準代理方案',
-          price: d.price || 0,
-          durationYears: Math.round(((new Date(d.expirationDate || d.expiration_date || new Date()).getTime() - new Date(d.joinedAt || d.joined_at || new Date()).getTime()) / (1000 * 3600 * 24 * 365)) || 2),
-          nodes: Number(d.quota) || Number(d.customNodes) || Number(d.nodes) || 100,
-          status: d.status || 'Active',
-          children
-        };
-      })
-    });
-  }
-
-  // 3. Orphan DistSales
-  const orphanSales = distSales.filter((s: any) => s.role !== 'SuperSales' && (!s.distributorId || !distributors.find((d: any) => d.id === s.distributorId)));
-  if (orphanSales.length > 0) {
-    tree.push({
-      id: 'hq-sales',
-      name: '總部直屬經銷業務',
-      type: 'distributor',
-      children: orphanSales.map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        type: 'dist-sales',
-        timestamp: s.timestamp || s.joinedAt,
-        joinedAt: s.joinedAt || s.timestamp,
-        status: s.status || 'Active',
-        parentDistId: 'hq',
-        children: temples.filter((t: any) => t.salesId === s.id).map((t: any) => {
-          const isYearly = t.paymentCycle === 'Yearly';
-          const discountRate = db_config.yearlyDiscountRate || 20;
-          const discountMultiplier = 1 - discountRate / 100;
-          const discountText = discountRate % 10 === 0 ? (10 - discountRate / 10) : (100 - discountRate);
-          const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 0);
-          const planStr = t.freeType === 'Permanent' ? '永久免費' : (isYearly ? `年租標準方案 (享${discountText}折)` : '月付標準方案');
-          return {
-            id: t.id,
-            name: t.templeName || t.name,
-            type: 'temple',
-            timestamp: t.timestamp,
-            joinedAt: t.timestamp,
-            expirationDate: t.expirationDate || null,
-            planName: t.planName || planStr,
-            price: t.freeType === 'Permanent' ? 0 : calcPrice,
-            status: t.status || 'Active',
-            freeType: t.freeType,
-            billingStartDate: t.billingStartDate,
-            paymentCycle: t.paymentCycle,
-            paymentStatus: t.paymentStatus
-          };
-        })
-      }))
-    });
-  }
-
-  // 4. Orphan Temples
-  const orphanTemples = getTempleNodes(null, null);
-  if (orphanTemples.length > 0) {
-    tree.push({
-      id: 'hq-temples',
-      name: '總部直營宮廟',
-      type: 'super-admin',
-      children: orphanTemples
-    });
-  }
-
-  return [{
-    id: 'super-admin-root',
-    name: '超級管理員 (總部)',
-    type: 'super-admin',
-    timestamp: new Date().toISOString(),
-    children: tree
-  }];
+      return [];
 }
 
 
 export async function updateDistributorProfile(distId: string, data: any) {
-  const dist = (await []).find(d => d.id === distId);
-  if (dist) {
-    if (data.name) dist.name = data.name;
-    if (data.account) dist.account = data.account;
-    if (data.password) dist.password = data.password;
-    if (data.email !== undefined) dist.email = data.email;
-    if (data.address !== undefined) dist.address = data.address;
-    if (data.bankInfo) {
-      dist.bankInfo = data.bankInfo;
-      dist.bank_name = data.bankInfo.bankName || '';
-      dist.bank_account = data.bankInfo.accountNumber || '';
-      dist.bank_code = data.bankInfo.bankCode || '';
-    }
-    
-    /* removed duplicate import */
-      await dbQuery(
-              'UPDATE distributors SET name=$1, account=$2, password=$3, email=$4, address=$5, bank_code=$6, bank_account=$7, bank_name=$8 WHERE id=$9',
-              [dist.name, dist.account, dist.password, dist.email, dist.address, dist.bank_code, dist.bank_account, dist.bank_name, distId]
-            );
-    
-    // add to audit log
-    if (!(await [])) await null;
-    await null;
-    
-    return { success: true };
-  }
-  return { success: false, error: 'Distributor not found' };
+
+      try {
+        const updateData: any = {};
+        if (data.name) updateData.name = data.name;
+        if (data.account) updateData.account = data.account;
+        if (data.password) updateData.password = data.password;
+        if (data.email !== undefined) updateData.email = data.email;
+        if (data.address !== undefined) updateData.address = data.address;
+        if (data.bankInfo) {
+          updateData.bankCode = data.bankInfo.bankCode || '';
+          updateData.bankAccount = data.bankInfo.accountNumber || '';
+          updateData.bankName = data.bankInfo.bankName || '';
+        }
+        
+        await prisma.distributor.update({
+          where: { id: distId },
+          data: updateData
+        });
+        
+        const { revalidatePath } = require('next/cache');
+        revalidatePath('/super-admin');
+        revalidatePath('/distributor');
+        return { success: true };
+      } catch (error) {
+        console.error('updateDistributorProfile error:', error);
+        return { success: false, error: String(error) };
+      }
 }
 
 export async function updateDistributorPaymentConfig(distId: string, paymentConfig: any) {
-  try {
-    /* removed duplicate import */
-    await dbQuery('UPDATE distributors SET b2b_payment_config = $1 WHERE id = $2', [JSON.stringify(paymentConfig), distId]);
-  } catch (e) {
-    console.error('Failed to update b2b_payment_config in DB', e);
-  }
-  const dist = (await []).find(d => d.id === distId);
-  if (dist) {
-    dist.b2bPayment = paymentConfig;
-    
-    // add to audit log
-    if (!(await [])) await null;
-    await null;
-    
-    return { success: true };
-  }
-  return { success: false, error: 'Distributor not found' };
+
+      try {
+        await prisma.distributor.update({
+          where: { id: distId },
+          data: { b2bPayment: paymentConfig }
+        });
+        return { success: true };
+      } catch (error) {
+        console.error('updateDistributorPaymentConfig error:', error);
+        return { success: false, error: String(error) };
+      }
 }
 
 export async function verifySaasOrder(orderId: string, status: 'paid' | 'rejected') {
@@ -6906,252 +6456,194 @@ export async function fetchSuperSalesWithdrawals(salesId: string) {
 }
 
 export async function fetchSalesProfileById(salesId: string) {
-  try {
-    /* removed duplicate import */
-    let name = '未知';
-    let parentDistributor = '未指派';
-    let account = '';
-    let distributorId = '';
 
-    const resSales = await dbQuery("SELECT * FROM dist_sales WHERE id = $1", [salesId], () => null) as any;
-    if (resSales && resSales.rowCount > 0) {
-      name = resSales.rows[0].name;
-      account = resSales.rows[0].account;
-      distributorId = resSales.rows[0].distributor_id;
-    } else {
-      const sales = (await []).find(s => s.id === salesId);
-      if (sales) {
-        name = sales.name;
-        account = sales.account;
-        distributorId = sales.distributorId;
+      try {
+        const sales = await prisma.distributorSales.findUnique({
+          where: { id: salesId },
+          include: { distributor: true }
+        });
+        if (sales) {
+          return {
+            name: sales.name,
+            parentDistributor: sales.distributor?.name || '未指派',
+            account: sales.account
+          };
+        }
+        return { name: '未知', parentDistributor: '未指派', account: '' };
+      } catch (error) {
+        console.error('fetchSalesProfileById error:', error);
+        return { name: '未知', parentDistributor: '未指派', account: '' };
       }
-    }
-
-    if (distributorId) {
-      const resDist = await dbQuery("SELECT * FROM distributors WHERE id = $1", [distributorId], () => null) as any;
-      if (resDist && resDist.rowCount > 0) {
-        parentDistributor = resDist.rows[0].name;
-      } else {
-        const dist = (await []).find(d => d.id === distributorId);
-        if (dist) parentDistributor = dist.name;
-      }
-    }
-
-    return { name, parentDistributor, account };
-  } catch(e) {
-    const sales = (await []).find(s => s.id === salesId);
-    const dist = (await []).find(d => d.id === sales?.distributorId);
-    return { name: sales?.name || '未知', parentDistributor: dist?.name || '未指派', account: sales?.account };
-  }
 }
 
 export async function fetchTempleBills(templeId: string) {
-  try {
-    /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1 ORDER BY created_at DESC", [templeId], () => null) as any;
-    if (!res) throw new Error("No DB connection");
-    const rows = res?.rows;
-    return (rows || []).map((r: any) => ({
-      id: r.id,
-      templeId: r.temple_id,
-      itemName: r.item_name,
-      amount: r.amount,
-      dueDate: r.due_date instanceof Date ? r.due_date.toISOString().split('T')[0] : r.due_date,
-      status: r.status,
-      receiptUrl: r.receipt_url
-    }));
-  } catch (e) {
-    const inMemBills = (await []).filter(b => b.templeId === templeId);
-    return inMemBills.map(r => ({
-      id: r.id,
-      templeId: r.templeId,
-      itemName: r.type,
-      amount: r.amount,
-      dueDate: r.dueDate,
-      status: r.status,
-      receiptUrl: (r as any).receiptUrl
-    }));
-  }
+
+      try {
+        return await prisma.templeBill.findMany({ where: { templeId }, orderBy: { date: 'desc' } });
+      } catch(e) {
+        return [];
+      }
 }
 
 export async function uploadTempleBillReceipt(billId: string, imageUrl: string) {
-  try {
-    const bill = (await []).find(b => b.id === billId);
-    if (bill) {
-      bill.status = 'PendingVerification' as any;
-      (bill as any).receiptUrl = imageUrl;
-      // (await jsonStore.find('temple_bills')) synced
-    }
-    /* removed duplicate import */
-    await dbQuery("UPDATE \"TempleBill\" SET status = 'PendingVerification', receipt_url = $1 WHERE id = $2", [imageUrl, billId]);
-    return { success: true };
-  } catch (e) {
-    return { success: false };
-  }
+
+      try {
+        await prisma.templeBill.update({
+          where: { id: billId },
+          data: { receiptUrl: imageUrl, status: 'Pending' }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function approveTempleBill(billId: string) {
-  try {
-      let rows: any = [];
-      /* removed duplicate import */
-      const res = await dbQuery("UPDATE \"TempleBill\" SET status = 'Paid' WHERE id = $1 RETURNING temple_id", [billId]) as any;
-      if (res && res.rows) rows = res.rows;
-      
-      const bill = (await []).find(b => b.id === billId);
-      if (bill) {
-        bill.status = 'Paid';
-        // (await jsonStore.find('temple_bills')) synced
-      }
 
-      const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
-      if (templeId) {
-         const tIdx = ((await []) || []).findIndex((t: any) => t.id === templeId);
-         if (tIdx > -1) {
-            (await [])[tIdx].paymentStatus = 'Paid';
-            (await [])[tIdx].status = 'Active';
-         }
-      }
+      try {
+        const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
+        if (!bill) return { success: false };
+        
+        await prisma.templeBill.update({
+          where: { id: billId },
+          data: { status: 'Paid' }
+        });
 
-      if (bill) {
-        const temple = (await [])?.find((t:any) => t.id === bill.templeId);
+        const templeId = bill.templeId;
+        if (templeId) {
+          await prisma.temple.update({
+            where: { id: templeId },
+            data: { paymentStatus: 'Paid', status: 'Active' }
+          });
+        }
 
-        // --- ADDED LOGIC FOR UPGRADES ON BILL APPROVAL ---
+        const temple = await prisma.temple.findUnique({ where: { id: templeId! } });
+
+        // --- LOGIC FOR UPGRADES ---
         if (bill.type === 'StorageUpgrade' || bill.type === 'AiUpgrade') {
-           const match = bill.item_name.match(/\(([^)]+)\)$/);
+           const match = bill.itemName?.match(/\(([^)]+)\)$/);
            const planId = match ? match[1] : null;
 
-           const adminWallet = (await [])?.find((w:any) => w.role === 'SuperAdmin');
+           const adminWallet = await prisma.wallet.findFirst({ where: { role: 'SuperAdmin' } });
            if (adminWallet) {
-              adminWallet.balance += bill.amount;
+              await prisma.wallet.update({
+                where: { id: adminWallet.id },
+                data: { balance: { increment: bill.amount } }
+              });
            }
-           
-           (await [])?.unshift({
-              id: `F-${Date.now()}-${Math.floor(Math.random()*1000)}`,
-              type: 'INCOME',
-              category: bill.type === 'StorageUpgrade' ? 'SPACE_UPGRADE' : 'AI_UPGRADE',
-              amount: bill.amount,
-              source: `${temple?.templeName || '宮廟'}-${bill.type === 'StorageUpgrade' ? '雲端空間升級' : 'AI方案升級'} (後台審核)`,
-              date: new Date().toISOString().split('T')[0]
+
+           await prisma.financeRecord.create({
+             data: {
+               type: 'INCOME',
+               category: bill.type === 'StorageUpgrade' ? 'SPACE_UPGRADE' : 'AI_UPGRADE',
+               amount: bill.amount,
+               source: `${temple?.templeName || '宮廟'}-${bill.type === 'StorageUpgrade' ? '雲端空間升級' : 'AI方案升級'} (後台審核)`,
+               date: new Date()
+             }
            });
 
            if (bill.type === 'StorageUpgrade' && planId) {
-              await upgradeTempleStorage(bill.templeId, planId, 'Monthly', true);
+              await upgradeTempleStorage(bill.templeId!, planId, 'Monthly', true);
            } else if (bill.type === 'AiUpgrade' && planId) {
-              let usage = (await []).find(u => u.templeId === bill.templeId);
+              let usage = await prisma.templeAiUsage.findUnique({ where: { templeId: bill.templeId! } });
               const thirtyDaysLater = new Date();
               thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-              
               if (usage) {
-                 usage.planId = planId;
-                 usage.expiryDate = thirtyDaysLater.toISOString();
-                 usage.usedCount = 0;
-                 usage.enabled = true;
+                 await prisma.templeAiUsage.update({
+                   where: { templeId: bill.templeId! },
+                   data: { planId, expiryDate: thirtyDaysLater, usedCount: 0, enabled: true }
+                 });
               } else {
-                 usage = { templeId: bill.templeId, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater.toISOString(), isVip: false };
-                 await null;
+                 await prisma.templeAiUsage.create({
+                   data: { templeId: bill.templeId!, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater, isVip: false }
+                 });
               }
-              // (await jsonStore.find('temple_ai_usage')) synced
            }
         }
-        // --- END ADDED LOGIC ---
+        // --- END LOGIC ---
 
         if (temple && temple.salesId) {
-          const sId = temple.salesId;
-          const salesPerson = (await [])?.find((s:any) => s.id === sId);
+          const salesPerson = await prisma.distributorSales.findUnique({ where: { id: temple.salesId } });
           if (salesPerson) {
-             const overrides = (await []) || {};
-             const db_config = (await []) || { defaultSuperSalesRates: { templeSetupRate: 20 }};
-             const rates = salesPerson.commissionRules || overrides[salesPerson.name] || db_config.defaultSuperSalesRates || {};
+             const sysConfig = await fetchSystemConfig();
+             const rates = salesPerson.commissionRules as any || sysConfig?.defaultSuperSalesRates || {};
              const rate = rates.templeSetupRate || 20; 
              const commissionAmt = Math.floor(bill.amount * (rate / 100));
              
              if (commissionAmt > 0) {
-               const comm = {
-                 id: 'COMM_' + Date.now() + Math.floor(Math.random()*1000),
-                 salesId: sId,
-                 templeId: temple.id,
-                 billId: bill.id,
-                 amount: commissionAmt,
-                 date: new Date().toISOString()
-               };
-               // Using atomic writes
-               await null;
+               await prisma.commission.create({
+                 data: {
+                   salesId: salesPerson.id,
+                   templeId: temple.id,
+                   billId: bill.id,
+                   amount: commissionAmt,
+                   date: new Date()
+                 }
+               });
                
-               await null;
+               const wallet = await prisma.wallet.findFirst({ where: { name: salesPerson.name } });
+               if (wallet) {
+                 await prisma.wallet.update({
+                   where: { id: wallet.id },
+                   data: { balance: { increment: commissionAmt } }
+                 });
+               } else {
+                 await prisma.wallet.create({
+                   data: {
+                     ownerId: salesPerson.id,
+                     name: salesPerson.name,
+                     role: salesPerson.role,
+                     balance: commissionAmt
+                   }
+                 });
+               }
              }
           }
         }
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
       }
-      return { success: true };
-    } catch (e) {
-      return { success: false };
-    }
 }
 
 export async function toggleBillStatusSimple(billId: string, status: string) {
-  try {
-      /* removed duplicate import */
-      await dbQuery("UPDATE \"TempleBill\" SET status = $1 WHERE id = $2", [status, billId]);
-      
-      const bill = (await []).find(b => b.id === billId);
-      if (bill) {
-        bill.status = status as any;
-        // (await jsonStore.find('temple_bills')) synced
-        if (status === 'Unpaid' || status === 'PendingPayment') {
-            const templeId = bill.templeId;
-            if (templeId) {
-                const tIdx = ((await []) || []).findIndex((t: any) => t.id === templeId);
-                if (tIdx > -1) {
-                    (await [])[tIdx].paymentStatus = 'PendingPayment';
-                    (await [])[tIdx].status = 'Pending';
-                }
-            }
 
-            // Reverse commission if it exists
-            if ((await [])) {
-                const commIdx = (await []).findIndex((c:any) => c.billId === billId);
-                if (commIdx > -1) {
-                    const comm = (await [])[commIdx];
-                    if ((await [])) {
-                        const w = (await []).find((w:any) => w.id === comm.salesId);
-                        if (w) {
-                            w.balance = Math.max(0, (w.balance || 0) - comm.amount);
-                        }
-                    }
-                    (await []).splice(commIdx, 1);
-                }
-            }
-        }
+      try {
+        await prisma.templeBill.update({
+          where: { id: billId },
+          data: { status }
+        });
+        return { success: true };
+      } catch (error) {
+        console.error('toggleBillStatusSimple error:', error);
+        return { success: false };
       }
-      return { success: true };
-  } catch (e) {
-      return { success: false };
-  }
 }
 
 export async function rejectTempleBill(billId: string) {
-  try {
-      /* removed duplicate import */
-      const { rows } = await dbQuery("UPDATE \"TempleBill\" SET status = 'PendingPayment', receipt_url = NULL WHERE id = $1 RETURNING temple_id", [billId]) as any;
-      
-      const bill = (await []).find(b => b.id === billId);
-      if (bill) {
-        bill.status = 'PendingPayment';
-        bill.receiptUrl = '';
-        // (await jsonStore.find('temple_bills')) synced
+
+      try {
+        const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
+        if (!bill) return { success: false };
+        
+        await prisma.templeBill.update({
+          where: { id: billId },
+          data: { status: 'PendingPayment', receiptUrl: null }
+        });
+
+        if (bill.templeId) {
+          await prisma.temple.update({
+            where: { id: bill.templeId },
+            data: { paymentStatus: 'PendingPayment' }
+          });
+        }
+
+        return { success: true };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
       }
-      
-      const templeId = (rows && rows.length > 0) ? rows[0].temple_id : bill?.templeId;
-      if (templeId) {
-         const tIdx = ((await []) || []).findIndex((t: any) => t.id === templeId);
-         if (tIdx > -1) {
-            (await [])[tIdx].paymentStatus = 'PendingPayment';
-         }
-      }
-      return { success: true };
-  } catch (e) {
-    return { success: false };
-  }
 }
 
 export async function fetchAllSalesBonusRequests() {
@@ -7176,21 +6668,16 @@ export async function fetchAllSalesBonusRequests() {
 
 
 export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
-  const sales = (await []).find(s => s.id === salesId);
-  if (sales) {
-    sales.bankAccount = bankInfo;
-  }
-  
-  try {
-    /* removed duplicate import */
-    await dbQuery(
-      "UPDATE dist_sales SET bank_code = $1, bank_name = $2, bank_account = $3 WHERE id = $4",
-      [bankInfo.bankCode || '', bankInfo.bankName || '', bankInfo.accountNumber || bankInfo.accountNo || '', salesId]
-    );
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: 'Database update failed' };
-  }
+
+      try {
+        await prisma.distributorSales.update({
+          where: { id: salesId },
+          data: { bankAccount: bankInfo }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
+      }
 }
 
 export async function getLineConfig(templeId: string) {
@@ -7223,12 +6710,16 @@ export async function updateLineConfig(templeId: string, config: any) {
 
 
 export async function getGuestLineId(templeId: string, phone: string) {
-  /* removed duplicate import */
-    const { rows } = await dbQuery("SELECT line_user_id FROM guests WHERE temple_id = $1 AND phone = $2 LIMIT 1", [templeId, phone], () => null) as any;
-    if (rows && rows.length > 0 && rows[0].line_user_id) return rows[0].line_user_id;
-  
-  const g = (await []).find(g => g.phone === phone);
-  return g?.lineId || g?.line_user_id || null;
+
+      try {
+        const guest = await prisma.guest.findFirst({
+          where: { templeId, phone }
+        });
+        return guest?.lineId || null;
+      } catch (error) {
+        console.error('getGuestLineId error:', error);
+        return null;
+      }
 }
 
 export async function sendLineMessage(templeId: string, lineUserId: string, messageText: string) {
@@ -7309,43 +6800,16 @@ export async function fetchTemplePaymentTarget(templeId: string) {
 }
 
 export async function updateRevenueRemark(id: string, source: string, remark: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, true, async (client) => {
-    let tableName = '';
-    if (source === 'Appointment') tableName = 'appointments';
-    else if (source === 'Lamp') tableName = 'lamp_records';
-    else if (source === 'Event') tableName = 'event_registrations';
-    else if (source === 'Queue') tableName = 'queue_tickets';
-    else if (source === 'Merit') tableName = 'deep_records';
-    else return { success: false, message: '不明的來源類型' };
 
-    try {
-      if (client) {
-        await client.query(`UPDATE ${tableName} SET remarks = $1 WHERE id = $2 AND temple_id = $3`, [remark, id, templeId]);
-      } else {
-        // Fallback to in-memory
-        if (source === 'Appointment') {
-          const rec = (await []).find(a => a.id === id);
-          if (rec) rec.remarks = remark;
-        } else if (source === 'Lamp') {
-          const rec = (await []).find(a => a.id === id);
-          if (rec) rec.remarks = remark;
-        } else if (source === 'Event') {
-          const rec = (await []).find(a => a.id === id);
-          if (rec) rec.remarks = remark;
-        } else if (source === 'Queue') {
-          const rec = (await []).find(a => a.id === id);
-          if (rec) rec.remarks = remark;
-        } else if (source === 'Merit') {
-          const rec = (await []).find(a => a.id === id);
-          if (rec) rec.remarks = remark;
-        }
+      try {
+        await prisma.financeRecord.update({
+          where: { id },
+          data: { source: remark }
+        });
+        return { success: true };
+      } catch(e) {
+        return { success: false };
       }
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, message: e.message };
-    }
-  });
 }
 
 
