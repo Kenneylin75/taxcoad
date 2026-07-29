@@ -165,6 +165,7 @@ model Temple {
   lampCategories      LampCategory[]
   lampRecords         LampRecord[]
   queueEvents         QueueEvent[]
+  queueTickets        QueueTicket[]
   adminNotifs         AdminNotification[]
   services            Service[]
   serviceSettings     ServiceSetting[]
@@ -320,8 +321,8 @@ model SystemConfig {
 
 model Guest {
   id            String   @id @default(cuid())
-  templeId      String?  @map("temple_id")
-  phone         String   @unique
+  templeId      String   @map("temple_id")
+  phone         String
   name          String
   gender        String?
   birthday      String?
@@ -339,24 +340,32 @@ model Guest {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  temple       Temple?             @relation(fields: [templeId], references: [id])
+  temple       Temple              @relation(fields: [templeId], references: [id])
   appointments Appointment[]
   lampRecords  LampRecord[]
   eventRegs    EventRegistration[]
   queueTickets QueueTicket[]
   adminNotifs  AdminNotification[]
   guestFiles   GuestFile[]
+  deepRecords  DeepRecord[]
+  activities   Activity[]
 
+  @@unique([templeId, phone])
   @@map("guests")
 }
 
 model GuestFile {
-  id        String   @id @default(cuid())
-  guestId   String?  @map("guest_id")
-  fileUrl   String?  @map("file_url")
-  fileName  String?  @map("file_name")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(cuid())
+  templeId   String   @map("temple_id")
+  guestId    String?  @map("guest_id")
+  phone      String?
+  url        String?
+  type       String?
+  name       String?
+  folder     String?
+  uploadedBy String?  @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   guest Guest? @relation(fields: [guestId], references: [id])
 
@@ -365,6 +374,8 @@ model GuestFile {
 
 model DeepRecord {
   id         String   @id @default(cuid())
+  templeId   String   @map("temple_id")
+  guestId    String?  @map("guest_id")
   phone      String?
   category   String?
   content    String?
@@ -374,11 +385,14 @@ model DeepRecord {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
+  guest      Guest?   @relation(fields: [guestId], references: [id])
   @@map("deep_records")
 }
 
 model Activity {
   id        String   @id @default(cuid())
+  templeId  String   @map("temple_id")
+  guestId   String?  @map("guest_id")
   phone     String?
   type      String?
   content   String?
@@ -386,7 +400,8 @@ model Activity {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("activitys")
+  guest     Guest?   @relation(fields: [guestId], references: [id])
+  @@map("activities")
 }
 
 // ---------------------------------------------------------------------
@@ -562,7 +577,10 @@ model LampRecord {
   paymentStatus   String   @default("Pending") @map("payment_status")
   paymentProofUrl String?  @map("payment_proof_url")
   remarks         String?
-  expiryDate      String?  @map("expiry_date")
+  position        String?
+  startDate       DateTime? @map("start_date")
+  durationDays    Int      @default(365) @map("duration_days")
+  expiryDate      DateTime? @map("expiry_date")
   status          String   @default("Pending")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -654,17 +672,21 @@ model QueueTicket {
   eventId     String?  @map("event_id")
   guestId     String?  @map("guest_id")
   guestName   String?  @map("guest_name")
-  phone       String?
-  displayNum  String?  @map("display_num")
-  paymentRef  String?  @map("payment_ref")
-  remarks     String?
-  actualOrder Int      @default(0) @map("actual_order")
-  status      String   @default("Queuing")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  phone         String?
+  eventTitle    String?  @map("event_title")
+  displayNum    String?  @map("display_num")
+  assignedNumber String? @map("assigned_number")
+  paymentStatus String?  @map("payment_status")
+  paymentRef    String?  @map("payment_ref")
+  remarks       String?
+  actualOrder   Int      @default(0) @map("actual_order")
+  status        String   @default("Queuing")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   queueEvent QueueEvent? @relation(fields: [eventId], references: [id])
   guest      Guest?      @relation(fields: [guestId], references: [id])
+  temple     Temple?     @relation(fields: [templeId], references: [id])
 
   @@map("queue_tickets")
 }

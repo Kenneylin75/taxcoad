@@ -76,6 +76,7 @@ function LampManagementContent() {
   const [lampGuestName, setLampGuestName] = useState<string>('');
   const [price, setPrice] = useState<number>(0);
   const [duration, setDuration] = useState<number>(365);
+  const [selectedPosition, setSelectedPosition] = useState<string>('');
   
   const [isSearchingGuest, setIsSearchingGuest] = useState(false);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
@@ -153,7 +154,8 @@ function LampManagementContent() {
       categoryId: selectedCategory,
       categoryName: categories.find(c => c.id === selectedCategory)?.name || '未定義',
       price: price,
-      startDate: new Date().toISOString().split('T')[0],
+      position: selectedPosition,
+      startDate: new Date().toISOString(),
       durationDays: duration
     });
     if (res.success) {
@@ -172,6 +174,7 @@ function LampManagementContent() {
     setLampGuestName('');
     setPrice(0);
     setDuration(365);
+    setSelectedPosition('');
     setShowQuickCreate(false);
     setNewGuestData({ name: '', phone: '' });
   };
@@ -255,7 +258,7 @@ function LampManagementContent() {
            {filteredRecords.map((record) => {
               const catIdx = categories.findIndex(c => c.id === record.categoryId);
               const styles = getUIStyles(catIdx === -1 ? 0 : catIdx);
-              const start = new Date(record.startDate || '');
+              const start = record.startDate ? new Date(record.startDate) : new Date(record.createdAt || Date.now());
               const now = new Date();
               const totalDays = record.durationDays || categories.find(c => c.id === record.categoryId)?.durationDays || 365;
               const isActiveAndPaid = record.status === 'Active' && record.paymentStatus === 'Paid';
@@ -382,12 +385,18 @@ function LampManagementContent() {
 
            <div className="relative z-10 grid grid-cols-8 sm:grid-cols-12 md:grid-cols-20 lg:grid-cols-25 gap-2 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
               {[...Array(selectedCategoryFilter ? (categories.find(c => c.id === selectedCategoryFilter)?.totalSlots || 500) : 1000)].map((_, i) => {
-                 const record = filteredRecords[i];
+                 const posStr = (i + 1).toString();
+                 let record: any = null;
+                 if (selectedCategoryFilter) {
+                   record = filteredRecords.find(r => r.categoryId === selectedCategoryFilter && r.position === posStr);
+                 } else {
+                   record = filteredRecords.find(r => r.position === posStr) || filteredRecords[i];
+                 }
                  const catIdx = record ? categories.findIndex(c => c.id === record.categoryId) : -1;
                  const styles = getUIStyles(catIdx === -1 ? 0 : catIdx);
                  return (
-                   <div key={i} className={`aspect-square rounded-md flex items-center justify-center text-[10px] transition-all cursor-pointer relative group ${record ? 'bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-pulse hover:scale-150 z-20' : 'bg-white border-2 border-slate-100 hover:border-indigo-200 hover:shadow-inner'}`}>
-                      {record ? '🕯️' : ''}
+                   <div key={i} onClick={() => { if(!record) { setSelectedPosition(posStr); setIsModalOpen(true); } }} className={`aspect-square rounded-md flex items-center justify-center text-[10px] transition-all cursor-pointer relative group ${record ? 'bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-pulse hover:scale-150 z-20' : 'bg-white border-2 border-slate-100 hover:border-indigo-200 hover:shadow-inner'}`}>
+                      {record ? '🕯️' : <span className="opacity-30 font-bold text-[8px]">{posStr}</span>}
                       {record && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 bg-slate-900 text-white p-4 rounded-2xl shadow-3xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-[100] border-2 border-white/10 scale-75 group-hover:scale-100 origin-bottom">
                            <div className="flex items-center gap-3 mb-2">
@@ -472,7 +481,11 @@ function LampManagementContent() {
                      <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pt-10 border-t-2 border-slate-50">
                         <div className="space-y-6">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Step 2. 配置服務類別與點燈人</label>
-                           <div className="grid grid-cols-1 gap-6">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-2">
+                                 <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-4">選定燈號位置</label>
+                                 <input type="text" value={selectedPosition} onChange={(e) => setSelectedPosition(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-8 py-5 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" placeholder="例如：1 (空白則自動分配)" />
+                              </div>
                               <div className="space-y-2">
                                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-4">點燈人姓名 (家人)</label>
                                  <input type="text" value={lampGuestName} onChange={(e) => setLampGuestName(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[30px] px-8 py-5 text-xl font-black outline-none focus:border-indigo-600 shadow-inner" placeholder={`預設為：${selectedGuest.name}`} />
