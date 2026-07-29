@@ -6915,8 +6915,100 @@ export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
 
 
 export async function fetchDataBridgeTree() {
+  try {
+    const rootNodes: any[] = [];
+    
+    // SuperAdmin Node (HQ)
+    const hqNode: any = {
+      id: 'HQ',
+      name: '系統總部 (Super Admin)',
+      type: 'super-admin',
+      children: []
+    };
+    rootNodes.push(hqNode);
 
-      return [];
+    // Fetch all entities
+    const superSales = await prisma.user.findMany({ where: { role: 'SuperSales' } });
+    const distributors = await prisma.distributor.findMany();
+    const distSales = await prisma.distributorSales.findMany();
+    const temples = await prisma.temple.findMany();
+
+    const superSalesNodes = superSales.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      type: 'super-sales',
+      timestamp: s.createdAt.toISOString(),
+      children: []
+    }));
+
+    const distNodes = distributors.map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      type: 'distributor',
+      timestamp: d.createdAt.toISOString(),
+      nodes: d.quota,
+      children: []
+    }));
+
+    const distSalesNodes = distSales.map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      type: 'dist-sales',
+      timestamp: d.createdAt.toISOString(),
+      children: []
+    }));
+
+    const templeNodes = temples.map((t: any) => ({
+      id: t.id,
+      name: t.name || t.templeName || '未知宮廟',
+      type: 'temple',
+      timestamp: t.createdAt.toISOString()
+    }));
+
+    // Build hierarchy
+    templeNodes.forEach((tNode: any) => {
+      const temple = temples.find((t: any) => t.id === tNode.id);
+      if (temple?.salesId) {
+        const parent = distSalesNodes.find(ds => ds.id === temple.salesId);
+        if (parent) parent.children.push(tNode);
+        else hqNode.children.push(tNode);
+      } else if (temple?.distributorId) {
+        const parent = distNodes.find(d => d.id === temple.distributorId);
+        if (parent) parent.children.push(tNode);
+        else hqNode.children.push(tNode);
+      } else if (temple?.superSalesId) {
+        const parent = superSalesNodes.find(ss => ss.id === temple.superSalesId);
+        if (parent) parent.children.push(tNode);
+        else hqNode.children.push(tNode);
+      } else {
+        hqNode.children.push(tNode);
+      }
+    });
+
+    distSalesNodes.forEach((dsNode: any) => {
+      const ds = distSales.find((d: any) => d.id === dsNode.id);
+      if (ds?.distributorId) {
+        const parent = distNodes.find(d => d.id === ds.distributorId);
+        if (parent) parent.children.push(dsNode);
+        else hqNode.children.push(dsNode);
+      } else {
+        hqNode.children.push(dsNode);
+      }
+    });
+
+    distNodes.forEach((dNode: any) => {
+      hqNode.children.push(dNode);
+    });
+
+    superSalesNodes.forEach((ssNode: any) => {
+      hqNode.children.push(ssNode);
+    });
+
+    return rootNodes;
+  } catch (e) {
+    console.error("fetchDataBridgeTree error:", e);
+    return [];
+  }
 }
 
 
