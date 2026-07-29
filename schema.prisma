@@ -428,6 +428,8 @@ model Service {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+  slots         Slot[]
+  appointments  Appointment[]
 
   @@map("services")
 }
@@ -510,6 +512,7 @@ model Slot {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
+  service Service? @relation(fields: [boundServiceId], references: [id])
 
   @@map("slots")
 }
@@ -537,6 +540,7 @@ model Appointment {
 
   temple Temple @relation(fields: [templeId], references: [id])
   guest  Guest? @relation(fields: [guestId], references: [id])
+  serviceRef Service? @relation(fields: [serviceId], references: [id])
 
   @@map("appointments")
 }

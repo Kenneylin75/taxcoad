@@ -853,62 +853,89 @@ export async function fetchAppointments() {
 
 // 5. 抓取與儲存服務項目
 export async function fetchServiceDefinitions() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS services (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL,
-          name VARCHAR(255) NOT NULL,
-          price INTEGER DEFAULT 0,
-          duration VARCHAR(50),
-          description TEXT,
-          color VARCHAR(50),
-          status VARCHAR(50) DEFAULT 'Active',
-          assigned_staff TEXT[],
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      await client.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0');
-      const res = await client.query('SELECT * FROM services WHERE temple_id = $1', [templeId]);
-      if (res.rowCount === 0) {
-              return [];
-            }
-      return JSON.parse(JSON.stringify(res.rows.map(r => ({ id: r.id, templeId: r.temple_id, name: r.name, price: r.price !== undefined && r.price !== null ? Number(r.price) : 0, duration: r.duration, description: r.description, color: r.color, status: r.status, assignedStaff: r.assigned_staff || [] }))));
-  });
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+    const services = await prisma.service.findMany({
+      where: { templeId }
+    });
+    return services.map(r => ({
+      id: r.id,
+      templeId: r.templeId,
+      name: r.name,
+      price: r.price,
+      duration: r.duration || '',
+      description: r.description || '',
+      color: r.color || '#6366f1',
+      status: r.status,
+      assignedStaff: r.assignedStaff ? JSON.parse(JSON.stringify(r.assignedStaff)) : []
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export async function saveServiceDefinition(data: any) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const id = data.id || `s-${Date.now()}`;
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
     const newColor = data.color || '#6366f1';
     
-    const res = await client.query('SELECT 1 FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
-      if (res.rowCount > 0) {
-              await client.query(
-                'UPDATE services SET name = $1, price = $2, duration = $3, description = $4, color = $5, assigned_staff = $6, status = $7 WHERE id = $8 AND temple_id = $9',
-                [data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active', id, templeId]
-              );
-            } else {
-              await client.query(
-                'INSERT INTO services (id, temple_id, name, price, duration, description, color, assigned_staff, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                [id, templeId, data.name, data.price || 0, data.duration || '', data.description || '', newColor, data.assignedStaff || [], data.status || 'Active']
-              );
-            }
+    if (data.id) {
+      await prisma.service.updateMany({
+        where: { id: data.id, templeId },
+        data: {
+          name: data.name,
+          price: data.price || 0,
+          duration: data.duration || '',
+          description: data.description || '',
+          color: newColor,
+          assignedStaff: data.assignedStaff || [],
+          status: data.status || 'Active'
+        }
+      });
+    } else {
+      const id = `s-${Date.now()}`;
+      await prisma.service.create({
+        data: {
+          id,
+          templeId,
+          name: data.name,
+          price: data.price || 0,
+          duration: data.duration || '',
+          description: data.description || '',
+          color: newColor,
+          assignedStaff: data.assignedStaff || [],
+          status: data.status || 'Active'
+        }
+      });
+    }
+    
     await revalidateTemple();
     await logSystemEvent('SUCCESS', '設定服務項目', `服務名稱：${data.name}`, '管理員', templeId);
     return { success: true };
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function deleteServiceDefinition(id: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('DELETE FROM services WHERE id = $1 AND temple_id = $2', [id, templeId]);
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    
+    await prisma.service.deleteMany({
+      where: { id, templeId }
+    });
+    
     await revalidateTemple();
     return { success: true };
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 6. 抓取與儲存表單
