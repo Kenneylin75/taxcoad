@@ -162,6 +162,7 @@ model Temple {
   guests              Guest[]
   leaveRecords        LeaveRecord[]
   appointments        Appointment[]
+  paymentConfig       TemplePaymentConfig?
   events              Event[]
   eventRegistrations  EventRegistration[]
   lampCategories      LampCategory[]
@@ -173,7 +174,6 @@ model Temple {
   serviceSettings     ServiceSetting[]
   printTemplates      PrintTemplate[]
   forms               Form[]
-  paymentConfigs      TemplePaymentConfig[]
   slots               Slot[]
   templeBills         TempleBill[]
   templeStorages      TempleStorage[]
@@ -479,15 +479,15 @@ model Form {
 }
 
 model TemplePaymentConfig {
-  id                   String   @id @default(cuid())
-  templeId             String   @map("temple_id")
-  ecpayHashKey         String?  @map("ecpay_hash_key")
-  ecpayHashIv          String?  @map("ecpay_hash_iv")
-  ecpayMerchantId      String?  @map("ecpay_merchant_id")
-  linepayChannelId     String?  @map("linepay_channel_id")
-  linepayChannelSecret String?  @map("linepay_channel_secret")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  templeId       String   @unique @map("temple_id")
+  linePay        Json     @default("{}") @map("line_pay")
+  thirdParty     Json     @default("{}") @map("third_party")
+  customTransfer Json     @default("{}") @map("custom_transfer")
+  customQR       Json     @default("{}") @map("custom_qr")
+  cash           Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -908,3 +908,5 @@ model LeaveRecord {
 
   @@map("leave_records")
 }
+
+

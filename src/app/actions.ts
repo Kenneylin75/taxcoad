@@ -1115,45 +1115,90 @@ export interface TemplePaymentConfig {
   };
 }
 
-export async function fetchPaymentConfig() {
+export async function fetchPaymentConfig(): Promise<TemplePaymentConfig> {
   const templeId = await getDynamicTempleId();
-  const config = [].find(c => c.templeId === templeId);
-  if (config) {
-    if (!config.cash) {
-      config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
-    }
-    ['linePay', 'thirdParty', 'customTransfer', 'customQR'].forEach(key => {
-      if (config[key] && config[key].allowBooking === undefined) {
-        config[key].allowBooking = true;
-        config[key].allowLamp = true;
-        config[key].allowEvent = true;
-        config[key].allowQueue = true;
-      }
-    });
-    return config;
+  if (!templeId) {
+    return {
+      templeId: '',
+      cash: { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+      linePay: { enabled: false, channelId: '', channelSecret: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+      thirdParty: { enabled: false, provider: '', merchantId: '', hashKey: '', hashIV: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+      customTransfer: { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+      customQR: { enabled: false, qrImageUrl: '', description: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true }
+    };
   }
 
-  // 強制預設僅開啟現場現金付款
+  const record = await prisma.templePaymentConfig.findUnique({
+    where: { templeId }
+  });
+
+  if (record) {
+    const config = {
+      templeId,
+      linePay: (record.linePay as any) || { enabled: false, channelId: '', channelSecret: '' },
+      thirdParty: (record.thirdParty as any) || { enabled: false, provider: '', merchantId: '', hashKey: '', hashIV: '' },
+      customTransfer: (record.customTransfer as any) || { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '' },
+      customQR: (record.customQR as any) || { enabled: false, qrImageUrl: '', description: '' },
+      cash: (record.cash as any) || { enabled: true, description: '現場現金付款' }
+    };
+
+    if (!config.cash.enabled && config.cash.description === undefined) {
+      config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
+    }
+
+    ['linePay', 'thirdParty', 'customTransfer', 'customQR'].forEach(key => {
+      const k = key as keyof typeof config;
+      if (config[k] && (config[k] as any).allowBooking === undefined) {
+        (config[k] as any).allowBooking = true;
+        (config[k] as any).allowLamp = true;
+        (config[k] as any).allowEvent = true;
+        (config[k] as any).allowQueue = true;
+      }
+    });
+
+    return config as TemplePaymentConfig;
+  }
+
   return {
-    templeId: templeId,
+    templeId,
     cash: { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-    linePay: { enabled: false },
-    thirdParty: { enabled: false },
-    customTransfer: { enabled: false },
-    customQR: { enabled: false }
-  } as TemplePaymentConfig;
+    linePay: { enabled: false, channelId: '', channelSecret: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+    thirdParty: { enabled: false, provider: '', merchantId: '', hashKey: '', hashIV: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+    customTransfer: { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
+    customQR: { enabled: false, qrImageUrl: '', description: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true }
+  };
 }
 
 export async function savePaymentConfig(data: TemplePaymentConfig) {
-  const templeId = await getDynamicTempleId();
-  const idx = [].findIndex(c => c.templeId === templeId);
-  if (idx > -1) {
-    [][idx] = { ...data, templeId };
-  } else {
-    await null;
-  }
-  await revalidateTemple();
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+
+    await prisma.templePaymentConfig.upsert({
+      where: { templeId },
+      update: {
+        linePay: data.linePay as any,
+        thirdParty: data.thirdParty as any,
+        customTransfer: data.customTransfer as any,
+        customQR: data.customQR as any,
+        cash: data.cash as any
+      },
+      create: {
+        templeId,
+        linePay: data.linePay as any,
+        thirdParty: data.thirdParty as any,
+        customTransfer: data.customTransfer as any,
+        customQR: data.customQR as any,
+        cash: data.cash as any
+      }
+    });
+
+    await revalidateTemple();
     return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function executeEmergencyReschedule(formData: FormData) {
