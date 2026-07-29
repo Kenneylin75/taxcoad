@@ -163,7 +163,7 @@ export async function getCurrentUser() {
 
   if (templeId) {
     let person: any = null;
-    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND \"templeId\" = $2", [account.toLowerCase(), templeId]) as any;
+    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND temple_id = $2", [account.toLowerCase(), templeId]) as any;
     if (resPerson && resPerson.rowCount > 0) {
       person = resPerson.rows[0];
     }
@@ -217,7 +217,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
 
   if (targetTempleId) {
     let person = null;
-    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND password = $2 AND \"templeId\" = $3", [searchAccount, password, targetTempleId]) as any;
+    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND password = $2 AND temple_id = $3", [searchAccount, password, targetTempleId]) as any;
     if (resPerson && resPerson.rowCount > 0) {
       person = resPerson.rows[0];
       person.templeId = person.temple_id;
