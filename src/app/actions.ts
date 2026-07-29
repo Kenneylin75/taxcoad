@@ -6262,74 +6262,59 @@ export interface TempleNotification {
   content: string;
   sendTime: string; // ISO string
   createdAt: string; // ISO string
+  guestId?: string | null;
 }
 
 // migrated (await jsonStore.find('temple_notifications')) to (await jsonStore.find('temple_notifications'))
 // (await jsonStore.find('temple_notifications')) synced
 
 // 1. 創立通知資料表與發佈公告
-export async function createNotification(title: string, content: string, sendTime: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const newId = `n-${Date.now()}`;
-    const newNotif = {
-      id: newId,
-      title,
-      content,
-      sendTime: new Date(sendTime).toISOString(),
-      createdAt: new Date().toISOString()
-    };
+export async function createNotification(title: string, content: string, sendTime: string, guestId?: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
 
-    await null;
-    // (await jsonStore.find('temple_notifications')) synced
-
-    if (client) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS temple_notifications (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          title VARCHAR(255) NOT NULL,
-          content TEXT NOT NULL,
-          send_time TIMESTAMP WITH TIME ZONE NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      await client.query(`
-        INSERT INTO temple_notifications (id, temple_id, title, content, send_time, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [newId, templeId, title, content, newNotif.sendTime, newNotif.createdAt]);
-    }
+    await prisma.templeNotification.create({
+      data: {
+        templeId,
+        title,
+        content,
+        sendTime: new Date(sendTime),
+        guestId: guestId || null
+      }
+    });
 
     await revalidateTemple();
     return { success: true };
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 2. 獲取所有通知紀錄（管理端：含定時預排通知）
 export async function fetchTempleNotifications(): Promise<TempleNotification[]> {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS temple_notifications (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          title VARCHAR(255) NOT NULL,
-          content TEXT NOT NULL,
-          send_time TIMESTAMP WITH TIME ZONE NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      const res = await client.query('SELECT * FROM temple_notifications WHERE temple_id = $1 ORDER BY send_time DESC', [templeId]);
-      return res.rows.map(r => ({
-              id: r.id,
-              title: r.title,
-              content: r.content,
-              sendTime: r.send_time instanceof Date ? r.send_time.toISOString() : r.send_time,
-              createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
-            }));
-  });
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+
+    const notifs = await prisma.templeNotification.findMany({
+      where: { templeId },
+      orderBy: { sendTime: 'desc' }
+    });
+
+    return notifs.map(n => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      sendTime: n.sendTime.toISOString(),
+      createdAt: n.createdAt.toISOString(),
+      guestId: n.guestId
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 // 3. 獲取最新的一則已發送公告（信眾端首頁）
@@ -6340,32 +6325,32 @@ export async function fetchLatestNotificationForGuest(): Promise<TempleNotificat
 
 // 4. 獲取所有已發送公告（信眾端歷史對話框）
 export async function fetchActiveNotificationsForGuest(): Promise<TempleNotification[]> {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+
     const now = new Date();
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS temple_notifications (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          title VARCHAR(255) NOT NULL,
-          content TEXT NOT NULL,
-          send_time TIMESTAMP WITH TIME ZONE NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      const res = await client.query(
-              'SELECT * FROM temple_notifications WHERE temple_id = $1 AND send_time <= $2 ORDER BY send_time DESC',
-              [templeId, now.toISOString()]
-            );
-      return res.rows.map(r => ({
-              id: r.id,
-              title: r.title,
-              content: r.content,
-              sendTime: r.send_time instanceof Date ? r.send_time.toISOString() : r.send_time,
-              createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
-            }));
-  });
+    const notifs = await prisma.templeNotification.findMany({
+      where: { 
+        templeId,
+        sendTime: { lte: now },
+        guestId: null // Global broadcasts only for now
+      },
+      orderBy: { sendTime: 'desc' }
+    });
+
+    return notifs.map(n => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      sendTime: n.sendTime.toISOString(),
+      createdAt: n.createdAt.toISOString(),
+      guestId: n.guestId
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 

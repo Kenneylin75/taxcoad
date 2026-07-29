@@ -351,6 +351,7 @@ model Guest {
   guestFiles   GuestFile[]
   deepRecords  DeepRecord[]
   activities   Activity[]
+  templeNotifications TempleNotification[]
 
   @@unique([templeId, phone])
   @@map("guests")
@@ -850,13 +851,17 @@ model AdminNotification {
 
 model TempleNotification {
   id        String   @id @default(cuid())
-  templeId  String?  @map("temple_id")
-  content   String?
+  templeId  String   @map("temple_id")
+  guestId   String?  @map("guest_id")
+  title     String
+  content   String
+  sendTime  DateTime @map("send_time")
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  temple Temple? @relation(fields: [templeId], references: [id])
+  temple Temple @relation(fields: [templeId], references: [id])
+  guest  Guest? @relation(fields: [guestId], references: [id])
 
   @@map("temple_notifications")
 }
