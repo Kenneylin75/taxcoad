@@ -1157,8 +1157,41 @@ export async function savePaymentConfig(data: TemplePaymentConfig) {
 }
 
 export async function executeEmergencyReschedule(formData: FormData) {
-  await revalidateTemple();
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+
+    const staff = formData.get('staff') as string;
+    const startDate = formData.get('start') as string;
+    const endDate = formData.get('end') as string;
+    const reason = formData.get('reason') as string || '突發請假';
+
+    if (!staff || !startDate || !endDate) return { success: false, message: '參數錯誤' };
+
+    await prisma.leaveRecord.create({
+      data: { templeId, staff, startDate, endDate, reason }
+    });
+
+    await prisma.slot.deleteMany({
+      where: { templeId, staff, date: { gte: startDate, lte: endDate }, status: 'Available' }
+    });
+
+    await prisma.appointment.updateMany({
+      where: { templeId, staff, date: { gte: startDate, lte: endDate }, status: { in: ['Pending', 'Confirmed'] } },
+      data: { status: 'Cancelled' }
+    });
+
+    await prisma.slot.updateMany({
+      where: { templeId, staff, date: { gte: startDate, lte: endDate }, status: 'Booked' },
+      data: { status: 'Unavailable' }
+    });
+
+    await revalidateTemple();
     return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // --- 其餘輔助函式 ---

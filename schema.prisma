@@ -160,6 +160,7 @@ model Temple {
 
   users               User[]
   guests              Guest[]
+  leaveRecords        LeaveRecord[]
   appointments        Appointment[]
   events              Event[]
   eventRegistrations  EventRegistration[]
@@ -882,4 +883,23 @@ model SalesTool {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("sales_tools")
+}
+
+// ---------------------------------------------------------------------
+// 請假與排程休假 (Leave & Scheduling)
+// ---------------------------------------------------------------------
+
+model LeaveRecord {
+  id          String   @id @default(cuid())
+  templeId    String   @map("temple_id")
+  staff       String
+  startDate   String   @map("start_date")
+  endDate     String   @map("end_date")
+  reason      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("leave_records")
 }
