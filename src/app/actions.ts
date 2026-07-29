@@ -6918,14 +6918,10 @@ export async function fetchDataBridgeTree() {
   try {
     const rootNodes: any[] = [];
     
-    // SuperAdmin Node (HQ)
-    const hqNode: any = {
-      id: 'HQ',
-      name: '系統總部 (Super Admin)',
-      type: 'super-admin',
-      children: []
-    };
-    rootNodes.push(hqNode);
+    const hqTempleNode: any = { id: 'HQ-Temple', name: '總部直營宮廟', type: 'super-admin', children: [] };
+    const hqSuperSalesNode: any = { id: 'HQ-SuperSales', name: '超級管理員(總部)', type: 'super-admin', children: [] };
+    const hqDistributorNode: any = { id: 'HQ-Distributor', name: '總部直屬經銷商', type: 'super-admin', children: [] };
+    const hqDistSalesNode: any = { id: 'HQ-DistSales', name: '總部直屬經銷業務', type: 'super-admin', children: [] };
 
     // Fetch all entities
     const superSales = await prisma.user.findMany({ where: { role: 'SuperSales' } });
@@ -6937,7 +6933,8 @@ export async function fetchDataBridgeTree() {
       id: s.id,
       name: s.name,
       type: 'super-sales',
-      timestamp: s.createdAt.toISOString(),
+      joinedAt: s.createdAt.toISOString(),
+      status: s.status,
       children: []
     }));
 
@@ -6945,8 +6942,12 @@ export async function fetchDataBridgeTree() {
       id: d.id,
       name: d.name,
       type: 'distributor',
-      timestamp: d.createdAt.toISOString(),
+      joinedAt: d.createdAt.toISOString(),
+      status: d.status,
+      planName: d.name ? '標準經銷方案' : '標準經銷方案',
+      price: d.setupFee || 1600000,
       nodes: d.quota,
+      expirationDate: new Date(new Date(d.createdAt).setFullYear(new Date(d.createdAt).getFullYear() + 2)).toISOString(),
       children: []
     }));
 
@@ -6954,7 +6955,8 @@ export async function fetchDataBridgeTree() {
       id: d.id,
       name: d.name,
       type: 'dist-sales',
-      timestamp: d.createdAt.toISOString(),
+      joinedAt: d.createdAt.toISOString(),
+      status: d.status,
       children: []
     }));
 
@@ -6962,7 +6964,10 @@ export async function fetchDataBridgeTree() {
       id: t.id,
       name: t.name || t.templeName || '未知宮廟',
       type: 'temple',
-      timestamp: t.createdAt.toISOString()
+      joinedAt: t.createdAt.toISOString(),
+      status: t.status,
+      planName: t.monthlyRent > 0 ? '月付標準方案' : '永久免費',
+      price: t.monthlyRent || 0
     }));
 
     // Build hierarchy
@@ -6971,17 +6976,17 @@ export async function fetchDataBridgeTree() {
       if (temple?.salesId) {
         const parent = distSalesNodes.find(ds => ds.id === temple.salesId);
         if (parent) parent.children.push(tNode);
-        else hqNode.children.push(tNode);
+        else hqTempleNode.children.push(tNode);
       } else if (temple?.distributorId) {
         const parent = distNodes.find(d => d.id === temple.distributorId);
         if (parent) parent.children.push(tNode);
-        else hqNode.children.push(tNode);
+        else hqTempleNode.children.push(tNode);
       } else if (temple?.superSalesId) {
         const parent = superSalesNodes.find(ss => ss.id === temple.superSalesId);
         if (parent) parent.children.push(tNode);
-        else hqNode.children.push(tNode);
+        else hqTempleNode.children.push(tNode);
       } else {
-        hqNode.children.push(tNode);
+        hqTempleNode.children.push(tNode);
       }
     });
 
@@ -6990,19 +6995,29 @@ export async function fetchDataBridgeTree() {
       if (ds?.distributorId) {
         const parent = distNodes.find(d => d.id === ds.distributorId);
         if (parent) parent.children.push(dsNode);
-        else hqNode.children.push(dsNode);
+        else hqDistSalesNode.children.push(dsNode);
       } else {
-        hqNode.children.push(dsNode);
+        hqDistSalesNode.children.push(dsNode);
       }
     });
 
+    // NOTE: If distributors were somehow linked to superSales, we would group them.
+    // In schema, Distributor has no superSalesId. 
+    // Wait! A superSales creates a distributor, where is that saved?
+    // Let's assume for now they are all direct to HQ-Distributor unless they have superSalesId.
+    // Let's check if they have superSalesId in DB anyway? The schema didn't have it.
     distNodes.forEach((dNode: any) => {
-      hqNode.children.push(dNode);
+      hqDistributorNode.children.push(dNode);
     });
 
     superSalesNodes.forEach((ssNode: any) => {
-      hqNode.children.push(ssNode);
+      hqSuperSalesNode.children.push(ssNode);
     });
+
+    if (hqTempleNode.children.length > 0) rootNodes.push(hqTempleNode);
+    if (hqSuperSalesNode.children.length > 0) rootNodes.push(hqSuperSalesNode);
+    if (hqDistributorNode.children.length > 0) rootNodes.push(hqDistributorNode);
+    if (hqDistSalesNode.children.length > 0) rootNodes.push(hqDistSalesNode);
 
     return rootNodes;
   } catch (e) {
