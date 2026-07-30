@@ -3476,7 +3476,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 export async function createSuperSalesAccount(data: any) {
 
       try {
-        const existing = await prisma.distributorSales.findUnique({ where: { account: data.account } });
+        const existing = await prisma.distributorSales.findFirst({ where: { account: data.account } });
         if (existing) {
           return { success: false, error: '帳號已被使用，請更換其他帳號' };
         }
