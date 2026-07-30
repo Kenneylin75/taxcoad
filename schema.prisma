@@ -164,6 +164,7 @@ model Temple {
   appointments        Appointment[]
   deepRecords         DeepRecord[]
   activities          Activity[]
+  auditLogs           AuditLog[]
   paymentConfig       TemplePaymentConfig?
   events              Event[]
   eventRegistrations  EventRegistration[]
@@ -299,13 +300,16 @@ model AdminLog {
 
 model AuditLog {
   id          String   @id @default(cuid())
+  templeId    String   @map("temple_id")
   action      String?
   details     String?
+  operator    String?
   timestamp   String?
   performedBy String?  @map("performed_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  temple Temple @relation(fields: [templeId], references: [id])
   @@map("audit_logs")
 }
 

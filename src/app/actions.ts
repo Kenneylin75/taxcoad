@@ -6678,11 +6678,13 @@ export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS
 
       try {
         const templeId = templeIdOverride || await getDynamicTempleId();
+        if (!templeId) return { success: false };
         const timestamp = new Date().toLocaleString('zh-TW');
         
         await prisma.auditLog.create({
           data: {
             id: `log-${Date.now()}`,
+            templeId,
             action: `[${level}] ${action}`,
             details: `Target: ${target}`,
             operator,
