@@ -965,38 +965,28 @@ export async function saveForm(data: any) {
 // 7. 抓取與管理人員 (修復 Build Error 關鍵)
 export async function fetchPersonnel() {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS personnel (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          name VARCHAR(255) NOT NULL,
-          role VARCHAR(255) NOT NULL,
-          account VARCHAR(255) NOT NULL,
-          phone VARCHAR(255) NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          status VARCHAR(50) DEFAULT 'Active',
-          avatar VARCHAR(255),
-          permissions TEXT[],
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      const res = await client.query('SELECT * FROM "User" WHERE "templeId" = $1', [templeId]);
-      if ((res.rowCount ?? 0) === 0) {
-              return [];
-            }
-      return res.rows.map(r => ({
-              id: r.id,
-              name: r.name,
-              role: r.role,
-              account: r.account,
-              phone: r.phone,
-              status: r.status,
-              avatar: r.avatar,
-              permissions: r.permissions || [],
-              serviceCount: 0
-            }));
-  });
+  if (!templeId) return [];
+  
+  try {
+    const users = await prisma.user.findMany({
+      where: { templeId }
+    });
+    
+    return users.map(r => ({
+      id: r.id,
+      name: r.name,
+      role: r.role as any,
+      account: r.account || '',
+      phone: r.phone || '',
+      status: r.status,
+      avatar: r.avatar || '',
+      permissions: (r.permissions as any) || [],
+      serviceCount: 0
+    }));
+  } catch (e) {
+    console.error("fetchPersonnel error:", e);
+    return [];
+  }
 }
 
 export async function fetchStaff() {
@@ -5018,16 +5008,26 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
 }
 export async function createPersonnel(formData: FormData) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  if (!templeId) return { success: false, error: '缺少 templeId' };
+
+  try {
     const name = formData.get('name') as string;
     const rawAccount = formData.get('account') as string;
     const account = (rawAccount || '').trim();
     
     if (account) {
-      const checkRes = await client.query('SELECT id FROM "User" WHERE "templeId" = $1 AND LOWER(account) = $2', [templeId, account.toLowerCase()]);
-        if (checkRes && checkRes.rowCount && checkRes.rowCount > 0) {
-                  return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
-                }
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          templeId,
+          account: {
+            equals: account,
+            mode: 'insensitive'
+          }
+        }
+      });
+      if (existingUser) {
+        return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
+      }
     }
 
     const phone = formData.get('phone') as string;
@@ -5036,60 +5036,94 @@ export async function createPersonnel(formData: FormData) {
     const newId = `p-${Date.now()}`;
     const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4F46E5&color=fff`;
 
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS personnel (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          name VARCHAR(255) NOT NULL,
-          role VARCHAR(255) NOT NULL,
-          account VARCHAR(255) NOT NULL,
-          phone VARCHAR(255) NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          status VARCHAR(50) DEFAULT 'Active',
-          avatar VARCHAR(255),
-          permissions TEXT[],
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      const defaultPerms = role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers'];
-      await client.query(`
-        INSERT INTO "User" (id, "templeId", name, role, account, phone, password, status, avatar, permissions)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      `, [newId, templeId, name, role, account, phone, password, 'Active', avatar, defaultPerms]);
-    await revalidateTemple();
+    const defaultPerms = role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers'];
+    
+    await prisma.user.create({
+      data: {
+        id: newId,
+        templeId,
+        name,
+        role,
+        account,
+        phone,
+        password,
+        status: 'Active',
+        avatar,
+        permissions: defaultPerms
+      }
+    });
+
+    await revalidateTemple(templeId);
     await logSystemEvent('SUCCESS', '新增人員', `人員名稱：${name}`, '管理員', templeId);
     return { success: true };
-  });
+  } catch (error) {
+    console.error('createPersonnel error:', error);
+    return { success: false, error: '建立人員失敗' };
+  }
 }
 
 export async function deletePersonnel(id: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    let currentPersonnel = await [];
-    const personnel = currentPersonnel.find((p: any) => p.id.toString() === id.toString() && p.templeId === templeId);
-    if (personnel) {
-      const currentAppts = await [];
-      const currentSlots = await [];
-      const hasAppointments = currentAppts.some((a: any) => a.staff === personnel.name && a.status !== 'Completed' && a.templeId === templeId);
-      const hasSlots = currentSlots.some((s: any) => s.staff === personnel.name && s.status !== 'Completed' && s.templeId === templeId);
+  if (!templeId) return { success: false, message: '缺少 templeId' };
+
+  try {
+    const personnel = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (personnel && personnel.templeId === templeId) {
+      const hasAppointments = await prisma.appointment.findFirst({
+        where: {
+          templeId,
+          staff: personnel.name,
+          status: { not: 'Completed' }
+        }
+      });
+
+      const hasSlots = await prisma.slot.findFirst({
+        where: {
+          templeId,
+          staff: personnel.name,
+          status: { not: 'Completed' }
+        }
+      });
+
       if (hasAppointments || hasSlots) {
         return { success: false, message: '此人員目前尚有預約服務或已排班時段，請先清空後再進行刪除！' };
       }
     }
 
-    await client.query('DELETE FROM "User" WHERE id = $1 AND "templeId" = $2', [id, templeId]);
-    await revalidateTemple();
+    await prisma.user.deleteMany({
+      where: {
+        id,
+        templeId
+      }
+    });
+
+    await revalidateTemple(templeId);
+    await logSystemEvent('SUCCESS', '刪除人員', `帳號 ID：${id}`, '管理員', templeId);
     return { success: true };
-  });
+  } catch (error) {
+    console.error('deletePersonnel error:', error);
+    return { success: false, message: '刪除人員失敗' };
+  }
 }
 
 export async function updateAccountPermissions(id: string, permissions: string[]) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('UPDATE "User" SET permissions = $1 WHERE id = $2 AND "templeId" = $3', [permissions, id, templeId]);
-    await revalidateTemple();
+  if (!templeId) return { success: false, message: '缺少 templeId' };
+  
+  try {
+    await prisma.user.updateMany({
+      where: { id, templeId },
+      data: { permissions }
+    });
+    await revalidateTemple(templeId);
     return { success: true };
-  });
+  } catch (error) {
+    console.error('updateAccountPermissions error:', error);
+    return { success: false };
+  }
 }
 
 export async function updateAccountPassword(id: string, newPass: string, role?: string) {
