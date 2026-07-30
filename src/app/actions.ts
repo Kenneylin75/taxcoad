@@ -3837,10 +3837,8 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     if (resBills && resBills.rows) {
           listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
         }
-    const resWD = await dbQuery("SELECT * FROM \"Withdrawal\"", [], () => null) as any;
-    if (resWD && resWD.rows) {
-          listWithdrawals = resWD.rows.map((r: any) => ({ ...r, salesName: r.sales_name, status: r.status, amount: r.amount }));
-        }
+    const resWD = await prisma.withdrawal.findMany();
+    listWithdrawals = resWD.map((r: any) => ({ ...r, salesName: r.salesName, status: r.status, amount: r.amount }));
 
   const sales = listSales.find(s => s.id === salesId);
   const salesName = sales?.name;
@@ -4832,28 +4830,34 @@ export async function fetchSuperSalesBonuses(salesName: string) {
 }
 
 export async function fetchAllWithdrawals() {
-  return withTempleSession(null, true, async (client) => {
-    const query = `
-      SELECT w.*, wal.role as wallet_role 
-      FROM "Withdrawal" w
-      LEFT JOIN wallets wal ON w.sales_name = wal.name
-      ORDER BY w.created_at DESC
-    `;
-    const res = await client.query(query);
+  try {
+    const withdrawals = await prisma.withdrawal.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
     
-    const allWithdrawals = res.rows.map((r: any) => ({
-      id: r.id,
-      salesName: r.salesName || r.sales_name,
-      amount: r.amount,
-      status: r.status,
-      receiptUrl: r.receipt_url || r.receiptUrl,
-      date: r.date instanceof Date ? `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}-${String(r.date.getDate()).padStart(2, '0')}` : r.date,
-      role: r.wallet_role
+    // Get distinct sales names to find their wallet roles
+    const salesNames = [...new Set(withdrawals.map((w: any) => w.salesName).filter(Boolean))];
+    const wallets = await prisma.wallet.findMany({
+      where: { name: { in: salesNames } }
+    });
+    const walletRoleMap = new Map(wallets.map(w => [w.name, w.role]));
+
+    const allWithdrawals = withdrawals.map((w: any) => ({
+      id: w.id,
+      salesName: w.salesName,
+      amount: w.amount,
+      status: w.status,
+      receiptUrl: w.receiptUrl,
+      date: w.date || w.createdAt.toISOString().split('T')[0],
+      role: walletRoleMap.get(w.salesName)
     }));
     
     // 過濾掉「經銷業務員」的提領申請，只留給對應的經銷商審核
     return allWithdrawals.filter((w: any) => w.role !== 'DistSales' && w.role !== 'DistributorSales');
-  });
+  } catch (error) {
+    console.error('Failed to fetch all withdrawals', error);
+    return [];
+  }
 }
 
 export async function approveWithdrawal(id: string, receiptUrl?: string) { 
