@@ -162,6 +162,8 @@ model Temple {
   guests              Guest[]
   leaveRecords        LeaveRecord[]
   appointments        Appointment[]
+  deepRecords         DeepRecord[]
+  activities          Activity[]
   paymentConfig       TemplePaymentConfig?
   events              Event[]
   eventRegistrations  EventRegistration[]
@@ -389,6 +391,7 @@ model DeepRecord {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   guest      Guest?   @relation(fields: [guestId], references: [id])
+  temple     Temple   @relation(fields: [templeId], references: [id])
   @@map("deep_records")
 }
 
@@ -404,6 +407,7 @@ model Activity {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   guest     Guest?   @relation(fields: [guestId], references: [id])
+  temple    Temple   @relation(fields: [templeId], references: [id])
   @@map("activities")
 }
 

@@ -5419,21 +5419,31 @@ export async function fetchGuestHistory(p: string) {
         const files = guest ? await prisma.guestFile.findMany({ where: { guestId: guest.id }, orderBy: { createdAt: 'desc' } }) : [];
         const appointments = await prisma.appointment.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
         const lampRecords = await prisma.lampRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        
-        // Wait, does QueueTicket have phone? Yes. EventRegistration?
-        // Check QueueTicket in schema later, assume yes for now since it was written like that.
-        // Actually, we can just use phone for those if they have it.
         const queueTickets = await prisma.queueTicket.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        
-        // EventRegistration might not exist, but let's assume it does with templeId and phone.
         const eventRegistrations = await prisma.eventRegistration.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+
+        const rawDeepRecords = await prisma.deepRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const records = rawDeepRecords.map(r => ({
+          id: r.id,
+          date: r.date,
+          serviceType: r.content || '',
+          staffName: r.remarks || '',
+          values: r.paymentRef ? JSON.parse(r.paymentRef) : null
+        }));
+
+        const rawActivities = await prisma.activity.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const activities = rawActivities.map(a => ({
+          type: a.type,
+          content: a.content,
+          timestamp: a.createdAt.toISOString()
+        }));
 
         return {
           files,
-          records: appointments,
+          records,
           appointments,
           lampRecords,
-          activities: [],
+          activities,
           queueTickets,
           eventRegistrations
         };
@@ -5462,11 +5472,14 @@ export async function fetchGuestRecords(phone: string) {
 export async function updateDeepRecord(recordId: string, phone: string, staffName: string, values: any) {
 
       try {
-        const app = await prisma.appointment.findUnique({ where: { id: recordId } });
-        if (app) {
-          await prisma.appointment.update({
+        const record = await prisma.deepRecord.findUnique({ where: { id: recordId } });
+        if (record) {
+          await prisma.deepRecord.update({
             where: { id: recordId },
-            data: values
+            data: {
+              remarks: staffName,
+              paymentRef: values ? JSON.stringify(values) : null
+            }
           });
           return { success: true, message: '紀錄已更新' };
         }
