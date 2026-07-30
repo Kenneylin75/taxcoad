@@ -1542,65 +1542,75 @@ export async function fetchGuestAppointments(p: any) {
     return [];
   }
 }
-// migrated (await jsonStore.find('service_settings_mock')) to (await jsonStore.find('service_settings_mock'))
 export async function fetchServiceSettings() { 
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS temple_settings (
-        temple_id VARCHAR(50) PRIMARY KEY REFERENCES "Temple"(id) ON DELETE CASCADE,
-        settings JSONB NOT NULL DEFAULT '{}'::jsonb
-      )
-    `);
-    const res = await client.query('SELECT settings FROM temple_settings WHERE temple_id = $1', [templeId]);
-    if (res.rowCount > 0) {
-      const s = res.rows[0].settings;
+  if (!templeId) return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+
+  try {
+    const existing = await prisma.serviceSetting.findFirst({
+      where: { templeId }
+    });
+
+    if (existing) {
+      const s = (existing.pushConfigs as any) || {};
       return {
         ...s,
         cancelHoursBefore: s.cancelHoursBefore ?? 24,
         modifyHoursBefore: s.modifyHoursBefore ?? 24,
         allowCancel: s.allowCancel ?? true,
         allowModify: s.allowModify ?? true,
-        pushConfigs: s.pushConfigs || []
+        pushConfigs: Array.isArray(s) ? s : (s.pushConfigs || [])
       };
     }
     return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
-  });
+  } catch (error) {
+    console.error('fetchServiceSettings error:', error);
+    return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+  }
 }
 
-// migrated (await jsonStore.find('guest_files')) to (await jsonStore.find('guest_files'))
 export async function fetchGuestFiles(phone: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS guest_files (
-          id VARCHAR(50) NOT NULL,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL ,
-          url TEXT NOT NULL,
-          type VARCHAR(50) NOT NULL,
-          name VARCHAR(255) NOT NULL,
-          folder VARCHAR(50) NOT NULL,
-          uploaded_by VARCHAR(50) NOT NULL,
-          uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (id, temple_id)
-        )
-      `);
-      const normPhone = normalizePhone(phone);
-      const guestRes = await client.query("SELECT phone FROM guests WHERE REPLACE(phone, '-', '') = $1", [normPhone]);
-      const dbPhone = guestRes.rows[0]?.phone || phone;
-      const res = await client.query('SELECT * FROM guest_files WHERE temple_id = $1 AND phone = $2 ORDER BY uploaded_at DESC', [templeId, dbPhone]);
-      return res.rows.map(r => ({
-              id: r.id,
-              phone: r.phone,
-              url: r.url,
-              type: r.type,
-              name: r.name,
-              folder: r.folder,
-              uploadedBy: r.uploaded_by,
-              uploadedAt: r.uploaded_at instanceof Date ? r.uploaded_at.toISOString().replace('T', ' ').slice(0, 19) : r.uploaded_at
-            }));
-  });
+  if (!templeId) return [];
+
+  try {
+    const normPhone = normalizePhone(phone);
+    const guest = await prisma.guest.findFirst({
+      where: {
+        templeId,
+        phone: {
+          equals: normPhone,
+          mode: 'insensitive'
+        }
+      }
+    });
+    
+    const dbPhone = guest?.phone || normPhone;
+    
+    const files = await prisma.guestFile.findMany({
+      where: {
+        templeId,
+        phone: dbPhone
+      },
+      orderBy: {
+        uploadedAt: 'desc'
+      }
+    });
+
+    return files.map(r => ({
+      id: r.id,
+      phone: r.phone,
+      url: r.url,
+      type: r.type,
+      name: r.name,
+      folder: r.folder,
+      uploadedBy: r.uploadedBy,
+      uploadedAt: r.uploadedAt ? r.uploadedAt.toISOString().replace('T', ' ').slice(0, 19) : new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error('fetchGuestFiles error:', error);
+    return [];
+  }
 }
 
 // migrated (await jsonStore.find('event_registrations')) to (await jsonStore.find('event_registrations'))
@@ -7203,11 +7213,22 @@ export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Even
 
 export async function deleteGuestFile(fileId: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query('DELETE FROM guest_files WHERE id = $1 AND temple_id = $2', [fileId, templeId]);
-    await revalidateTemple();
+  if (!templeId) return { success: false, error: '未指定宮廟' };
+
+  try {
+    await prisma.guestFile.deleteMany({
+      where: {
+        id: fileId,
+        templeId
+      }
+    });
+
+    await revalidateTemple(templeId);
     return { success: true };
-  });
+  } catch (error) {
+    console.error('deleteGuestFile error:', error);
+    return { success: false, error: '刪除檔案失敗' };
+  }
 }
 export async function activateLampRecord(recordId: string) {
 
