@@ -2912,31 +2912,36 @@ export async function rejectTempleBySuperAdmin(id: string) {
 }
 
 export async function fetchPendingDistributors() {
-  let pgApps: any[] = [];
-  const res = await dbQuery("SELECT * FROM distributor_applications WHERE status = 'Pending'", [], () => null) as any;
-    if (res && res.rows) {
-          pgApps = res.rows.map((r: any) => ({
-            id: r.id, name: r.name, contactName: r.contact_name, phone: r.phone, email: r.email,
-            taxId: r.tax_id, address: r.address, planId: r.plan_id, price: r.price, nodes: r.nodes,
-            submittedBy: r.submitted_by, status: r.status, date: r.created_at, account: r.account,
-            password: r.password, expirationDate: r.expiration_date
-          }));
-        }
-
-  const allApps = new Map();
-  db_distributor_applications.filter(a => a.status === 'Pending').forEach(a => allApps.set(a.id, a));
-  pgApps.forEach(a => allApps.set(a.id, a));
-
-  return Array.from(allApps.values());
+  try {
+    const apps = await prisma.distributorApplication.findMany({
+      where: { status: 'Pending' }
+    });
+    const allApps = new Map();
+    db_distributor_applications.filter(a => a.status === 'Pending').forEach(a => allApps.set(a.id, a));
+    apps.forEach(a => allApps.set(a.id, {
+      id: a.id, name: a.name, contactName: a.contactName, phone: a.phone, email: a.email,
+      taxId: a.taxId, address: a.address, planId: a.planId, price: a.price, nodes: a.nodes,
+      submittedBy: a.submittedBy, status: a.status, date: a.createdAt, account: a.account,
+      password: a.password, expirationDate: a.expirationDate
+    }));
+    return Array.from(allApps.values());
+  } catch (error) {
+    console.error('fetchPendingDistributors error:', error);
+    return [];
+  }
 }
 
 export async function approveDistributorBySuperAdmin(id: string, overrideQuota?: number) {
       try {
-        const res = await dbQuery("SELECT * FROM distributor_applications WHERE id = $1", [id], () => null) as any;
-        if (!res || !res.rows || res.rows.length === 0) return { success: false };
-        const app = res.rows[0];
+        const app = await prisma.distributorApplication.findUnique({
+          where: { id }
+        });
+        if (!app) return { success: false };
 
-        await dbQuery("UPDATE distributor_applications SET status = 'Active' WHERE id = $1", [id], () => null);
+        await prisma.distributorApplication.update({
+          where: { id },
+          data: { status: 'Active' }
+        });
 
         const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
         
@@ -2975,7 +2980,10 @@ export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: s
     (app as any).rejectReason = rejectReason || '';
     (app as any).rejectedAt = new Date().toISOString();
   }
-  await dbQuery("UPDATE distributor_applications SET status = 'Rejected' WHERE id = $1", [id]);
+  await prisma.distributorApplication.update({
+    where: { id },
+    data: { status: 'Rejected', rejectReason: reason, rejectedAt: new Date().toISOString() }
+  });
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
   return { success: true };
@@ -6933,7 +6941,6 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
 }
 export async function fetchDistributorFinancials(distId: string) {
   try {
-    /* removed duplicate import */
     const templesQuery = `
       SELECT t.* 
       FROM "Temple" t
@@ -6969,23 +6976,20 @@ export async function fetchDistributorFinancials(distId: string) {
     const salesRes = await dbQuery("SELECT id, name FROM dist_sales WHERE \"distributorId\" = $1", [distId], () => null) as any;
     const salesIds = (salesRes?.rows || []).map((s: any) => s.id);
     
-    let bonusRequests: any[] = [];
+    let myBonusRequests: any[] = [];
     if (salesIds.length > 0) {
-      const bonusRes = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = ANY($1::varchar[]) ORDER BY timestamp DESC", [salesIds], () => null) as any;
-      bonusRequests = (bonusRes?.rows || []).map((r: any) => ({
-        id: r.id,
-        salesId: r.sales_id,
-        salesName: r.sales_name,
-        distributorId: r.distributor_id,
-        amount: r.amount,
-        date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
-        status: r.status,
-        receiptUrl: r.receipt_url,
-        method: r.method
-      }));
+      const bonusRes = await prisma.bonusRequest.findMany({
+        where: { salesId: { in: salesIds } },
+        orderBy: { createdAt: 'desc' }
+      });
+      bonusRes.forEach((r: any) => {
+        myBonusRequests.push({
+          id: r.id, amount: r.amount, date: r.date || r.createdAt.toISOString().split('T')[0], status: r.status, method: r.method, salesName: r.salesName
+        });
+      });
     }
 
-    return { paymentRecords, bonusRequests };
+    return { paymentRecords, bonusRequests: myBonusRequests };
   } catch (e) {
     return { paymentRecords: [], bonusRequests: [] };
   }
@@ -6993,7 +6997,6 @@ export async function fetchDistributorFinancials(distId: string) {
 
 export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
   try {
-    /* removed duplicate import */
     const salesRes = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distId], () => null) as any;
     const sales = salesRes?.rows || [];
 
@@ -7031,12 +7034,17 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
         }, 0);
       }
 
-      const wRes = await dbQuery("SELECT * FROM distributor_withdrawals WHERE sales_name = $1 AND (status = 'Approved' OR status = 'Verified')", [s.name], () => null) as any;
-      const myWithdrawals = wRes?.rows || [];
+      const myWithdrawals = await prisma.withdrawal.findMany({
+        where: {
+          salesName: s.name,
+          status: { in: ['Approved', 'Verified'] }
+        }
+      });
       const totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
 
-      const vRes = await dbQuery("SELECT * FROM sales_visits WHERE sales_name = $1", [s.name], () => null) as any;
-      const salesVisits = vRes?.rows || [];
+      const salesVisits = await prisma.salesVisit.findMany({
+        where: { salesName: s.name }
+      });
       const convertedTempleNames = temples.map((t: any) => t.temple_name || t.name);
       const uniqueVisitedTemples = [...new Set(salesVisits.map((v: any) => v.temple_name))];
       const unconvertedVisitsCount = uniqueVisitedTemples.filter((name: any) => !convertedTempleNames?.includes(name)).length;
@@ -7375,11 +7383,19 @@ export async function fetchDistributorLogs(distributorId: string) {
 }
 export async function requestBonus(salesId: string, distributorId: string, amount: number, method: string = 'Bank Transfer', salesName: string = '') {
   try {
-    /* removed duplicate import */
-    await dbQuery(
-      "INSERT INTO bonus_requests (id, sales_id, distributor_id, amount, date, status, method, sales_name) VALUES ($1, $2, $3, $4, CURRENT_DATE, 'Pending', $5, $6)",
-      [`REQ-${Date.now()}`, salesId, distributorId, amount, method, salesName]
-    );
+    const newId = 'bonus-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    await prisma.bonusRequest.create({
+      data: {
+        id: newId,
+        salesId: salesId,
+        distributorId: distributorId || '',
+        amount: amount,
+        date: new Date().toISOString().split('T')[0],
+        status: 'Pending',
+        method: method,
+        salesName: salesName || ''
+      }
+    });
     return { success: true };
   } catch (e) {
     return { success: false };
@@ -7387,27 +7403,24 @@ export async function requestBonus(salesId: string, distributorId: string, amoun
 }
 export async function fetchSalesBonusRequests(salesId: string) {
   try {
-    /* removed duplicate import */
-    const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
-    return (rows || []).map((r: any) => ({
-      id: r.id,
-      salesId: r.sales_id,
-      distributorId: r.distributor_id,
-      amount: r.amount,
-      date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
-      status: r.status,
-      salesName: r.sales_name,
-      receiptUrl: r.receipt_url,
-      method: r.method
+    const requests = await prisma.bonusRequest.findMany({
+      where: { salesId: salesId },
+      orderBy: { createdAt: 'desc' }
+    });
+    return requests.map((r: any) => ({
+      id: r.id, amount: r.amount, date: r.date || r.createdAt.toISOString().split('T')[0], status: r.status, method: r.method
     }));
-  } catch (e) {
+  } catch (error) {
+    console.error('Failed to fetch bonus history', error);
     return [];
   }
 }
 export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: string) {
   try {
-    /* removed duplicate import */
-    await dbQuery("UPDATE bonus_requests SET status = 'Paid', receipt_url = $1 WHERE id = $2", [imageUrl, requestId]);
+    await prisma.bonusRequest.update({
+      where: { id: requestId },
+      data: { status: 'Paid', receiptUrl: imageUrl }
+    });
     const { revalidatePath } = require('next/cache');
     revalidatePath('/distributor');
     revalidatePath('/super-admin');
@@ -7423,7 +7436,6 @@ export async function fetchSaasOrders() {
 
 export async function fetchDistributorTempleBills(distributorId: string) {
   try {
-    /* removed duplicate import */
     const templesQuery = `
       SELECT t.id, t.name, t.temple_name 
       FROM "Temple" t
@@ -7865,20 +7877,15 @@ export async function rejectTempleBill(billId: string) {
 
 export async function fetchAllSalesBonusRequests() {
   try {
-    /* removed duplicate import */
-    const { rows } = await dbQuery("SELECT * FROM bonus_requests ORDER BY timestamp DESC", [], () => null) as any;
-    return (rows || []).map((r: any) => ({
-      id: r.id,
-      salesId: r.sales_id,
-      distributorId: r.distributor_id,
-      amount: r.amount,
-      date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
-      status: r.status,
-      salesName: r.sales_name,
-      receiptUrl: r.receipt_url,
-      method: r.method
+    const requests = await prisma.bonusRequest.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    return requests.map((r: any) => ({
+      id: r.id, amount: r.amount, date: r.date || r.createdAt.toISOString().split('T')[0], status: r.status, method: r.method,
+      salesName: r.salesName, distributorId: r.distributorId, receiptUrl: r.receiptUrl
     }));
-  } catch (e) {
+  } catch (error) {
+    console.error('Failed to fetch all bonus requests', error);
     return [];
   }
 }
@@ -8052,16 +8059,18 @@ export async function updateRevenueRemark(id: string, source: string, remark: st
 
 
 export async function fetchSuperSalesApplications(salesName: string) {
-  let list = [...db_distributor_applications];
-  /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM distributor_applications WHERE submitted_by = $1", [salesName], () => null) as any;
-    if (res && res.rows) {
-          list = res.rows.map((r: any) => ({
-            ...r,
-            rejectReason: r.reject_reason || '',
-            rejectedAt: r.rejected_at || ''
-          }));
-        }
-  return list.filter(a => a.submittedBy === salesName);
+  try {
+    const apps = await prisma.distributorApplication.findMany({
+      where: { submittedBy: salesName }
+    });
+    return apps.map((r: any) => ({
+      ...r,
+      rejectReason: r.rejectReason || '',
+      rejectedAt: r.rejectedAt || ''
+    }));
+  } catch (error) {
+    console.error('fetchSuperSalesApplications error:', error);
+    return [];
+  }
 }
 

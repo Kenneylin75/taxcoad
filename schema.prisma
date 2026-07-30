@@ -99,6 +99,7 @@ model SalesVisit {
   id         String   @id @default(cuid())
   salesId    String?  @map("sales_id")
   templeName String?  @map("temple_name")
+  salesName  String?  @map("sales_name")
   content    String?
   date       String?
   createdAt  DateTime @default(now()) @map("created_at")
@@ -112,8 +113,21 @@ model SalesVisit {
 model DistributorApplication {
   id          String   @id @default(cuid())
   name        String?
-  contactInfo String?  @map("contact_info")
+  contactName String?  @map("contact_name")
+  phone       String?
+  email       String?
+  taxId       String?  @map("tax_id")
+  address     String?
+  planId      String?  @map("plan_id")
+  price       Int?
+  nodes       Int?
+  account     String?
+  password    String?
+  expirationDate String? @map("expiration_date")
+  rejectReason String? @map("reject_reason")
+  rejectedAt   String? @map("rejected_at")
   status      String   @default("Pending")
+  submittedBy String?  @map("submitted_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -812,15 +826,20 @@ model Wallet {
   @@map("wallets")
 }
 
-model Bonus {
-  id        String   @id @default(cuid())
-  targetId  String?  @map("target_id")
-  amount    Int      @default(0)
-  reason    String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+model BonusRequest {
+  id            String   @id @default(cuid())
+  salesId       String?  @map("sales_id")
+  distributorId String?  @map("distributor_id")
+  amount        Int      @default(0)
+  date          String?
+  status        String   @default("Pending")
+  method        String?
+  salesName     String?  @map("sales_name")
+  receiptUrl    String?  @map("receipt_url")
+  createdAt     DateTime @default(now()) @map("timestamp")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  @@map("bonus")
+  @@map("bonus_requests")
 }
 
 model Withdrawal {
@@ -833,6 +852,8 @@ model Withdrawal {
   receiptUrl String?  @map("receipt_url")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("distributor_withdrawals")
 }
 
 model Notification {
