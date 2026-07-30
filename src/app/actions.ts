@@ -687,30 +687,56 @@ export async function rescheduleSingleAppointment(appointmentId: number, newSlot
 
 export async function cancelServiceRecord(recordId: string, type: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    try {
-      if (type === '點燈') {
-        await client.query('UPDATE lamp_records SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
-      } else if (type === '活動') {
-        await client.query('UPDATE event_registrations SET payment_status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
-      } else if (type === '排隊') {
-        await client.query('UPDATE queue_tickets SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
-      } else if (type === '預約') {
-        await client.query('UPDATE appointments SET status = $1 WHERE id = $2 AND temple_id = $3', ['Cancelled', recordId, templeId]);
+  if (!templeId) return { success: false, message: '未指定宮廟' };
+
+  try {
+    if (type === '點燈') {
+      await prisma.lampRecord.updateMany({
+        where: { id: recordId, templeId },
+        data: { status: 'Cancelled' }
+      });
+    } else if (type === '活動') {
+      await prisma.eventRegistration.updateMany({
+        where: { id: recordId, templeId },
+        data: { paymentStatus: 'Cancelled' }
+      });
+    } else if (type === '排隊') {
+      await prisma.queueTicket.updateMany({
+        where: { id: recordId, templeId },
+        data: { status: 'Cancelled' }
+      });
+    } else if (type === '預約') {
+      const app = await prisma.appointment.findFirst({
+        where: { id: recordId, templeId }
+      });
+      
+      if (app) {
+        await prisma.appointment.update({
+          where: { id: recordId },
+          data: { status: 'Cancelled' }
+        });
         
-        // Also free up the slot
-        const appRes = await client.query('SELECT * FROM appointments WHERE id = $1', [recordId]);
-        if ((appRes.rowCount ?? 0) > 0) {
-          const app = appRes.rows[0];
-          await client.query('UPDATE slots SET status = $1, guest_name = $2 WHERE date = $3 AND time = $4 AND staff = $5 AND temple_id = $6', ['Available', null, app.date, app.time, app.staff, templeId]);
-        }
+        await prisma.slot.updateMany({
+          where: {
+            date: app.date,
+            time: app.time,
+            staff: app.staff,
+            templeId
+          },
+          data: {
+            status: 'Available',
+            guestName: null
+          }
+        });
       }
-      await revalidateTemple();
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, message: e.message };
     }
-  });
+    
+    await revalidateTemple(templeId);
+    return { success: true };
+  } catch (error: any) {
+    console.error('cancelServiceRecord error:', error);
+    return { success: false, message: error.message };
+  }
 }
 
 export async function modifyAppointment(appId: number, newSlotId: number) {
@@ -1658,20 +1684,51 @@ export async function markRegistrationAsPaid(registrationId: string, actualPrice
 // migrated (await jsonStore.find('deep_records')) to (await jsonStore.find('deep_records'))
 
 // (Removed duplicate createOrUpdateGuest)
-export async function verifyQueueTicket(eventId: any, phone: string) {
+export async function verifyQueueTicket(eventId: string, phone: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const tRes = await client.query('SELECT id, status FROM queue_tickets WHERE event_id = $1 AND REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [eventId, phone.replace(/-/g, ''), templeId]);
-      if (tRes.rowCount === 0) return { success: false, error: 'No ticket found' };
-      const t = tRes.rows[0];
-      if (t.status === 'Pending') {
-              const orderRes = await client.query('SELECT COUNT(*) as count FROM queue_tickets WHERE event_id = $1 AND status != \'Pending\' AND temple_id = $2', [eventId, templeId]);
-              const actualOrder = parseInt(orderRes.rows[0].count) + 1;
-              await client.query('UPDATE queue_tickets SET status = $1, scanned_at = $2, actual_order = $3 WHERE id = $4', ['Queuing', new Date().toLocaleTimeString(), actualOrder, t.id]);
-            }
-    await revalidateTemple();
+  if (!templeId) return { success: false, error: '未指定宮廟' };
+
+  try {
+    const normPhone = phone.replace(/-/g, '');
+    const ticket = await prisma.queueTicket.findFirst({
+      where: {
+        eventId,
+        templeId,
+        phone: {
+          equals: normPhone,
+          mode: 'insensitive'
+        }
+      }
+    });
+
+    if (!ticket) return { success: false, error: 'No ticket found' };
+
+    if (ticket.status === 'Pending') {
+      const activeCount = await prisma.queueTicket.count({
+        where: {
+          eventId,
+          templeId,
+          status: { not: 'Pending' }
+        }
+      });
+      const actualOrder = activeCount + 1;
+
+      await prisma.queueTicket.update({
+        where: { id: ticket.id },
+        data: {
+          status: 'Queuing',
+          scannedAt: new Date().toLocaleTimeString(),
+          actualOrder
+        }
+      });
+    }
+
+    await revalidateTemple(templeId);
     return { success: true };
-  });
+  } catch (error) {
+    console.error('verifyQueueTicket error:', error);
+    return { success: false, error: '驗證失敗' };
+  }
 }
 export async function registerForEvent(id: any, phone: string, n: string, pr: number, paymentMethod?: string) {
 
