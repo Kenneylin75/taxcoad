@@ -342,14 +342,16 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
     const logMsg = "使用者 " + loggedInName + " (" + assignedRole + ") 登入成功";
     const newLogTimestamp = new Date().toISOString();
 
-    withTempleSession("hq", true, async (client) => {
-      if (client) {
-         try {
-           await client.query("CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, action VARCHAR(100), details TEXT, timestamp VARCHAR(100), performed_by VARCHAR(100))");
-           await client.query("INSERT INTO admin_logs (action, details, timestamp, performed_by) VALUES ($1, $2, $3, $4)", ["LOGIN", logMsg, newLogTimestamp, loggedInName]);
-         } catch(e) { console.error("Log error", e); }
-      }
-    });
+    try {
+      await prisma.adminLog.create({
+        data: {
+          action: "LOGIN",
+          details: logMsg,
+          timestamp: newLogTimestamp,
+          performedBy: loggedInName
+        }
+      });
+    } catch(e) { console.error("Log error", e); }
     
     await logSystemEvent('INFO', '帳號登入', logMsg, loggedInName, redirectPath.split('/')[1] || 'hq');
 
@@ -7213,21 +7215,35 @@ export async function confirmPaymentSuccess(orderId: string, method: string) {
     }
 
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  if (!templeId) return false;
+
+  try {
     // Check appointments
-    let res = await client.query('UPDATE appointments SET payment_status = , payment_method =  WHERE id =  RETURNING id', ['Paid', method, parseInt(orderId) || 0]);
-    if (res.rowCount > 0) return true;
+    let updateRes = await prisma.appointment.updateMany({
+      where: { id: orderId, templeId },
+      data: { paymentStatus: 'Paid', paymentMethod: method }
+    });
+    if (updateRes.count > 0) return true;
     
     // Check event registrations
-    res = await client.query('UPDATE event_registrations SET payment_status =  WHERE id =  RETURNING id', ['Paid', orderId]);
-    if (res.rowCount > 0) return true;
+    updateRes = await prisma.eventRegistration.updateMany({
+      where: { id: orderId, templeId },
+      data: { paymentStatus: 'Paid' }
+    });
+    if (updateRes.count > 0) return true;
     
     // Check queue tickets
-    res = await client.query('UPDATE queue_tickets SET payment_status =  WHERE id =  RETURNING id', ['Paid', orderId]);
-    if (res.rowCount > 0) return true;
+    updateRes = await prisma.queueTicket.updateMany({
+      where: { id: orderId, templeId },
+      data: { paymentStatus: 'Paid' }
+    });
+    if (updateRes.count > 0) return true;
     
     return false;
-  });
+  } catch (error) {
+    console.error('handlePaymentCallback error:', error);
+    return false;
+  }
 }
 
 export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
