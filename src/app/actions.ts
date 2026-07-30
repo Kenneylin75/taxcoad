@@ -1451,49 +1451,46 @@ export async function askAgiAssistant(q: string, h: number) {
   if (q.includes('預約') || q.includes('掛號')) reply = "您想了解預約相關的服務嗎？您可以點擊下方的「立刻線上預約」來查看目前可用的時段喔！";
   if (q.includes('點燈')) reply = "我們提供多種點燈服務（如太歲燈、光明燈），歡迎前往「線上點燈」了解詳情與價格！";
 
-  return withTempleSession(templeId, false, async (client) => {
-    if (client) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS ai_chat_logs (
-          id SERIAL PRIMARY KEY,
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          user_query TEXT NOT NULL,
-          ai_reply TEXT NOT NULL,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      await client.query(
-        'INSERT INTO ai_chat_logs (temple_id, phone, user_query, ai_reply) VALUES ($1, $2, $3, $4)',
-        [templeId, phone, q, reply]
-      );
-    }
-    return { reply, suggestedAction: "none" };
-  });
+  if (!templeId) return { reply, suggestedAction: "none" };
+
+  try {
+    await prisma.aiChatLog.create({
+      data: {
+        templeId,
+        phone,
+        userQuery: q,
+        aiReply: reply
+      }
+    });
+  } catch (error) {
+    console.error('Failed to log AI chat:', error);
+  }
+
+  return { reply, suggestedAction: "none" };
 }
 
 export async function fetchAiChatLogs() {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS ai_chat_logs (
-        id SERIAL PRIMARY KEY,
-        temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-        phone VARCHAR(50) NOT NULL,
-        user_query TEXT NOT NULL,
-        ai_reply TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    const res = await client.query('SELECT * FROM ai_chat_logs WHERE temple_id = $1 ORDER BY created_at DESC LIMIT 100', [templeId]);
-    return res.rows.map(r => ({
+  if (!templeId) return [];
+
+  try {
+    const logs = await prisma.aiChatLog.findMany({
+      where: { templeId },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+
+    return logs.map((r: any) => ({
       id: r.id,
       phone: r.phone,
-      userQuery: r.user_query,
-      aiReply: r.ai_reply,
-      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at
+      userQuery: r.userQuery,
+      aiReply: r.aiReply,
+      createdAt: r.createdAt.toISOString()
     }));
-  });
+  } catch (error) {
+    console.error('Failed to fetch AI chat logs:', error);
+    return [];
+  }
 }
 
 const normCompare = (p1: string, p2: string) => {
@@ -2315,17 +2312,24 @@ export async function fetchStoragePlans() {
 }
 
 export async function updateStoragePlans(plans: any[]) {
-  return withTempleSession(null, true, async (client) => {
-    await client.query('DELETE FROM storage_plans');
-      for (const p of plans) {
-              await client.query(
-                'INSERT INTO storage_plans (size_gb, price_monthly, price_yearly) VALUES ($1, $2, $3)',
-                [p.sizeGb, p.priceMonthly, p.priceYearly]
-              );
-            }
+  try {
+    await prisma.storagePlan.deleteMany();
+    
+    for (const p of plans) {
+      await prisma.storagePlan.create({
+        data: {
+          sizeGb: p.sizeGb,
+          priceMonthly: p.priceMonthly,
+          priceYearly: p.priceYearly
+        }
+      });
+    }
     revalidatePath('/super-admin');
     return { success: true };
-  });
+  } catch (error) {
+    console.error('Failed to update storage plans:', error);
+    return { success: false, message: '更新失敗' };
+  }
 }
 
 export async function fetchTempleStorages() {
@@ -6248,148 +6252,160 @@ export async function fetchDistributorStats() {
 }
 
 export async function fetchPricePlans() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS price_plans (
-          id VARCHAR(50) PRIMARY KEY,
-          distributor_id VARCHAR(50),
-          name VARCHAR(255) NOT NULL,
-          setup_fee INT NOT NULL,
-          monthly_fee INT NOT NULL,
-          is_free BOOLEAN DEFAULT FALSE,
-          free_months INT DEFAULT 0
-        )
-      `);
-      const res = await client.query('SELECT * FROM price_plans');
-      if ((res.rowCount ?? 0) === 0) {
-              await client.query(`
-          INSERT INTO price_plans (id, distributor_id, name, setup_fee, monthly_fee, is_free, free_months)
-          VALUES 
-            ('plan-1', 'dist-1', '基礎推廣方案', 12000, 3600, FALSE, 0),
-            ('plan-2', 'dist-1', '免費推廣試用方案', 0, 3600, TRUE, 3)
-        `);
-              const resRetry = await client.query('SELECT * FROM price_plans');
-              return resRetry.rows.map(r => ({
-                id: r.id,
-                distributorId: r.distributor_id,
-                name: r.name,
-                setupFee: r.setup_fee,
-                monthlyFee: r.monthly_fee,
-                isFree: r.is_free,
-                freeMonths: r.free_months
-              }));
-            }
-      return res.rows.map(r => ({
-              id: r.id,
-              distributorId: r.distributor_id,
-              name: r.name,
-              setupFee: r.setup_fee,
-              monthlyFee: r.monthly_fee,
-              isFree: r.is_free,
-              freeMonths: r.free_months
-            }));
-  });
+  try {
+    const plans = await prisma.pricePlan.findMany();
+    if (plans.length === 0) {
+      const defaultPlans = [
+        { id: 'plan-1', distributorId: 'dist-1', name: '基礎推廣方案', setupFee: 12000, monthlyFee: 3600, isFree: false, freeMonths: 0 },
+        { id: 'plan-2', distributorId: 'dist-1', name: '免費推廣試用方案', setupFee: 0, monthlyFee: 3600, isFree: true, freeMonths: 3 }
+      ];
+      await prisma.pricePlan.createMany({ data: defaultPlans });
+      return defaultPlans;
+    }
+    return plans;
+  } catch (error) {
+    console.error('Failed to fetch price plans:', error);
+    return [];
+  }
 }
 
 export async function createPricePlan(plan: any) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  try {
     const newId = `plan-${Date.now()}`;
-    const newP: PricePlan = {
-      id: newId,
-      distributorId: 'dist-1',
-      name: plan.name,
-      setupFee: Number(plan.setupFee || 0),
-      monthlyFee: Number(plan.monthlyFee || 0),
-      isFree: Boolean(plan.isFree),
-      freeMonths: Number(plan.freeMonths || 0)
-    };
+    await prisma.pricePlan.create({
+      data: {
+        id: newId,
+        distributorId: 'dist-1',
+        name: plan.name,
+        setupFee: Number(plan.setupFee || 0),
+        monthlyFee: Number(plan.monthlyFee || 0),
+        isFree: Boolean(plan.isFree),
+        freeMonths: Number(plan.freeMonths || 0)
+      }
+    });
     
-    await client.query(`
-        INSERT INTO price_plans (id, distributor_id, name, setup_fee, monthly_fee, is_free, free_months)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [newId, 'dist-1', plan.name, Number(plan.setupFee || 0), Number(plan.monthlyFee || 0), Boolean(plan.isFree), Number(plan.freeMonths || 0)]);
     await revalidateTemple();
     return { success: true };
-  });
+  } catch (error) {
+    console.error('Failed to create price plan:', error);
+    return { success: false, message: '建立方案失敗' };
+  }
 }
 
 export async function fetchTempleApplications() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS temple_applications (
-          id VARCHAR(50) PRIMARY KEY,
-          temple_name VARCHAR(255) NOT NULL,
-          contact_person VARCHAR(255),
-          contact_phone VARCHAR(255),
-          plan_id VARCHAR(50) NOT NULL,
-          setup_fee INT NOT NULL,
-          monthly_fee INT NOT NULL,
-          status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-          sales_id VARCHAR(50)
-        )
-      `);
-      const res = await client.query('SELECT * FROM temple_applications');
-      return res.rows.map(r => ({
-              id: r.id,
-              templeName: r.temple_name,
-              contactPerson: r.contact_person,
-              contactPhone: r.contact_phone,
-              planId: r.plan_id,
-              setupFee: r.setup_fee,
-              monthlyFee: r.monthly_fee,
-              status: r.status,
-              salesId: r.sales_id
-            }));
-  });
+  try {
+    const apps = await prisma.templeApplication.findMany();
+    return apps.map((r: any) => ({
+      id: r.id,
+      templeName: r.templeName,
+      contactPerson: r.contactPerson,
+      contactPhone: r.contactPhone,
+      planId: r.planId,
+      setupFee: r.setupFee,
+      monthlyFee: r.monthlyFee,
+      status: r.status,
+      salesId: r.salesId
+    }));
+  } catch (error) {
+    console.error('Failed to fetch temple applications:', error);
+    return [];
+  }
 }
 
 export async function submitTempleApplication(data: any) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  try {
     const newId = `app-${Date.now()}`;
     let setupFee = 12000;
     let monthlyFee = 3600;
     
-    const planRes = await client.query('SELECT * FROM price_plans WHERE id = $1', [data.planId]);
-      if ((planRes.rowCount ?? 0) > 0) {
-              setupFee = planRes.rows[0].setup_fee;
-              monthlyFee = planRes.rows[0].monthly_fee;
-            }
-      await client.query(`
-        INSERT INTO temple_applications (id, temple_name, contact_person, contact_phone, plan_id, setup_fee, monthly_fee, status, sales_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [newId, data.templeName, data.contactPerson || '聯絡人', data.contactPhone || '', data.planId, setupFee, monthlyFee, 'Pending', 'sales-1']);
+    const plan = await prisma.pricePlan.findUnique({
+      where: { id: data.planId }
+    });
+    
+    if (plan) {
+      setupFee = plan.setupFee;
+      monthlyFee = plan.monthlyFee;
+    }
+    
+    await prisma.templeApplication.create({
+      data: {
+        id: newId,
+        templeName: data.templeName,
+        contactPerson: data.contactPerson || '聯絡人',
+        contactPhone: data.contactPhone || '',
+        planId: data.planId,
+        setupFee,
+        monthlyFee,
+        status: 'Pending',
+        salesId: 'sales-1'
+      }
+    });
+    
     await revalidateTemple();
     return { success: true };
-  });
+  } catch (error) {
+    console.error('Failed to submit temple application:', error);
+    return { success: false, message: '提交申請失敗' };
+  }
 }
 
 export async function approveTempleApplication(appId: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    const appRes = await client.query('SELECT * FROM temple_applications WHERE id = $1', [appId]);
-      if ((appRes.rowCount ?? 0) === 0) return { success: false, error: '找不到該筆開案申請' };
-      const app = appRes.rows[0];
-      await client.query('UPDATE temple_applications SET status = $1 WHERE id = $2', ['Approved', appId]);
-      const newTempleId = `temple-${Date.now()}`;
-      await client.query(`
-        INSERT INTO "Temple" (id, name, city, status, "salesId", "setupFee", "monthlyRent", "paymentCycle")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [newTempleId, app.temple_name, '台北市', 'Active', app.sales_id, app.setup_fee, app.monthly_fee, 'Monthly']);
-      await client.query(`
-        INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [newTempleId, 0, 5368709120, '標準免費空間', '台北市']);
-      await client.query(`
-        INSERT INTO "User" (id, "templeId", name, role, account, phone, password, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [`p-${Date.now()}`, newTempleId, app.contact_person || '管理員', 'TempleAdmin', app.contact_phone || 'admin', app.contact_phone || '0000', app.contact_phone || 'admin', 'Active']);
+  try {
+    const app = await prisma.templeApplication.findUnique({
+      where: { id: appId }
+    });
+    
+    if (!app) return { success: false, error: '找不到該筆開案申請' };
+    
+    await prisma.templeApplication.update({
+      where: { id: appId },
+      data: { status: 'Approved' }
+    });
+    
+    const newTempleId = `temple-${Date.now()}`;
+    
+    await prisma.temple.create({
+      data: {
+        id: newTempleId,
+        name: app.templeName,
+        city: '台北市',
+        status: 'Active',
+        salesId: app.salesId,
+        setupFee: app.setupFee,
+        monthlyRent: app.monthlyFee,
+        paymentCycle: 'Monthly'
+      }
+    });
+    
+    await prisma.templeStorage.create({
+      data: {
+        templeId: newTempleId,
+        usedBytes: 0,
+        allocatedBytes: BigInt(5368709120),
+        planName: '標準免費空間',
+        city: '台北市'
+      }
+    });
+    
+    await prisma.user.create({
+      data: {
+        id: `p-${Date.now()}`,
+        templeId: newTempleId,
+        name: app.contactPerson || '管理員',
+        role: 'TempleAdmin',
+        account: app.contactPhone || 'admin',
+        phone: app.contactPhone || '0000',
+        password: app.contactPhone || 'admin',
+        status: 'Active'
+      }
+    });
+    
     await revalidateTemple();
     return { success: true };
-  });
+  } catch (error) {
+    console.error('Failed to approve temple application:', error);
+    return { success: false, error: '核准失敗' };
+  }
 }
 
 // -------------------------------------------------------------------------

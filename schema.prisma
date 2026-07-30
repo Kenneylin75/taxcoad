@@ -184,15 +184,21 @@ model Temple {
   syncQueues          SyncQueue[]
   financeRecords      FinanceRecord[]
   templeNotifications TempleNotification[]
+  aiChatLogs          AiChatLog[]
 }
 
 model TempleApplication {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String?
-  status    String   @default("Pending")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  templeName    String   @map("temple_name")
+  contactPerson String?  @map("contact_person")
+  contactPhone  String?  @map("contact_phone")
+  planId        String   @map("plan_id")
+  setupFee      Int      @map("setup_fee")
+  monthlyFee    Int      @map("monthly_fee")
+  status        String   @default("Pending")
+  salesId       String?  @map("sales_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("temple_applications")
 }
@@ -917,4 +923,33 @@ model LeaveRecord {
   @@map("leave_records")
 }
 
+// ---------------------------------------------------------------------
+// 抽成紀錄 (Payout Records)
+// ---------------------------------------------------------------------
+model PayoutRecord {
+  id          Int      @id @default(autoincrement())
+  templeName  String?  @map("temple_name")
+  type        String?
+  amount      Decimal?
+  percentage  Decimal?
+  roleName    String?  @map("role_name")
+  createdAt   DateTime @default(now()) @map("created_at")
 
+  @@map("payout_records")
+}
+
+// ---------------------------------------------------------------------
+// AI 對話紀錄 (AI Chat Logs)
+// ---------------------------------------------------------------------
+model AiChatLog {
+  id          Int      @id @default(autoincrement())
+  templeId    String   @map("temple_id")
+  phone       String
+  userQuery   String   @map("user_query")
+  aiReply     String   @map("ai_reply")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  temple Temple @relation(fields: [templeId], references: [id], onDelete: Cascade)
+
+  @@map("ai_chat_logs")
+}
