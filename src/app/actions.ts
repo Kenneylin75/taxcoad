@@ -1270,101 +1270,97 @@ export async function createLightingOrder(fd: FormData) {
 export async function getGuestUser() {
   const store = await cookies();
   const templeId = await getDynamicTempleId();
+  if (!templeId) return null;
   const phone = store.get(`guestPhone_${templeId}`)?.value;
   if (!phone) return null;
   
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query('SELECT * FROM guests WHERE phone = $1 AND temple_id = $2', [phone, templeId]);
-    if ((res.rowCount ?? 0) > 0) {
-      const r = res.rows[0];
+  try {
+    const r = await prisma.guest.findFirst({
+      where: { templeId, phone }
+    });
+    if (r) {
       return {
-        templeId: r.temple_id,
+        templeId: r.templeId,
         phone: r.phone,
         name: r.name,
         email: r.email,
         password: r.password,
         address: r.address,
         birthday: r.birthday,
-        lunarBirthday: r.lunar_birthday,
-        birthHour: r.birth_hour,
-        lineId: r.line_id,
+        lunarBirthday: r.lunarBirthday,
+        birthHour: r.birthHour,
+        lineId: r.lineId,
         status: r.status
       };
     }
     return null;
-  });
+  } catch (error) {
+    console.error('getGuestUser error:', error);
+    return null;
+  }
 }
 
 export async function checkPhoneStatus(phone: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  if (!templeId) return { status: 'NEW' };
+  
+  try {
     const normLogin = normalizePhone(phone);
-    let existing: any = null;
-
-    const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
-      if ((res.rowCount ?? 0) > 0) {
-              const r = res.rows[0];
-              existing = {
-                templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
-              };
-            }
+    const existing = await prisma.guest.findFirst({
+      where: {
+        templeId,
+        phone: {
+          equals: normLogin,
+          mode: 'insensitive'
+        }
+      }
+    });
 
     if (!existing) return { status: 'NEW' };
     if (!existing.password) return { status: 'NO_PASSWORD', name: existing.name };
     return { status: 'HAS_PASSWORD', name: existing.name };
-  });
+  } catch (error) {
+    console.error('checkPhoneStatus error:', error);
+    return { status: 'NEW' };
+  }
 }
 
 export async function liffAutoLogin(lineId: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    let existing: any = null;
-    const res = await client.query('SELECT * FROM guests WHERE line_id = $1 AND temple_id = $2', [lineId, templeId]);
-      if ((res.rowCount ?? 0) > 0) {
-              const r = res.rows[0];
-              existing = {
-                templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
-              };
-            }
+  if (!templeId) return { success: false };
+  
+  try {
+    const existing = await prisma.guest.findFirst({
+      where: { templeId, lineId }
+    });
+    
     if (existing) {
       const store = await cookies();
       store.set(`guestPhone_${templeId}`, existing.phone, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
       return { success: true, guest: existing };
     }
     return { success: false };
-  });
+  } catch (error) {
+    console.error('liffAutoLogin error:', error);
+    return { success: false };
+  }
 }
 
 export async function guestLogin(phone: string, password?: string, inputName?: string) {
   const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  if (!templeId) return { success: false, error: '未指定宮廟' };
+  
+  try {
     const normLogin = normalizePhone(phone);
-    let existing: any = null;
-
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS guests (
-          temple_id VARCHAR(50) NOT NULL REFERENCES "Temple"(id) ON DELETE CASCADE,
-          phone VARCHAR(50) NOT NULL,
-          PRIMARY KEY (temple_id, phone),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          password VARCHAR(255),
-          address TEXT,
-          birthday VARCHAR(50),
-          lunar_birthday VARCHAR(255),
-          birth_hour VARCHAR(50),
-          line_id VARCHAR(255),
-          status VARCHAR(50) DEFAULT 'Active',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      const res = await client.query('SELECT * FROM guests WHERE REPLACE(phone, \'-\', \'\') = $1 AND temple_id = $2', [normLogin, templeId]);
-      if ((res.rowCount ?? 0) > 0) {
-              const r = res.rows[0];
-              existing = {
-                templeId: r.temple_id, phone: r.phone, name: r.name, email: r.email, password: r.password, address: r.address, birthday: r.birthday, lunarBirthday: r.lunar_birthday, birthHour: r.birth_hour, lineId: r.line_id, status: r.status
-              };
-            }
+    let existing = await prisma.guest.findFirst({
+      where: {
+        templeId,
+        phone: {
+          equals: normLogin,
+          mode: 'insensitive'
+        }
+      }
+    });
 
     if (existing) {
       if (existing.password && existing.password !== password) {
@@ -1372,37 +1368,41 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
       }
       if (!existing.password && password) {
         // 首次綁定密碼
-        existing.password = password;
-        await client.query('UPDATE guests SET password = $1 WHERE REPLACE(phone, \'-\', \'\') = $2 AND temple_id = $3', [password, normLogin, templeId]);
+        existing = await prisma.guest.update({
+          where: { id: existing.id },
+          data: { password }
+        });
       }
     } else if (!inputName || !password) {
       return { success: false, error: "首次登入請務必填寫真實姓名與密碼" };
     }
 
     const guestName = existing ? existing.name : inputName;
-    const fullGuest = existing || {
-      templeId,
-      phone,
-      name: guestName,
-      password,
-      status: 'Active',
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName)}&background=B91C1C&color=fff`
-    };
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName || '')}&background=B91C1C&color=fff`;
 
     if (!existing) {
-      await client.query(`
-          INSERT INTO guests (temple_id, phone, name, password, status)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (temple_id, phone) DO NOTHING
-        `, [templeId, phone, guestName, password, 'Active']);
+      existing = await prisma.guest.create({
+        data: {
+          id: `g-${Date.now()}`,
+          templeId,
+          phone: normLogin,
+          name: guestName || '無名氏',
+          password,
+          status: 'Active',
+          avatar
+        }
+      });
     }
 
     const store = await cookies();
-    store.set(`guestPhone_${templeId}`, phone, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
+    store.set(`guestPhone_${templeId}`, normLogin, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
     
-    await revalidateTemple();
-    return { success: true, guestName: fullGuest.name, fullGuest };
-  });
+    await revalidateTemple(templeId);
+    return { success: true, guestName: existing.name, fullGuest: existing };
+  } catch (error) {
+    console.error('guestLogin error:', error);
+    return { success: false, error: '登入失敗' };
+  }
 }
 
 export async function guestLogout() {
@@ -7884,11 +7884,31 @@ export async function sendLineMessage(templeId: string, lineUserId: string, mess
 }
 
 export async function bindCustomerLine(templeId: string, phone: string, lineUserId: string) {
-  return withTempleSession(templeId, false, async (client) => {
+  if (!templeId) return { success: false, reason: 'NoTemple' };
+  try {
     let normPhone = phone.replace(/\D/g, '');
-    await client.query(`UPDATE customers SET line_user_id = $1 WHERE phone = $2 AND temple_id = $3`, [lineUserId, normPhone, templeId]);
-    return { success: true };
-  });
+    
+    // Find if the guest exists
+    const guest = await prisma.guest.findFirst({
+      where: {
+        templeId,
+        phone: normPhone
+      }
+    });
+
+    if (guest) {
+      await prisma.guest.update({
+        where: { id: guest.id },
+        data: { lineId: lineUserId }
+      });
+      return { success: true };
+    } else {
+      return { success: false, reason: 'GuestNotFound' };
+    }
+  } catch (error) {
+    console.error('bindCustomerLine error:', error);
+    return { success: false, reason: 'DatabaseError' };
+  }
 }
 
 export async function fetchTemplePaymentTarget(templeId: string) {
