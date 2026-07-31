@@ -7258,6 +7258,7 @@ export async function fetchSuperAdminFinancials() {
     const discountMultiplier = 1 - discountRate / 100;
     const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 3600);
     const rentAmount = t.freeType === 'Permanent' ? 0 : calcPrice;
+    const isPaid = bills.length > 0 && unpaidBills.length === 0;
 
     return {
       id: t.id,
@@ -7265,7 +7266,7 @@ export async function fetchSuperAdminFinancials() {
       monthlyRent: t.monthlyRent || 3600,
       rentAmount: rentAmount,
       paymentCycle: t.paymentCycle || 'Monthly',
-      status: t.freeType === 'Permanent' ? 'VIP' : (isPending ? 'PendingVerification' : (hasUnpaid ? 'Unpaid' : 'Paid')),
+      status: t.freeType === 'Permanent' ? 'VIP' : (isPending ? 'PendingVerification' : (isPaid ? 'Paid' : 'Unpaid')),
       unpaidAmount: unpaidBills.reduce((s, b) => s + Number(b.amount), 0),
       bills: bills,
       billingStartDate: t.billingStartDate,
