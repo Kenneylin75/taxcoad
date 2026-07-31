@@ -3401,8 +3401,16 @@ export async function fetchSuperSalesProfile(salesId: string) {
         const sales = await prisma.distributorSales.findUnique({
           where: { id: salesId }
         });
-        if (sales && typeof sales.bankAccount === 'string') {
-          try { sales.bankAccount = JSON.parse(sales.bankAccount); } catch(e) {}
+        if (sales) {
+          if (typeof sales.bankAccount === 'string') {
+            try { sales.bankAccount = JSON.parse(sales.bankAccount); } catch(e) {}
+          }
+          (sales as any).bankInfo = sales.bankAccount || {
+            bankCode: '',
+            bankName: '',
+            accountNumber: '',
+            accountName: sales.name
+          };
         }
         return sales;
       } catch (e) {
@@ -5365,7 +5373,17 @@ export async function fetchDistributorProfile(distId?: string) {
 
       try {
         if (!distId) return null;
-        return await prisma.distributor.findUnique({ where: { id: distId } });
+        const dist = await prisma.distributor.findUnique({ where: { id: distId } });
+        if (!dist) return null;
+        return {
+          ...dist,
+          bankInfo: {
+            bankCode: dist.bankCode || '',
+            bankName: dist.bankName || '',
+            accountNumber: dist.bankAccount || '',
+            accountName: dist.name
+          }
+        };
       } catch(e) {
         return null;
       }
