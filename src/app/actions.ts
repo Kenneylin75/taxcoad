@@ -2378,7 +2378,8 @@ export async function fetchTempleStorages() {
 
 export async function requestTempleStorageUpgrade(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly') {
   return withTempleSession(templeId, true, async (client) => {
-    const plan = db_storage_plans.find((p: any) => p.id === planId);
+    let plan = await prisma.storagePlan.findUnique({ where: { id: planId } }) as any;
+    if (!plan) plan = db_storage_plans.find((p: any) => p.id === planId);
     if (!plan) return { success: false, message: '找不到選定的空間方案' };
 
     const discount = db_config.yearlyDiscountRate || 20;
@@ -2399,7 +2400,8 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
 
 export async function requestAiPlanUpgrade(templeId: string, planId: string) {
   return withTempleSession(templeId, true, async (client) => {
-    const plan = db_ai_plans.find((p: any) => p.id === planId);
+    let plan = await prisma.aiPlan.findUnique({ where: { id: planId } }) as any;
+    if (!plan) plan = db_ai_plans.find((p: any) => p.id === planId);
     if (!plan) return { success: false, message: '找不到選定的AI方案' };
 
     await client.query(`
@@ -2717,7 +2719,8 @@ export async function generateInitialBills(newTemple: any) {
 
     const storagePlanId = newTemple.cloudStorage;
     if (storagePlanId && storagePlanId.startsWith('SP-')) {
-       const plan = []?.find((p: any) => p.id === storagePlanId) || db_storage_plans.find(p => p.id === storagePlanId);
+       let plan = await prisma.storagePlan.findUnique({ where: { id: storagePlanId } }) as any;
+       if (!plan) plan = db_storage_plans.find(p => p.id === storagePlanId);
        if (plan) {
          const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
          if (storageFee > 0) {
@@ -2924,7 +2927,7 @@ export async function fetchPendingDistributors() {
       where: { status: 'Pending' }
     });
     const allApps = new Map();
-    db_distributor_applications.filter(a => a.status === 'Pending').forEach(a => allApps.set(a.id, a));
+    // Removed mock array fallback
     apps.forEach(a => allApps.set(a.id, {
       id: a.id, name: a.name, contactName: a.contactName, phone: a.phone, email: a.email,
       taxId: a.taxId, address: a.address, planId: a.planId, price: a.price, nodes: a.nodes,
@@ -2987,10 +2990,12 @@ export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: s
     (app as any).rejectReason = rejectReason || '';
     (app as any).rejectedAt = new Date().toISOString();
   }
-  await prisma.distributorApplication.update({
-    where: { id },
-    data: { status: 'Rejected', rejectReason: reason, rejectedAt: new Date().toISOString() }
-  });
+  try {
+    await prisma.distributorApplication.update({
+      where: { id },
+      data: { status: 'Rejected', rejectReason: rejectReason || '', rejectedAt: new Date().toISOString() }
+    });
+  } catch (e) {}
   revalidatePath('/super-admin');
   revalidatePath('/super-sales');
   return { success: true };
@@ -3314,7 +3319,8 @@ export async function submitDistributorApplication(data: any) {
     date: new Date().toISOString().split('T')[0],
     expirationDate: expirationDate.toISOString().split('T')[0]
   };
-  db_distributor_applications.push(newApp);
+  // Removed mock array push, strictly using SQL
+
   try {
     await dbQuery(`
       INSERT INTO distributor_applications (id, name, contact_name, phone, email, tax_id, address, plan_id, price, nodes, submitted_by, status, created_at, account, password, expiration_date)
@@ -3699,7 +3705,8 @@ export async function createTempleAccount(data: any) {
       pName = '無限免費方案';
   } else if (newTemple.cloudStorage) {
      if (newTemple.cloudStorage.startsWith('SP-')) {
-         const p = []?.find((x: any) => x.id === newTemple.cloudStorage) || db_storage_plans.find(x => x.id === newTemple.cloudStorage);
+         let p = await prisma.storagePlan.findUnique({ where: { id: newTemple.cloudStorage } }) as any;
+         if (!p) p = db_storage_plans.find(x => x.id === newTemple.cloudStorage);
          if (p) { qGB = p.sizeGb; pName = p.name; }
      } else {
          qGB = parseInt(newTemple.cloudStorage) || 5;
@@ -7736,10 +7743,17 @@ export async function updateDistributorPaymentConfig(distId: string, paymentConf
 }
 
 export async function verifySaasOrder(orderId: string, status: 'paid' | 'rejected') {
-  const order = db_saas_orders.find(o => o.id === orderId);
-  if (order) {
-    order.status = status;
-    return { success: true };
+  try {
+    const order = await prisma.saasOrder.findUnique({ where: { id: orderId } });
+    if (order) {
+      await prisma.saasOrder.update({
+        where: { id: orderId },
+        data: { status: status === 'paid' ? 'Paid' : 'Rejected' }
+      });
+      return { success: true };
+    }
+  } catch (e) {
+    console.error(e);
   }
   return { success: false, error: 'Order not found' };
 }

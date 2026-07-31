@@ -977,3 +977,15 @@ model AiChatLog {
 
   @@map("ai_chat_logs")
 }
+
+model SaasOrder {
+  id          String   @id
+  templeId    String   @map("temple_id")
+  type        String
+  planName    String   @map("plan_name")
+  amount      Float
+  status      String   @default("Paid")
+  timestamp   DateTime @default(now())
+  
+  @@map("saas_orders")
+}
