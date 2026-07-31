@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from 'react';
-import { fetchSystemConfig, requestPasswordReset, requestWithdrawal, fetchSuperSalesWithdrawals } from '@/app/actions';
+import { fetchSystemConfig, requestPasswordReset, requestWithdrawal, fetchSuperSalesWithdrawals, fetchSalesTools, fetchSuperSalesLogs, addSuperSalesLog } from '@/app/actions';
 import DistributorApplicationForm from '@/app/components/DistributorApplicationForm';
 
 export default function SuperSalesClient({ 
@@ -35,10 +35,18 @@ export default function SuperSalesClient({
   // --- Financial Mock Data (Enhanced) ---
   const [revenueHistory] = useState<any[]>([]);
   const [withdrawHistory] = useState<any[]>([]);
-  const [logs, setLogs] = useState([{ id: 1, action: "系統初始化", target: "超級業務權限", time: "15:34" }]);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [tools, setTools] = useState<any[]>([]);
 
-  const addLog = (action: string, target: string) => {
-    setLogs([{ id: Date.now(), action, target, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }, ...logs]);
+  useEffect(() => {
+    fetchSuperSalesLogs(initialProfile.name).then(setLogs);
+    fetchSalesTools().then(setTools);
+  }, [initialProfile.name]);
+
+  const addLog = async (action: string, target: string) => {
+    const newLog = { id: Date.now().toString(), action, target, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+    setLogs(prev => [newLog, ...prev]);
+    await addSuperSalesLog(initialProfile.name, action, target);
   };
 
   const handleAction = (type: string, name: string) => {
@@ -52,6 +60,7 @@ export default function SuperSalesClient({
     // 假設提領餘額為 $856,400 (依照原本介面寫死的值為例)
     if (confirm(`確定要提領您的帳戶餘額嗎？`)) {
       await requestWithdrawal(initialProfile.name, 856400);
+      addLog('申請提領餘額', `$856,400`);
       alert('提領申請已送出！');
       setIsWithdrawModalOpen(false);
       fetchSuperSalesWithdrawals(initialProfile.name).then(setWithdrawals);

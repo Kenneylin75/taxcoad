@@ -3183,7 +3183,58 @@ export async function addVisitationRecord(data: any) {
   return { success: true }; 
 }
 
-export async function fetchSalesTools() { return [...[]]; }
+export async function fetchSalesTools() {
+  try {
+    let tools = await prisma.tool.findMany();
+    if (tools.length === 0) {
+      const defaultTools = [
+        { name: "電子授權合約", description: "📑", isEnabled: true },
+        { name: "超級業務規章", description: "💎", isEnabled: true },
+        { name: "系統全功能手冊", description: "📖", isEnabled: true },
+        { name: "分潤結算細則", description: "📊", isEnabled: true }
+      ];
+      for (const t of defaultTools) {
+        await prisma.tool.create({ data: t });
+      }
+      tools = await prisma.tool.findMany();
+    }
+    const colorMap = ["bg-indigo-50 text-indigo-600", "bg-purple-50 text-purple-600", "bg-emerald-50 text-emerald-600", "bg-slate-100 text-slate-900"];
+    return tools.map((t, i) => ({ n: t.name, icon: t.description, c: colorMap[i % 4] }));
+  } catch (error) {
+    console.error('fetchSalesTools error:', error);
+    return [];
+  }
+}
+
+export async function fetchSuperSalesLogs(salesName: string) {
+  try {
+    const logs = await prisma.adminLog.findMany({
+      where: { adminName: salesName },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    return logs.map((l: any) => ({ id: l.id, action: l.action, target: l.target, time: l.timestamp }));
+  } catch (error) {
+    console.error('fetchSuperSalesLogs error:', error);
+    return [];
+  }
+}
+
+export async function addSuperSalesLog(salesName: string, action: string, target: string) {
+  try {
+    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    await prisma.adminLog.create({
+      data: {
+        adminName: salesName,
+        action,
+        target,
+        timestamp: time
+      }
+    });
+  } catch (error) {
+    console.error('addSuperSalesLog error:', error);
+  }
+}
 export async function uploadTool(formData: FormData) {
   const type = formData.get('type') as string;
   const title = formData.get('title') as string;
@@ -7177,6 +7228,7 @@ export async function fetchSuperAdminFinancials() {
   const totalCommission = records.filter(r => r.type === 'EXPENSE').reduce((s, r) => s + r.amount, 0);
   const netProfit = totalRevenue - totalCommission;
 
+  const config = await fetchSystemConfig();
   const templePayments = allTemples.filter((t: any) => !t.distributorId && t.status !== 'Inactive').map((t: any) => {
     const bills = templeBills.filter(b => b.temple_id === t.id || b.templeId === t.id);
     const unpaidBills = bills.filter(b => b.status === 'Unpaid' || b.status === 'PendingVerification');
@@ -7184,7 +7236,6 @@ export async function fetchSuperAdminFinancials() {
     const isPending = unpaidBills.some(b => b.status === 'PendingVerification');
 
     const isYearly = t.paymentCycle === 'Yearly';
-    const config = await fetchSystemConfig();
     const discountRate = config.yearlyDiscountRate || 20;
     const discountMultiplier = 1 - discountRate / 100;
     const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 3600);
