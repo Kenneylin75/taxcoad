@@ -2768,10 +2768,17 @@ export async function submitFreeAccountApplication(data: any) {
   
   const status = (role === 'distributor' || role === 'super-admin' || role === 'dist-sales') ? 'Active' : 'Pending';
 
-  const sales = [].find(s => s.name === data.submittedBy);
+  let sales: any = null;
+  try {
+    const salesRes = await dbQuery('SELECT id, distributor_id FROM dist_sales WHERE name = $1 OR account = $1', [data.submittedBy]);
+    sales = (salesRes as any)?.rows?.[0];
+  } catch (e) {
+    console.error('Failed to fetch sales info', e);
+  }
+
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
-  const templeNo = [].length + 1;
+  const templeNo = 1;
 
       const newTemple = {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
@@ -2788,7 +2795,7 @@ export async function submitFreeAccountApplication(data: any) {
       creatorRole: role,
       creatorId: currentUser.name,
       salesId: sales?.id || null,
-      distributorId: role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null)),
+      distributorId: role === 'super-admin' ? null : (sales?.distributor_id || (role === 'distributor' ? data.distributorId : null)),
       timestamp: new Date().toISOString(),
       billingStartDate: data.freeType === 'Trial' ? 
         new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
@@ -2801,9 +2808,9 @@ export async function submitFreeAccountApplication(data: any) {
     try {
       /* removed duplicate import */
       await dbQuery(
-        `INSERT INTO "Temple" (id, name, city, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle, account, password, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), now())`,
-        [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle, newTemple.account, newTemple.password]
+        `INSERT INTO "Temple" (id, name, city, address, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle, account, password, phone, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), now())`,
+        [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.address || '', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle, newTemple.account, newTemple.password, newTemple.templePhone || newTemple.contactPhone || '']
       );
       await dbQuery(
         `INSERT INTO temple_storages (id, temple_id, used_bytes, created_at, updated_at)
@@ -3122,7 +3129,12 @@ export async function fetchAllAccountsForAdmin() {
       account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
       templePhone: t.phone,
       status: t.status || 'Active',
-      creatorInfo: creatorInfo
+      creatorInfo: creatorInfo,
+      setupFee: t.setup_fee,
+      monthlyRent: t.monthly_rent,
+      paymentCycle: t.payment_cycle,
+      address: t.address,
+      timestamp: t.created_at
     };
   });
   
@@ -3329,6 +3341,9 @@ export async function fetchSuperSalesProfile(salesId: string) {
         const sales = await prisma.distributorSales.findUnique({
           where: { id: salesId }
         });
+        if (sales && typeof sales.bankAccount === 'string') {
+          try { sales.bankAccount = JSON.parse(sales.bankAccount); } catch(e) {}
+        }
         return sales;
       } catch (e) {
         console.error(e);
@@ -3387,6 +3402,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
             monthlyRent: r.monthly_rent,
             setupFee: r.setup_fee,
             paymentCycle: r.payment_cycle,
+            paymentStatus: r.payment_status,
             timestamp: r.created_at
           }));
         }
@@ -3428,11 +3444,16 @@ export async function fetchSuperSalesRegistry(salesId: string) {
        const m = now.getMonth() + 1;
        const y = now.getFullYear();
        const cycle = t.paymentCycle || 'Monthly';
-       const paymentStatus = hasUnpaid 
-          ? (cycle === 'Yearly' ? `${y}年未支付` : `${m}月未支付`)
-          : (cycle === 'Yearly' ? `${y}年已支付` : `${m}月已支付`);
+       let paymentStatus = '';
+       if (t.paymentStatus === 'PendingPayment' || (bills.length === 0 && t.freeType !== 'Permanent' && t.status !== 'Pending')) {
+          paymentStatus = cycle === 'Yearly' ? `${y}年未支付` : `${m}月未支付`;
+       } else {
+          paymentStatus = hasUnpaid 
+             ? (cycle === 'Yearly' ? `${y}年未支付` : `${m}月未支付`)
+             : (cycle === 'Yearly' ? `${y}年已支付` : `${m}月已支付`);
+       }
        
-       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp?.split('T')[0] || '未知', revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
+       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階營運方案', date: t.timestamp ? new Date(t.timestamp).toISOString().split('T')[0] : (t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '未知'), revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
     }
   }
 
@@ -3458,15 +3479,27 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     };
   });
 
-  const pendingTempleCount = [].filter(a => a.submittedBy === name && a.status === 'Pending').length;
+  let pendingTempleCount = 0;
+  for (const t of listTemples) {
+    if (t.status === 'Pending') {
+      const creatorInfo = await getTempleCreatorInfo(t.id);
+      if ((creatorInfo && creatorInfo.salesName === name) || t.salesId === salesId) {
+        pendingTempleCount++;
+      }
+    }
+  }
+
   let pgPendingDistCount = 0;
-  const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name], () => null) as any;
-    if (res && res.rows && res.rows.length > 0) pgPendingDistCount = parseInt(res.rows[0].count);
+  try {
+    const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name]);
+    if (res && (res as any).rows && (res as any).rows.length > 0) {
+      pgPendingDistCount = parseInt((res as any).rows[0].count);
+    }
+  } catch (e) {
+    console.error(e);
+  }
 
-  const memPendingDistCount = db_distributor_applications.filter(a => a.submittedBy === name && a.status === 'Pending').length;
-  const pendingDistCount = Math.max(pgPendingDistCount, memPendingDistCount);
-
-  const pendingCount = pendingTempleCount + pendingDistCount;
+  const pendingCount = pendingTempleCount + pgPendingDistCount;
 
   return { temples, distributors, pendingCount };
 }
@@ -3498,10 +3531,13 @@ export async function createSuperSalesAccount(data: any) {
             id,
             name: data.name,
             account: data.account,
+            phone: data.phone || null,
+            email: data.email || null,
             password: data.password || '',
             role: 'SuperSales',
             status: 'Active',
             commissionRules,
+            bankAccount: data.bankInfo || data.bankAccount || null,
             joinedAt: new Date().toISOString().split('T')[0]
           }
         });
@@ -3578,18 +3614,14 @@ export async function createDistributorAccount(data: any) {
   
   await null;
   
-  db_distributor_applications.push({
-    id: `DAPP-${id}`,
-    name: data.name,
-    plan: plan.name,
-    price: finalPrice,
-    submittedBy: 'System Admin',
-    status: 'Active',
-    account: safeAccount,
-    password: safePassword,
-    owner: data.owner,
-    date: new Date().toISOString().split('T')[0]
-  });
+  try {
+    await dbQuery(
+      "INSERT INTO distributor_applications (id, name, plan, price, submitted_by, status, account, password, owner) VALUES ($1, $2, $3, $4, $5, 'Active', $6, $7, $8)",
+      [`DAPP-${id}`, data.name, plan.name, finalPrice, 'System Admin', safeAccount, safePassword, data.owner || 'System']
+    );
+  } catch (err) {
+    console.error('Failed to insert into distributor_applications', err);
+  }
   
   try {
     await prisma.distributor.create({
@@ -3907,7 +3939,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
         records.push({
           id: bill.id,
           templeName: t.templeName,
-          date: bill.dueDate || bill.billingDate || bill.timestamp.split('T')[0],
+          date: bill.dueDate || bill.billingDate || (bill.timestamp ? new Date(bill.timestamp).toISOString().split('T')[0] : '未知'),
           type: label,
           amount: commission,
           percent,
@@ -3921,8 +3953,21 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   });
   
   // 3. 手動獎金覆寫 (Bonus Overrides)
-  const myBonuses = [].filter(b => b.salesName === salesName);
-  myBonuses.forEach(b => {
+  let myBonuses = [];
+  try {
+    const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 AND status = 'Approved'", [salesId]) as any;
+    if (rows) {
+      myBonuses = rows.map((r: any) => ({
+        id: r.id,
+        salesName: r.sales_name,
+        date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
+        amount: r.amount,
+        reason: r.reason || '手動發放'
+      }));
+    }
+  } catch (e) {}
+
+  myBonuses.forEach((b: any) => {
     totalEarned += b.amount;
     records.push({
       id: b.id,
@@ -3935,7 +3980,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     });
   });
   
-  let myWithdrawals = [].filter(w => w.salesName === salesName);
+  let myWithdrawals: any[] = [];
   /* removed duplicate import */
     const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
     const myBonusRequests = (rows || []).map((r: any) => ({
@@ -7177,15 +7222,31 @@ export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-
       try {
-        const temple = await prisma.temple.findUnique({ where: { id: templeId }, include: { sales: { include: { distributor: true } } } });
-        if (!temple || !temple.sales) return null;
+        const res = await dbQuery('SELECT sales_id, distributor_id, super_sales_id FROM "Temple" WHERE id = $1', [templeId]);
+        const temple = (res as any)?.rows?.[0];
+        if (!temple) return null;
+
+        let salesName = '';
+        let distName = '';
+
+        if (temple.sales_id) {
+           const salesRes = await dbQuery('SELECT name FROM dist_sales WHERE id = $1', [temple.sales_id]);
+           salesName = (salesRes as any)?.rows?.[0]?.name || temple.sales_id;
+        } else if (temple.super_sales_id) {
+           const salesRes = await dbQuery('SELECT name FROM dist_sales WHERE id = $1', [temple.super_sales_id]);
+           salesName = (salesRes as any)?.rows?.[0]?.name || temple.super_sales_id;
+        }
+
+        if (temple.distributor_id) {
+           const distRes = await dbQuery('SELECT name FROM "Distributor" WHERE id = $1', [temple.distributor_id]);
+           distName = (distRes as any)?.rows?.[0]?.name || temple.distributor_id;
+        }
+
         return {
-          type: 'Sales',
-          id: temple.sales.id,
-          name: temple.sales.name,
-          distributorName: temple.sales.distributor?.name || ''
+           type: temple.sales_id ? 'Sales' : (temple.distributor_id ? 'Distributor' : 'super_admin'),
+           salesName: salesName,
+           distName: distName
         };
       } catch(e) {
         return null;

@@ -13,7 +13,7 @@ import {
   uploadTool, 
   deleteTool,
   approveTempleBySuperAdmin, 
-  rejectTempleBySuperAdmin, 
+  rejectTempleBySuperAdmin,
   fetchSystemConfig, 
   updateSystemConfig,
   fetchPendingDistributors,
@@ -637,6 +637,7 @@ export default function SuperAdminClient({
                                  </p>
                                  <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
                                     <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.freeType === 'Trial' ? '免費試用' : app.freeType === 'Permanent' ? '永久免費' : '標準方案'}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">開辦費：NT$ {Number(app.setupFee || 0).toLocaleString()}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded">繳費：{app.paymentCycle === 'Yearly' ? '年繳' : '月繳'}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded">{app.paymentCycle === 'Yearly' ? '年費' : '月費'}：NT$ {app.paymentCycle === 'Yearly' ? Number((app.monthlyRent || 3600) * 12 * 0.8).toLocaleString() : Number(app.monthlyRent || 0).toLocaleString()}</span>
                                  </div>
@@ -647,11 +648,11 @@ export default function SuperAdminClient({
                              </div>
                           </div>
                           <div className="flex gap-6">
-                              <button onClick={() => approveDistributorBySuperAdmin(app.id).then(()=>window.location.reload())} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
+                              <button onClick={() => approveTempleBySuperAdmin(app.id).then(()=>window.location.reload())} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
                               <button onClick={() => {
                                  const reason = prompt('請填寫駁回原因：');
                                  if (reason !== null) {
-                                    rejectDistributorBySuperAdmin(app.id, reason).then(()=>window.location.reload());
+                                    rejectTempleBySuperAdmin(app.id).then(()=>window.location.reload());
                                  }
                               }} className="px-10 py-5 bg-rose-500 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-rose-600 transition-all">駁回</button>
                            </div>

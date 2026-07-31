@@ -62,6 +62,7 @@ model DistributorSales {
   distributorId String?  @map("distributor_id")
   name          String
   phone         String?
+  email         String?
   status        String   @default("Active")
   setupFee      Int      @default(0)
   monthlyRent   Int      @default(0)
@@ -158,6 +159,7 @@ model Temple {
   city          String?
   address       String?
   phone         String?
+  email         String?
   status        String   @default("Active")
   setupFee      Int      @default(0) @map("setup_fee")
   monthlyRent   Int      @default(0) @map("monthly_rent")
@@ -275,6 +277,7 @@ model User {
   role        String
   templeId    String?  @map("temple_id")
   phone       String?
+  email       String?
   status        String   @default("Active")
   setupFee      Int      @default(0) @map("setup_fee")
   monthlyRent   Int      @default(0) @map("monthly_rent")

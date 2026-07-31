@@ -44,3 +44,8 @@ Before every database change: Validate schema, Review migration, Never drop tabl
 
 ### Deliverables
 Every task must include: Files modified, Schema changes, Migration summary, Indexes added, Foreign keys added, Validation results, Build status.
+
+### Local Development Startup
+When asked to start the local environment or server, you MUST ensure both the Next.js server and PostgreSQL are running.
+- Start PostgreSQL explicitly as a long-running background task using: `C:\Users\KenneyLin\pgsql\bin\postgres.exe -D C:\Users\KenneyLin\pgsql\data` (Do NOT use `pg_ctl start` in a background task, as Windows job objects will kill it when the task ends).
+- Start the Next.js dev server in a separate background task using `npm run dev`.
