@@ -92,9 +92,10 @@ export async function GET() {
       planId: 'plan_1',
       setupFee: 1000,
       monthlyRent: 500,
-      paymentCycle: 'Monthly'
-    }, 'DistSales', dsAccount);
-    
+      paymentCycle: 'Monthly',
+      salesId: ds.id,
+      distributorId: dist.id
+    });
     if (templeRes && templeRes.success === false) {
       throw new Error(`Temple creation failed: ${templeRes.message}`);
     }
