@@ -2283,7 +2283,7 @@ export async function fetchB2BPaymentConfig(templeId: string) {
       return dist?.b2bPayment || null;
     } else {
       const sysConfig = await fetchSystemConfig();
-      return sysConfig?.b2bPayment || db_config.b2bPayment || null;
+      return sysConfig?.b2bPayment || null;
     }
   } catch (e) {
     console.error(e);
@@ -2382,7 +2382,8 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
     if (!plan) plan = db_storage_plans.find((p: any) => p.id === planId);
     if (!plan) return { success: false, message: '找不到選定的空間方案' };
 
-    const discount = db_config.yearlyDiscountRate || 20;
+    const config = await fetchSystemConfig();
+    const discount = config.yearlyDiscountRate || 20;
     const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
@@ -2683,7 +2684,8 @@ export async function generateInitialBills(newTemple: any) {
 
   if (newTemple.freeType !== 'Permanent') {
     const isYearly = newTemple.paymentCycle === 'Yearly';
-    const rentAmount = isYearly ? (monthlyRent * 12 * (1 - (db_config.yearlyDiscountRate || 20) / 100)) : monthlyRent;
+    const config = await fetchSystemConfig();
+    const rentAmount = isYearly ? (monthlyRent * 12 * (1 - (config.yearlyDiscountRate || 20) / 100)) : monthlyRent;
     const rentType = isYearly ? 'YearlyFee' : 'MonthlyFee';
     const setupFee = newTemple.setupFee ?? 12000;
 
@@ -2790,7 +2792,7 @@ export async function submitFreeAccountApplication(data: any) {
       account,
       password,
       paymentCycle: paymentCycle || 'Monthly',
-      monthlyRent: data.freeType === 'Permanent' ? 0 : (db_config.fixedMonthlyRent || 3600),
+      monthlyRent: data.freeType === 'Permanent' ? 0 : ((await fetchSystemConfig()).fixedMonthlyRent || 3600),
       trialMonths: data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0,
       freeType: data.freeType || 'Normal',
       role: 'Temple',
@@ -3111,7 +3113,8 @@ export async function fetchAllAccountsForAdmin() {
   for (const s of Array.from(allSalesMap.values()) as any[]) {
     if (s.role === 'SuperSales') {
       const overrides = superOverrides[s.name];
-      const mergedRules = overrides || s.commissionRules || db_config.defaultSuperSalesRates;
+      const config = await fetchSystemConfig();
+      const mergedRules = overrides || s.commissionRules || config.defaultSuperSalesRates;
       accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active', commissionRules: mergedRules });
     }
   }
@@ -3436,9 +3439,10 @@ export async function fetchSuperSalesRegistry(salesId: string) {
        let yearlyRent = 0;
        let setupFee = 0;
        if (t.freeType !== 'Permanent') {
-          const rent = Number(t.monthlyRent) || (db_config.fixedMonthlyRent || 3600);
+          const config = await fetchSystemConfig();
+          const rent = Number(t.monthlyRent) || (config.fixedMonthlyRent || 3600);
           const cycle = t.paymentCycle || 'Monthly';
-          const discount = db_config.yearlyDiscountRate || 20;
+          const discount = config.yearlyDiscountRate || 20;
           yearlyRent = cycle === 'Yearly' ? (rent * 12 * (1 - discount / 100)) : (rent * 12);
           setupFee = t.setupFee ?? 12000;
        }
@@ -3586,7 +3590,8 @@ export async function createDistributorAccount(data: any) {
   const safeAccount = (data.account || '').trim();
   const safePassword = (data.password || '').trim();
   const id = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-  const plan = db_config.distributorPlans.find((p: any) => p.id === data.planId) || db_config.distributorPlans[0];
+  const config = await fetchSystemConfig();
+  const plan = config.distributorPlans.find((p: any) => p.id === data.planId) || config.distributorPlans[0];
   const finalPrice = Number(data.customPrice) || plan.price;
   
   const expirationDate = new Date();
@@ -3670,7 +3675,8 @@ export async function createTempleAccount(data: any) {
     const templeNo = [].length + 1;
   const { paymentCycle, ...rest } = data;
   
-  const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || db_config.fixedMonthlyRent);
+  const config = await fetchSystemConfig();
+  const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || config.fixedMonthlyRent || 3600);
   const trialMonths = data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0;
   
   const newTemple = {
@@ -3898,7 +3904,8 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   const records: any[] = [];
   
   const overrides = salesName ? [][salesName] : null;
-  const rules = sales?.commissionRules || overrides || db_config.defaultSuperSalesRates;
+  const config = await fetchSystemConfig();
+  const rules = sales?.commissionRules || overrides || config.defaultSuperSalesRates;
   const setupRate = rules.templeSetupRate ?? rules.setupFeePercent ?? 20;
   const rentY1 = rules.templeRentRates?.[0] ?? rules.rentYear1Percent ?? 15;
   const rentY2 = rules.templeRentRates?.[1] ?? rules.rentYear2Percent ?? 12;
@@ -4802,7 +4809,7 @@ export async function fetchFinancialOverview() {
           }
         } else {
            const sysConfig = await fetchSystemConfig();
-           payeeSettings[pId] = sysConfig?.b2bPayment || db_config?.b2bPayment || null;
+           payeeSettings[pId] = sysConfig?.b2bPayment || null;
         }
       }
     }
@@ -7177,7 +7184,8 @@ export async function fetchSuperAdminFinancials() {
     const isPending = unpaidBills.some(b => b.status === 'PendingVerification');
 
     const isYearly = t.paymentCycle === 'Yearly';
-    const discountRate = db_config.yearlyDiscountRate || 20;
+    const config = await fetchSystemConfig();
+    const discountRate = config.yearlyDiscountRate || 20;
     const discountMultiplier = 1 - discountRate / 100;
     const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 3600);
     const rentAmount = t.freeType === 'Permanent' ? 0 : calcPrice;
