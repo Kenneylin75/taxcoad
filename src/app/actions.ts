@@ -2749,11 +2749,19 @@ export async function generateInitialBills(newTemple: any) {
         const exists = [].find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
         if (!exists) {
           await null;
-          await dbQuery(
-            "INSERT INTO \"TempleBill\" (id, temple_id, \"itemName\", amount, \"dueDate\", status, \"payeeRole\", \"payeeId\") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)",
-            [newBill.id, newTemple.id, newBill.type, newBill.amount, newBill.dueDate, newBill.payeeRole, newBill.payeeId]
-          ).catch(err => {
-             console.error('Failed dbQuery in generateInitialBills', err);
+          await prisma.templeBill.create({
+            data: {
+              id: newBill.id,
+              templeId: newTemple.id,
+              itemName: newBill.type,
+              amount: newBill.amount,
+              dueDate: newBill.dueDate,
+              status: 'Unpaid',
+              payeeRole: newBill.payeeRole,
+              payeeId: newBill.payeeId
+            }
+          }).catch(err => {
+             console.error('Failed Prisma create in generateInitialBills', err);
           });
         }
       }
@@ -3262,8 +3270,22 @@ export async function uploadTool(formData: FormData) {
   }
 
   const uploadedAt = new Date().toISOString().split('T')[0];
-  await null;
-  
+  try {
+    await prisma.tool.create({
+      data: {
+        id: 'tool-' + Date.now(),
+        type: type,
+        title: title,
+        category: category,
+        url: url,
+        thumbnail: thumbnail,
+        uploadedAt: uploadedAt,
+        uploadedBy: 'System'
+      }
+    });
+  } catch(e) {
+    console.error('Failed to upload tool to db', e);
+  }
   const { revalidatePath } = require('next/cache');
   revalidatePath('/super-admin');
   revalidatePath('/distributor');
@@ -3281,26 +3303,32 @@ export async function createDistributorSales(distId: string, data: any) {
   const joinedAt = new Date().toISOString().split('T')[0];
 
   try {
-    await prisma.distributorSales.upsert({
-      where: { account },
-      update: {
-        password,
-        status: 'Active',
-        phone
-      },
-      create: {
-        id: newSalesId,
-        distributorId: distId,
-        name,
-        account,
-        password,
-        phone,
-        role: 'DistSales',
-        status: 'Active',
-        joinedAt,
-        commissionRules: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate }
-      }
-    });
+    const existing = await prisma.distributorSales.findFirst({ where: { account } });
+    if (existing) {
+      await prisma.distributorSales.update({
+        where: { id: existing.id },
+        data: {
+          password,
+          status: 'Active',
+          phone
+        }
+      });
+    } else {
+      await prisma.distributorSales.create({
+        data: {
+          id: newSalesId,
+          distributorId: distId,
+          name,
+          account,
+          password,
+          phone,
+          role: 'DistSales',
+          status: 'Active',
+          joinedAt,
+          commissionRules: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate }
+        }
+      });
+    }
   } catch (e) {
     console.error("DB Insert Error for dist_sales:", e);
     return { success: false, error: String(e) };
@@ -3309,16 +3337,20 @@ export async function createDistributorSales(distId: string, data: any) {
   return { success: true, data: { id: newSalesId } };
 }
 export async function deleteTool(toolId: string) {
-  const idx = [].findIndex((t: any) => t.id === toolId);
-  if (idx > -1) {
-    [].splice(idx, 1);
+  try {
+    await prisma.tool.delete({
+      where: { id: toolId }
+    });
+    const { revalidatePath } = require('next/cache');
     revalidatePath('/super-admin');
     revalidatePath('/distributor');
     revalidatePath('/dist-sales');
     revalidatePath('/super-sales/[salesId]', 'page');
     return { success: true };
+  } catch (e) {
+    console.error('Failed to delete tool', e);
+    return { success: false, error: 'Tool not found or delete failed' };
   }
-  return { success: false, error: 'Tool not found' };
 }
 export async function fetchEContracts() { return []; }
 export async function submitEContract(fd: any) { return { success: true }; }
@@ -3729,7 +3761,7 @@ export async function createTempleAccount(data: any) {
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
   const creatorRole = reqRole;
-  const creatorId = currentUser.name;
+  const creatorId = currentUser?.name || 'System';
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
     const templeNo = [].length + 1;
   const { paymentCycle, ...rest } = data;
@@ -3805,35 +3837,49 @@ export async function createTempleAccount(data: any) {
     await null;
   }
   /* removed duplicate import */
-    await dbQuery(`
-        INSERT INTO "Temple" (id, name, temple_name, account, region, city, address, phone, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      `, [
-        id, 
-        newTemple.templeName || '未知宮廟', 
-        newTemple.templeName || '未知宮廟',
-        data.account || null,
-        data.region || null,
-        newTemple.city || '台北市', 
-        data.address || null,
-        data.phone || null,
-        'Active', 
-        newTemple.salesId || null, 
-        newTemple.distributorId || null, 
-        newTemple.setupFee || 0, 
-        newTemple.monthlyRent || 0, 
-        newTemple.paymentCycle || 'Monthly'
-      ]);
-    await dbQuery(`
-        INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [id, 0, newStorage.quotaGb * 1024 * 1024 * 1024, newStorage.planName, '台北市']);
+    await prisma.temple.create({
+      data: {
+        id,
+        name: newTemple.templeName || '未知宮廟',
+        templeName: newTemple.templeName || '未知宮廟',
+        account: data.account || null,
+        region: data.region || null,
+        city: newTemple.city || '台北市',
+        address: data.address || null,
+        phone: data.phone || null,
+        status: 'Active',
+        salesId: newTemple.salesId || null,
+        distributorId: newTemple.distributorId || null,
+        setupFee: newTemple.setupFee || 0,
+        monthlyRent: newTemple.monthlyRent || 0,
+        paymentCycle: newTemple.paymentCycle || 'Monthly',
+      }
+    });
+
+    await prisma.templeStorage.create({
+      data: {
+        templeId: id,
+        usedBytes: BigInt(0),
+        allocatedBytes: BigInt(newStorage.quotaGb) * BigInt(1024 * 1024 * 1024),
+        planName: newStorage.planName,
+        city: '台北市'
+      }
+    });
+
     if (data.account && data.password) {
-            await dbQuery(`
-          INSERT INTO "User" (id, "templeId", name, role, account, phone, password, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `, [`p-${Date.now()}`, id, data.name || '宮廟管理員', 'TempleAdmin', data.account, data.account, data.password, 'Active']);
-          }
+      await prisma.user.create({
+        data: {
+          id: `p-${Date.now()}`,
+          templeId: id,
+          name: data.name || '宮廟管理員',
+          role: 'TempleAdmin',
+          account: data.account,
+          phone: data.account,
+          password: data.password,
+          status: 'Active'
+        }
+      });
+    }
 
     // Deduct quota if Distributor/Sales
     const { cookies } = require("next/headers");
@@ -3843,10 +3889,13 @@ export async function createTempleAccount(data: any) {
   
     if (currentRole === 'Distributor' || currentRole === 'DistSales') {
       if (currentRole === 'Distributor') {
-        const dist = [].find((d: any) => d.account === accountStr);
+        const dist = await prisma.distributor.findFirst({ where: { account: accountStr } });
         if (dist) {
            if (dist.quota <= 0) return { success: false, message: '配額已耗盡，無法開設新宮廟' };
-           dist.quota -= 1;
+           await prisma.distributor.update({
+             where: { id: dist.id },
+             data: { quota: dist.quota - 1 }
+           });
         }
       }
     }
@@ -4197,14 +4246,22 @@ export async function fetchDistributorTemples(distributorId: string) {
       }
 }
 export async function fetchDistributorVisits(distributorId: string) {
-  let listSales = [...[]];
-  /* removed duplicate import */
-    const resSales = await dbQuery("SELECT * FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
-    if (resSales && resSales.rows) {
-          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
-        }
-  const teamIds = listSales.filter(s => s.distributorId === distributorId).map(s => s.name);
-  return [].filter(v => teamIds?.includes(v.salesName));
+  try {
+    const resSales = await dbQuery("SELECT id, name FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
+    if (!resSales || !resSales.rows || resSales.rows.length === 0) return [];
+    
+    const teamNames = resSales.rows.map((r: any) => r.name);
+    const visits = await prisma.salesVisit.findMany({
+      where: {
+        salesName: { in: teamNames }
+      },
+      orderBy: { timestamp: 'desc' }
+    });
+    return visits;
+  } catch(e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
@@ -5824,23 +5881,39 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
 
+    let amount = 0;
+    let category = 'OTHER';
+    let source = '';
+
     if (recordType === 'Appointment') {
-      await prisma.appointment.updateMany({
-        where: { id: recordId, templeId },
-        data: { status: 'Confirmed', paymentStatus: 'Paid' }
-      });
+      const rec = await prisma.appointment.findFirst({ where: { id: recordId, templeId } });
+      if (rec) {
+         amount = rec.price || 0; category = 'SERVICE'; source = `預約服務付款 - ${rec.serviceName}`;
+         await prisma.appointment.updateMany({
+           where: { id: recordId, templeId },
+           data: { status: 'Confirmed', paymentStatus: 'Paid' }
+         });
+      }
     }
     if (recordType === 'Lamp') {
-      await prisma.lampRecord.updateMany({
-        where: { id: recordId, templeId },
-        data: { paymentStatus: 'Paid' }
-      });
+      const rec = await prisma.lampRecord.findFirst({ where: { id: recordId, templeId } });
+      if (rec) {
+         amount = rec.actualPrice || 0; category = 'LAMP'; source = `點燈付款 - ${rec.categoryName}`;
+         await prisma.lampRecord.updateMany({
+           where: { id: recordId, templeId },
+           data: { paymentStatus: 'Paid' }
+         });
+      }
     }
     if (recordType === 'Event') {
-      await prisma.eventRegistration.updateMany({
-        where: { id: recordId, templeId },
-        data: { paymentStatus: 'Paid' }
-      });
+      const rec = await prisma.eventRegistration.findFirst({ where: { id: recordId, templeId } });
+      if (rec) {
+         amount = rec.actualPrice || 0; category = 'EVENT'; source = `法會付款 - ${rec.eventName}`;
+         await prisma.eventRegistration.updateMany({
+           where: { id: recordId, templeId },
+           data: { paymentStatus: 'Paid' }
+         });
+      }
     }
     if (recordType === 'Queue') {
       await prisma.queueTicket.updateMany({
@@ -5848,6 +5921,13 @@ export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Eve
         data: { paymentStatus: 'Paid' }
       });
     }
+
+    if (amount > 0) {
+      await prisma.financeRecord.create({
+         data: { templeId, type: 'INCOME', category, amount, source, date: new Date() }
+      });
+    }
+
     await revalidateTemple();
     return { success: true };
   } catch (e) {
@@ -6330,10 +6410,20 @@ export async function approveFreeAccount(id: string) { return { success: true };
 export async function rejectFreeAccount(id: string) { return { success: true }; }
 
 export async function completeMeritPayment(phone: string, recordId: string, amount: number, service: string) {
-  // Mock implementation: just log it and return success
-  console.log(`[MERIT PAYMENT] Phone: ${phone}, ID: ${recordId}, Amount: ${amount}, Service: ${service}`);
-  await revalidateTemple();
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    
+    await prisma.financeRecord.create({
+      data: { templeId, type: 'INCOME', category: 'DONATION', amount: Number(amount), source: `香油錢/緣金 - ${service}`, date: new Date() }
+    });
+    
+    await revalidateTemple();
     return { success: true };
+  } catch (e) {
+    console.error('completeMeritPayment error:', e);
+    return { success: false };
+  }
 }
 
 // -------------------------------------------------------------------------
