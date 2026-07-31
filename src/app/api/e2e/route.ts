@@ -72,10 +72,10 @@ export async function GET() {
     if (!ds) throw new Error("DistSales not found in DB");
 
     // Give distributor some quota so Temple creation succeeds
-    await prisma.distributor.update({
-      where: { id: dist.id },
-      data: { quota: 10 }
-    });
+    // await prisma.distributor.update({
+    //   where: { id: dist.id },
+    //   data: { quota: 10 } as any
+    // });
 
     // 4. Create Temple
     const templeAccount = `temple_${postfix}`;
