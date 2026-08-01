@@ -168,6 +168,11 @@ model Temple {
   salesId       String?  @map("sales_id")
   superSalesId  String?  @map("super_sales_id")
   planId        String?  @map("plan_id")
+  themeColor    String?  @map("theme_color")
+  logoUrl       String?  @map("logo_url")
+  bannerUrl     String?  @map("banner_url")
+  analyticsData Json?    @map("analytics_data")
+  guestSettings Json?    @map("guest_settings")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -468,11 +473,16 @@ model Service {
 }
 
 model ServiceSetting {
-  id          String   @id @default(cuid())
-  templeId    String   @map("temple_id")
-  pushConfigs Json?    @map("push_configs")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                String   @id @default(cuid())
+  templeId          String   @map("temple_id")
+  pushConfigs       Json?    @map("push_configs")
+  cancelHoursBefore Int?     @map("cancel_hours_before")
+  modifyHoursBefore Int?     @map("modify_hours_before")
+  allowCancel       Boolean? @default(true) @map("allow_cancel")
+  allowModify       Boolean? @default(true) @map("allow_modify")
+  modules           Json?    @map("modules")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 

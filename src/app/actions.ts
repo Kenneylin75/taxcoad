@@ -1440,7 +1440,33 @@ export async function guestLogout() {
   return { success: true };
 }
 
-export async function fetchGuestSettings() { return {}; }
+export async function fetchGuestSettings() {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return {};
+    const t = await prisma.temple.findUnique({ where: { id: templeId } });
+    if (!t) return {};
+    return (t.guestSettings as any) || { requireBirthday: false, requireAddress: false, requireNeeds: false };
+  } catch(e) {
+    console.error(e);
+    return {};
+  }
+}
+
+export async function updateGuestSettings(settings: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    await prisma.temple.update({
+      where: { id: templeId },
+      data: { guestSettings: settings }
+    });
+    return { success: true };
+  } catch(e) {
+    console.error(e);
+    return { success: false };
+  }
+}
 export async function askAgiAssistant(q: string, h: number) {
   const store = await cookies();
   const templeId = await getDynamicTempleId();
@@ -1569,7 +1595,8 @@ export async function fetchGuestAppointments(p: any) {
 }
 export async function fetchServiceSettings() { 
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+  const defaultSettings = { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+  if (!templeId) return defaultSettings;
 
   try {
     const existing = await prisma.serviceSetting.findFirst({
@@ -1577,20 +1604,19 @@ export async function fetchServiceSettings() {
     });
 
     if (existing) {
-      const s = (existing.pushConfigs as any) || {};
       return {
-        ...s,
-        cancelHoursBefore: s.cancelHoursBefore ?? 24,
-        modifyHoursBefore: s.modifyHoursBefore ?? 24,
-        allowCancel: s.allowCancel ?? true,
-        allowModify: s.allowModify ?? true,
-        pushConfigs: Array.isArray(s) ? s : (s.pushConfigs || [])
+        cancelHoursBefore: existing.cancelHoursBefore ?? 24,
+        modifyHoursBefore: existing.modifyHoursBefore ?? 24,
+        allowCancel: existing.allowCancel ?? true,
+        allowModify: existing.allowModify ?? true,
+        pushConfigs: (existing.pushConfigs as any) || [],
+        modules: (existing.modules as any) || defaultSettings.modules
       };
     }
-    return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+    return defaultSettings;
   } catch (error) {
     console.error('fetchServiceSettings error:', error);
-    return { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+    return defaultSettings;
   }
 }
 
@@ -4371,10 +4397,55 @@ export async function rejectTempleByDistributor(templeId: string) {
   return { success: true }; 
 }
 export type Organization = any;
-export async function fetchOrganizations() { return []; }
+export async function fetchOrganizations() {
+  try {
+    const temples = await prisma.temple.findMany({
+      select: { id: true, templeName: true, name: true, status: true, planId: true }
+    });
+    const dists = await prisma.distributor.findMany({
+      select: { id: true, name: true, status: true }
+    });
+    
+    const orgs = [
+      ...temples.map(t => ({ id: t.id, name: t.templeName || t.name, type: 'Temple', status: t.status, planInfo: t.planId })),
+      ...dists.map(d => ({ id: d.id, name: d.name, type: 'DistributorOffice', status: d.status }))
+    ];
+    return orgs;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+}
+
 export type AnalyticsSettings = any;
-export async function updateAnalyticsSettings() { return { success: true }; }
-export async function fetchAnalyticsSettings() { return {}; }
+
+export async function updateAnalyticsSettings(settings: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    await prisma.temple.update({
+      where: { id: templeId },
+      data: { analyticsData: settings }
+    });
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
+}
+
+export async function fetchAnalyticsSettings() {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return {};
+    const t = await prisma.temple.findUnique({ where: { id: templeId } });
+    if (!t) return {};
+    return (t.analyticsData as any) || {};
+  } catch (e) {
+    console.error(e);
+    return {};
+  }
+}
 export async function fetchComplexAnalyticsData() { 
   const templeId = await getDynamicTempleId();
 
@@ -7091,6 +7162,9 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
         if (data.city) updateData.city = data.city;
         if (data.address) updateData.address = data.address;
         if (data.phone) updateData.phone = data.phone;
+        if (data.themeColor) updateData.themeColor = data.themeColor;
+        if (data.logoUrl) updateData.logoUrl = data.logoUrl;
+        if (data.bannerUrl) updateData.bannerUrl = data.bannerUrl;
         
         if (Object.keys(updateData).length > 0) {
           await prisma.temple.update({
@@ -7101,6 +7175,7 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
         
         const { revalidatePath } = require('next/cache');
         revalidatePath('/[templeId]/admin/settings', 'page');
+        revalidatePath('/[templeId]/admin/appearance', 'page');
         return { success: true };
       } catch (e) {
         console.error(e);
