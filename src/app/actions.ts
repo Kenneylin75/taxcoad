@@ -2643,7 +2643,7 @@ export async function updateSystemConfig(data: any) {
 export async function fetchFreeApplications(distId?: string) { 
   let list = [...[]];
   /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"created_at\" DESC", [], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"createdAt\" DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
           list = res.rows.map((r: any) => ({
             ...r,
@@ -7176,7 +7176,7 @@ export async function fetchDistributorFinancials(distId: string) {
 
     let bills: any[] = [];
     if (templeIds.length > 0) {
-      const billsRes = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = ANY($1::varchar[]) ORDER BY created_at DESC", [templeIds], () => null) as any;
+      const billsRes = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = ANY($1::varchar[]) ORDER BY \"createdAt\" DESC", [templeIds], () => null) as any;
       bills = billsRes?.rows || [];
     }
     
@@ -7692,7 +7692,7 @@ export async function fetchDistributorTempleBills(distributorId: string) {
     const billsQuery = `
       SELECT * FROM "TempleBill" 
       WHERE temple_id = ANY($1::varchar[]) OR payee_id = $2
-      ORDER BY created_at DESC
+      ORDER BY "createdAt" DESC
     `;
     const billsRes = await dbQuery(billsQuery, [templeIds, distributorId], () => null) as any;
     const bills = billsRes?.rows || [];
