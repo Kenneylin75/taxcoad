@@ -6929,7 +6929,7 @@ export async function submitFreeAccountApplication(data: any) {
       creatorRole: role,
       creatorId: currentUser.name,
       salesId: sales?.id || null,
-      distributorId: role === 'super-admin' ? null : (sales?.distributor_id || (role === 'distributor' ? data.distributorId : null)),
+      distributorId: role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null)),
       timestamp: new Date().toISOString(),
       billingStartDate: data.freeType === 'Trial' ? 
         new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
