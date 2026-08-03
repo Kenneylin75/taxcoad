@@ -1695,7 +1695,7 @@ export default function SuperAdminClient({
                                        {node.planName} {node.price > 0 ? (node.planName.includes('經銷') && node.price >= 160000 ? `(NT$${node.price.toLocaleString()} / ${node.durationYears || 2}年 / ${node.nodes || 100}組宮廟帳戶)` : `(NT$${node.price.toLocaleString()})`) : '(免費)'}
                                     </span>
                                  )}
-                                 {node.type === 'temple' && node.freeType !== 'Permanent' && (() => {
+                                 {node.type === 'temple' && node.planName !== '永久免費' && node.freeType !== 'Permanent' && (() => {
                                     const now = new Date();
                                     const start = node.billingStartDate ? new Date(node.billingStartDate) : new Date(node.joinedAt);
                                     const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
