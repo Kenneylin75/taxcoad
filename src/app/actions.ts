@@ -4729,7 +4729,7 @@ export async function fetchFinancialOverview() {
         dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND amount > 0 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM event_registrations WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM queue_tickets WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
-        dbQuery("SELECT * FROM deep_records WHERE temple_id = $1 AND (id LIKE 'MERIT-%' OR service_type LIKE '%功德%')", [templeId], () => null) as any
+        dbQuery("SELECT * FROM deep_records WHERE temple_id = $1 AND (id LIKE 'MERIT-%' OR category LIKE '%功德%')", [templeId], () => null) as any
       ]);
       
       if (appRes?.rows) {
@@ -4811,7 +4811,7 @@ export async function fetchFinancialOverview() {
             if (vals && vals['付款人']) payer = vals['付款人'];
           revenue.push({
             id: r.id,
-            title: r.service_type,
+            title: r.category,
             source: 'Merit',
             amount: amt,
             timestamp: r.payment_updated_at || r.created_at || (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date)),
