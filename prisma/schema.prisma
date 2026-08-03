@@ -22,7 +22,7 @@ model PricePlan {
   annualPrice  Int      @default(0) @map("annual_price")
   features     Json?
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
   temples      Temple[]
 
   @@map("price_plans")
@@ -49,7 +49,7 @@ model Distributor {
   nodes        Int?     @default(100)
   customNodes  Int?     @default(100) @map("custom_nodes")
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   sales   DistributorSales[]
   temples Temple[]
@@ -74,7 +74,7 @@ model DistributorSales {
   commissionRules Json?  @map("commission_rules")
   joinedAt      String?  @map("joined_at")
   createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   commissions Commission[]
@@ -89,7 +89,7 @@ model Commission {
   amount    Int      @default(0)
   status    String?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   sales DistributorSales? @relation(fields: [salesId], references: [id])
 
@@ -104,7 +104,7 @@ model SalesVisit {
   content    String?
   date       String?
   createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   sales DistributorSales? @relation(fields: [salesId], references: [id])
 
@@ -130,7 +130,7 @@ model DistributorApplication {
   status      String   @default("Pending")
   submittedBy String?  @map("submitted_by")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("distributor_applications")
 }
@@ -140,7 +140,7 @@ model SuperSalesOverride {
   ruleName     String?  @map("rule_name")
   overrideData Json?    @map("override_data")
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("super_sales_overrides")
 }
@@ -179,7 +179,7 @@ model Temple {
   linePushEnabled    Boolean? @default(false) @map("line_push_enabled")
   formTemplates      Json?    @map("form_templates")
   createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   plan        PricePlan?   @relation(fields: [planId], references: [id])
@@ -224,7 +224,7 @@ model TempleApplication {
   status        String   @default("Pending")
   salesId       String?  @map("sales_id")
   createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("temple_applications")
 }
@@ -242,7 +242,7 @@ model TempleBill {
   payeeId     String?  @map("payee_id")
   timestamp   String?
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 }
@@ -253,7 +253,7 @@ model StoragePlan {
   priceMonthly Int      @map("price_monthly")
   priceYearly  Int      @map("price_yearly")
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("storage_plans")
 }
@@ -267,7 +267,7 @@ model TempleStorage {
   city           String?
   planId         String?  @map("plan_id")
   createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -295,7 +295,7 @@ model User {
   permissions Json?
   avatar      String?
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
 }
@@ -311,7 +311,7 @@ model Admin {
   monthlyRent   Int      @default(0)
   paymentCycle  String   @default("Yearly")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("admins")
 }
@@ -326,7 +326,7 @@ model AdminLog {
   timestamp   String?
   performedBy String?  @map("performed_by")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("admin_logs")
 }
@@ -340,7 +340,7 @@ model AuditLog {
   timestamp   String?
   performedBy String?  @map("performed_by")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   @@map("audit_logs")
@@ -351,7 +351,7 @@ model SystemConfig {
   key       String   @unique
   value     Json?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("system_config")
 }
@@ -379,7 +379,7 @@ model Guest {
   monthlyRent   Int      @default(0)
   paymentCycle  String   @default("Yearly")
   createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple       Temple              @relation(fields: [templeId], references: [id])
   appointments Appointment[]
@@ -407,7 +407,7 @@ model GuestFile {
   folder     String?
   uploadedBy String?  @map("uploaded_by")
   createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   guest Guest? @relation(fields: [guestId], references: [id])
 
@@ -425,7 +425,7 @@ model DeepRecord {
   paymentRef String?  @map("payment_ref")
   remarks    String?
   createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   guest      Guest?   @relation(fields: [guestId], references: [id])
   temple     Temple   @relation(fields: [templeId], references: [id])
@@ -441,7 +441,7 @@ model Activity {
   content   String?
   timestamp String?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   guest     Guest?   @relation(fields: [guestId], references: [id])
   temple    Temple   @relation(fields: [templeId], references: [id])
@@ -468,7 +468,7 @@ model Service {
   linkedFormId          String?  @map("linked_form_id")
   linkedPrintTemplateId String?  @map("linked_print_template_id")
   createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   slots         Slot[]
@@ -487,7 +487,7 @@ model ServiceSetting {
   allowModify       Boolean? @default(true) @map("allow_modify")
   modules           Json?    @map("modules")
   createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -504,7 +504,7 @@ model PrintTemplate {
   borderStyle      String?  @map("border_style")
   content          Json?
   createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -517,7 +517,7 @@ model Form {
   name      String
   fields    Json?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -533,7 +533,7 @@ model TemplePaymentConfig {
   customQR       Json     @default("{}") @map("custom_qr")
   cash           Json     @default("{}")
   createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -557,7 +557,7 @@ model Slot {
   status         String   @default("Available")
   guestName      String?  @map("guest_name")
   createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   service Service? @relation(fields: [boundServiceId], references: [id])
@@ -584,7 +584,7 @@ model Appointment {
   remarks         String?
   status          String   @default("Pending")
   createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   guest  Guest? @relation(fields: [guestId], references: [id])
@@ -607,7 +607,7 @@ model LampCategory {
   totalSlots   Int      @default(500) @map("total_slots")
   precautions  String?
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple  Temple       @relation(fields: [templeId], references: [id])
   records LampRecord[]
@@ -636,7 +636,7 @@ model LampRecord {
   expiryDate      DateTime? @map("expiry_date")
   status          String   @default("Pending")
   createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple   Temple        @relation(fields: [templeId], references: [id])
   category LampCategory? @relation(fields: [categoryId], references: [id])
@@ -663,7 +663,7 @@ model Event {
   fields      Json?
   status      String   @default("Draft")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple        Temple              @relation(fields: [templeId], references: [id])
   registrations EventRegistration[]
@@ -686,7 +686,7 @@ model EventRegistration {
   remarks          String?
   registrationData Json?    @map("registration_data")
   createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   event Event? @relation(fields: [eventId], references: [id])
   guest Guest? @relation(fields: [guestId], references: [id])
@@ -712,7 +712,7 @@ model QueueEvent {
   maxCapacity Int      @default(0) @map("max_capacity")
   status      String   @default("Draft")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple  Temple        @relation(fields: [templeId], references: [id])
   tickets QueueTicket[]
@@ -736,7 +736,7 @@ model QueueTicket {
   actualOrder   Int      @default(0) @map("actual_order")
   status        String   @default("Queuing")
   createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   queueEvent QueueEvent? @relation(fields: [eventId], references: [id])
   guest      Guest?      @relation(fields: [guestId], references: [id])
@@ -755,7 +755,7 @@ model AiPlan {
   price     Int      @default(0)
   features  Json?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("ai_plans")
 }
@@ -767,7 +767,7 @@ model AiApiModel {
   version   String?
   isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("ai_api_models")
 }
@@ -784,7 +784,7 @@ model TempleAiUsage {
   expiryDate DateTime? @map("expiry_date")
   isVip      Boolean  @default(false) @map("is_vip")
   createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
@@ -798,7 +798,7 @@ model SyncQueue {
   status    String?
   payload   Json?
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
 
@@ -814,7 +814,7 @@ model FinanceRecord {
   date        String?
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple? @relation(fields: [templeId], references: [id])
 
@@ -827,7 +827,7 @@ model Tool {
   description String?
   isEnabled   Boolean  @default(true) @map("is_enabled")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("tools")
 }
@@ -839,7 +839,7 @@ model Wallet {
   role      String?
   balance   Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("wallets")
 }
@@ -855,7 +855,7 @@ model BonusRequest {
   salesName     String?  @map("sales_name")
   receiptUrl    String?  @map("receipt_url")
   createdAt     DateTime @default(now()) @map("timestamp")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("bonus_requests")
 }
@@ -869,7 +869,7 @@ model Withdrawal {
   date       String?
   receiptUrl String?  @map("receipt_url")
   createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("distributor_withdrawals")
 }
@@ -880,7 +880,7 @@ model Notification {
   content   String?
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("notifications")
 }
@@ -894,7 +894,7 @@ model AdminNotification {
   isRead    Boolean  @default(false) @map("is_read")
   linkPath  String?  @map("link_path")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   guest  Guest? @relation(fields: [guestId], references: [id])
@@ -911,7 +911,7 @@ model TempleNotification {
   sendTime  DateTime @map("send_time")
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
   guest  Guest? @relation(fields: [guestId], references: [id])
@@ -925,7 +925,7 @@ model PasswordReset {
   token     String?
   isUsed    Boolean  @default(false) @map("is_used")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("password_resets")
 }
@@ -938,7 +938,7 @@ model SalesTool {
   thumbnail String?
   url       String
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("sales_tools")
 }
@@ -955,7 +955,7 @@ model LeaveRecord {
   endDate     String   @map("end_date")
   reason      String?
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   temple Temple @relation(fields: [templeId], references: [id])
 
