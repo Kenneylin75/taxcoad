@@ -75,13 +75,7 @@ export async function checkTempleSuspension(templeId?: string) {
 // 🛡️ 服務管理系統 - 核心資料持久化模擬 (Global Scope Persistence)
 // -------------------------------------------------------------------------
 
-const gStore = globalThis as any;
 
-// Helper to initialize global state
-const initGlobal = (key: string, defaultValue: any) => {
-  if (!gStore[key]) gStore[key] = defaultValue;
-  return gStore[key];
-};
 
 
 
@@ -2067,7 +2061,7 @@ export async function deleteEvent(id: string) {
 // migrated (await jsonStore.find('tools')) to (await jsonStore.find('tools'))
 // migrated (await jsonStore.find('commissions')) to (await jsonStore.find('commissions'))
 
-let db_config = initGlobal('db_config', {
+export const db_config = {
   fixedMonthlyRent: 3600,
   yearlyDiscountRate: 20,
   defaultSuperSalesRates: {
@@ -2112,7 +2106,7 @@ let db_config = initGlobal('db_config', {
 
 // migrated (await jsonStore.find('sync_queue')) to (await jsonStore.find('sync_queue'))
 
-let db_storage_plans: any[] = initGlobal('db_storage_plans', [
+export const db_storage_plans: any[] = [
   { id: 'SP-50', name: '50GB 大容量方案', sizeGb: 50, priceMonthly: 300 },
   { id: 'SP-200', name: '200GB 旗艦方案', sizeGb: 200, priceMonthly: 900 },
   { id: 'SP-1000', name: '1TB 至尊方案', sizeGb: 1000, priceMonthly: 3000 }
@@ -2140,7 +2134,7 @@ export interface AiPlan {
   monthlyFee: number;
   chatLimit: number;
 }
-let db_ai_plans: AiPlan[] = initGlobal('db_ai_plans', [
+export const db_ai_plans: AiPlan[] = [
   { id: 'AI-500', name: '基礎智慧助理方案', monthlyFee: 500, chatLimit: 2000 },
   { id: 'AI-1500', name: '進階智慧助理方案', monthlyFee: 1500, chatLimit: 10000 }
 ]);
@@ -2167,9 +2161,6 @@ export interface TempleAiUsage {
 
 // migrated (await jsonStore.readJson('super_sales_overrides')) to (await jsonStore.readJson('super_sales_overrides'))
 
-let db_distributor_applications: any[] = initGlobal('db_distributor_applications', [
-  { id: 'DAPP-001', name: '大甲區域授權中心', plan: 'PLAN-A', submittedBy: '超級精英業務', status: 'Active', account: 'dajia_dist', owner: '顏主委', date: '2026-05-12' }
-]);
 
 
 export async function fetchAdminLogs() {
@@ -4853,11 +4844,10 @@ export interface TempleApplication {
   salesId: string;
 }
 
-let db_price_plans: PricePlan[] = initGlobal('db_price_plans', [
+export const db_price_plans: PricePlan[] = [
   { id: 'plan-1', distributorId: 'dist-1', name: '基礎推廣方案', setupFee: 12000, monthlyFee: 3600, isFree: false, freeMonths: 0 },
   { id: 'plan-2', distributorId: 'dist-1', name: '免費推廣試用方案', setupFee: 0, monthlyFee: 3600, isFree: true, freeMonths: 3 }
 ]);
-gStore.db_price_plans = db_price_plans;
 
 // migrated (await jsonStore.find('temple_applications')) to (await jsonStore.find('temple_applications'))
 // (await jsonStore.find('temple_applications')) synced

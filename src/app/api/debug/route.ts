@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+
 export async function GET() {
-  const gStore = globalThis as any;
   return NextResponse.json({
-    distributors: gStore.db_distributors || [],
-    applications: gStore.db_distributor_applications || [],
-    sales: gStore.db_dist_sales || [],
-    temples: gStore.db_temples || []
+    distributors: await prisma.distributor.findMany(),
+    applications: await prisma.distributorApplication.findMany(),
+    sales: await prisma.distributorSales.findMany(),
+    temples: await prisma.temple.findMany()
   });
 }
