@@ -58,10 +58,14 @@ export async function getDynamicTempleId() {
 export async function checkTempleSuspension(templeId?: string) {
   const tId = templeId || await getDynamicTempleId();
   try {
-    /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = $1 AND status = 'Unpaid' AND \"dueDate\" < CURRENT_DATE", [tId], () => null) as any;
-    const rows = res?.rows;
-    return (rows && rows.length > 0);
+    const rows = await prisma.templeBill.findMany({
+      where: {
+        templeId: tId,
+        status: 'Unpaid',
+        dueDate: { lt: new Date().toISOString().split('T')[0] }
+      }
+    });
+    return rows.length > 0;
   } catch(e) {
     return false;
   }
@@ -147,17 +151,18 @@ export async function getCurrentUser() {
   let id = "admin-1";
 
   if (templeId) {
-    let person: any = null;
-    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND temple_id = $2", [account.toLowerCase(), templeId]) as any;
-    if (resPerson && resPerson.rowCount > 0) {
-      person = resPerson.rows[0];
-    }
+    const person = await prisma.user.findFirst({
+      where: {
+        account: { equals: account, mode: 'insensitive' },
+        templeId: templeId
+      }
+    });
     
     if (person) {
       name = person.name;
-      id = person.id || person.temple_id;
+      id = person.id || person.templeId;
       if (person.permissions && Array.isArray(person.permissions)) {
-        permissions = person.permissions;
+        permissions = person.permissions as string[];
       } else {
         permissions = role === 'TempleAdmin' ? ['all'] : [];
       }
@@ -198,22 +203,15 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
   let loggedInName = account;
   let assignedRole = "TempleAdmin";
   let loginStatus = "Active";
-  const searchAccount = account.toLowerCase();
-
   if (targetTempleId) {
-    let person = null;
-    const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND password = $2 AND temple_id = $3", [searchAccount, password, targetTempleId]) as any;
-    if (resPerson && resPerson.rowCount > 0) {
-      person = resPerson.rows[0];
-      person.templeId = person.temple_id;
-    }
+    const person = await prisma.user.findFirst({
+      where: { account: { equals: account, mode: 'insensitive' }, password, templeId: targetTempleId }
+    });
 
     if (person) {
-      const resTemple = await dbQuery("SELECT status FROM \"Temple\" WHERE id = $1", [person.templeId]) as any;
-      if (resTemple && resTemple.rowCount > 0) {
-        if (resTemple.rows[0].status === "Inactive") {
-          return { success: false, error: "該宮廟已被停權，無法登入" };
-        }
+      const resTemple = await prisma.temple.findUnique({ where: { id: person.templeId || '' } });
+      if (resTemple && resTemple.status === "Inactive") {
+        return { success: false, error: "該宮廟已被停權，無法登入" };
       }
       success = true; 
       redirectPath = `/${person.templeId}/admin`; 
@@ -229,20 +227,14 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       loggedInName = "超級總裁";
       assignedRole = "SuperAdmin";
     } else {
-      let isSuperAdmin = false;
-      const resAdmin = await dbQuery("SELECT * FROM admins WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
-      if (resAdmin && resAdmin.rowCount > 0) isSuperAdmin = true;
+      const admin = await prisma.admin.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
 
-      if (isSuperAdmin) {
+      if (admin) {
         success = true;
         redirectPath = "/super-admin";
         assignedRole = "SuperAdmin";
       } else {
-        let distributor = null;
-        const resDist = await dbQuery("SELECT * FROM distributors WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
-        if (resDist && resDist.rowCount > 0) {
-          distributor = resDist.rows[0];
-        }
+        const distributor = await prisma.distributor.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
 
         if (distributor) {
           if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
@@ -252,12 +244,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
             assignedRole = "Distributor";
           }
         } else {
-          let salesPerson = null;
-          const resSales = await dbQuery("SELECT * FROM dist_sales WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
-          if (resSales && resSales.rowCount > 0) {
-            salesPerson = resSales.rows[0];
-            salesPerson.distributorId = salesPerson.distributor_id;
-          }
+          const salesPerson = await prisma.distributorSales.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
 
           if (salesPerson) {
             if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
@@ -267,22 +254,17 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
               assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
             }
           } else {
-            let person = null;
-            const resPerson = await dbQuery("SELECT * FROM \"User\" WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
-            if (resPerson && resPerson.rowCount > 0) {
-              person = resPerson.rows[0];
-              person.templeId = person.temple_id;
-            }
+            const person = await prisma.user.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
 
             if (person) { 
               if (person.role !== 'TempleAdmin') {
                 return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
               }
-              const resTemple = await dbQuery("SELECT status FROM \"Temple\" WHERE id = $1", [person.templeId]) as any;
-              if (!resTemple || resTemple.rowCount === 0) {
+              const resTemple = await prisma.temple.findUnique({ where: { id: person.templeId || '' } });
+              if (!resTemple) {
                  return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
               }
-              if (resTemple.rows[0].status === "Inactive") {
+              if (resTemple.status === "Inactive") {
                  loginStatus = "Inactive";
               } else {
                  success = true; 
@@ -292,15 +274,14 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
               }
             } else {
               // Try finding temple master account directly
-              const resMainTemple = await dbQuery("SELECT * FROM \"Temple\" WHERE LOWER(account) = $1 AND password = $2", [searchAccount, password]) as any;
-              if (resMainTemple && resMainTemple.rowCount > 0) {
-                const mainTemple = resMainTemple.rows[0];
+              const mainTemple = await prisma.temple.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
+              if (mainTemple) {
                 if (mainTemple.status === "Inactive") {
                   loginStatus = "Inactive";
                 } else {
                   success = true;
                   redirectPath = `/${mainTemple.id}/admin`;
-                  loggedInName = mainTemple.temple_name;
+                  loggedInName = mainTemple.templeName || mainTemple.name;
                   assignedRole = "TempleAdmin";
                 }
               }
@@ -347,30 +328,14 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
 }
 export async function checkAccountExists(account: string) {
   if (!account) return false;
-  const searchAccount = account.toLowerCase();
   
   if (account === "PIVOTADMIN01") return true;
   
-  let exists = false;
-  const res1 = await dbQuery("SELECT 1 FROM \"User\" WHERE LOWER(account) = $1", [searchAccount]) as any;
-  if (res1 && res1.rowCount > 0) exists = true;
-  
-  const res2 = await dbQuery("SELECT 1 FROM distributors WHERE LOWER(account) = $1", [searchAccount]) as any;
-  if (res2 && res2.rowCount > 0) exists = true;
-  
-  const res3 = await dbQuery("SELECT 1 FROM dist_sales WHERE LOWER(account) = $1", [searchAccount]) as any;
-  if (res3 && res3.rowCount > 0) exists = true;
-
-  const res4 = await dbQuery("SELECT 1 FROM \"Temple\" WHERE LOWER(account) = $1", [searchAccount]) as any;
-  if (res4 && res4.rowCount > 0) exists = true;
-  
-  return exists;
-  if (adminData.some((a: any) => (a.account || "").toLowerCase() === searchAccount)) return true;
-  
-  const resDist = await dbQuery("SELECT id FROM distributors WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
-    if (resDist && resDist.rowCount > 0) return true;
-    const resSales = await dbQuery("SELECT id FROM dist_sales WHERE LOWER(account) = $1", [searchAccount], () => null) as any;
-    if (resSales && resSales.rowCount > 0) return true;
+  if (await prisma.user.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
+  if (await prisma.distributor.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
+  if (await prisma.distributorSales.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
+  if (await prisma.temple.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
+  if (await prisma.admin.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
   
   return false;
 }
@@ -2831,17 +2796,30 @@ export async function submitFreeAccountApplication(data: any) {
     // synced
 
     try {
-      /* removed duplicate import */
-      await dbQuery(
-        `INSERT INTO "Temple" (id, name, city, address, status, sales_id, distributor_id, setup_fee, monthly_rent, payment_cycle, account, password, phone, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now(), now())`,
-        [newTemple.id, newTemple.templeName, newTemple.city || '台北市', newTemple.address || '', newTemple.status, newTemple.salesId, newTemple.distributorId, newTemple.setupFee || 0, newTemple.monthlyRent || 0, newTemple.paymentCycle, newTemple.account, newTemple.password, newTemple.templePhone || newTemple.contactPhone || '']
-      );
-      await dbQuery(
-        `INSERT INTO temple_storages (id, temple_id, used_bytes, created_at, updated_at)
-         VALUES ($1, $2, $3, now(), now())`,
-        [`ts-${Date.now()}`, newTemple.id, 0]
-      );
+      await prisma.temple.create({
+        data: {
+          id: newTemple.id,
+          name: newTemple.templeName || newTemple.name,
+          city: newTemple.city || '台北市',
+          address: newTemple.address || '',
+          status: newTemple.status,
+          salesId: newTemple.salesId,
+          distributorId: newTemple.distributorId,
+          setupFee: newTemple.setupFee || 0,
+          monthlyRent: newTemple.monthlyRent || 0,
+          paymentCycle: newTemple.paymentCycle,
+          account: newTemple.account,
+          password: newTemple.password,
+          phone: newTemple.templePhone || newTemple.contactPhone || ''
+        }
+      });
+      await prisma.templeStorage.create({
+        data: {
+          id: `ts-${Date.now()}`,
+          templeId: newTemple.id,
+          usedBytes: 0
+        }
+      });
     } catch (e) {
       console.error("Failed to insert new temple into postgres", e);
     }
@@ -2868,12 +2846,17 @@ export async function submitFreeAccountApplication(data: any) {
     await null;
     
     try {
-      /* removed duplicate import */
-      await dbQuery(
-        `INSERT INTO "User" (id, temple_id, name, account, password, role, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())`,
-        [pId, newTemple.id, data.templeName || '宮廟管理員', account, password, 'TempleAdmin', 'Active']
-      );
+      await prisma.user.create({
+        data: {
+          id: pId,
+          templeId: newTemple.id,
+          name: data.templeName || '宮廟管理員',
+          account: account,
+          password: password,
+          role: 'TempleAdmin',
+          status: 'Active'
+        }
+      });
     } catch (e) {
       console.error("Failed to insert \"User\"", e);
     }
@@ -3064,17 +3047,12 @@ export async function fetchAllAccountsForAdmin() {
   accounts.push({ id: 'ADMIN', name: '總部最高系統管理員', role: 'SuperAdmin', account: 'PIVOTADMIN01', status: 'Active' });
   
   // 從 PostgreSQL 撈取系統管理員
-  let pgAdmins: any[] = [];
-  /* removed duplicate import */
-    const resAdmins = await dbQuery("SELECT * FROM \"User\" WHERE role = 'Admin'", [], () => null) as any;
-    if (resAdmins && resAdmins.rows) {
-          pgAdmins = resAdmins.rows;
-        }
+  // 從 PostgreSQL 取出所有的 Admin
+  let pgAdmins = await prisma.user.findMany({
+    where: { role: 'Admin' }
+  });
 
   const allAdminsMap = new Map();
-  [].forEach(p => {
-    if (p.role === 'Admin') allAdminsMap.set(p.account, p);
-  });
   pgAdmins.forEach(p => {
     allAdminsMap.set(p.account, { ...p, name: p.name, account: p.account, status: p.status || 'Active' });
   });
@@ -3083,28 +3061,21 @@ export async function fetchAllAccountsForAdmin() {
   });
 
   // 從 PostgreSQL 取出所有的經銷商
-  let pgDistributors: any[] = [];
-  const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
-    if (resDist && resDist.rows) {
-          pgDistributors = resDist.rows;
-        }
+  let pgDistributors = await prisma.distributor.findMany();
 
   const allDistributorsMap = new Map();
-  [].forEach(d => {
-    allDistributorsMap.set(d.account, d);
-  });
   pgDistributors.forEach(d => {
     allDistributorsMap.set(d.account, { 
       ...d, 
-      planId: d.plan_id || 'DEFAULT', 
-      planName: d.plan_name || '經銷專案', 
-      joinedAt: d.joined_at || (d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : '未知'), 
-      creatorSalesId: d.creator_sales_id || 'SuperAdmin', 
-      phone: d.contact_phone || d.phone || '', 
+      planId: d.planId || 'DEFAULT', 
+      planName: d.planName || '經銷專案', 
+      joinedAt: d.joinedAt || (d.createdAt ? d.createdAt.toISOString().split('T')[0] : '未知'), 
+      creatorSalesId: d.creatorSalesId || 'SuperAdmin', 
+      phone: d.contactPhone || d.phone || '', 
       email: d.email || '', 
       address: d.address || '', 
-      contactName: d.contact_name || '', 
-      taxId: d.tax_id || '' 
+      contactName: d.contactName || '', 
+      taxId: d.taxId || '' 
     });
   });
   
@@ -3113,15 +3084,10 @@ export async function fetchAllAccountsForAdmin() {
   });
 
   // 從 PostgreSQL 取出所有的業務員
-  let pgSales: any[] = [];
-  const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
-    if (resSales && resSales.rows) {
-          pgSales = resSales.rows;
-        }
+  let pgSales = await prisma.distributorSales.findMany();
 
   const allSalesMap = new Map();
-  [].forEach(s => allSalesMap.set(s.account, s));
-  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributor_id, joinedAt: s.joined_at }));
+  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributorId, joinedAt: s.joinedAt }));
 
   const superOverrides = await [];
   for (const s of Array.from(allSalesMap.values()) as any[]) {
@@ -3133,30 +3099,28 @@ export async function fetchAllAccountsForAdmin() {
     }
   }
   
-  let pgTemples: any[] = [];
-  const resTemples = await dbQuery('SELECT * FROM "Temple"', [], () => null) as any;
-  if (resTemples && resTemples.rows) {
-    pgTemples = resTemples.rows;
-  }
+  let pgTemples = await prisma.temple.findMany();
   
   const templePromises = pgTemples.map(async t => {
-    let personnelRes = await dbQuery('SELECT account FROM "User" WHERE temple_id = $1', [t.id], () => null) as any;
-    let personnel = personnelRes?.rows?.[0];
+    let personnel = await prisma.user.findFirst({
+      select: { account: true },
+      where: { templeId: t.id }
+    });
     const creatorInfo = await getTempleCreatorInfo(t.id);
     return { 
       ...t,
       id: t.id, 
-      name: t.temple_name || t.name || '未知宮廟', 
+      name: t.templeName || t.name || '未知宮廟', 
       role: 'Temple', 
       account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
       templePhone: t.phone,
       status: t.status || 'Active',
       creatorInfo: creatorInfo,
-      setupFee: t.setup_fee,
-      monthlyRent: t.monthly_rent,
-      paymentCycle: t.payment_cycle,
+      setupFee: t.setupFee,
+      monthlyRent: t.monthlyRent,
+      paymentCycle: t.paymentCycle,
       address: t.address,
-      timestamp: t.created_at
+      timestamp: t.createdAt
     };
   });
   
@@ -3497,7 +3461,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   let listSales = [...[]];
 
   /* removed duplicate import */
-    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
+    const resTemples = { rows: await prisma.temple.findMany() };
     if (resTemples && resTemples.rows) {
           listTemples = resTemples.rows.map((r: any) => ({
             ...r,
@@ -3512,7 +3476,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
             timestamp: r.created_at
           }));
         }
-    const resDist = await dbQuery("SELECT * FROM distributors", [], () => null) as any;
+    const resDist = { rows: await prisma.distributor.findMany() };
     if (resDist && resDist.rows) {
           listDistributors = resDist.rows.map((r: any) => ({
             ...r,
@@ -3521,7 +3485,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
             planId: r.plan_id
           }));
         }
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
+    const resSales = { rows: await prisma.distributorSales.findMany() };
     if (resSales && resSales.rows) {
           listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
         }
@@ -3598,7 +3562,8 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 
   let pgPendingDistCount = 0;
   try {
-    const res = await dbQuery("SELECT COUNT(*) FROM distributor_applications WHERE submitted_by = $1 AND status = 'Pending'", [name]);
+    const count = await prisma.templeApplication.count({ where: { salesId: name, status: 'Pending' } });
+    const res = { rows: [{ count: count }] };
     if (res && (res as any).rows && (res as any).rows.length > 0) {
       pgPendingDistCount = parseInt((res as any).rows[0].count);
     }
@@ -3974,7 +3939,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   let listWithdrawals = [...([] || [])];
 
   /* removed duplicate import */
-    const resTemples = await dbQuery("SELECT * FROM \"Temple\"", [], () => null) as any;
+    const resTemples = { rows: await prisma.temple.findMany() };
     if (resTemples && resTemples.rows) {
           listTemples = resTemples.rows.map((r: any) => ({
             ...r,
@@ -3988,11 +3953,11 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
             timestamp: r.created_at
           }));
         }
-    const resSales = await dbQuery("SELECT * FROM dist_sales", [], () => null) as any;
+    const resSales = { rows: await prisma.distributorSales.findMany() };
     if (resSales && resSales.rows) {
           listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
         }
-    const resBills = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
+    const resBills = { rows: await prisma.templeBill.findMany() };
     if (resBills && resBills.rows) {
           listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
         }
@@ -7355,7 +7320,7 @@ export async function fetchSuperAdminFinancials() {
 
   let templeBills: any[] = [];
   try {
-    const res = await dbQuery("SELECT * FROM \"TempleBill\"", [], () => null) as any;
+    const res = { rows: await prisma.templeBill.findMany() };
     if (res && res.rows) templeBills = res.rows;
   } catch(e) {}
 
