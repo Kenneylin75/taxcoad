@@ -3378,14 +3378,25 @@ export async function submitDistributorApplication(data: any) {
   // Removed mock array push, strictly using SQL
 
   try {
-    await dbQuery(`
-      INSERT INTO distributor_applications (id, name, contact_name, phone, email, tax_id, address, plan_id, price, nodes, submitted_by, status, created_at, account, password, expiration_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-    `, [
-      newApp.id, data.name || '', data.contactName || '', data.phone || '', data.email || '', data.taxId || '', data.address || '', 
-      data.planId || '', Number(data.customPrice) || 0, Number(data.customNodes) || 0, data.submittedBy || '', 
-      'Pending', newApp.date, safeAccount, safePassword, newApp.expirationDate
-    ]);
+    await prisma.distributorApplication.create({
+      data: {
+        id: newApp.id,
+        name: data.name || '',
+        contactName: data.contactName || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        taxId: data.taxId || '',
+        address: data.address || '',
+        planId: data.planId || '',
+        price: Number(data.customPrice) || 0,
+        nodes: Number(data.customNodes) || 0,
+        submittedBy: data.submittedBy || '',
+        status: 'Pending',
+        account: safeAccount,
+        password: safePassword,
+        expirationDate: newApp.expirationDate
+      }
+    });
   } catch(e) {
     console.error("Failed to insert distributor_application:", e);
   }
@@ -3688,10 +3699,18 @@ export async function createDistributorAccount(data: any) {
   await null;
   
   try {
-    await dbQuery(
-      "INSERT INTO distributor_applications (id, name, plan, price, submitted_by, status, account, password, owner) VALUES ($1, $2, $3, $4, $5, 'Active', $6, $7, $8)",
-      [`DAPP-${id}`, data.name, plan.name, finalPrice, 'System Admin', safeAccount, safePassword, data.owner || 'System']
-    );
+    await prisma.distributorApplication.create({
+      data: {
+        id: `DAPP-${id}`,
+        name: data.name,
+        planId: plan.id,
+        price: finalPrice,
+        submittedBy: 'System Admin',
+        status: 'Active',
+        account: safeAccount,
+        password: safePassword
+      }
+    });
   } catch (err) {
     console.error('Failed to insert into distributor_applications', err);
   }
@@ -4048,14 +4067,14 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   // 3. 手動獎金覆寫 (Bonus Overrides)
   let myBonuses = [];
   try {
-    const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 AND status = 'Approved'", [salesId]) as any;
+    const rows = await prisma.bonusRequest.findMany({ where: { salesId, status: 'Approved' } });
     if (rows) {
       myBonuses = rows.map((r: any) => ({
         id: r.id,
-        salesName: r.sales_name,
+        salesName: r.salesName,
         date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
         amount: r.amount,
-        reason: r.reason || '手動發放'
+        reason: (r as any).reason || '手動發放'
       }));
     }
   } catch (e) {}
@@ -4075,14 +4094,14 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   
   let myWithdrawals: any[] = [];
   /* removed duplicate import */
-    const { rows } = await dbQuery("SELECT * FROM bonus_requests WHERE sales_id = $1 ORDER BY timestamp DESC", [salesId], () => null) as any;
+    const rows = await prisma.bonusRequest.findMany({ where: { salesId }, orderBy: { createdAt: 'desc' } });
     const myBonusRequests = (rows || []).map((r: any) => ({
           id: r.id,
-          salesName: r.sales_name,
+          salesName: r.salesName,
           amount: r.amount,
           date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
           status: r.status,
-          receiptUrl: r.receipt_url,
+          receiptUrl: r.receiptUrl,
           method: r.method
         }));
     myWithdrawals = [...myWithdrawals, ...myBonusRequests];
@@ -4218,10 +4237,10 @@ export async function fetchDistributorTemples(distributorId: string) {
 }
 export async function fetchDistributorVisits(distributorId: string) {
   try {
-    const resSales = await dbQuery("SELECT id, name FROM dist_sales WHERE \"distributorId\" = $1", [distributorId], () => null) as any;
-    if (!resSales || !resSales.rows || resSales.rows.length === 0) return [];
+    const resSales = await prisma.distributorSales.findMany({ select: { name: true }, where: { distributorId } });
+    if (!resSales || resSales.length === 0) return [];
     
-    const teamNames = resSales.rows.map((r: any) => r.name);
+    const teamNames = resSales.map((r: any) => r.name);
     const visits = await prisma.salesVisit.findMany({
       where: {
         salesName: { in: teamNames }
@@ -4237,16 +4256,15 @@ export async function fetchDistributorVisits(distributorId: string) {
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
     /* removed duplicate import */
-    const query = `
-      SELECT t.* 
-      FROM "Temple" t
-      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
-      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
-        AND t.status = 'Active' 
-        AND (ds.role IS NULL OR ds.role != 'SuperSales')
-    `;
-    const res = await dbQuery(query, [distributorId], () => null) as any;
-    const myTemples = res?.rows || [];
+    const myTemples = await prisma.temple.findMany({
+      where: {
+        status: 'Active',
+        OR: [
+          { distributorId: distributorId },
+          { sales: { distributorId: distributorId, role: { not: 'SuperSales' } } }
+        ]
+      }
+    });
     
     let totalRevenue = 0;
     let totalCommissionPayout = 0;
