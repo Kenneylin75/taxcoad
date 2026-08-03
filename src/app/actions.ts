@@ -8227,31 +8227,45 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
 }
 
 export async function getLineConfig(templeId: string) {
-  return withTempleSession(templeId, false, async (client) => {
-    const res = await client.query(`
-      SELECT line_channel_token, line_channel_secret, line_login_client_id, line_push_enabled 
-      FROM "Temple" WHERE id = $1
-    `, [templeId]);
-    if (res.rows.length === 0) return { lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false };
-    const r = res.rows[0];
+  try {
+    const temple = await prisma.temple.findUnique({
+      where: { id: templeId },
+      select: {
+        lineChannelToken: true,
+        lineChannelSecret: true,
+        lineLoginClientId: true,
+        linePushEnabled: true,
+      }
+    });
+    if (!temple) return { lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false };
     return {
-      lineChannelToken: r.line_channel_token || '',
-      lineChannelSecret: r.line_channel_secret || '',
-      lineLoginClientId: r.line_login_client_id || '',
-      linePushEnabled: r.line_push_enabled || false
+      lineChannelToken: temple.lineChannelToken || '',
+      lineChannelSecret: temple.lineChannelSecret || '',
+      lineLoginClientId: temple.lineLoginClientId || '',
+      linePushEnabled: temple.linePushEnabled || false
     };
-  });
+  } catch (error) {
+    console.error('getLineConfig error:', error);
+    return { lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false };
+  }
 }
 
 export async function updateLineConfig(templeId: string, config: any) {
-  return withTempleSession(templeId, true, async (client) => {
-    await client.query(`
-      UPDATE temples 
-      SET line_channel_token = $1, line_channel_secret = $2, line_login_client_id = $3, line_push_enabled = $4
-      WHERE id = $5
-    `, [config.lineChannelToken, config.lineChannelSecret, config.lineLoginClientId, config.linePushEnabled, templeId]);
+  try {
+    await prisma.temple.update({
+      where: { id: templeId },
+      data: {
+        lineChannelToken: config.lineChannelToken,
+        lineChannelSecret: config.lineChannelSecret,
+        lineLoginClientId: config.lineLoginClientId,
+        linePushEnabled: config.linePushEnabled,
+      }
+    });
     return { success: true };
-  });
+  } catch (error) {
+    console.error('updateLineConfig error:', error);
+    return { success: false, error: 'Database update failed' };
+  }
 }
 
 
