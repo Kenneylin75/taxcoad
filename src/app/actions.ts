@@ -6896,7 +6896,7 @@ export async function submitFreeAccountApplication(data: any) {
   const password = data.password || data.adminPassword;
 
   if (account && await checkAccountExists(account)) {
-    return { success: false, error: '撣唾?撌脰◤閮餃?嚗??湔?' };
+    return { success: false, error: '帳號已被註冊' };
   }
   const { role, paymentCycle, ...formData } = data;
   
@@ -7211,7 +7211,7 @@ export async function fetchAllAccountsForAdmin() {
     allDistributorsMap.set(d.account, { 
       ...d, 
       planId: d.planId || 'DEFAULT', 
-      planName: d.planName || '蝬撠?', 
+      planName: d.planName || '標準方案', 
       joinedAt: d.joinedAt || (d.createdAt ? d.createdAt.toISOString().split('T')[0] : '未知'), 
       creatorSalesId: d.creatorSalesId || 'SuperAdmin', 
       phone: d.contactPhone || d.phone || '', 
@@ -7254,7 +7254,7 @@ export async function fetchAllAccountsForAdmin() {
     return { 
       ...t,
       id: t.id, 
-      name: t.templeName || t.name || '未知摰桀?', 
+      name: t.templeName || t.name || '未知宮廟', 
       role: 'Temple', 
       account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
       templePhone: t.phone,
@@ -7649,14 +7649,14 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     const distTemples = listTemples.filter(t => t.distributorId === d.id);
     const distSales = listSales.filter(s => s.distributorId === d.id);
     const totalIncome = distTemples.reduce((acc, t) => acc + (Number(t.monthlyRent) || 0) * 12, 0);
-    const commissionExpense = Math.floor(totalIncome * 0.2); // ?身雿???臬雿?20%
+    const commissionExpense = Math.floor(totalIncome * 0.2); // 預設費用20%
     const netRevenue = totalIncome - commissionExpense;
 
     return {
       id: d.id,
       name: d.name,
       status: d.contractStatus || d.status || 'Active',
-      plan: d.planName || '蝬撠?',
+      plan: d.planName || '標準方案',
       date: d.joinedAt || '未知',
       nodesUsed: distTemples.length,
       templeCount: distTemples.length,
@@ -7850,7 +7850,7 @@ export async function createDistributorAccount(data: any) {
 
 export async function createTempleAccount(data: any) {
   if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '撣唾?撌脰◤閮餃?嚗??湔?' };
+    return { success: false, error: '帳號已被註冊' };
   }
   const reqRole = await getCurrentRole() || 'System';
   const currentUser = await getCurrentUser();
@@ -7890,10 +7890,10 @@ export async function createTempleAccount(data: any) {
   // Initialize temple storage immediately to prevent overriding
   const isVip = newTemple.plan === 'Unlimited Node' || newTemple.plan === 'Free' || newTemple.plan === '?祥' || newTemple.cloudStorage?.includes('?⊿?') || newTemple.cloudStorage === 'Free' || newTemple.cloudStorage === '?祥' || !newTemple.cloudStorage;
   let qGB = 5;
-  let pName = '?祥 5GB 蝛粹?';
+  let pName = '免費 5GB 空間';
   if (isVip) {
       qGB = 999999;
-      pName = '?⊿??祥?寞?';
+      pName = '進階免費空間';
   } else if (newTemple.cloudStorage) {
      if (newTemple.cloudStorage.startsWith('SP-')) {
          let p = await prisma.storagePlan.findUnique({ where: { id: newTemple.cloudStorage } }) as any;
@@ -7934,8 +7934,8 @@ export async function createTempleAccount(data: any) {
     await prisma.temple.create({
       data: {
         id,
-        name: newTemple.templeName || '未知摰桀?',
-        templeName: newTemple.templeName || '未知摰桀?',
+        name: newTemple.templeName || '未知宮廟',
+        templeName: newTemple.templeName || '未知宮廟',
         account: data.account || null,
         region: data.region || null,
         city: newTemple.city || '未設定',
@@ -8021,7 +8021,7 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
         
         const temples = await prisma.temple.findMany({ where: { status: 'Active' }, select: { city: true, address: true } });
         const regionCounts: Record<string, number> = {};
-        const majorRegions = ['?粹?', '?啣?', '?啣?', '獢?', '?啁姘', '??', '?唬葉', '敶啣?', '??', '?脫?', '?儔', '?啣?', '擃?', '撅', '摰', '?梯', '?唳', '瞉?', '??', '???'];
+        const majorRegions = ['台北', '新北', '基隆', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'];
         
         temples.forEach((t: any) => {
           let region = t.city || (t.address ? t.address.substring(0, 2) : '');
@@ -8166,7 +8166,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     });
   });
   
-  // 3. ????閬神 (Bonus Overrides)
+  // 3. 獎金抽成比例 (Bonus Overrides)
   let myBonuses = [];
   try {
     const rows = await prisma.bonusRequest.findMany({ where: { salesId, status: 'Approved' } });
@@ -8176,7 +8176,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
         salesName: r.salesName,
         date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
         amount: r.amount,
-        reason: (r as any).reason || '???潭'
+        reason: (r as any).reason || '額外獎勵'
       }));
     }
   } catch (e) {}
