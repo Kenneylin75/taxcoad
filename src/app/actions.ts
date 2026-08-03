@@ -4726,7 +4726,7 @@ export async function fetchFinancialOverview() {
 
       const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
         dbQuery("SELECT * FROM appointments WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
-        dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND amount > 0 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
+        dbQuery("SELECT * FROM lamp_records WHERE temple_id = $1 AND actual_price > 0 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM event_registrations WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM queue_tickets WHERE temple_id = $1 AND payment_status != 'Pending' AND payment_status != 'Unpaid'", [templeId], () => null) as any,
         dbQuery("SELECT * FROM deep_records WHERE temple_id = $1 AND (id LIKE 'MERIT-%' OR category LIKE '%功德%')", [templeId], () => null) as any
@@ -4755,7 +4755,7 @@ export async function fetchFinancialOverview() {
             id: r.id,
             title: r.lamp_type || r.categoryName,
             source: 'Lamp',
-            amount: Number(r.amount || r.price) || 0,
+            amount: Number(r.actual_price || r.amount || r.price) || 0,
             timestamp: r.payment_updated_at || (r.created_at instanceof Date ? r.created_at.toISOString().split('T')[0] : String(r.created_at)),
             guestName: r.guest_name || r.phone,
             paymentMethod: r.payment_method || '現金/臨櫃',
@@ -4763,7 +4763,7 @@ export async function fetchFinancialOverview() {
             paymentRef: r.payment_ref,
             remarks: r.remarks
           });
-          totalRevenue += (Number(r.amount || r.price) || 0);
+          totalRevenue += (Number(r.actual_price || r.amount || r.price) || 0);
         });
       }
       if (evRes?.rows) {
