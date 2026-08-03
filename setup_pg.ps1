@@ -35,6 +35,7 @@ $env:PGPASSWORD="test"
 
 Write-Host "Syncing Prisma schema..."
 Set-Location $workspace
-& npx prisma db push --schema=schema.prisma
+& npx prisma generate
+& npx prisma migrate deploy
 
 Write-Host "Setup complete!"

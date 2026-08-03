@@ -2669,7 +2669,7 @@ export async function updateSystemConfig(data: any) {
 export async function fetchFreeApplications(distId?: string) { 
   let list = [...[]];
   /* removed duplicate import */
-    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"createdAt\" DESC", [], () => null) as any;
+    const res = await dbQuery("SELECT * FROM \"Temple\" ORDER BY \"created_at\" DESC", [], () => null) as any;
     if (res && res.rows && res.rows.length > 0) {
           list = res.rows.map((r: any) => ({
             ...r,

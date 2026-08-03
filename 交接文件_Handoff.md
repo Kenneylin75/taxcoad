@@ -30,7 +30,7 @@
 我已經為您寫好了一份 `schema.prisma`。
 1. 請執行 `npm install prisma -D` 與 `npm install @prisma/client`
 2. 將 `schema.prisma` 放入 `prisma/` 資料夾中。
-3. 執行 `npx prisma db push`，就能立刻在您的 PostgreSQL 建立好所有關聯式資料表！
+3. 執行 `npx prisma generate` 生成 Client，然後執行 `npx prisma migrate deploy`，就能安全地在您的 PostgreSQL 建立/更新所有關聯式資料表，而不會遺失資料！
 
 ### 步驟 2：改寫 `actions.ts` 內的函數
 打開 `src/app/actions.ts`，您會看到很多類似以下的寫法：
