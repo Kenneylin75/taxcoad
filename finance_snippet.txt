@@ -1,0 +1,55 @@
+export async function fetchDistributorFinanceSummary(distributorId: string) {
+  try {
+    /* removed duplicate import */
+    const myTemples = await prisma.temple.findMany({
+      where: {
+        status: 'Active',
+        OR: [
+          { distributorId: distributorId },
+          { sales: { distributorId: distributorId, role: { not: 'SuperSales' } } }
+        ]
+      }
+    });
+    
+    let totalRevenue = 0;
+    let totalCommissionPayout = 0;
+    
+    const now = new Date();
+    const templeIds = myTemples.map((t: any) => t.id);
+
+    let bills: any[] = [];
+    if (templeIds.length > 0) {
+      const bRes = await dbQuery("SELECT * FROM \"TempleBill\" WHERE temple_id = ANY($1::varchar[]) AND status = 'Paid'", [templeIds], () => null) as any;
+      bills = bRes?.rows || [];
+    }
+
+    myTemples.forEach((t: any) => {
+      const tBills = bills.filter((b: any) => b.temple_id === t.id);
+      
+      const rules = { setupFeePercent: 20, rentYear1Percent: 15, rentYear2Percent: 10, rentYear3PlusPercent: 5 };
+      const activeDate = new Date(t.timestamp || t.created_at || new Date());
+      const monthsDiff = (now.getFullYear() - activeDate.getFullYear()) * 12 + (now.getMonth() - activeDate.getMonth());
+
+      tBills.forEach((b: any) => {
+         totalRevenue += b.amount;
+         if (b.type === 'Setup' || b.item_name === 'SetupFee') {
+            totalCommissionPayout += b.amount * (rules.setupFeePercent / 100);
+         } else {
+            let rentPercent = rules.rentYear1Percent;
+            if (monthsDiff >= 12 && monthsDiff < 24) rentPercent = rules.rentYear2Percent;
+            else if (monthsDiff >= 24) rentPercent = rules.rentYear3PlusPercent;
+            totalCommissionPayout += b.amount * (rentPercent / 100);
+         }
+      });
+    });
+
+    return {
+      totalRevenue,
+      totalCommissionPayout,
+      totalTemples: myTemples.length
+    };
+  } catch(e) {
+    return { totalRevenue: 0, totalCommissionPayout: 0, totalTemples: 0 };
+  }
+}
+export async
