@@ -2,22 +2,7 @@
 "use server";
 import prisma from '@/lib/prisma';
 
-export async function getSafeJsonArray(collection: string): Promise<any[]> {
-  try {
-    const data = await [];
-    return Array.isArray(data) ? data : [];
-  } catch (e) {
-    return [];
-  }
-}
-export async function getSafeJsonObject(collection: string): Promise<any> {
-  try {
-    const data = await [];
-    return (data && !Array.isArray(data)) ? data : (Array.isArray(data) && data.length > 0 ? data[0] : {});
-  } catch (e) {
-    return {};
-  }
-}
+
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -507,11 +492,13 @@ export async function updateSlot(id: number, data: any) {
 // 🚀 LINE 推播觸發引擎 (Simulation)
 // ==========================================
 export async function triggerLinePush(templeId: string, serviceId: string, targetName: string, targetPhone: string, serviceTitle: string) {
-  const currentSettings = gStore.db_service_settings || db_service_settings;
-  const tSettings = currentSettings.find((s: any) => s.templeId === templeId);
+  const tSettings = await prisma.serviceSetting.findFirst({
+    where: { templeId }
+  });
   if (!tSettings || !tSettings.pushConfigs) return;
 
-  const config = tSettings.pushConfigs.find((c: any) => c.serviceId === serviceId);
+  const pushConfigs = Array.isArray(tSettings.pushConfigs) ? tSettings.pushConfigs : [];
+  const config = pushConfigs.find((c: any) => c.serviceId === serviceId);
   if (!config) return;
 
   // Find 'Immediate' stages that are enabled
@@ -519,15 +506,14 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
   
   for (const stage of immediateStages) {
     const logMsg = `[LINE 推播成功] 已發送【${serviceTitle}】通知至信眾 ${targetName} (${targetPhone}) | 內容: ${stage.content}`;
-    const newLog = {
-      id: "log-" + Date.now() + Math.random(),
-      action: "LINE_PUSH",
-      details: logMsg,
-      timestamp: new Date().toISOString(),
-      performedBy: 'System (Auto)'
-    };
-    await null;
-    // (await jsonStore.find('audit_logs')) synced
+    await prisma.auditLog.create({
+      data: {
+        templeId,
+        action: "LINE_PUSH",
+        details: logMsg,
+        performedBy: 'System (Auto)'
+      }
+    });
   }
 }
 
@@ -3020,12 +3006,6 @@ export async function approveDistributorBySuperAdmin(id: string, overrideQuota?:
 }
 
 export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: string) {
-  const app = db_distributor_applications.find(a => a.id === id);
-  if (app) {
-    app.status = 'Rejected';
-    (app as any).rejectReason = rejectReason || '';
-    (app as any).rejectedAt = new Date().toISOString();
-  }
   try {
     await prisma.distributorApplication.update({
       where: { id },
@@ -8410,3 +8390,27 @@ export async function fetchSuperSalesApplications(salesName: string) {
   }
 }
 
+export async function getTempleFormTemplates(templeId: string) {
+  try {
+    const temple = await prisma.temple.findUnique({
+      where: { id: templeId },
+      select: { formTemplates: true }
+    });
+    if (!temple || !temple.formTemplates) return [];
+    return Array.isArray(temple.formTemplates) ? temple.formTemplates : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function updateTempleFormTemplates(templeId: string, templates: any) {
+  try {
+    await prisma.temple.update({
+      where: { id: templeId },
+      data: { formTemplates: templates }
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
+}

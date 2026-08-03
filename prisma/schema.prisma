@@ -177,6 +177,7 @@ model Temple {
   lineChannelSecret  String?  @map("line_channel_secret")
   lineLoginClientId  String?  @map("line_login_client_id")
   linePushEnabled    Boolean? @default(false) @map("line_push_enabled")
+  formTemplates      Json?    @map("form_templates")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

@@ -13,11 +13,13 @@ import {
    removeSingleSlot,
    fetchPrintTemplates,
    savePrintTemplate,
-   deletePrintTemplate
+   deletePrintTemplate,
+   getTempleFormTemplates,
+   updateTempleFormTemplates
 } from '@/app/actions';
 
 // --- 📱 手機版組件 (App Style Modern Professional) ---
-const AdminMobileView = ({ services, forms, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm }: any) => {
+const AdminMobileView = ({ services, forms, printTemplates, formTemplates, setFormTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm }: any) => {
    const [isMenuOpen, setIsMenuOpen] = useState(false);
    const [editingService, setEditingService] = useState<any>(null);
    
@@ -463,7 +465,7 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                            {showTemplateMenu && (
                               <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50">
                                  {(() => {
-                                    const tpls = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem(`temple_form_templates_${templeId}`) || '[]') : [];
+                                    const tpls = formTemplates || [];
                                     if (tpls.length === 0) return <div className="p-4 text-xs text-slate-400 text-center font-bold">尚未儲存任何模組</div>;
                                     return tpls.map((t: any, i: number) => (
                                        <div key={i} onClick={() => {
@@ -473,11 +475,13 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
                                           <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 truncate mr-2 flex-1">{t.name}</span>
                                           <span className="text-[10px] text-slate-400 shrink-0 group-hover:mr-8 transition-all">{t.fields?.length || 0} 欄位</span>
                                           <button 
-                                            onClick={(e) => {
+                                            onClick={async (e) => {
                                               e.stopPropagation();
                                               if (confirm(`確定要刪除預設模組 [${t.name}] 嗎？`)) {
                                                 const updated = tpls.filter((_: any, idx: number) => idx !== i);
-                                                localStorage.setItem(`temple_form_templates_${templeId}`, JSON.stringify(updated));
+                                                setFormTemplates(updated);
+                                                const templeId = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'default';
+                                                await updateTempleFormTemplates(templeId, updated);
                                                 setShowTemplateMenu(false);
                                                 setTimeout(() => setShowTemplateMenu(true), 10);
                                               }
@@ -650,12 +654,13 @@ const AdminDesktopView = ({ services, forms, printTemplates, staffList, availabl
 
                      <div className="pt-12 flex gap-6 mt-12">
                         <button onClick={async () => { await saveForm(editingForm); await loadData(); setEditingForm(null); }} className="flex-1 bg-slate-900 text-white py-6 rounded-2xl font-bold text-sm shadow-xl hover:bg-indigo-600 transition-all uppercase tracking-widest">發布建模並儲存</button>
-                        <button onClick={() => {
+                        <button onClick={async () => {
                            const tName = prompt('請輸入此預設模組的名稱：', editingForm.name);
                            if (!tName) return;
-                           const tpls = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem(`temple_form_templates_${templeId}`) || '[]') : [];
-                           tpls.push({ name: tName, fields: editingForm.fields });
-                           if (typeof window !== 'undefined') localStorage.setItem(`temple_form_templates_${templeId}`, JSON.stringify(tpls));
+                           const tpls = [...formTemplates, { name: tName, fields: editingForm.fields }];
+                           setFormTemplates(tpls);
+                           const templeId = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'default';
+                           await updateTempleFormTemplates(templeId, tpls);
                            alert('✅ 已將目前設計儲存為預設模組！');
                         }} className="px-8 py-6 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl font-bold text-sm shadow-sm hover:bg-amber-100 transition-all">存為預設模組</button>
                         <button onClick={() => setEditingForm(null)} className="px-8 py-6 text-slate-400 font-bold text-sm">取消更改</button>
@@ -807,6 +812,7 @@ export default function ServicesManagement() {
    const [services, setServices] = useState<any[]>([]);
    const [forms, setForms] = useState<any[]>([]);
    const [printTemplates, setPrintTemplates] = useState<any[]>([]);
+   const [formTemplates, setFormTemplates] = useState<any[]>([]);
    const [staffList, setStaffList] = useState<any[]>([]);
    const [availableSlots, setAvailableSlots] = useState<any[]>([]);
    const [isLoading, setIsLoading] = useState(true);
@@ -834,14 +840,16 @@ export default function ServicesManagement() {
    const loadData = async () => {
       setIsLoading(true);
       try {
-         const [s, f, st, sl, pt] = await Promise.all([
-            fetchServiceDefinitions(), fetchForms(), fetchStaff(), fetchAvailableSlots(), fetchPrintTemplates()
+         const templeId = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'default';
+         const [s, f, st, sl, pt, ft] = await Promise.all([
+            fetchServiceDefinitions(), fetchForms(), fetchStaff(), fetchAvailableSlots(), fetchPrintTemplates(), getTempleFormTemplates(templeId)
          ]);
          setServices(Array.isArray(s) ? s : []);
          setForms(Array.isArray(f) ? f : []);
          setStaffList(Array.isArray(st) ? st : []);
          setAvailableSlots(Array.isArray(sl) ? sl : []);
          setPrintTemplates(Array.isArray(pt) ? pt : []);
+         setFormTemplates(Array.isArray(ft) ? ft : []);
       } catch (e) { console.error(e); }
       finally { setIsLoading(false); }
    };
@@ -856,7 +864,7 @@ export default function ServicesManagement() {
 
    if (isLoading) return <div className="h-screen flex items-center justify-center font-bold text-slate-300 animate-pulse tracking-[0.5em] italic text-xl">系統資料加載中...</div>;
 
-   const commonProps = { services, forms, printTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm };
+   const commonProps = { services, forms, printTemplates, formTemplates, setFormTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm };
 
    return isMobile ? <AdminMobileView {...commonProps} /> : <AdminDesktopView {...commonProps} />;
 }
