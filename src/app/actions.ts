@@ -7203,7 +7203,8 @@ export async function fetchAllAccountsForAdmin() {
     accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
   });
 
-  // 敺?PostgreSQL ????蝬??  let pgDistributors = await prisma.distributor.findMany();
+  // 敺?PostgreSQL ????蝬??  
+  let pgDistributors = await prisma.distributor.findMany();
 
   const allDistributorsMap = new Map();
   pgDistributors.forEach(d => {
@@ -7225,7 +7226,8 @@ export async function fetchAllAccountsForAdmin() {
     accounts.push({ ...d, id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
   });
 
-  // 敺?PostgreSQL ????璆剖???  let pgSales = await prisma.distributorSales.findMany();
+  // 取得所有業務
+  let pgSales = await prisma.distributorSales.findMany();
 
   const allSalesMap = new Map();
   pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributorId, joinedAt: s.joinedAt }));
@@ -7240,6 +7242,7 @@ export async function fetchAllAccountsForAdmin() {
     }
   }
   
+  // 取得所有宮廟
   let pgTemples = await prisma.temple.findMany();
   
   const templePromises = pgTemples.map(async t => {
