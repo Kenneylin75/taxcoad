@@ -670,7 +670,7 @@ export default function SuperAdminClient({
                                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
                                     申請身份：經銷商 | 
                                     提交：{app.submittedBy || '超級業務員'} | 
-                                    日期：{app.date?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                    日期：{new Date(app.date || new Date()).toISOString().split('T')[0]}
                                  </p>
                                  <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
                                     <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.plan || '標準代理方案'}</span>
@@ -1994,7 +1994,7 @@ export default function SuperAdminClient({
                                  if (tp.freeType === 'Permanent' || tp.status === 'VIP') return { ...tp, displayStatus: 'VIP', displayUnpaid: 0 };
                                  
                                  const targetBills = tp.bills?.filter((b: any) => {
-                                    const bMonth = b.bill_month || b.billingDate || b.billing_date || (b.created_at ? b.created_at.split('T')[0].substring(0, 7) : '') || (b.timestamp ? b.timestamp.split('T')[0].substring(0, 7) : '');
+                                    const bMonth = b.bill_month || b.billingDate || b.billing_date || ((b.created_at ? new Date(b.created_at).toISOString().split('T')[0].substring(0, 7) : '')) || ((b.timestamp ? new Date(b.timestamp).toISOString().split('T')[0].substring(0, 7) : ''));
                                     if (tp.paymentCycle === 'Yearly') {
                                        return bMonth.startsWith(templePaymentMonth.split('-')[0]);
                                     }
@@ -2037,7 +2037,7 @@ export default function SuperAdminClient({
                                     <td className="px-6 py-4 text-sm font-black text-slate-800 italic">{tp.name}</td>
                                     <td className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{tp.paymentCycle}</td>
                                     <td className="px-6 py-4 text-sm font-black text-slate-900">${(tp.rentAmount !== undefined ? tp.rentAmount : (tp.paymentCycle === 'Yearly' ? tp.monthlyRent * 12 : tp.monthlyRent)).toLocaleString()}</td>
-                                    <td className="px-6 py-4 text-xs font-bold text-slate-400">{tp.billingStartDate ? tp.billingStartDate.split('T')[0] : 'N/A'}</td>
+                                    <td className="px-6 py-4 text-xs font-bold text-slate-400">{tp.billingStartDate ? new Date(tp.billingStartDate).toISOString().split('T')[0] : 'N/A'}</td>
                                     <td className="px-6 py-4">
                                        {tp.displayStatus === 'Trial' && <span className="px-3 py-1 bg-amber-50 text-amber-500 rounded text-[10px] font-black uppercase tracking-widest border border-amber-200">剩餘 {tp.diffDays} 天試用</span>}
                                        {tp.displayStatus === 'Paid' && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black uppercase tracking-widest border border-emerald-100">已付款</span>}
