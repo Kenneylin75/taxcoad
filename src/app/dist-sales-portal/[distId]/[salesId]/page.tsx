@@ -121,11 +121,11 @@ export default function DistSalesPage() {
     const currentName = profData.name;
 
     const [perf, apps, visitData, toolData, conData, capData, plans] = await Promise.all([
-      fetchSalesPerformance(currentName),
+      fetchSalesPerformance(salesId),
       fetchFreeApplications(),
-      fetchVisitationRecords(currentName),
+      fetchVisitationRecords(salesId),
       fetchSalesTools(),
-      fetchEContracts(currentName),
+      fetchEContracts(salesId),
       fetchDistributorCapacity(distId),
       fetchRentPlans()
     ]);

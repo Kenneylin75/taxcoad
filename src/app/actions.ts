@@ -7155,13 +7155,10 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
   return { success: true };
 }
 
-export async function fetchSalesPerformance(salesName: string) {
+export async function fetchSalesPerformance(salesId: string) {
 
       try {
-        const sales = await prisma.distributorSales.findFirst({ where: { name: salesName } });
-        if (!sales) return { total: 0, approved: 0 };
-        
-        const temples = await prisma.temple.findMany({ where: { salesId: sales.id } });
+        const temples = await prisma.temple.findMany({ where: { salesId: salesId } });
         return {
           total: temples.length,
           approved: temples.filter(t => t.status === 'Active').length
@@ -7172,11 +7169,11 @@ export async function fetchSalesPerformance(salesName: string) {
       }
 }
 
-export async function fetchVisitationRecords(salesName: string) {
+export async function fetchVisitationRecords(salesId: string) {
 
       try {
         const records = await prisma.salesVisit.findMany({
-          where: { salesName }
+          where: { salesId }
         });
         return records;
       } catch (error) {
@@ -8268,31 +8265,29 @@ export async function addSalesMember(data: any) {
     return { success: false, error: '帳號已被使用' };
   }
   const id = 'sales-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-  const newSales = { 
-    id: id, 
-    distributorId: data.distributorId || 'dist-1', 
-    account: data.account || `sales_${id}`, 
-    password: data.password || '12345678',
-    role: 'DistributorSales',
-    status: 'Active',
-    joinedAt: new Date().toISOString().split('T')[0],
-    commissionRules: {
-      setupFeePercent: data.setupFeePercent || 20,
-      rentYear1Percent: data.rentYear1Percent || 15,
-      rentYear2Percent: data.rentYear2Percent || 10,
-      rentYear3PlusPercent: data.rentYear3PlusPercent || 5
-    },
-    ...data 
-  };
-  await null;
   try {
-    await prisma.$queryRawUnsafe(`
-      INSERT INTO dist_sales (id, distributor_id, name, account, password, role, status, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT DO NOTHING
-    `, [newSales.id, newSales.distributorId, newSales.name || '未命名業務員', newSales.account, newSales.password, newSales.role, newSales.status, newSales.joinedAt]);
+    await prisma.distributorSales.create({
+      data: {
+        id: id,
+        distributorId: data.distributorId || 'dist-1',
+        name: data.name || '未命名業務員',
+        account: data.account || `sales_${id}`,
+        password: data.password || '12345678',
+        phone: data.phone || null,
+        role: 'DistSales',
+        status: 'Active',
+        joinedAt: new Date().toISOString().split('T')[0],
+        commissionRules: {
+          setupRate: data.setupFeePercent || 20,
+          rentYear1Rate: data.rentYear1Percent || 15,
+          rentYear2Rate: data.rentYear2Percent || 10,
+          rentYear3PlusRate: data.rentYear3PlusPercent || 5
+        }
+      }
+    });
   } catch (e) {
     console.error("DB Insert Error for sales:", e);
+    return { success: false, error: '建立業務菁英失敗' };
   }
   revalidatePath('/distributor');
   return { success: true, id }; 
