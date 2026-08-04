@@ -2167,7 +2167,7 @@ export async function fetchAdminLogs() {
 
       try {
         const logs = await prisma.adminLog.findMany({
-          orderBy: { timestamp: 'desc' }
+          orderBy: { createdAt: 'desc' }
         });
         return logs;
       } catch (e) {
@@ -2557,7 +2557,7 @@ export async function fetchSyncQueue() { return [...[]]; }
 export async function fetchFreeApplications(distId?: string) {
   try {
     let list = await prisma.temple.findMany({
-      orderBy: { timestamp: 'desc' }
+      orderBy: { createdAt: 'desc' }
     });
     if (distId) {
        const allSales2 = await prisma.distributorSales.findMany();
@@ -2680,7 +2680,7 @@ export async function fetchDistributorVisits(distributorId: string) {
       where: {
         salesName: { in: teamNames }
       },
-      orderBy: { timestamp: 'desc' }
+      orderBy: { createdAt: 'desc' }
     });
     return visits;
   } catch(e) {
@@ -5483,7 +5483,7 @@ export async function fetchAuditLogs() {
         
         const logs = await prisma.auditLog.findMany({
           where: { templeId },
-          orderBy: { timestamp: 'desc' }
+          orderBy: { createdAt: 'desc' }
         });
         return logs;
       } catch (e) {
@@ -6044,7 +6044,7 @@ export async function fetchDistributorLogs(distributorId: string) {
       try {
         const logs = await prisma.adminLog.findMany({
           where: { target: { contains: distributorId } },
-          orderBy: { timestamp: 'desc' }
+          orderBy: { createdAt: 'desc' }
         });
         return logs;
       } catch (e) {

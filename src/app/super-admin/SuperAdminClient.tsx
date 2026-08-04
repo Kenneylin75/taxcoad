@@ -633,7 +633,7 @@ export default function SuperAdminClient({
                                 <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
                                     申請身份：{app.creatorRole === 'SuperSales' ? `超級業務員 ${app.creatorId || ''}` : app.creatorRole === 'Distributor' ? `經銷商 ${app.creatorId || ''}` : app.creatorRole === 'System' ? '超級管理員' : (app.creatorRole || '超級業務員')} | 
                                     提交：超級管理員 | 
-                                    日期：{app.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                    日期：{new Date(app.createdAt || app.timestamp || new Date()).toISOString().split('T')[0]}
                                  </p>
                                  <div className="flex gap-4 text-xs font-medium text-slate-500 mt-2">
                                     <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.freeType === 'Trial' ? '免費試用' : app.freeType === 'Permanent' ? '永久免費' : '標準方案'}</span>
