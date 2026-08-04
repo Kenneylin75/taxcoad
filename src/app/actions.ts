@@ -6237,7 +6237,12 @@ export async function fetchDataBridgeTree() {
       joinedAt: t.createdAt.toISOString(),
       status: t.status,
       planName: t.monthlyRent > 0 ? '月付標準方案' : '永久免費',
-      price: t.monthlyRent || 0
+      price: t.monthlyRent || 0,
+      freeType: t.freeType,
+      plan: t.plan,
+      paymentCycle: t.paymentCycle,
+      billingStartDate: t.billingStartDate,
+      paymentStatus: t.paymentStatus
     }));
 
     // Build hierarchy
@@ -8016,12 +8021,12 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
         const bills = await prisma.templeBill.findMany({ where: { status: 'Paid' } });
         const monthlyRevenue = bills.reduce((sum, b) => sum + Number(b.amount || 0), 0);
         
-        const temples = await prisma.temple.findMany({ where: { status: 'Active' }, select: { city: true, address: true } });
+        const temples = await prisma.temple.findMany({ where: { status: 'Active' }, select: { city: true, address: true, region: true } });
         const regionCounts: Record<string, number> = {};
         const majorRegions = ['台北', '新北', '基隆', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'];
         
         temples.forEach((t: any) => {
-          let region = t.city || (t.address ? t.address.substring(0, 2) : '');
+          let region = t.city || (t.address ? t.address.substring(0, 2) : '') || t.region || '';
           const shortRegion = region.substring(0, 2);
           const matchedRegion = majorRegions.find(r => shortRegion?.includes(r));
           if (matchedRegion) {
