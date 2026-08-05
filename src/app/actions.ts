@@ -7197,9 +7197,8 @@ export async function fetchVisitationRecords(salesId: string) {
 export async function fetchAllAccountsForAdmin() {
   const accounts: any[] = [];
   
-  accounts.push({ id: 'ADMIN', name: '蝮賡?擃頂蝯梁恣?', role: 'SuperAdmin', account: 'PIVOTADMIN01', status: 'Active' });
+  accounts.push({ id: 'ADMIN', name: '系統總部 HQ', role: 'SuperAdmin', account: 'PIVOTADMIN01', status: 'Active' });
   
-  // 敺?PostgreSQL ??蝟餌絞蝞∠???  // 敺?PostgreSQL ???? Admin
   let pgAdmins = await prisma.user.findMany({
     where: { role: 'Admin' }
   });
@@ -7212,7 +7211,14 @@ export async function fetchAllAccountsForAdmin() {
     accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
   });
 
-  // 敺?PostgreSQL ????蝬??  
+  // SuperSales
+  let pgSuperSales = await prisma.user.findMany({
+    where: { role: 'SuperSales' }
+  });
+  pgSuperSales.forEach(s => {
+    accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active' });
+  });
+
   let pgDistributors = await prisma.distributor.findMany();
 
   const allDistributorsMap = new Map();
@@ -7235,23 +7241,13 @@ export async function fetchAllAccountsForAdmin() {
     accounts.push({ ...d, id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
   });
 
-  // 取得所有業務
+  // DistSales
   let pgSales = await prisma.distributorSales.findMany();
-
-  const allSalesMap = new Map();
-  pgSales.forEach(s => allSalesMap.set(s.account, { ...s, distributorId: s.distributorId, joinedAt: s.joinedAt }));
-
-  const superOverrides = await [];
-  for (const s of Array.from(allSalesMap.values()) as any[]) {
-    if (s.role === 'SuperSales') {
-      const overrides = superOverrides[s.name];
-      const config = await fetchSystemConfig();
-      const mergedRules = overrides || s.commissionRules || config.defaultSuperSalesRates;
-      accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active', commissionRules: mergedRules });
-    }
-  }
+  pgSales.forEach(s => {
+    accounts.push({ ...s, id: s.id, name: s.name, role: 'DistSales', account: s.account, status: s.status || 'Active' });
+  });
   
-  // 取得所有宮廟
+  // Temples
   let pgTemples = await prisma.temple.findMany();
   
   const templePromises = pgTemples.map(async t => {

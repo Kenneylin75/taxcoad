@@ -579,11 +579,11 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
                                <td className="px-12 py-8 text-[12px] font-bold text-slate-600">{(() => {
-                                  if (acc.distributorId && acc.distributorId !== 'system-hq') {
-                                     return initialAccounts.find((a: any) => a.id === acc.distributorId)?.name || '系統總部 HQ';
-                                  }
-                                  if (acc.salesId) {
-                                     return initialAccounts.find((a: any) => a.id === acc.salesId)?.name || '系統總部 HQ';
+                                  const possibleIds = [acc.salesId, acc.distributorId, acc.superSalesId].filter(Boolean);
+                                  for (const pId of possibleIds) {
+                                     if (pId === 'system-hq') continue;
+                                     const found = initialAccounts.find((a: any) => a.id === pId);
+                                     if (found) return found.name;
                                   }
                                   return '系統總部 HQ';
                                })()}</td>
