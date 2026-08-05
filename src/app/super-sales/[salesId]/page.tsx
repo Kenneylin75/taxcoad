@@ -166,6 +166,7 @@ export default function SuperSalesPage() {
                 <TempleApplicationForm 
                    role="super-sales"
                    submittedBy={salesName}
+                   superSalesId={salesId}
                    onSuccess={() => setSubmitted(true)}
                    onCancel={() => setActiveTab('overview')}
                 />

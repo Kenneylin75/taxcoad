@@ -2,23 +2,17 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const temples = await prisma.temple.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-  });
-  console.log('--- 最近新增的三筆宮廟 ---');
-  console.table(temples.map(t => ({ id: t.id, name: t.name, status: t.status, phone: t.phone, setupFee: t.setupFee, account: t.account })));
+  const temples = await prisma.temple.findMany({ where: { name: { contains: '鎮安堂' } } });
+  console.log('Temples:', JSON.stringify(temples.map(t => ({ id: t.id, name: t.name, salesId: t.salesId, distributorId: t.distributorId, superSalesId: t.superSalesId })), null, 2));
+  
+  const distSales = await prisma.distributorSales.findMany();
+  console.log('DistSales:', JSON.stringify(distSales.map(d => ({ id: d.id, name: d.name, distributorId: d.distributorId })), null, 2));
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-  });
-  console.log('\n--- 最近新增的三個使用者 ---');
-  console.table(users.map(u => ({ id: u.id, name: u.name, role: u.role, account: u.account, templeId: u.templeId })));
+  const superSales = await prisma.user.findMany({ where: { role: 'SuperSales' }});
+  console.log('SuperSales:', JSON.stringify(superSales.map(d => ({ id: d.id, name: d.name })), null, 2));
+
+  const dists = await prisma.distributor.findMany();
+  console.log('Distributors:', JSON.stringify(dists.map(d => ({ id: d.id, name: d.name })), null, 2));
 }
 
-main()
-  .catch(e => console.error(e))
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch(console.error).finally(() => prisma.$disconnect());

@@ -984,6 +984,8 @@ export default function DistSalesPage() {
                <TempleApplicationForm 
                  role="DistSales"
                  submittedBy={salesName}
+                 salesId={salesId}
+                 distributorId={distId}
                  onSuccess={() => {
                    setIsAppModalOpen(false);
                    loadData();

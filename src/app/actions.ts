@@ -7170,7 +7170,11 @@ export async function updateSuperSalesCommission(salesName: string, rates: any) 
 export async function fetchSalesPerformance(salesId: string) {
 
       try {
-        const temples = await prisma.temple.findMany({ where: { salesId: salesId } });
+        const temples = await prisma.temple.findMany({
+           where: {
+             OR: [{ salesId: salesId }, { superSalesId: salesId }]
+           }
+        });
         return {
           total: temples.length,
           approved: temples.filter(t => t.status === 'Active').length
