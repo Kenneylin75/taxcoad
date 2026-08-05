@@ -6198,6 +6198,7 @@ export async function fetchDataBridgeTree() {
     const distributors = await prisma.distributor.findMany();
     const distSales = await prisma.distributorSales.findMany();
     const temples = await prisma.temple.findMany();
+    const distApps = await prisma.distributorApplication.findMany(); // For mapping dist to superSales
 
     const superSalesNodes = superSales.map((s: any) => ({
       id: s.id,
@@ -6211,6 +6212,7 @@ export async function fetchDataBridgeTree() {
     const distNodes = distributors.map((d: any) => ({
       id: d.id,
       name: d.name,
+      account: d.account,
       type: 'distributor',
       joinedAt: d.createdAt.toISOString(),
       status: d.status,
@@ -6248,19 +6250,21 @@ export async function fetchDataBridgeTree() {
     // Build hierarchy
     templeNodes.forEach((tNode: any) => {
       const temple = temples.find((t: any) => t.id === tNode.id);
-      if (temple?.salesId) {
-        const parent = distSalesNodes.find(ds => ds.id === temple.salesId);
-        if (parent) parent.children.push(tNode);
-        else hqTempleNode.children.push(tNode);
-      } else if (temple?.distributorId) {
-        const parent = distNodes.find(d => d.id === temple.distributorId);
-        if (parent) parent.children.push(tNode);
-        else hqTempleNode.children.push(tNode);
-      } else if (temple?.superSalesId) {
-        const parent = superSalesNodes.find(ss => ss.id === temple.superSalesId);
-        if (parent) parent.children.push(tNode);
-        else hqTempleNode.children.push(tNode);
-      } else {
+      const possibleIds = [temple?.salesId, temple?.distributorId, temple?.superSalesId].filter(Boolean);
+      
+      let foundParent = false;
+      for (const pId of possibleIds) {
+        let parent = distSalesNodes.find(ds => ds.id === pId);
+        if (parent) { parent.children.push(tNode); foundParent = true; break; }
+        
+        parent = distNodes.find(d => d.id === pId);
+        if (parent) { parent.children.push(tNode); foundParent = true; break; }
+
+        parent = superSalesNodes.find(ss => ss.id === pId);
+        if (parent) { parent.children.push(tNode); foundParent = true; break; }
+      }
+
+      if (!foundParent) {
         hqTempleNode.children.push(tNode);
       }
     });
@@ -6276,12 +6280,15 @@ export async function fetchDataBridgeTree() {
       }
     });
 
-    // NOTE: If distributors were somehow linked to superSales, we would group them.
-    // In schema, Distributor has no superSalesId. 
-    // Wait! A superSales creates a distributor, where is that saved?
-    // Let's assume for now they are all direct to HQ-Distributor unless they have superSalesId.
-    // Let's check if they have superSalesId in DB anyway? The schema didn't have it.
     distNodes.forEach((dNode: any) => {
+      const app = distApps.find((a: any) => (a.account && a.account === dNode.account) || (a.name && a.name === dNode.name));
+      if (app && app.submittedBy) {
+        const parentSS = superSalesNodes.find(ss => ss.id === app.submittedBy);
+        if (parentSS) {
+          parentSS.children.push(dNode);
+          return;
+        }
+      }
       hqDistributorNode.children.push(dNode);
     });
 
