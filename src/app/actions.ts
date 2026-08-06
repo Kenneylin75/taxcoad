@@ -6250,7 +6250,7 @@ export async function fetchDataBridgeTree() {
     // Build hierarchy
     templeNodes.forEach((tNode: any) => {
       const temple = temples.find((t: any) => t.id === tNode.id);
-      const possibleIds = [temple?.salesId, temple?.distributorId, temple?.superSalesId].filter(Boolean);
+      const possibleIds = [temple?.salesId, temple?.superSalesId, temple?.distributorId].filter(Boolean);
       
       let foundParent = false;
       for (const pId of possibleIds) {

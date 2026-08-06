@@ -19,7 +19,7 @@ export default async function DistributorPage({ params }: { params: Promise<{ di
   const [profile, team, apps, capacity, commission, temples, visits, tools, financials, logs] = await Promise.all([
     fetchDistributorProfile(distributorId),
     fetchDistributorTeam(distributorId),
-    fetchFreeApplications(),
+    fetchFreeApplications(distributorId),
     fetchDistributorCapacity(distributorId),
     fetchDistributorCommissionSummary(distributorId, new Date().getFullYear().toString(), (new Date().getMonth() + 1).toString().padStart(2, '0')),
     fetchDistributorTemples(distributorId),
