@@ -173,13 +173,16 @@ function DeepFileCenterContent() {
       logs.push({ type: 'RECORD', date: rec.date, time: '---', title: title, desc: detailDesc, icon: isMerit ? '✨' : '📜', color: isMerit ? 'amber' : 'emerald' });
     });
     history.lampRecords?.forEach(lamp => {
-      logs.push({ type: 'LAMP', date: lamp.startDate, time: '---', title: `安奉燈位：${lamp.categoryName}`, desc: `狀態：${lamp.status} | 圓滿日：${lamp.expiryDate}`, icon: '🏮', color: 'amber', paymentRef: lamp.paymentRef, paymentProofUrl: lamp.paymentProofUrl });
+      const startDateStr = lamp.startDate ? (typeof lamp.startDate === 'string' ? lamp.startDate.split('T')[0] : new Date(lamp.startDate).toISOString().split('T')[0]) : '---';
+      const expiryDateStr = lamp.expiryDate ? (typeof lamp.expiryDate === 'string' ? lamp.expiryDate.split('T')[0] : new Date(lamp.expiryDate).toISOString().split('T')[0]) : '---';
+      logs.push({ type: 'LAMP', date: startDateStr, time: '---', title: `安奉燈位：${lamp.categoryName || lamp.lampType}`, desc: `狀態：${lamp.status} | 圓滿日：${expiryDateStr}`, icon: '🏮', color: 'amber', paymentRef: lamp.paymentRef, paymentProofUrl: lamp.paymentProofUrl });
     });
     history.eventRegistrations?.forEach(evt => {
       logs.push({ type: 'EVENT', date: (evt.timestamp || evt.createdAt) ? (typeof (evt.timestamp || evt.createdAt) === 'string' ? (evt.timestamp || evt.createdAt) : new Date(evt.timestamp || evt.createdAt).toISOString()).split('T')[0] : '---', time: '---', title: `活動：${evt.title || evt.eventId}`, desc: `狀態：${evt.status || evt.paymentStatus || '成功'}`, icon: '🎉', color: 'indigo', paymentRef: evt.paymentRef, paymentProofUrl: evt.paymentProofUrl });
     });
     history.queueTickets?.forEach(qt => {
-      logs.push({ type: 'QUEUE', date: qt.date || qt.scannedAt, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
+      const qtDateStr = (qt.date || qt.scannedAt || qt.createdAt) ? (typeof (qt.date || qt.scannedAt || qt.createdAt) === 'string' ? (qt.date || qt.scannedAt || qt.createdAt).split('T')[0] : new Date(qt.date || qt.scannedAt || qt.createdAt).toISOString().split('T')[0]) : '---';
+      logs.push({ type: 'QUEUE', date: qtDateStr, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.displayNum || qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
     });
     history.files.forEach(file => {
       if (file.folder !== 'Payment_Proofs' && file.folder !== '對帳審核') {
@@ -558,7 +561,7 @@ function DeepFileCenterContent() {
                                      <div className="flex flex-wrap justify-between items-center gap-4 pb-4 border-b border-slate-100/50">
                                         <div className="space-y-1">
                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p>
-                                           <p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate}</p>
+                                           <p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate ? (typeof lamp.expiryDate === 'string' ? lamp.expiryDate.split('T')[0] : new Date(lamp.expiryDate).toISOString().split('T')[0]) : '---'}</p>
                                         </div>
                                         <div className="flex gap-3 flex-wrap items-center">
                                            {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
