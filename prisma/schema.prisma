@@ -500,6 +500,7 @@ model PrintTemplate {
   name             String
   templeName       String?  @map("temple_name")
   watermarkUrl     String?  @map("watermark_url")
+  watermarkLocalUrl String? @map("watermark_local_url")
   watermarkOpacity Float?   @map("watermark_opacity")
   borderStyle      String?  @map("border_style")
   content          Json?

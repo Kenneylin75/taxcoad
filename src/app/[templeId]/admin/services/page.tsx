@@ -144,6 +144,7 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
          name: '自訂新版型',
          templeName: '宮廟名稱',
          watermarkUrl: '',
+         watermarkLocalUrl: '',
          watermarkOpacity: 0.1,
          borderStyle: 'border: 8px double #fcd34d; padding: 20px;'
       });
@@ -202,8 +203,8 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
 
                      {/* Mini Preview Box */}
                      <div className="w-full aspect-[1/1.4] bg-slate-50 rounded-xl overflow-hidden border border-slate-200 relative mb-4 flex flex-col" style={(pt.borderStyle || '').split(';').reduce((acc: any, rule: string) => { const parts = rule.split(':'); if (parts.length > 1) { acc[parts[0].trim().replace(/-([a-z])/g, (g: any) => g[1].toUpperCase())] = parts.slice(1).join(':').trim(); } return acc; }, {})}>
-                        {pt.watermarkUrl && (
-                           <div className="absolute inset-0 bg-center bg-contain bg-no-repeat z-0" style={{ backgroundImage: `url(${pt.watermarkUrl})`, opacity: pt.watermarkOpacity }}></div>
+                        {(pt.watermarkLocalUrl || pt.watermarkUrl) && (
+                           <div className="absolute inset-0 bg-center bg-contain bg-no-repeat z-0" style={{ backgroundImage: `url(${pt.watermarkLocalUrl || pt.watermarkUrl})`, opacity: pt.watermarkOpacity }}></div>
                         )}
                         <div className="relative z-10 text-center font-black" style={{ fontSize: '10px' }}>{pt.templeName}</div>
                         <div className="relative z-10 w-full h-[2px] bg-black/20 my-2"></div>
@@ -267,7 +268,33 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
                         <div className="space-y-2">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">主神浮水印圖片網址 (Watermark URL)</label>
                            <input type="text" placeholder="請貼上圖片網址" value={editingTemplate.watermarkUrl} onChange={e => setEditingTemplate({ ...editingTemplate, watermarkUrl: e.target.value })} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white" />
-                           <p className="text-[10px] text-slate-400 font-bold">第一階段支援貼上圖片網址，或留空不使用背景。</p>
+                           <p className="text-[10px] text-slate-400 font-bold mb-4">第一階段支援貼上圖片網址，或留空不使用背景。</p>
+
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">上傳本地圖片 (Local Image)</label>
+                           <input type="file" accept="image/*" onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              const tId = typeof window !== 'undefined' ? window.location.pathname.split('/')[1] : 'default';
+                              formData.append('templeId', tId);
+                              formData.append('type', 'watermark');
+                              try {
+                                 const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                 const data = await res.json();
+                                 if (data.success) {
+                                    setEditingTemplate({ ...editingTemplate, watermarkLocalUrl: data.url });
+                                 } else {
+                                    alert('上傳失敗：' + data.message);
+                                 }
+                              } catch (err) {
+                                 console.error(err);
+                                 alert('上傳發生錯誤');
+                              }
+                           }} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+                           {editingTemplate.watermarkLocalUrl && (
+                              <p className="text-[10px] text-indigo-600 font-bold mt-1">✓ 已上傳本地圖片 (將優先使用此圖片)</p>
+                           )}
                         </div>
 
                         <div className="space-y-2">
@@ -293,8 +320,8 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
                      {/* Simulated A4 Paper */}
                      <div className="w-[400px] h-[565px] bg-white shadow-2xl relative flex flex-col" style={(editingTemplate.borderStyle || '').split(';').reduce((acc: any, rule: string) => { const parts = rule.split(':'); if (parts.length > 1) { acc[parts[0].trim().replace(/-([a-z])/g, (g: any) => g[1].toUpperCase())] = parts.slice(1).join(':').trim(); } return acc; }, {})}>
                         {/* Watermark */}
-                        {editingTemplate.watermarkUrl && (
-                           <div className="absolute inset-0 bg-center bg-contain bg-no-repeat pointer-events-none z-0" style={{ backgroundImage: `url(${editingTemplate.watermarkUrl})`, opacity: editingTemplate.watermarkOpacity }}></div>
+                        {(editingTemplate.watermarkLocalUrl || editingTemplate.watermarkUrl) && (
+                           <div className="absolute inset-0 bg-center bg-contain bg-no-repeat pointer-events-none z-0" style={{ backgroundImage: `url(${editingTemplate.watermarkLocalUrl || editingTemplate.watermarkUrl})`, opacity: editingTemplate.watermarkOpacity }}></div>
                         )}
                         {/* Content */}
                         <div className="relative z-10 w-full h-full flex flex-col">

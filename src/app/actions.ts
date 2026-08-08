@@ -908,6 +908,7 @@ export async function fetchPrintTemplates() {
       name: t.name,
       templeName: t.templeName,
       watermarkUrl: t.watermarkUrl,
+      watermarkLocalUrl: t.watermarkLocalUrl,
       watermarkOpacity: t.watermarkOpacity,
       borderStyle: t.borderStyle,
       content: t.content ? JSON.parse(JSON.stringify(t.content)) : []
@@ -930,6 +931,7 @@ export async function savePrintTemplate(data: any) {
           name: data.name,
           templeName: data.templeName,
           watermarkUrl: data.watermarkUrl,
+          watermarkLocalUrl: data.watermarkLocalUrl,
           watermarkOpacity: data.watermarkOpacity,
           borderStyle: data.borderStyle,
           content: data.content || []
@@ -943,6 +945,7 @@ export async function savePrintTemplate(data: any) {
           name: data.name,
           templeName: data.templeName,
           watermarkUrl: data.watermarkUrl,
+          watermarkLocalUrl: data.watermarkLocalUrl,
           watermarkOpacity: data.watermarkOpacity,
           borderStyle: data.borderStyle,
           content: data.content || []
