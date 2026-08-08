@@ -97,9 +97,15 @@ export default function FinancialManagerClient({ initialData, freeApps }: Financ
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredRevenue = (initialData?.revenue || []).filter(rev => {
-    const tsStr = typeof rev.timestamp === 'string' ? rev.timestamp : (rev.timestamp instanceof Date ? rev.timestamp.toISOString() : new Date(rev.timestamp || Date.now()).toISOString());
-    const matchMonth = tsStr.startsWith(selectedMonth);
+  const sanitizedRevenue = (initialData?.revenue || []).map((rev: any) => ({
+    ...rev,
+    timestamp: typeof rev.timestamp === 'string' 
+      ? rev.timestamp.split('T')[0] 
+      : (rev.timestamp instanceof Date ? rev.timestamp.toISOString().split('T')[0] : new Date(rev.timestamp || Date.now()).toISOString().split('T')[0])
+  }));
+
+  const filteredRevenue = sanitizedRevenue.filter(rev => {
+    const matchMonth = rev.timestamp.startsWith(selectedMonth);
     if (!searchTerm) return matchMonth;
     const term = searchTerm.toLowerCase();
     const matchSearch = (rev.title || '').toLowerCase().includes(term) ||
