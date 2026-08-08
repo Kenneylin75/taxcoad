@@ -1079,14 +1079,26 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
               const file = e.target.files?.[0];
               if (!file || !guestUser?.phone) return;
               
-              // Simulate uploading
-              const mockUrl = `/uploads/${Date.now()}_${file.name}`;
-              await uploadCustomerMedia(guestUser.phone, mockUrl, activeFileTab, 'Member', file.name);
-              
-              // Refresh files list
-              const updatedFiles = await fetchGuestFiles(guestUser.phone);
-              setGuestFiles(updatedFiles);
-              alert(`✨ 檔案「${file.name}」已成功上傳至您的個人空間！`);
+              const formData = new FormData();
+              formData.append('file', file);
+              formData.append('templeId', params?.templeId as string || 'default');
+              formData.append('type', activeFileTab);
+
+              try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (!data.success) {
+                  throw new Error(data.message);
+                }
+                await uploadCustomerMedia(guestUser.phone, data.url, activeFileTab, 'Member', file.name);
+                
+                // Refresh files list
+                const updatedFiles = await fetchGuestFiles(guestUser.phone);
+                setGuestFiles(updatedFiles);
+                alert(`✨ 檔案「${file.name}」已成功上傳至您的個人空間！`);
+              } catch (err: any) {
+                alert('上傳失敗：' + err.message);
+              }
             }}
           />
           <label 
