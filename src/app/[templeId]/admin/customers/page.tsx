@@ -560,10 +560,16 @@ function DeepFileCenterContent() {
                                        })()}
                                      </div>
                                      <div className="flex flex-wrap justify-between items-center gap-4 pb-4 border-b border-slate-100/50">
-                                        <div className="space-y-1">
+                                        <div className="flex gap-8 items-center">
+<div className="space-y-1">
                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p>
                                            <p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(lamp.expiryDate)).replace(/\//g, '-') : '---'}</p>
                                         </div>
+                                         <div className="space-y-1">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">結緣金額</p>
+                                            <p className="text-sm font-bold text-slate-900 font-mono">NT$ {(lamp.actualPrice ?? lamp.price ?? 0).toLocaleString()}</p>
+                                         </div>
+                                      </div>
                                         <div className="flex gap-3 flex-wrap items-center">
                                            {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
                                               <button 
