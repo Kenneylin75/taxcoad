@@ -319,7 +319,7 @@ const PrintTemplatesView = ({ printTemplates, loadData }: any) => {
    );
 };
 
-const AdminDesktopView = ({ services, forms, printTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService }: any) => {
+const AdminDesktopView = ({ services, forms, printTemplates, formTemplates, setFormTemplates, staffList, availableSlots, loadData, activeTab, setActiveTab, handleDeleteService, handleDeleteForm }: any) => {
    const [editingService, setEditingService] = useState<any>(null);
    const [editingForm, setEditingForm] = useState<any>(null);
    const [showTemplateMenu, setShowTemplateMenu] = useState(false);
