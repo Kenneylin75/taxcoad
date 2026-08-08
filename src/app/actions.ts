@@ -1679,7 +1679,7 @@ export async function fetchGuestFiles(phone: string) {
         phone: dbPhone
       },
       orderBy: {
-        uploadedAt: 'desc'
+        createdAt: 'desc'
       }
     });
 
@@ -1691,7 +1691,7 @@ export async function fetchGuestFiles(phone: string) {
       name: r.name,
       folder: r.folder,
       uploadedBy: r.uploadedBy,
-      uploadedAt: r.uploadedAt ? r.uploadedAt.toISOString().replace('T', ' ').slice(0, 19) : new Date().toISOString()
+      uploadedAt: r.createdAt ? r.createdAt.toISOString().replace('T', ' ').slice(0, 19) : new Date().toISOString()
     }));
   } catch (error) {
     console.error('fetchGuestFiles error:', error);
