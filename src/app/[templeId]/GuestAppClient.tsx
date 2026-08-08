@@ -1398,15 +1398,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   </div>
                   
                   <div className="bg-gray-50 p-4 rounded-xl space-y-3">
-                    {record.type !== '點燈' && (
-                       <div className="flex items-center gap-3">
-                         <span className="text-gray-400">📅</span>
-                         <div>
-                            <p className="text-xs text-gray-500 font-bold">時間與日期</p>
-                            <p className="text-gray-900 font-bold text-sm">{record.time}</p>
-                         </div>
-                       </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-400">📅</span>
+                      <div>
+                         <p className="text-xs text-gray-500 font-bold">{record.type === '點燈' ? '安奉期間' : '時間與日期'}</p>
+                         <p className="text-gray-900 font-bold text-sm">{record.time}</p>
+                      </div>
+                    </div>
                     {(record.type === '點燈' || (record.staff && record.type !== '活動')) && (
                       <div className="flex items-center gap-3">
                         <span className="text-gray-400">{record.type === '點燈' ? '⏳' : '👤'}</span>
@@ -1428,13 +1426,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                        </div>
                      </div>
                   )}
-                  {record.type === '預約' && record.amount !== undefined && record.amount !== null && (
+                  {(record.amount !== undefined || record.price !== undefined) && (record.amount !== null || record.price !== null) && (
                     <div className="bg-gray-50 p-4 rounded-xl mt-2 flex items-center gap-3">
                       <span className="text-gray-400">💰</span>
                       <div>
                          <p className="text-xs text-gray-500 font-bold">結緣金額</p>
                          <p className="text-gray-900 font-bold text-sm">
-                            ${record.amount}
+                            NT$ {(record.amount ?? record.price)?.toLocaleString()}
                          </p>
                       </div>
                     </div>
@@ -1442,7 +1440,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
                   {(record.paymentProofUrl || record.paymentRef) && (
                     <div className="space-y-2 pt-2 mt-2 border-t border-slate-100">
-                      {record.paymentRef && (
+                      {record.paymentRef && record.paymentRef.length < 20 && (
                          <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[11px] font-black tracking-widest w-full justify-center">
                            <span>💳</span> 匯款後五碼：{record.paymentRef}
                          </div>

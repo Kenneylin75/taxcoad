@@ -1950,19 +1950,12 @@ export async function fetchGuestLampRecords(p: any) {
       });
     }
 
+    const formatLocal = (val: any) => val ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(val)).replace(/\//g, '-') : '';
+
     return records.map(r => {
-      let startStr = '';
-      let expStr = '';
-      try {
-        const start = r.createdAt ? new Date(r.createdAt) : new Date();
-        if (isNaN(start.getTime())) throw new Error();
-        const exp = new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000));
-        startStr = start.toISOString().split('T')[0];
-        expStr = exp.toISOString().split('T')[0];
-      } catch {
-        startStr = new Date().toISOString().split('T')[0];
-        expStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      }
+      let startStr = formatLocal(r.startDate || r.createdAt || new Date());
+      let expStr = formatLocal(r.expiryDate || new Date((r.startDate || r.createdAt || new Date()).getTime() + 365 * 24 * 60 * 60 * 1000));
+      
       return {
         id: r.id, 
         templeId: r.templeId, 
@@ -1972,7 +1965,7 @@ export async function fetchGuestLampRecords(p: any) {
         price: r.actualPrice, 
         status: r.status,
         startDate: startStr, 
-        expiryDate: r.expiryDate || expStr,
+        expiryDate: expStr,
         paymentMethod: r.paymentMethod, 
         paymentRef: r.paymentProofUrl, 
         paymentStatus: r.paymentStatus, 
