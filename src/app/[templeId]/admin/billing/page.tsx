@@ -36,7 +36,10 @@ export default async function BillingPage({ params }: { params: Promise<{ temple
           </div>
         </div>
       )}
-      <FinancialManagerClient initialData={financialData} freeApps={freeApps} />
+      <FinancialManagerClient 
+        initialData={JSON.parse(JSON.stringify(financialData))} 
+        freeApps={JSON.parse(JSON.stringify(freeApps))} 
+      />
     </div>
   );
 }
