@@ -1309,7 +1309,8 @@ export async function fetchLampRecords() {
           status: r.status,
           createdAt: r.createdAt.toISOString(),
           paymentMethod: r.paymentMethod,
-          paymentRef: r.paymentProofUrl,
+          paymentRef: r.paymentRef,
+          paymentProofUrl: r.paymentProofUrl,
           paymentStatus: r.paymentStatus
         }));
       } catch(e) {
@@ -1967,9 +1968,9 @@ export async function fetchGuestLampRecords(p: any) {
         startDate: startStr, 
         expiryDate: expStr,
         paymentMethod: r.paymentMethod, 
-        paymentRef: r.paymentProofUrl, 
         paymentStatus: r.paymentStatus, 
         createdAt: r.createdAt.toISOString().replace('T', ' ').split('.')[0],
+        paymentRef: r.paymentRef || null,
         paymentProofUrl: r.paymentProofUrl || null
       };
     });
@@ -4508,7 +4509,7 @@ export async function createLampRecord(data: any) {
             actualPrice: cat.price,
             status: 'Pending',
             paymentMethod,
-            paymentProofUrl: paymentRef,
+            paymentRef: paymentRef,
             paymentStatus,
             remarks: notice,
             position,

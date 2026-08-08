@@ -629,6 +629,7 @@ model LampRecord {
   actualPrice     Int      @default(0) @map("actual_price")
   paymentMethod   String?  @map("payment_method")
   paymentStatus   String   @default("Pending") @map("payment_status")
+  paymentRef      String?  @map("payment_ref")
   paymentProofUrl String?  @map("payment_proof_url")
   remarks         String?
   position        String?
