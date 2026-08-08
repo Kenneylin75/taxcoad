@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useParams } from 'next/navigation';
 import {
   fetchGuests,
   fetchForms,
@@ -52,6 +52,8 @@ const getUIStylesForCategory = (catName: string) => {
 };
 
 export default function DeepFileCenter() {
+  const params = useParams();
+  const searchParams = useSearchParams();
   return (
     <Suspense fallback={
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -65,6 +67,7 @@ export default function DeepFileCenter() {
 }
 
 function DeepFileCenterContent() {
+  const params = useParams();
   const [guests, setGuests] = useState<any[]>([]);
   const [selectedGuest, setSelectedGuest] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,7 +176,7 @@ function DeepFileCenterContent() {
       logs.push({ type: 'LAMP', date: lamp.startDate, time: '---', title: `安奉燈位：${lamp.categoryName}`, desc: `狀態：${lamp.status} | 圓滿日：${lamp.expiryDate}`, icon: '🏮', color: 'amber', paymentRef: lamp.paymentRef, paymentProofUrl: lamp.paymentProofUrl });
     });
     history.eventRegistrations?.forEach(evt => {
-      logs.push({ type: 'EVENT', date: evt.timestamp?.split('T')[0] || evt.timestamp, time: '---', title: `活動：${evt.title}`, desc: `狀態：${evt.status || '成功'}`, icon: '🎉', color: 'indigo', paymentRef: evt.paymentRef, paymentProofUrl: evt.paymentProofUrl });
+      logs.push({ type: 'EVENT', date: (evt.timestamp || evt.createdAt) ? (typeof (evt.timestamp || evt.createdAt) === 'string' ? (evt.timestamp || evt.createdAt) : new Date(evt.timestamp || evt.createdAt).toISOString()).split('T')[0] : '---', time: '---', title: `活動：${evt.title || evt.eventId}`, desc: `狀態：${evt.status || evt.paymentStatus || '成功'}`, icon: '🎉', color: 'indigo', paymentRef: evt.paymentRef, paymentProofUrl: evt.paymentProofUrl });
     });
     history.queueTickets?.forEach(qt => {
       logs.push({ type: 'QUEUE', date: qt.date || qt.scannedAt, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
@@ -288,18 +291,28 @@ function DeepFileCenterContent() {
     if (!file || !selectedGuest) return;
     setIsSaving(true);
     
-    // 為了讓展示環境中，信眾端與管理端能跨元件看到圖片與影片，
-    // 我們將檔案轉為 Base64 格式儲存。
-    const base64Url = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
+    let fileUrl = '';
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('templeId', (params?.templeId as string) || 'default');
+    formData.append('type', uploadType);
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message);
+      }
+      fileUrl = data.url;
+    } catch (err: any) {
+      alert('上傳失敗：' + err.message);
+      setIsSaving(false);
+      return;
+    }
     
     const finalName = pendingServiceFileName ? `${pendingServiceFileName}.${file.name.split('.').pop()}` : file.name;
     
-    await uploadCustomerMedia(selectedGuest.phone, base64Url, uploadType, 'Temple', finalName);
+    await uploadCustomerMedia(selectedGuest.phone, fileUrl, uploadType, '管理人員', finalName);
     await loadHistory(selectedGuest.phone);
     setIsSaving(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -514,7 +527,7 @@ function DeepFileCenterContent() {
                                      {/* Media Row for Lamps */}
                                      <div className="flex items-center gap-2 flex-wrap justify-start pt-2">
                                        {(() => {
-                                         const timeStr = lamp.createdAt ? lamp.createdAt.split(/[ T]/)[0] : 'UnknownTime';
+                                         const timeStr = lamp.createdAt ? (typeof lamp.createdAt === 'string' ? lamp.createdAt : new Date(lamp.createdAt).toISOString()).split(/[ T]/)[0] : 'UnknownTime';
                                          const prefix = `${lamp.categoryName || lamp.lampType}_${timeStr}_${lamp.guestName || selectedGuest?.name}`;
                                          const svcVideo = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'video');
                                          const svcPhoto = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'photo');
