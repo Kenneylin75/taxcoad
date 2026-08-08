@@ -172,16 +172,17 @@ function DeepFileCenterContent() {
       }
       logs.push({ type: 'RECORD', date: rec.date, time: '---', title: title, desc: detailDesc, icon: isMerit ? '✨' : '📜', color: isMerit ? 'amber' : 'emerald' });
     });
+    const formatLocal = (val: any) => val ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(val)).replace(/\//g, '-') : '---';
     history.lampRecords?.forEach(lamp => {
-      const startDateStr = lamp.startDate ? (typeof lamp.startDate === 'string' ? lamp.startDate.split('T')[0] : new Date(lamp.startDate).toISOString().split('T')[0]) : '---';
-      const expiryDateStr = lamp.expiryDate ? (typeof lamp.expiryDate === 'string' ? lamp.expiryDate.split('T')[0] : new Date(lamp.expiryDate).toISOString().split('T')[0]) : '---';
+      const startDateStr = formatLocal(lamp.startDate);
+      const expiryDateStr = formatLocal(lamp.expiryDate);
       logs.push({ type: 'LAMP', date: startDateStr, time: '---', title: `安奉燈位：${lamp.categoryName || lamp.lampType}`, desc: `狀態：${lamp.status} | 圓滿日：${expiryDateStr}`, icon: '🏮', color: 'amber', paymentRef: lamp.paymentRef, paymentProofUrl: lamp.paymentProofUrl });
     });
     history.eventRegistrations?.forEach(evt => {
-      logs.push({ type: 'EVENT', date: (evt.timestamp || evt.createdAt) ? (typeof (evt.timestamp || evt.createdAt) === 'string' ? (evt.timestamp || evt.createdAt) : new Date(evt.timestamp || evt.createdAt).toISOString()).split('T')[0] : '---', time: '---', title: `活動：${evt.title || evt.eventId}`, desc: `狀態：${evt.status || evt.paymentStatus || '成功'}`, icon: '🎉', color: 'indigo', paymentRef: evt.paymentRef, paymentProofUrl: evt.paymentProofUrl });
+      logs.push({ type: 'EVENT', date: formatLocal(evt.timestamp || evt.createdAt), time: '---', title: `活動：${evt.title || evt.eventId}`, desc: `狀態：${evt.status || evt.paymentStatus || '成功'}`, icon: '🎉', color: 'indigo', paymentRef: evt.paymentRef, paymentProofUrl: evt.paymentProofUrl });
     });
     history.queueTickets?.forEach(qt => {
-      const qtDateStr = (qt.date || qt.scannedAt || qt.createdAt) ? (typeof (qt.date || qt.scannedAt || qt.createdAt) === 'string' ? (qt.date || qt.scannedAt || qt.createdAt).split('T')[0] : new Date(qt.date || qt.scannedAt || qt.createdAt).toISOString().split('T')[0]) : '---';
+      const qtDateStr = formatLocal(qt.date || qt.scannedAt || qt.createdAt);
       logs.push({ type: 'QUEUE', date: qtDateStr, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.displayNum || qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
     });
     history.files.forEach(file => {
@@ -530,7 +531,7 @@ function DeepFileCenterContent() {
                                      {/* Media Row for Lamps */}
                                      <div className="flex items-center gap-2 flex-wrap justify-start pt-2">
                                        {(() => {
-                                         const timeStr = lamp.createdAt ? (typeof lamp.createdAt === 'string' ? lamp.createdAt : new Date(lamp.createdAt).toISOString()).split(/[ T]/)[0] : 'UnknownTime';
+                                         const timeStr = lamp.createdAt ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(lamp.createdAt)).replace(/\//g, '-') : 'UnknownTime';
                                          const prefix = `${lamp.categoryName || lamp.lampType}_${timeStr}_${lamp.guestName || selectedGuest?.name}`;
                                          const svcVideo = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'video');
                                          const svcPhoto = history.files?.find((f: any) => f.name?.startsWith(prefix) && f.type === 'photo');
@@ -561,7 +562,7 @@ function DeepFileCenterContent() {
                                      <div className="flex flex-wrap justify-between items-center gap-4 pb-4 border-b border-slate-100/50">
                                         <div className="space-y-1">
                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">圓滿屆期日</p>
-                                           <p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate ? (typeof lamp.expiryDate === 'string' ? lamp.expiryDate.split('T')[0] : new Date(lamp.expiryDate).toISOString().split('T')[0]) : '---'}</p>
+                                           <p className="text-sm font-bold text-slate-900 font-mono">{lamp.expiryDate ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(lamp.expiryDate)).replace(/\//g, '-') : '---'}</p>
                                         </div>
                                         <div className="flex gap-3 flex-wrap items-center">
                                            {(lamp.paymentStatus === 'Pending' || lamp.paymentStatus === 'Unpaid' || lamp.paymentStatus === 'PENDING_REVIEW') && (
