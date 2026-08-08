@@ -4458,12 +4458,12 @@ export async function createLampRecord(data: any) {
         if (data instanceof FormData) {
           phone = data.get('phone') as string; categoryId = data.get('categoryId') as string; guestName = data.get('guestName') as string; notice = data.get('notice') as string; paymentMethod = data.get('paymentMethod') as string || 'Cash'; paymentRef = data.get('paymentRef') as string || '';
           position = data.get('position') as string || '';
-          durationDays = parseInt(data.get('durationDays') as string || '365', 10);
+          durationDays = data.get('durationDays') ? parseInt(data.get('durationDays') as string, 10) : 0;
           startDate = data.get('startDate') ? new Date(data.get('startDate') as string) : new Date();
         } else {
           phone = data.phone; categoryId = data.categoryId; guestName = data.guestName; notice = data.notice; paymentMethod = data.paymentMethod || 'Cash'; paymentRef = data.paymentRef || '';
           position = data.position || '';
-          durationDays = data.durationDays || 365;
+          durationDays = data.durationDays ? parseInt(data.durationDays, 10) : 0;
           startDate = data.startDate ? new Date(data.startDate) : new Date();
         }
 
@@ -4489,6 +4489,10 @@ export async function createLampRecord(data: any) {
           update: {},
           create: { templeId: templeId!, phone: normPhone, name: guestName, status: 'Active' }
         });
+
+        if (!durationDays) {
+          durationDays = cat.durationDays || 365;
+        }
 
         const expiryDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
