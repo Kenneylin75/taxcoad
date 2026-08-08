@@ -6854,16 +6854,31 @@ export async function fetchTemplePaymentTarget(templeId: string) {
 }
 
 export async function updateRevenueRemark(id: string, source: string, remark: string) {
-
-      try {
-        await prisma.financeRecord.update({
-          where: { id },
-          data: { source: remark }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+  try {
+    switch (source) {
+      case 'Appointment':
+        await prisma.appointment.update({ where: { id }, data: { remarks: remark } });
+        break;
+      case 'Lamp':
+        await prisma.lampRecord.update({ where: { id }, data: { remarks: remark } });
+        break;
+      case 'Event':
+        await prisma.eventRegistration.update({ where: { id }, data: { remarks: remark } });
+        break;
+      case 'QueueTicket':
+        await prisma.queueTicket.update({ where: { id }, data: { remarks: remark } });
+        break;
+      case 'DeepRecord':
+        await prisma.deepRecord.update({ where: { id }, data: { remarks: remark } });
+        break;
+      default:
+        console.warn('Unknown revenue source for remark update:', source);
+    }
+    return { success: true };
+  } catch(e) {
+    console.error('Update remark error', e);
+    return { success: false };
+  }
 }
 
 
