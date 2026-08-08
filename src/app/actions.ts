@@ -836,7 +836,8 @@ export async function saveServiceDefinition(data: any) {
     if (!templeId) return { success: false };
     const newColor = data.color || '#6366f1';
     
-    if (data.id) {
+    const existing = data.id ? await prisma.service.findFirst({ where: { id: data.id, templeId } }) : null;
+    if (existing) {
       await prisma.service.updateMany({
         where: { id: data.id, templeId },
         data: {
@@ -852,7 +853,7 @@ export async function saveServiceDefinition(data: any) {
         }
       });
     } else {
-      const id = `s-${Date.now()}`;
+      const id = data.id || `s-${Date.now()}`;
       await prisma.service.create({
         data: {
           id,
@@ -921,7 +922,8 @@ export async function savePrintTemplate(data: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    if (data.id) {
+    const existing = data.id ? await prisma.printTemplate.findFirst({ where: { id: data.id, templeId } }) : null;
+    if (existing) {
       await prisma.printTemplate.updateMany({
         where: { id: data.id, templeId },
         data: {
@@ -936,7 +938,7 @@ export async function savePrintTemplate(data: any) {
     } else {
       await prisma.printTemplate.create({
         data: {
-          id: `pt-${Date.now()}`,
+          id: data.id || `pt-${Date.now()}`,
           templeId,
           name: data.name,
           templeName: data.templeName,
@@ -988,14 +990,15 @@ export async function saveForm(data: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    if (data.id) {
+    const existing = data.id ? await prisma.form.findFirst({ where: { id: data.id, templeId } }) : null;
+    if (existing) {
       await prisma.form.updateMany({
         where: { id: data.id, templeId },
         data: { name: data.name, fields: data.fields || [] }
       });
     } else {
       await prisma.form.create({
-        data: { id: `form-${Date.now()}`, templeId, name: data.name, fields: data.fields || [] }
+        data: { id: data.id || `form-${Date.now()}`, templeId, name: data.name, fields: data.fields || [] }
       });
     }
     await revalidateTemple();
