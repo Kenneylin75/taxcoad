@@ -820,7 +820,9 @@ export async function fetchServiceDefinitions() {
       description: r.description || '',
       color: r.color || '#6366f1',
       status: r.status,
-      assignedStaff: r.assignedStaff ? JSON.parse(JSON.stringify(r.assignedStaff)) : []
+      assignedStaff: r.assignedStaff ? JSON.parse(JSON.stringify(r.assignedStaff)) : [],
+      linkedFormId: r.linkedFormId || null,
+      linkedPrintTemplateId: r.linkedPrintTemplateId || null
     }));
   } catch (e) {
     console.error(e);
@@ -844,7 +846,9 @@ export async function saveServiceDefinition(data: any) {
           description: data.description || '',
           color: newColor,
           assignedStaff: data.assignedStaff || [],
-          status: data.status || 'Active'
+          status: data.status || 'Active',
+          linkedFormId: data.linkedFormId || null,
+          linkedPrintTemplateId: data.linkedPrintTemplateId || null
         }
       });
     } else {
@@ -859,7 +863,9 @@ export async function saveServiceDefinition(data: any) {
           description: data.description || '',
           color: newColor,
           assignedStaff: data.assignedStaff || [],
-          status: data.status || 'Active'
+          status: data.status || 'Active',
+          linkedFormId: data.linkedFormId || null,
+          linkedPrintTemplateId: data.linkedPrintTemplateId || null
         }
       });
     }
@@ -892,47 +898,125 @@ export async function deleteServiceDefinition(id: string) {
 
 // 6. 抓取與儲存表單
 export async function fetchPrintTemplates() {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
-    // DB impl omitted for now
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+    const templates = await prisma.printTemplate.findMany({ where: { templeId } });
+    return templates.map(t => ({
+      id: t.id,
+      name: t.name,
+      templeName: t.templeName,
+      watermarkUrl: t.watermarkUrl,
+      watermarkOpacity: t.watermarkOpacity,
+      borderStyle: t.borderStyle,
+      content: t.content ? JSON.parse(JSON.stringify(t.content)) : []
+    }));
+  } catch (e) {
+    console.error(e);
     return [];
-  });
+  }
 }
 
-export async function savePrintTemplate(template: any) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+export async function savePrintTemplate(data: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    if (data.id) {
+      await prisma.printTemplate.updateMany({
+        where: { id: data.id, templeId },
+        data: {
+          name: data.name,
+          templeName: data.templeName,
+          watermarkUrl: data.watermarkUrl,
+          watermarkOpacity: data.watermarkOpacity,
+          borderStyle: data.borderStyle,
+          content: data.content || []
+        }
+      });
+    } else {
+      await prisma.printTemplate.create({
+        data: {
+          id: `pt-${Date.now()}`,
+          templeId,
+          name: data.name,
+          templeName: data.templeName,
+          watermarkUrl: data.watermarkUrl,
+          watermarkOpacity: data.watermarkOpacity,
+          borderStyle: data.borderStyle,
+          content: data.content || []
+        }
+      });
+    }
+    await revalidateTemple();
     return { success: true };
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function deletePrintTemplate(id: string) {
-  const templeId = await getDynamicTempleId();
-  return withTempleSession(templeId, false, async (client) => {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    await prisma.printTemplate.deleteMany({ where: { id, templeId } });
+    await revalidateTemple();
     return { success: true };
-  });
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function fetchForms() {
-  const templeId = await getDynamicTempleId();
-  const current = [] || [];
-  const mine = current.filter((f: any) => f.templeId === templeId);
-  return JSON.parse(JSON.stringify(mine));
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+    const forms = await prisma.form.findMany({ where: { templeId } });
+    return forms.map(f => ({
+      id: f.id,
+      name: f.name,
+      fields: f.fields ? JSON.parse(JSON.stringify(f.fields)) : []
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export async function saveForm(data: any) {
-  const templeId = await getDynamicTempleId();
-  const id = data.id;
-  const current = [] || [];
-  const exists = current.some((f: any) => f.id === id);
-  if (exists) {
-    await null;
-  } else {
-    await null;
-  }
-  // array synced manually
-  await revalidateTemple();
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    if (data.id) {
+      await prisma.form.updateMany({
+        where: { id: data.id, templeId },
+        data: { name: data.name, fields: data.fields || [] }
+      });
+    } else {
+      await prisma.form.create({
+        data: { id: `form-${Date.now()}`, templeId, name: data.name, fields: data.fields || [] }
+      });
+    }
+    await revalidateTemple();
     return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
+}
+
+export async function deleteForm(id: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+    await prisma.form.deleteMany({ where: { id, templeId } });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 7. 抓取與管理人員 (修復 Build Error 關鍵)
@@ -3057,12 +3141,12 @@ export async function fetchFinancialOverview() {
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
-  const temple = [].find(t => t.id === templeId);
+  const temple = await prisma.temple.findUnique({ where: { id: templeId } });
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
   
   if (temple) {
-    if (temple.freeType === 'Permanent') {
+    if ((temple as any).freeType === 'Permanent' || temple.monthlyRent === 0) {
       isPermanentFree = true;
     } else {
       const trialMonths = temple.trialMonths || temple.freeMonths || 0;
@@ -3280,7 +3364,7 @@ export async function fetchFinancialOverview() {
   let expenses: ExpenseEntry[] = []
     .filter(b => b.templeId === templeId)
     .map(b => {
-      const t = _allTemplesForBills?.find((x: any) => x.id === templeId);
+      const t = temple;
       const isSuperAdminService = b.type === 'StorageUpgrade' || b.type === 'AgiService';
       const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
       const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
@@ -3301,7 +3385,7 @@ export async function fetchFinancialOverview() {
     const rows = await prisma.templeBill.findMany({ where: { templeId } });
     if (rows && rows.length > 0) {
       expenses = rows.map((r: any) => {
-        const t = _allTemplesForBills?.find((x: any) => x.id === r.temple_id);
+        const t = temple;
         const type = r.item_name || '';
         const isSuperAdminService = type?.includes('空間') || type?.includes('AI') || type?.includes('Storage') || type?.includes('Agi');
         const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
@@ -5388,17 +5472,23 @@ export async function fetchAllTempleAiUsage() {
 
 
 export async function grantTempleAiVip(templeId: string, isVip: boolean = true) {
-
-      try {
-        await prisma.templeAiUsage.upsert({
-          where: { templeId },
-          update: { isVip, planId: isVip ? 'VIP-AI' : 'FREE' },
-          create: { templeId, isVip, planId: isVip ? 'VIP-AI' : 'FREE', usedCount: 0 }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+  try {
+    const existing = await prisma.templeAiUsage.findFirst({ where: { templeId } });
+    if (existing) {
+      await prisma.templeAiUsage.update({
+        where: { id: existing.id },
+        data: { planId: isVip ? 'VIP-AI' : 'FREE' }
+      });
+    } else {
+      await prisma.templeAiUsage.create({
+        data: { templeId, planId: isVip ? 'VIP-AI' : 'FREE', usedCount: 0 }
+      });
+    }
+    return { success: true };
+  } catch(e) {
+    console.error('grantTempleAiVip error:', e);
+    return { success: false };
+  }
 }
 
 export async function fetchTempleAiUsage() {
@@ -6152,17 +6242,27 @@ export async function logDistributorAction(...args: any[]) {
 }
 
 export async function grantTempleStorageVip(templeId: string, isVip: boolean = true) {
-
-      try {
-        await prisma.templeStorage.upsert({
-          where: { templeId },
-          update: { isVip, planId: isVip ? 'VIP-STORAGE' : 'FREE' },
-          create: { templeId, isVip, planId: isVip ? 'VIP-STORAGE' : 'FREE', usedBytes: 0, totalBytes: isVip ? 1099511627776 : 5368709120 }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
+  try {
+    await prisma.templeStorage.upsert({
+      where: { templeId },
+      update: {
+        planId: isVip ? 'VIP-STORAGE' : 'FREE',
+        allocatedBytes: isVip ? 1099511627776n : 5368709120n,
+        planName: isVip ? '進階免費空間' : '免費 5GB 空間'
+      },
+      create: {
+        templeId,
+        planId: isVip ? 'VIP-STORAGE' : 'FREE',
+        allocatedBytes: isVip ? 1099511627776n : 5368709120n,
+        planName: isVip ? '進階免費空間' : '免費 5GB 空間',
+        usedBytes: 0n
       }
+    });
+    return { success: true };
+  } catch(e) {
+    console.error('grantTempleStorageVip error:', e);
+    return { success: false };
+  }
 }
 
 export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
@@ -6969,20 +7069,50 @@ export async function submitFreeAccountApplication(data: any) {
           phone: newTemple.templePhone || newTemple.contactPhone || ''
         }
       });
+      let allocatedBytes = 5368709120n;
+      let storagePlanName = '免費 5GB 空間';
+
+      if (data.cloudStorage === 'Free' || data.freeType === 'Permanent') {
+         allocatedBytes = 1099511627776n;
+         storagePlanName = '進階免費空間';
+      } else if (data.cloudStorage === '100GB') {
+         allocatedBytes = 107374182400n;
+         storagePlanName = '100GB 進階版';
+      } else if (data.cloudStorage === '500GB') {
+         allocatedBytes = 536870912000n;
+         storagePlanName = '500GB 專業版';
+      } else if (data.cloudStorage === '50GB') {
+         allocatedBytes = 53687091200n;
+         storagePlanName = '50GB 標準版';
+      }
+
       await prisma.templeStorage.create({
         data: {
           id: `ts-${Date.now()}`,
           templeId: newTemple.id,
-          usedBytes: 0
+          usedBytes: 0n,
+          allocatedBytes,
+          planName: storagePlanName,
+          planId: data.cloudStorage === 'Free' ? 'FREE' : undefined
         }
       });
+
+      let isAiVip = data.aiLife === 'Free' || data.freeType === 'Permanent';
+      await prisma.templeAiUsage.create({
+        data: {
+          templeId: newTemple.id,
+          planId: isAiVip ? 'VIP-AI' : 'FREE',
+          enabled: data.enableAi ?? true,
+          usedCount: 0
+        }
+      });
+
     } catch (e) {
       console.error("Failed to insert new temple into postgres", e);
     }
 
     if (data.freeType === 'Permanent') {
-      await grantTempleAiVip(newTemple.id, true);
-      await grantTempleStorageVip(newTemple.id, true);
+      // Already handled in creation above
     }
 
 
