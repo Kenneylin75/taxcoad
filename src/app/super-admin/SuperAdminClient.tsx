@@ -606,6 +606,20 @@ export default function SuperAdminClient({
                                      import('@/app/actions').then(async m => { const res = await m.impersonateTemple((acc.templeId || acc.id) as string, 'SuperAdmin'); if(res.success && res.redirectPath) window.location.href = res.redirectPath; })
                                   }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
                                   <button onClick={() => setViewingAccountDetail(acc)} className="text-[11px] font-black text-slate-300 uppercase hover:text-slate-900 transition-all border-b-2 border-transparent hover:border-slate-900 italic mt-2">VIEW DETAIL 🔑</button>
+                                  <button 
+                                    onClick={async () => {
+                                      if (confirm('確定要永久刪除此宮廟的所有資料嗎？此動作無法復原！')) {
+                                        const { deleteTempleAllData } = await import('@/app/actions');
+                                        const res = await deleteTempleAllData(acc.id);
+                                        if (res.success) {
+                                          alert('刪除成功');
+                                          window.location.reload();
+                                        } else {
+                                          alert('刪除失敗: ' + res.error);
+                                        }
+                                      }
+                                    }} 
+                                    className="text-[11px] font-black text-rose-300 uppercase hover:text-rose-600 transition-all border-b-2 border-transparent hover:border-rose-600 italic mt-2">刪除 (DELETE 🗑️)</button>
                                </td>
                             </tr>
                           ))}

@@ -8500,4 +8500,62 @@ export async function createDistributorSales(distId: string, data: any) {
   }
 
   return { success: true, data: { id: newSalesId } };
-}
+}
+
+export async function deleteTempleAllData(templeId: string) {
+  try {
+    if (!templeId) throw new Error("templeId is required");
+    
+    // First verify if the temple exists
+    const temple = await prisma.temple.findUnique({ where: { id: templeId } });
+    if (!temple) return { success: false, error: "Temple not found" };
+
+    // Execute deletion in a transaction
+    // Order is important: delete child records before parent records to avoid foreign key constraints
+    await prisma.$transaction([
+      // 1. Leaf tables (no other tables depend on these)
+      prisma.appointment.deleteMany({ where: { templeId } }),
+      prisma.lampRecord.deleteMany({ where: { templeId } }),
+      prisma.eventRegistration.deleteMany({ where: { templeId } }),
+      prisma.queueTicket.deleteMany({ where: { templeId } }),
+      prisma.guestFile.deleteMany({ where: { templeId } }),
+      prisma.deepRecord.deleteMany({ where: { templeId } }),
+      prisma.activity.deleteMany({ where: { templeId } }),
+      prisma.leaveRecord.deleteMany({ where: { templeId } }),
+      prisma.slot.deleteMany({ where: { templeId } }),
+      
+      // 2. Secondary leaf tables that only depend on Temple
+      prisma.templeBill.deleteMany({ where: { templeId } }),
+      prisma.templeStorage.deleteMany({ where: { templeId } }),
+      prisma.auditLog.deleteMany({ where: { templeId } }),
+      prisma.serviceSetting.deleteMany({ where: { templeId } }),
+      prisma.printTemplate.deleteMany({ where: { templeId } }),
+      prisma.form.deleteMany({ where: { templeId } }),
+      prisma.templePaymentConfig.deleteMany({ where: { templeId } }),
+      prisma.templeAiUsage.deleteMany({ where: { templeId } }),
+      prisma.syncQueue.deleteMany({ where: { templeId } }),
+      prisma.financeRecord.deleteMany({ where: { templeId } }),
+      prisma.adminNotification.deleteMany({ where: { templeId } }),
+      prisma.templeNotification.deleteMany({ where: { templeId } }),
+      prisma.aiChatLog.deleteMany({ where: { templeId } }),
+      prisma.saasOrder.deleteMany({ where: { templeId } }),
+      
+      // 3. Parent tables (referenced by Leaf tables)
+      prisma.service.deleteMany({ where: { templeId } }),
+      prisma.event.deleteMany({ where: { templeId } }),
+      prisma.queueEvent.deleteMany({ where: { templeId } }),
+      prisma.lampCategory.deleteMany({ where: { templeId } }),
+      prisma.guest.deleteMany({ where: { templeId } }),
+      prisma.user.deleteMany({ where: { templeId } }),
+      
+      // 4. Finally, delete the root temple
+      prisma.temple.delete({ where: { id: templeId } })
+    ]);
+    
+    return { success: true };
+  } catch (e: any) {
+    console.error("Failed to delete temple:", e);
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
