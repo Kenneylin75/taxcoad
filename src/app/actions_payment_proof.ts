@@ -41,6 +41,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
         where: { id: recordId },
         data: {
           paymentProofUrl: imageUrl || undefined,
+          paymentRef: paymentRef || undefined,
           paymentMethod: paymentMethod || undefined,
           paymentStatus: 'PENDING_REVIEW'
         }

@@ -1738,7 +1738,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                <div className="flex gap-2">
                   <button onClick={() => setPaymentSubView('methods')} className="py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors">返回</button>
                   <button onClick={async () => {
-                    await paymentIntent.onPaid('transfer', paymentRefInput || '無', checkoutProofFile);
+                    if (!paymentRefInput || paymentRefInput.trim().length < 5) {
+                       return alert('⚠️ 請輸入完整的匯款帳號末五碼！');
+                    }
+                    if (!checkoutProofFile) {
+                       return alert('⚠️ 請上傳匯款截圖以便廟方對帳！');
+                    }
+                    await paymentIntent.onPaid('transfer', paymentRefInput, checkoutProofFile);
                     setPaymentIntent(null);
                     setPaymentSubView('methods');
                     setPaymentRefInput('');
@@ -1772,7 +1778,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                <div className="flex gap-2">
                   <button onClick={() => setPaymentSubView('methods')} className="py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors">返回</button>
                   <button onClick={async () => {
-                    await paymentIntent.onPaid('customQR', paymentRefInput || '無', checkoutProofFile);
+                    if (!paymentRefInput || paymentRefInput.trim().length < 5) {
+                       return alert('⚠️ 請輸入完整的帳號末五碼或備註！');
+                    }
+                    if (!checkoutProofFile) {
+                       return alert('⚠️ 請上傳匯款截圖以便廟方對帳！');
+                    }
+                    await paymentIntent.onPaid('customQR', paymentRefInput, checkoutProofFile);
                     setPaymentIntent(null);
                     setPaymentSubView('methods');
                     setPaymentRefInput('');

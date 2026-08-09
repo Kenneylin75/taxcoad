@@ -4536,9 +4536,9 @@ export async function createLampRecord(data: any) {
         
         await revalidateTemple();
         return { success: true, id: newId };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
+      } catch(e: any) {
+        console.error('createLampRecord error:', e);
+        return { success: false, message: e.message || String(e) };
       }
 }
 export async function checkLampNotifications() { return { hasNotification: false }; }
