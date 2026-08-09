@@ -7383,11 +7383,19 @@ export async function fetchAllAccountsForAdmin() {
     accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
   });
 
-  // SuperSales
+  // SuperSales (Legacy from User)
   let pgSuperSales = await prisma.user.findMany({
     where: { role: 'SuperSales' }
   });
   pgSuperSales.forEach(s => {
+    accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active' });
+  });
+
+  // SuperSales (New from DistributorSales)
+  let pgSuperSalesNew = await prisma.distributorSales.findMany({
+    where: { role: 'SuperSales' }
+  });
+  pgSuperSalesNew.forEach(s => {
     accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active' });
   });
 
