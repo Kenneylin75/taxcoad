@@ -8614,4 +8614,42 @@ export async function deleteDistributorAllData(distributorId: string) {
   }
 }
 
+export async function deleteSuperSalesAllData(superSalesId: string) {
+  try {
+    if (!superSalesId) throw new Error("superSalesId is required");
+    
+    await prisma.$transaction([
+      // 1. Transfer Temples created by this SuperSales to system-hq
+      prisma.temple.updateMany({
+        where: { superSalesId },
+        data: { superSalesId: 'system-hq' }
+      }),
+      
+      // 2. Transfer Distributors by removing SuperSalesOverride links
+      prisma.superSalesOverride.deleteMany({
+        where: { superSalesId }
+      }),
+      
+      // 3. Delete personal records of the SuperSales (commissions, visits, applications)
+      prisma.commission.deleteMany({ where: { salesId: superSalesId } }),
+      prisma.salesVisit.deleteMany({ where: { salesId: superSalesId } }),
+      prisma.templeApplication.deleteMany({ where: { salesId: superSalesId } }),
+      
+      // 4. Delete the SuperSales account from DistributorSales table (if it exists)
+      prisma.distributorSales.deleteMany({
+        where: { id: superSalesId, role: 'SuperSales' }
+      }),
+      
+      // 5. Delete from User table just in case it exists there
+      prisma.user.deleteMany({
+        where: { id: superSalesId, role: 'SuperSales' }
+      })
+    ]);
+    
+    return { success: true };
+  } catch (e: any) {
+    console.error("Failed to delete SuperSales:", e);
+    return { success: false, error: e.message || String(e) };
+  }
+}
 
