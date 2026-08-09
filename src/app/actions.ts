@@ -2736,14 +2736,24 @@ export async function fetchDistributorTeam(distributorId: string) {
 export async function fetchDistributorTemples(distributorId: string) {
 
       try {
+        const distSales = await prisma.distributorSales.findMany({
+          where: { distributorId, role: { not: 'SuperSales' } }
+        });
+        const salesIds = distSales.map((s: any) => s.id);
+        
         const temples = await prisma.temple.findMany({
           where: {
             OR: [
               { distributorId },
-              { sales: { distributorId, role: { not: 'SuperSales' } } }
+              { salesId: { in: salesIds } }
             ]
-          },
-          include: { sales: true }
+          }
+        }) as any;
+        
+        temples.forEach((t: any) => {
+          if (t.salesId) {
+             t.sales = distSales.find((s: any) => s.id === t.salesId) || null;
+          }
         });
         
         const sysConfig = await prisma.systemConfig.findFirst();
@@ -2778,12 +2788,17 @@ export async function fetchDistributorVisits(distributorId: string) {
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
+    const distSalesIdsForFinance = (await prisma.distributorSales.findMany({
+      where: { distributorId: distributorId, role: { not: 'SuperSales' } },
+      select: { id: true }
+    })).map((s: any) => s.id);
+
     const myTemples = await prisma.temple.findMany({
       where: {
         status: 'Active',
         OR: [
           { distributorId: distributorId },
-          { sales: { distributorId: distributorId, role: { not: 'SuperSales' } } }
+          { salesId: { in: distSalesIdsForFinance } }
         ]
       }
     });
@@ -7599,11 +7614,18 @@ export async function fetchDistributorCapacity(distId?: string) {
         }
         
         const temples = await prisma.temple.findMany({
-          where: whereClause,
-          include: { sales: true }
+          where: whereClause
+        }) as any;
+        
+        const salesIdsForCapacity = temples.map((t: any) => t.salesId).filter(Boolean);
+        const salesData = await prisma.distributorSales.findMany({
+          where: { id: { in: salesIdsForCapacity as string[] } }
         });
         
-        const used = temples.filter(t => !t.sales || t.sales.role !== 'SuperSales').length;
+        const used = temples.filter((t: any) => {
+           const s = salesData.find((sd: any) => sd.id === t.salesId);
+           return !s || s.role !== 'SuperSales';
+        }).length;
         
         let total = 0;
         if (distId) {
