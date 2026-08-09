@@ -2159,6 +2159,11 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       <button 
                         key={slot.id} 
                         onClick={() => {
+                          const isBooked = guestAppointments.some(a => a.date === selectedDate && a.time === slot.time && a.service === selectedService?.name && a.status !== 'Cancelled');
+                          if (isBooked) {
+                            alert("您已預約過此時段的相同項目，無法重複預約！");
+                            return;
+                          }
                           setDetailContent({
                             title: selectedService?.name,
                             category: '預約',
@@ -2322,6 +2327,10 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     <div className="pt-2">
                        <button 
                          onClick={() => {
+                           if (isRegistered) {
+                             alert('您已經報名過此活動，無法重複報名！');
+                             return;
+                           }
                            if (isFull && !isRegistered) {
                              alert('很抱歉，此活動已額滿！');
                              return;
@@ -2332,7 +2341,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                              price: `結緣價 $${evt.price}`,
                              precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
                              description: `活動內容：${evt.description || evt.content || '詳細內容請洽宮廟'}\n日期：${evt.date}`,
-                             onConfirm: isRegistered ? undefined : async () => {
+                             onConfirm: async () => {
                                initiatePayment(evt.price || 0, 'Event', async (method: string, ref?: string, proofFile?: File | null) => {
                                  const res = await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price || 0, method, ref);
                                  if (res && res.success !== false) {
@@ -2476,6 +2485,11 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
                       <button 
                         onClick={async () => {
+                          const isQueued = myTickets.some(t => t.eventId === evt.id && t.status !== 'Completed' && t.status !== 'Cancelled');
+                          if (isQueued) {
+                            alert('您已領取過此項目的號碼牌，無法重複領取！');
+                            return;
+                          }
                           initiatePayment(0, 'Queue', async (method: string, ref?: string, proofFile?: File | null) => {
                             const res = await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
                             if (res && res.success !== false) {
@@ -2548,6 +2562,11 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
                 <button 
                   onClick={() => {
+                    const isLampActive = guestLamps.some(l => l.categoryName === item.name && (l.status === 'Active' || l.status === 'Pending' || l.status === 'WaitingLamp') && new Date(l.startDate || l.createdAt).getFullYear() === new Date().getFullYear());
+                    if (isLampActive) {
+                      alert('您今年已有生效中或辦理中的相同點燈項目，無法重複辦理！');
+                      return;
+                    }
                     setDetailContent({
                       title: item.name,
                       category: '點燈',
