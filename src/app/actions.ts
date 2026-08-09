@@ -8558,4 +8558,60 @@ export async function deleteTempleAllData(templeId: string) {
     return { success: false, error: e.message || String(e) };
   }
 }
+
+export async function deleteDistributorAllData(distributorId: string) {
+  try {
+    if (!distributorId) throw new Error("distributorId is required");
+    
+    // First verify if the distributor exists
+    const distributor = await prisma.distributor.findUnique({ where: { id: distributorId } });
+    if (!distributor) return { success: false, error: "Distributor not found" };
+
+    // Get all sales ids for this distributor
+    const sales = await prisma.distributorSales.findMany({
+      where: { distributorId },
+      select: { id: true }
+    });
+    const salesIds = sales.map(s => s.id);
+
+    await prisma.$transaction([
+      // 1. Transfer Temples assigned directly to the distributor
+      prisma.temple.updateMany({
+        where: { distributorId },
+        data: {
+          distributorId: null,
+          salesId: null,
+          superSalesId: 'system-hq'
+        }
+      }),
+      // Transfer Temples assigned to the distributor's sales reps
+      ...(salesIds.length > 0 ? [
+        prisma.temple.updateMany({
+          where: { salesId: { in: salesIds } },
+          data: {
+            distributorId: null,
+            salesId: null,
+            superSalesId: 'system-hq'
+          }
+        }),
+        // 2. Delete Sales Reps' child records
+        prisma.commission.deleteMany({ where: { salesId: { in: salesIds } } }),
+        prisma.salesVisit.deleteMany({ where: { salesId: { in: salesIds } } }),
+        prisma.templeApplication.deleteMany({ where: { salesId: { in: salesIds } } })
+      ] : []),
+      
+      // 3. Delete the Sales Reps
+      prisma.distributorSales.deleteMany({ where: { distributorId } }),
+      
+      // 4. Delete the Distributor main record
+      prisma.distributor.delete({ where: { id: distributorId } })
+    ]);
+    
+    return { success: true };
+  } catch (e: any) {
+    console.error("Failed to delete distributor:", e);
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
 
