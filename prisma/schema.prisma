@@ -664,6 +664,7 @@ model Event {
   bannerUrl   String?  @map("banner_url")
   price       Int      @default(0)
   capacity    Int      @default(0)
+  precautions String?
   fields      Json?
   status      String   @default("Draft")
   createdAt   DateTime @default(now()) @map("created_at")

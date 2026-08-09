@@ -2099,7 +2099,7 @@ export async function saveEvent(fd: FormData) {
           await prisma.event.updateMany({
             where: { id, templeId },
             data: {
-              title, date, location, price, capacity, status, imageUrl, description
+              title, date, location, price, capacity, status, imageUrl, description, precautions
             }
           });
         } else {
@@ -2107,7 +2107,7 @@ export async function saveEvent(fd: FormData) {
             data: {
               id: `ev-${Date.now()}`,
               templeId,
-              title, date, location, price, capacity, status, imageUrl, description
+              title, date, location, price, capacity, status, imageUrl, description, precautions
             }
           });
         }
