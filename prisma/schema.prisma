@@ -79,6 +79,7 @@ model DistributorSales {
   distributor Distributor? @relation(fields: [distributorId], references: [id])
   commissions Commission[]
   visits      SalesVisit[]
+  temples     Temple[]
 
   @@map("dist_sales")
 }
@@ -182,6 +183,7 @@ model Temple {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   distributor Distributor? @relation(fields: [distributorId], references: [id])
+  sales       DistributorSales? @relation(fields: [salesId], references: [id])
   plan        PricePlan?   @relation(fields: [planId], references: [id])
 
   users               User[]
