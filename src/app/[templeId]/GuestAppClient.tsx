@@ -1287,7 +1287,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       ...guestAppointments.map(a => ({ ...a, type: '預約', icon: '📅', color: 'text-indigo-600', bg: 'bg-indigo-50', time: `${a.date} ${a.time}`, rawTime: `${a.date}T${a.time}` })),
       ...guestRegistrations.map(r => {
         const evt = events.find(e => e.id === r.eventId);
-        return { ...r, type: '活動', icon: '🏮', color: 'text-red-600', bg: 'bg-red-50', service: r.title, time: r.timestamp, rawTime: r.timestamp, staff: null, precautions: evt?.precautions };
+        return { ...r, paymentProofUrl: sanitizeUrl(r.paymentProofUrl), type: '活動', icon: '🏮', color: 'text-red-600', bg: 'bg-red-50', service: r.title, time: r.timestamp, rawTime: r.timestamp, staff: null, precautions: evt?.precautions };
       }),
       ...guestTickets.map(t => ({ ...t, type: '排隊', icon: '🎟️', color: 'text-emerald-600', bg: 'bg-emerald-50', service: t.eventTitle, time: t.scannedAt || '尚未核銷', rawTime: t.scannedAt, staff: '現場候位' })),
       ...guestLamps.map(l => {

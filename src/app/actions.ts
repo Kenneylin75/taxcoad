@@ -1855,6 +1855,8 @@ export async function fetchGuestRegistrations(p: any) {
           guestName: r.guestName,
           price: r.event?.price || 0,
           paymentStatus: r.paymentStatus,
+          paymentRef: r.paymentRef,
+          paymentProofUrl: r.paymentProofUrl,
           actualPrice: r.actualPrice,
           timestamp: r.createdAt.toISOString()
         }));
