@@ -3167,6 +3167,71 @@ export async function fetchComplexAnalyticsData() {
     serviceHeat: sortedServices
   }; 
 }
+async function autoGenerateRecurringBills(temple: any) {
+  if (!temple || (temple as any).freeType === 'Permanent' || temple.monthlyRent === 0) return;
+
+  const isYearly = temple.paymentCycle === 'Yearly';
+  const rentType = isYearly ? 'YearlyFee' : 'MonthlyFee';
+  const payeeRole = temple.distributorId ? 'Distributor' : 'SuperAdmin';
+  const payeeId = temple.distributorId || 'system-hq';
+  
+  const config = await prisma.systemConfig.findFirst();
+  const yearlyDiscount = config?.yearlyDiscountRate || 20;
+  
+  const monthlyRent = temple.monthlyRent || 0;
+  if (monthlyRent <= 0) return;
+
+  const rentAmount = isYearly ? (monthlyRent * 12 * (1 - yearlyDiscount / 100)) : monthlyRent;
+  const trialMonths = (temple as any).trialMonths || (temple as any).freeMonths || 0;
+  
+  const createdDate = new Date(temple.billingStartDate || temple.createdAt || temple.timestamp || Date.now());
+  const startDate = new Date(createdDate);
+  startDate.setMonth(startDate.getMonth() + trialMonths);
+  
+  const now = new Date();
+  if (now < startDate) return; 
+
+  const existingBills = await prisma.templeBill.findMany({
+    where: { templeId: temple.id, itemName: rentType }
+  });
+
+  const generateBills = [];
+  let cycleDate = new Date(startDate);
+  
+  while (cycleDate <= now) {
+    const billingStr = cycleDate.toISOString().substring(0, 7);
+    
+    const hasBill = existingBills.some((b: any) => {
+       const bStr = (b.billingDate || (b.createdAt instanceof Date ? b.createdAt.toISOString() : '')).substring(0, 7);
+       return bStr === billingStr || b.id.includes(billingStr) || (b.dueDate && b.dueDate.startsWith(billingStr));
+    });
+
+    if (!hasBill) {
+      generateBills.push({
+        id: `BILL-RENT-${temple.id.substring(0,4)}-${billingStr}`,
+        templeId: temple.id,
+        itemName: rentType,
+        amount: rentAmount,
+        dueDate: cycleDate.toISOString().split('T')[0],
+        status: 'Unpaid',
+        payeeRole,
+        payeeId,
+        billingDate: billingStr
+      });
+    }
+
+    if (isYearly) {
+      cycleDate.setFullYear(cycleDate.getFullYear() + 1);
+    } else {
+      cycleDate.setMonth(cycleDate.getMonth() + 1);
+    }
+  }
+
+  for (const newBill of generateBills) {
+    await prisma.templeBill.create({ data: newBill }).catch(e => console.error('Failed to auto gen bill', e));
+  }
+}
+
 export async function fetchFinancialOverview() {
   const templeId = await getDynamicTempleId();
   
@@ -3191,6 +3256,11 @@ export async function fetchFinancialOverview() {
           trialDaysRemaining = Math.ceil((endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         }
       }
+    }
+    
+    // Auto Generate Recurring Bills for existing temples
+    if (!isPermanentFree && trialDaysRemaining === undefined) {
+      await autoGenerateRecurringBills(temple);
     }
   }
 
@@ -7056,7 +7126,8 @@ export async function generateInitialBills(newTemple: any) {
               dueDate: newBill.dueDate,
               status: 'Unpaid',
               payeeRole: newBill.payeeRole,
-              payeeId: newBill.payeeId
+              payeeId: newBill.payeeId,
+              billingDate: newBill.billingDate
             }
           }).catch(err => {
              console.error('Failed Prisma create in generateInitialBills', err);
