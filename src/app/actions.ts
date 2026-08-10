@@ -4256,7 +4256,11 @@ export async function fetchGuestHistory(p: string) {
         const appointments = await prisma.appointment.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
         const lampRecords = await prisma.lampRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
         const queueTickets = await prisma.queueTicket.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        const eventRegistrations = await prisma.eventRegistration.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const eventRegistrations = await prisma.eventRegistration.findMany({ 
+          where: { templeId, phone: { contains: normPhone } }, 
+          include: { event: true },
+          orderBy: { createdAt: 'desc' } 
+        });
 
         const rawDeepRecords = await prisma.deepRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
         const records = rawDeepRecords.map(r => ({

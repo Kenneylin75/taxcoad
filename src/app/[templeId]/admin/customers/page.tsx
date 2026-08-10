@@ -863,8 +863,9 @@ function DeepFileCenterContent() {
                         {history.eventRegistrations?.length > 0 ? history.eventRegistrations.map((evt: any) => (
                            <div key={evt.id} className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center justify-between shadow-sm">
                               <div>
-                                 <h4 className="text-base font-bold text-slate-900">{evt.title}</h4>
-                                 <p className="text-sm text-slate-500 mt-1">結緣金：{evt.price > 0 ? `$${evt.price}` : '隨喜'}</p>
+                                 <h4 className="text-base font-bold text-slate-900">{evt.event?.title || '未命名活動'}</h4>
+                                 <p className="text-sm text-slate-500 mt-1">結緣金：{evt.actualPrice > 0 ? `$${evt.actualPrice}` : (evt.event?.price > 0 ? `$${evt.event.price}` : '隨喜')}</p>
+                                 {evt.event?.date && <p className="text-sm text-slate-500 mt-1">活動時間：{evt.event.date}</p>}
                               </div>
                                <div className="flex flex-col items-end gap-2">
                                   <div className="flex gap-4 items-center">
