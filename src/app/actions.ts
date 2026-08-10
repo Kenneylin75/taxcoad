@@ -2944,9 +2944,26 @@ export async function fetchAnalyticsSettings() {
 export async function fetchComplexAnalyticsData() { 
   const templeId = await getDynamicTempleId();
 
+  if (!templeId) return {
+    revenueTrends: [], ageDemographics: [], queueStats: { avgWaitTime: '0', totalTickets: '0', completionRate: '0' },
+    overview: { totalRevenue: 0, totalGuests: 0, conversionRate: 0, avgProcessingTime: 0 },
+    genderDemographics: { newGuest: 0, returning: 0, hasData: false }, serviceHeat: []
+  };
+
+  const [apps, lamps, events, queues, deeps, guests, queueEvents, lampCats] = await Promise.all([
+    prisma.appointment.findMany({ where: { templeId } }),
+    prisma.lampRecord.findMany({ where: { templeId } }),
+    prisma.eventRegistration.findMany({ where: { templeId } }),
+    prisma.queueTicket.findMany({ where: { templeId } }),
+    prisma.deepRecord.findMany({ where: { templeId, OR: [{ id: { startsWith: 'MERIT-' } }, { category: { contains: '功德' } }] } }),
+    prisma.guest.findMany({ where: { templeId } }),
+    prisma.queueEvent.findMany({ where: { templeId } }),
+    prisma.lampCategory.findMany({ where: { templeId } })
+  ]);
+
   // 1. Revenue Trends (Group by month for the past 6 months)
   const now = new Date();
-  const months = [];
+  const months: any[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({
@@ -2957,11 +2974,10 @@ export async function fetchComplexAnalyticsData() {
     });
   }
 
-  const addRevenue = (dateStr: string | undefined, amount: number, tId?: string) => {
+  const addRevenue = (dateStr: string | undefined | Date, amount: number) => {
     if (!dateStr || amount <= 0) return;
-    if (templeId && tId && templeId !== tId) return;
     
-    const d = new Date(dateStr);
+    const d = new Date(dateStr as any);
     if (isNaN(d.getTime())) return;
     
     const y = d.getFullYear();
@@ -2973,62 +2989,60 @@ export async function fetchComplexAnalyticsData() {
     }
   };
 
-  [].forEach((a: any) => {
+  apps.forEach((a: any) => {
     if (a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid' && a.status !== 'Cancelled') {
-      addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0, a.templeId);
+      addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0);
     }
   });
 
-  const allLampCats = await [];
-  [].forEach((r: any) => {
+  lamps.forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
-         const cat = allLampCats.find((c: any) => c.id === r.categoryId);
+         const cat = lampCats.find((c: any) => c.id === r.categoryId);
          if (cat) price = cat.price;
       }
-      addRevenue(r.createdAt || r.date || r.timestamp, Number(price) || 0, r.templeId);
+      addRevenue(r.createdAt || r.date || r.timestamp, Number(price) || 0);
     }
   });
 
-  [].forEach((r: any) => {
+  events.forEach((r: any) => {
     if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
-      addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0, r.templeId);
+      addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0);
     }
   });
 
-  [].forEach((t: any) => {
+  queues.forEach((t: any) => {
     if (t.paymentStatus === 'Paid' || t.status === 'Paid') {
-      addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(t.price || 0) || 0, t.templeId);
+      let price = t.price || 0;
+      if (!price && t.eventId) {
+         const qe = queueEvents.find((e: any) => e.id === t.eventId);
+         if (qe) price = qe.price || 0;
+      }
+      addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(price) || 0);
     }
   });
 
-  [].forEach((r: any) => {
-    if ((r.id.startsWith('MERIT-') || r.serviceType?.includes('功德')) && (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid')) {
+  deeps.forEach((r: any) => {
+    let paymentStatus = (r as any).paymentStatus || 'Paid';
+    if ((r.id.startsWith('MERIT-') || (r.category && r.category.includes('功德'))) && (paymentStatus !== 'Pending' && paymentStatus !== 'Unpaid')) {
       let amt = 0;
-      if (r.values && r.values['金額']) {
-        amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
+      const vals = typeof r.content === 'string' ? JSON.parse(r.content || '{}') : (r.content || {});
+      if (vals && vals['金額']) {
+        amt = Number(String(vals['金額']).replace(/[^0-9]/g, ''));
       }
-      addRevenue(r.paymentUpdatedAt || r.createdAt || r.date, amt, r.templeId);
+      addRevenue((r as any).paymentUpdatedAt || r.createdAt || (r as any).date, amt);
     }
   });
 
   // 2. Age Demographics
-  let ageGroups = {
-    '20歲以下': 0,
-    '20-30歲': 0,
-    '31-40歲': 0,
-    '41-50歲': 0,
-    '51-60歲': 0,
-    '60歲以上': 0,
-    '未提供': 0
+  let ageGroups: Record<string, number> = {
+    '20歲以下': 0, '20-30歲': 0, '31-40歲': 0, '41-50歲': 0, '51-60歲': 0, '60歲以上': 0, '未提供': 0
   };
   
   let totalGuests = 0;
 
-  [].forEach((g: any) => {
-    if (templeId && g.templeId && g.templeId !== templeId) return;
-    
+  guests.forEach((g: any) => {
     totalGuests++;
     if (!g.birthday) {
       ageGroups['未提供']++;
@@ -3063,37 +3077,32 @@ export async function fetchComplexAnalyticsData() {
     }));
 
   // 3. Queue Stats
-  let validEventIds: string[] | null = null;
-  if (templeId) {
-    validEventIds = [].filter((e: any) => !e.templeId || e.templeId === templeId).map((e: any) => e.id);
-  }
+  const validEventIds = queueEvents.map((e: any) => e.id);
 
   let totalTickets = 0;
   let completedTickets = 0;
   
-  [].forEach((t: any) => {
-    if (validEventIds && !validEventIds.includes(t.eventId)) return;
+  queues.forEach((t: any) => {
+    if (validEventIds.length > 0 && !validEventIds.includes(t.eventId)) return;
     totalTickets++;
     if (t.status === 'Completed') completedTickets++;
   });
 
   const completionRate = totalTickets === 0 ? 0 : Math.round((completedTickets / totalTickets) * 100);
 
-
-  // --- New Analytics Sections ---
   // A. Overview
   let totalRevenue = 0;
   if (months.length > 0) {
-    totalRevenue = months[months.length - 1].amount; // Only use the current month's accumulated revenue
+    totalRevenue = months[months.length - 1].amount; 
   }
   
   // Calculate Conversion Rate
   let totalOrders = 0;
   let paidOrders = 0;
-  [].forEach((a: any) => {
-    if (templeId && a.templeId && a.templeId !== templeId) return;
+  const allOrders = [...apps, ...lamps, ...events, ...queues];
+  allOrders.forEach((a: any) => {
     totalOrders++;
-    if (a.paymentStatus === 'Paid') paidOrders++;
+    if (a.paymentStatus === 'Paid' || a.status === 'Paid') paidOrders++;
   });
   const conversionRate = totalOrders === 0 ? 0 : Math.round((paidOrders / totalOrders) * 100);
 
@@ -3102,8 +3111,7 @@ export async function fetchComplexAnalyticsData() {
   let returningGuestCount = 0;
   
   const guestApptCounts: Record<string, number> = {};
-  [].forEach((a: any) => {
-    if (templeId && a.templeId && a.templeId !== templeId) return;
+  allOrders.forEach((a: any) => {
     if (a.phone) {
       guestApptCounts[a.phone] = (guestApptCounts[a.phone] || 0) + 1;
     }
@@ -3121,8 +3129,7 @@ export async function fetchComplexAnalyticsData() {
   // C. Service Heat
   const serviceCounts: Record<string, number> = {};
   let totalServices = 0;
-  [].forEach((a: any) => {
-    if (templeId && a.templeId && a.templeId !== templeId) return;
+  apps.forEach((a: any) => {
     if (a.service) {
       serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1;
       totalServices++;
@@ -3167,6 +3174,7 @@ export async function fetchComplexAnalyticsData() {
     serviceHeat: sortedServices
   }; 
 }
+
 async function autoGenerateRecurringBills(temple: any) {
   if (!temple || (temple as any).freeType === 'Permanent' || temple.monthlyRent === 0) return;
 
