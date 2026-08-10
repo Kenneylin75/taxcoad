@@ -830,25 +830,33 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
         <div className="px-5 mt-8">
           <h3 className="text-lg font-bold text-gray-900 mb-4 px-1">常用服務</h3>
           <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => handleFeatureClick('booking')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
-              <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-3xl text-red-600">📅</div>
-              <span className="font-bold text-gray-900">預約</span>
-            </button>
+            {serviceSettings?.modules?.calendar && (
+              <button onClick={() => handleFeatureClick('booking')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-3xl text-red-600">📅</div>
+                <span className="font-bold text-gray-900">預約</span>
+              </button>
+            )}
             
-            <button onClick={() => handleFeatureClick('lighting')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
-              <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl text-amber-600"><IconCandle /></div>
-              <span className="font-bold text-gray-900">點燈</span>
-            </button>
+            {serviceSettings?.modules?.lamps && (
+              <button onClick={() => handleFeatureClick('lighting')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+                <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl text-amber-600"><IconCandle /></div>
+                <span className="font-bold text-gray-900">點燈</span>
+              </button>
+            )}
             
-            <button onClick={() => handleFeatureClick('queue')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
-              <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-3xl text-emerald-600">🎟️</div>
-              <span className="font-bold text-gray-900">排隊</span>
-            </button>
+            {serviceSettings?.modules?.queue && (
+              <button onClick={() => handleFeatureClick('queue')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+                <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-3xl text-emerald-600">🎟️</div>
+                <span className="font-bold text-gray-900">排隊</span>
+              </button>
+            )}
             
-            <button onClick={() => handleFeatureClick('events')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
-              <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl text-indigo-600"><IconFestive /></div>
-              <span className="font-bold text-gray-900">活動</span>
-            </button>
+            {serviceSettings?.modules?.events && (
+              <button onClick={() => handleFeatureClick('events')} className="app-card p-6 flex flex-col items-center justify-center gap-3 active:bg-gray-50 transition-colors">
+                <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl text-indigo-600"><IconFestive /></div>
+                <span className="font-bold text-gray-900">活動</span>
+              </button>
+            )}
           </div>
         </div>
 
