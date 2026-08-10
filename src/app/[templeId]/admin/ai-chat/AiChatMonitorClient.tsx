@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { fetchAiChatLogs } from '@/app/actions';
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AiChatMonitorClient({ initialLogs }: { initialLogs: any[] }) {
   const [logs, setLogs] = useState(initialLogs);
@@ -48,7 +48,7 @@ export default function AiChatMonitorClient({ initialLogs }: { initialLogs: any[
                     </div>
                   </div>
                   <div className="text-slate-400">
-                    {isExpanded ? <ChevronUpIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
+                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </div>
                 </button>
                 
