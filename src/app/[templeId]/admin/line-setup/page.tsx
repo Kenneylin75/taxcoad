@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   fetchServiceSettings, 
   updateServiceSettings, 
@@ -23,6 +24,8 @@ export default function LineSetupPage() {
   const [lineConfig, setLineConfig] = useState({ lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false });
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  
+  const router = useRouter();
 
   // Settings Data
   const [settings, setSettings] = useState<ServiceSettings | null>(null);
@@ -74,6 +77,7 @@ export default function LineSetupPage() {
     const templeId = window.location.pathname.split('/')[1];
     await updateLineConfig(templeId, lineConfig);
     await updateServiceSettings(settings);
+    router.refresh();
     setIsSaving(false);
     alert("LINE 串接與推播規則已成功更新！");
   };

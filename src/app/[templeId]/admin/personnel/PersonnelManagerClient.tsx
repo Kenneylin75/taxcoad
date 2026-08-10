@@ -83,6 +83,7 @@ export default function PersonnelManagerClient({ initialAccounts, currentRole }:
       await updateAccountPassword(editingPermissionsAccount.id, newPass);
       alert('✅ 密碼已重設！');
       (e.target as HTMLFormElement).reset();
+      router.refresh();
     });
   };
 

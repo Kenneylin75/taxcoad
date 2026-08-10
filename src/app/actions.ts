@@ -3202,7 +3202,7 @@ export async function fetchFinancialOverview() {
         prisma.appointment.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
         prisma.lampRecord.findMany({ where: { templeId, actualPrice: { gt: 0 }, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
         prisma.eventRegistration.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } }, include: { event: true } }),
-        prisma.queueTicket.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
+        prisma.queueTicket.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } }, include: { queueEvent: true } }),
         prisma.deepRecord.findMany({ where: { templeId, OR: [{ id: { startsWith: 'MERIT-' } }, { category: { contains: '功德' } }] } })
       ]);
       
@@ -3965,7 +3965,8 @@ export async function updateAccountPassword(id: string, newPass: string, role?: 
         } else {
           await prisma.user.update({ where: { id }, data: { password: newPass } });
         }
-        return { success: true };
+        await revalidateTemple();
+          return { success: true };
       } catch (e) {
         console.error(e);
         return { success: false };
@@ -4270,7 +4271,7 @@ export async function fetchGuestHistory(p: string) {
         const files = guest ? await prisma.guestFile.findMany({ where: { guestId: guest.id }, orderBy: { createdAt: 'desc' } }) : [];
         const appointments = await prisma.appointment.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
         const lampRecords = await prisma.lampRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        const queueTickets = await prisma.queueTicket.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
+        const queueTickets = await prisma.queueTicket.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' }, include: { queueEvent: true } });
         const eventRegistrations = await prisma.eventRegistration.findMany({ 
           where: { templeId, phone: { contains: normPhone } }, 
           include: { event: true },
@@ -6680,6 +6681,7 @@ export async function toggleBillStatusSimple(billId: string, status: string) {
           where: { id: billId },
           data: { status }
         });
+        await revalidateTemple();
         return { success: true };
       } catch (error) {
         console.error('toggleBillStatusSimple error:', error);
@@ -6705,6 +6707,7 @@ export async function rejectTempleBill(billId: string) {
           });
         }
 
+        await revalidateTemple();
         return { success: true };
       } catch (e) {
         console.error(e);

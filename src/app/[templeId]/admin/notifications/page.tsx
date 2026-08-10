@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   fetchTempleNotifications, 
   createNotification, 
@@ -20,6 +21,8 @@ export default function BelieverNotificationsPage() {
 
   // Expand State
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  
+  const router = useRouter();
 
   useEffect(() => {
     loadNotifications();
@@ -29,6 +32,7 @@ export default function BelieverNotificationsPage() {
     setIsLoading(true);
     const data = await fetchTempleNotifications();
     setNotifications(data);
+    router.refresh();
     setIsLoading(false);
   };
 

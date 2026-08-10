@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { fetchAvailableSlots, createSlot, updateSlot, removeSingleSlot, removeBatchSlots, analyzeAffectedAppointments, executeEmergencyReschedule, fetchPersonnel, getCurrentRole, AppRole, fetchServiceDefinitions } from '@/app/actions';
 
 export default function AdminSlotsPage() {
@@ -39,6 +40,8 @@ export default function AdminSlotsPage() {
   // 智能調度控制
   const [enableSmartScheduling, setEnableSmartScheduling] = useState(true);
   const [aiInsight, setAiInsight] = useState("目前預約負載平衡中，建議下週增加時段以應對高峰期需求。");
+  
+  const router = useRouter();
 
   const loadSlots = async () => {
     setIsLoading(true);
@@ -60,6 +63,7 @@ export default function AdminSlotsPage() {
       
       const role = await getCurrentRole();
       setCurrentRole(role);
+      router.refresh();
     } catch (err) {
       console.error("Failed to load slots data:", err);
     } finally {

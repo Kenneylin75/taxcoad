@@ -917,6 +917,10 @@ function DeepFileCenterContent() {
                            <div key={tix.id} className="bg-white border border-slate-100 rounded-2xl p-6 flex items-center justify-between shadow-sm">
                               <div>
                                  <h4 className="text-base font-bold text-slate-900">{tix.eventTitle}</h4>
+                                 <div className="flex items-center gap-4 mt-2">
+                                     <span className="text-xs font-bold text-slate-400 font-mono">{tix.createdAt ? new Date(tix.createdAt).toLocaleString() : ''}</span>
+                                     <span className="text-xs font-black text-amber-600">NT$ {(tix.queueEvent?.price || 0).toLocaleString()}</span>
+                                 </div>
                                  <p className="text-sm text-slate-500 mt-1">號碼牌：<span className="font-mono font-bold text-indigo-600 text-lg">{tix.assignedNumber}</span></p>
                               </div>
                                <div className="flex flex-col items-end gap-2">

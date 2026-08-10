@@ -2421,7 +2421,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 text-2xl">🎟️</div>
                     <div className="flex-1">
                       <h4 className="font-bold text-gray-900">{ticket.eventTitle}</h4>
-                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Status: {ticket.status === 'Pending' ? '已報名' : '已報到'}</p>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Status: {ticket.queueEvent?.status === 'Draft' ? '未開始' : (ticket.status === 'Pending' || ticket.status === 'Registered' ? '未到現場' : '已到現場')}</p>
                     </div>
                     <div className="text-right">
                        <p className="text-[10px] font-bold text-gray-400 uppercase">持票號碼</p>
