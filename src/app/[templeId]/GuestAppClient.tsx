@@ -2903,7 +2903,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       )}
       
       {/* Floating AI Assistant (LINE Style) - 全域顯示 */}
-      {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && (templeAiUsage.isVip || (new Date(templeAiUsage.expiryDate).getTime() > Date.now() && templeAiUsage.usedCount < templeAiUsage.chatLimit)) && !isAgiModalOpen && (
+      {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && templeAiUsage.aiTokens > 0 && !isAgiModalOpen && (
         <button 
           onClick={() => setIsAgiModalOpen(true)}
           className="fixed bottom-24 right-5 w-14 h-14 bg-red-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-transform z-40 hover:bg-red-800 border-2 border-white/20"

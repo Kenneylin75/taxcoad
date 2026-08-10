@@ -173,6 +173,7 @@ model Temple {
   logoUrl       String?  @map("logo_url")
   bannerUrl     String?  @map("banner_url")
   analyticsData Json?    @map("analytics_data")
+  aiTokens      Int      @default(5000) @map("ai_tokens")
   guestSettings Json?    @map("guest_settings")
   lineChannelToken   String?  @map("line_channel_token")
   lineChannelSecret  String?  @map("line_channel_secret")

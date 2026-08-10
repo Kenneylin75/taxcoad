@@ -1512,27 +1512,49 @@ export async function askAgiAssistant(q: string, h: number) {
   const templeId = await getDynamicTempleId();
   const phone = store.get(`guestPhone_${templeId}`)?.value || 'unknown';
 
-  // 簡單的 AI 回應邏輯 (此處可未來串接真實 LLM API)
-  let reply = "好的，我已經收到您的訊息。如果有更詳細的問題，歡迎隨時告訴我！";
-  if (q.includes('預約') || q.includes('掛號')) reply = "您想了解預約相關的服務嗎？您可以點擊下方的「立刻線上預約」來查看目前可用的時段喔！";
-  if (q.includes('點燈')) reply = "我們提供多種點燈服務（如太歲燈、光明燈），歡迎前往「線上點燈」了解詳情與價格！";
-
-  if (!templeId) return { reply, suggestedAction: "none" };
+  if (!templeId) return { reply: "未找到宮廟", suggestedAction: "none" };
 
   try {
-    await prisma.aiChatLog.create({
-      data: {
-        templeId,
-        phone,
-        userQuery: q,
-        aiReply: reply
-      }
-    });
+    const temple = await prisma.temple.findUnique({ where: { id: templeId }, select: { aiTokens: true } });
+    if (!temple) return { reply: "未找到宮廟", suggestedAction: "none" };
+    if (temple.aiTokens <= 0) return { reply: "抱歉，本宮廟的 AI 服務額度已用罄。", suggestedAction: "none" };
+
+    let reply = "您好！我是宮廟專屬的 AI 生活助手，有任何關於點燈、預約、法會報名或排隊的問題，都可以問我喔！";
+    if (q.includes('預約') || q.includes('問事') || q.includes('收驚') || q.includes('掛號')) {
+      reply = '您可以點擊下方的「服務預約」按鈕，我們提供收驚、問事等服務，並且可以線上排隊喔！';
+    } else if (q.includes('點燈') || q.includes('燈')) {
+      reply = '我們有光明燈、太歲燈、財神燈等多種選擇，您可以點擊「服務預約」或「線上點燈」來了解詳情與報名喔！';
+    } else if (q.includes('法會') || q.includes('普渡')) {
+      reply = '近期的法會活動可以透過「法會報名」按鈕查看，點擊進去就能看到時間與詳細內容了。';
+    } else if (q.includes('排隊')) {
+      reply = '您可以在首頁點擊「預約」或「排隊」按鈕，系統會給您專屬的號碼牌，您可以隨時查看目前的叫號進度喔！';
+    }
+
+    const cost = q.length + reply.length;
+    if (temple.aiTokens < cost) {
+      return { reply: "抱歉，本宮廟的 AI 服務額度不足。", suggestedAction: "none" };
+    }
+
+    await prisma.$transaction([
+      prisma.temple.update({
+        where: { id: templeId },
+        data: { aiTokens: { decrement: cost } }
+      }),
+      prisma.aiChatLog.create({
+        data: {
+          templeId,
+          phone,
+          userQuery: q,
+          aiReply: reply
+        }
+      })
+    ]);
+
+    return { reply, suggestedAction: "none" };
   } catch (error) {
     console.error('Failed to log AI chat:', error);
+    return { reply: "系統發生錯誤，請稍後再試。", suggestedAction: "none" };
   }
-
-  return { reply, suggestedAction: "none" };
 }
 
 export async function fetchAiChatLogs() {
@@ -5618,10 +5640,10 @@ export async function grantTempleAiVip(templeId: string, isVip: boolean = true) 
 }
 
 export async function fetchTempleAiUsage() {
-
       try {
         const templeId = await getDynamicTempleId();
-        return await prisma.templeAiUsage.findUnique({ where: { templeId: templeId! } });
+        const temple = await prisma.temple.findUnique({ where: { id: templeId! }, select: { aiTokens: true } });
+        return { enabled: true, aiTokens: temple?.aiTokens || 0 };
       } catch(e) {
         return null;
       }
