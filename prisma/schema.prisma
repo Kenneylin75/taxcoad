@@ -708,6 +708,7 @@ model QueueEvent {
   id          String   @id @default(cuid())
   templeId    String   @map("temple_id")
   title       String
+  description String?
   date        String?
   startTime   String?  @map("start_time")
   endTime     String?  @map("end_time")

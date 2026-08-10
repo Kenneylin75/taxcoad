@@ -37,6 +37,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [location, setLocation] = useState('正殿廣場');
+  const [description, setDescription] = useState('');
   const [maxCapacity, setMaxCapacity] = useState('100');
   const [serviceType, setServiceType] = useState('');
   const [price, setPrice] = useState('0');
@@ -75,6 +76,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
         title, 
         date, 
         location, 
+        description,
         maxCapacity: parseInt(maxCapacity), 
         serviceType: useCustomService ? customService : serviceType,
         price: parseInt(price),
@@ -99,7 +101,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
          alert('✅ 排隊活動已成功部署！');
       }
       
-      setTitle(''); setDate(''); setServiceType(''); setPrice('0');
+      setTitle(''); setDate(''); setLocation('正殿廣場'); setDescription(''); setServiceType(''); setPrice('0');
     });
   };
 
@@ -108,6 +110,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
     setTitle(evt.title);
     setDate(evt.date);
     setLocation(evt.location);
+    setDescription(evt.description || '');
     setMaxCapacity(String(evt.maxCapacity));
     setServiceType(evt.serviceType || '');
     setPrice(String(evt.price || 0));
@@ -270,9 +273,13 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                            <input type="number" value={maxCapacity} onChange={e=>setMaxCapacity(e.target.value)} required className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-slate-900" />
                         </div>
                         <div className="space-y-2">
-                           <label className="text-xs font-black text-slate-900 uppercase tracking-widest">服務地點</label>
+                           <label className="text-xs font-black text-slate-900 uppercase tracking-widest">舉辦地點</label>
                            <input type="text" value={location} onChange={e=>setLocation(e.target.value)} required className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-slate-900" />
                         </div>
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-900 uppercase tracking-widest">活動說明 (ACTIVITY DESCRIPTION)</label>
+                        <textarea value={description} onChange={e=>setDescription(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-slate-900 resize-none h-24" placeholder="請輸入活動注意事項或說明..." />
                      </div>
                      <button type="submit" disabled={isPending} className="w-full bg-slate-900 text-amber-500 font-black py-4 rounded-xl text-sm tracking-widest shadow-xl hover:bg-amber-500 hover:text-slate-900 transition-all uppercase">
                         {isPending ? (editingEvent ? '正在更新活動...' : '正在發佈活動...') : (editingEvent ? '確認更新活動' : '活動發佈')}

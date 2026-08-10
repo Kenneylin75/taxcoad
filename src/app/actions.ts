@@ -4635,6 +4635,7 @@ export async function fetchQueueEvents() {
           startTime: r.startTime,
           endTime: r.endTime,
           location: r.location,
+          description: r.description,
           serviceType: r.serviceType,
           price: r.price,
           maxCapacity: r.maxCapacity,
@@ -4655,7 +4656,7 @@ export async function fetchActiveQueues() {
         });
         return events.map(r => ({
           id: r.id, templeId: r.templeId, title: r.title, date: r.date, startTime: r.startTime, endTime: r.endTime,
-          location: r.location, serviceType: r.serviceType, price: r.price, maxCapacity: r.maxCapacity, status: r.status
+          location: r.location, description: r.description, serviceType: r.serviceType, price: r.price, maxCapacity: r.maxCapacity, status: r.status
         }));
       } catch(e) {
         console.error(e);
@@ -4718,6 +4719,7 @@ export async function createQueueEvent(data: any) {
             startTime: data.startTime,
             endTime: data.endTime,
             location: data.location,
+            description: data.description,
             serviceType: data.serviceType,
             price: data.price,
             maxCapacity: data.maxCapacity,
@@ -4745,6 +4747,7 @@ export async function updateQueueEvent(id: string, data: any) {
             startTime: data.startTime,
             endTime: data.endTime,
             location: data.location,
+            description: data.description,
             serviceType: data.serviceType,
             price: data.price,
             maxCapacity: data.maxCapacity

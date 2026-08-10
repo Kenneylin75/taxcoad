@@ -2480,7 +2480,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       
                       <div className="bg-gray-50 p-3 rounded-xl">
                         <p className="text-[10px] font-bold text-gray-500 uppercase">活動說明</p>
-                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">{evt.precautions}</p>
+                        <p className="text-xs text-gray-600 mt-1 leading-relaxed whitespace-pre-line">{evt.description || '請依現場工作人員指示，依序排隊等候。'}</p>
                       </div>
 
                       <button 
