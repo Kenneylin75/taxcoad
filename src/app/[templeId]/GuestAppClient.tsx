@@ -25,6 +25,7 @@ import {
   fetchServiceSettings, 
   fetchQueueEvents, 
   fetchGuestFiles, 
+  deleteGuestFile,
   createOrUpdateGuest,
   createLightingOrder,
   uploadCustomerMedia,
@@ -43,6 +44,7 @@ import {
   fetchActiveQueueCount,
   fetchTempleAiUsage,
   fetchGuestRecords,
+  fetchGuestDeepRecords,
   type TempleNotification,
   setGuestTempleContext
 } from "@/app/actions";
@@ -182,6 +184,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   const [guestUser, setGuestUser] = useState<any | null>(null);
   const [guestFiles, setGuestFiles] = useState<any[]>([]);
   const [guestRecords, setGuestRecords] = useState<any[]>([]);
+  const [guestDeepRecords, setGuestDeepRecords] = useState<any[]>([]);
   const [guestAppointments, setGuestAppointments] = useState<any[]>([]);
   const [serviceDefinitions, setServiceDefinitions] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -476,7 +479,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   const [previewRecord, setPreviewRecord] = useState<any>(null);
 
   const refreshAllData = async (phone: string) => {
-    const [apps, files, regs, tix, lamps, latestNotif, activeNotifs, qCount, records] = await Promise.all([
+    const [apps, files, regs, tix, lamps, latestNotif, activeNotifs, qCount, records, deepRecords] = await Promise.all([
       fetchGuestAppointments(phone), 
       fetchGuestFiles(phone),
       fetchGuestRegistrations(phone),
@@ -485,7 +488,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       fetchLatestNotificationForGuest(),
       fetchActiveNotificationsForGuest(),
       fetchActiveQueueCount(),
-      fetchGuestRecords(phone)
+      fetchGuestRecords(phone),
+      fetchGuestDeepRecords(phone)
     ]);
     setGuestAppointments(apps);
     setGuestFiles(files);
@@ -496,6 +500,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
     setActiveNotifications(activeNotifs);
     setActiveQueueCount(qCount);
     setGuestRecords(records);
+    setGuestDeepRecords(deepRecords);
   };
 
   const handlePhoneNext = async (e?: React.FormEvent) => {
@@ -1061,12 +1066,32 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   </span>
                 </div>
               </div>
-              <button 
-                onClick={(e) => { e.stopPropagation(); alert(`已複製連結：${file.url}`); }}
-                className="p-2 text-gray-400 hover:text-gray-950 font-bold"
-              >
-                🔗
-              </button>
+              <div className="flex items-center gap-1">
+                {file.uploadedBy === 'Member' && (
+                  <button 
+                    onClick={async (e) => { 
+                      e.stopPropagation(); 
+                      if(confirm('確定要刪除這個檔案嗎？')) {
+                        const res = await deleteGuestFile(file.id);
+                        if(res.success) {
+                          setGuestFiles(guestFiles.filter(f => f.id !== file.id));
+                        } else {
+                          alert(res.error || '刪除失敗');
+                        }
+                      }
+                    }}
+                    className="p-2 text-gray-400 hover:text-red-500 font-bold"
+                  >
+                    🗑️
+                  </button>
+                )}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); alert(`已複製連結：${file.url}`); }}
+                  className="p-2 text-gray-400 hover:text-gray-950 font-bold"
+                >
+                  🔗
+                </button>
+              </div>
             </div>
           ))}
 
@@ -1289,7 +1314,19 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
         const evt = events.find(e => e.id === r.eventId);
         return { ...r, paymentProofUrl: sanitizeUrl(r.paymentProofUrl), type: '活動', icon: '🏮', color: 'text-red-600', bg: 'bg-red-50', service: r.title, time: r.timestamp, rawTime: r.timestamp, staff: null, precautions: evt?.precautions };
       }),
-      ...guestTickets.map(t => ({ ...t, type: '排隊', icon: '🎟️', color: 'text-emerald-600', bg: 'bg-emerald-50', service: t.eventTitle, time: t.scannedAt || '尚未核銷', rawTime: t.scannedAt, staff: '現場候位' })),
+      ...guestTickets.map(t => ({ 
+        ...t, 
+        paymentProofUrl: sanitizeUrl(t.paymentProofUrl),
+        amount: t.queueEvent?.price || 0,
+        type: '排隊', 
+        icon: '🎟️', 
+        color: 'text-emerald-600', 
+        bg: 'bg-emerald-50', 
+        service: t.eventTitle, 
+        time: t.scannedAt || '尚未核銷', 
+        rawTime: t.scannedAt, 
+        staff: '現場候位' 
+      })),
       ...guestLamps.map(l => {
         const remaining = Math.ceil((new Date(l.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
         return { 
@@ -1305,6 +1342,28 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
           staff: '本宮法事',
           remaining: remaining > 0 ? remaining : 0,
           status: l.paymentStatus === 'Unpaid' ? 'Unpaid' : (l.status === 'Active' ? '生效中' : (l.status === 'Pending' ? 'WaitingLamp' : l.status))
+        };
+      }),
+      ...guestDeepRecords.map(d => {
+        let valuesStr = '';
+        try {
+           if (d.paymentRef) {
+              const parsed = JSON.parse(d.paymentRef);
+              valuesStr = Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join('\n');
+           }
+        } catch(e) {}
+        return { 
+          ...d,
+          type: '功德', 
+          icon: '✨', 
+          color: 'text-amber-600', 
+          bg: 'bg-amber-50',
+          service: d.content || '功德登記', 
+          time: d.date || d.createdAt.split('T')[0], 
+          rawTime: d.date || d.createdAt,
+          staff: d.remarks || '管理中心',
+          status: 'Completed',
+          precautions: valuesStr
         };
       })
     ].sort((a, b) => {
@@ -1342,7 +1401,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
         <div className="max-w-md mx-auto px-5 pt-6 space-y-6">
           {/* Categories Tab */}
           <div className="flex overflow-x-auto no-scrollbar gap-2 pb-2">
-            {['全部', '預約', '點燈', '活動', '排隊'].map(cat => (
+            {['全部', '預約', '點燈', '活動', '排隊', '功德'].map(cat => (
               <button 
                 key={cat} 
                 onClick={() => setRecordsTab(cat)}
@@ -1458,14 +1517,14 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                        <button onClick={() => {
                           setPaymentIntent({
                              amount: record.amount,
-                             module: record.type === '預約' ? 'Booking' : record.type === '點燈' ? 'Lamp' : 'Event',
+                             module: record.type === '預約' ? 'Booking' : record.type === '點燈' ? 'Lamp' : record.type === '排隊' ? 'Queue' : 'Event',
                              onPaid: async (method: string, ref: string, proofFile: File | null) => {
                                 let proofUrl = '';
                                 if (proofFile) {
                                    proofUrl = await fileToBase64(proofFile);
                                 }
                                 const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                const recordType = record.type === '預約' ? 'Appointment' : record.type === '點燈' ? 'LampRecord' : 'EventRegistration';
+                                const recordType = record.type === '預約' ? 'Appointment' : record.type === '點燈' ? 'LampRecord' : record.type === '排隊' ? 'QueueTicket' : 'EventRegistration';
                                 await uploadPaymentProof(record.id.toString(), recordType, proofUrl, guestUser?.phone, ref, method);
                                 refreshAllData(guestUser?.phone);
                              }

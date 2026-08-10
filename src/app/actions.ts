@@ -8709,4 +8709,25 @@ export async function deleteSuperSalesAllData(superSalesId: string) {
     return { success: false, error: e.message || String(e) };
   }
 }
-
+
+export async function fetchGuestDeepRecords(phone: string) {
+      try {
+        const templeId = await getDynamicTempleId();
+        if (!templeId) return [];
+        const normPhone = phone.replace(/-/g, '');
+        return await prisma.deepRecord.findMany({
+          where: { 
+            templeId, 
+            phone: { contains: normPhone },
+            OR: [
+              { category: { startsWith: 'MERIT-' } },
+              { content: { contains: '功德' } }
+            ]
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+      } catch (error) {
+        console.error('fetchGuestDeepRecords error:', error);
+        return [];
+      }
+}

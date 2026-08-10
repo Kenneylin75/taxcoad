@@ -183,7 +183,7 @@ function DeepFileCenterContent() {
     });
     history.queueTickets?.forEach(qt => {
       const qtDateStr = formatLocal(qt.date || qt.scannedAt || qt.createdAt);
-      logs.push({ type: 'QUEUE', date: qtDateStr, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.displayNum || qt.ticketNumber} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
+      logs.push({ type: 'QUEUE', date: qtDateStr, time: '---', title: `排隊：現場服務`, desc: `號碼：${qt.displayNum || qt.assignedNumber || '未發號'} | 狀態：${qt.status}`, icon: '🎟️', color: 'emerald', paymentRef: qt.paymentRef, paymentProofUrl: qt.paymentProofUrl });
     });
     history.files.forEach(file => {
       if (file.folder !== 'Payment_Proofs' && file.folder !== '對帳審核') {
