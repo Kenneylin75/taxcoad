@@ -2490,14 +2490,14 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             alert('您已領取過此項目的號碼牌，無法重複領取！');
                             return;
                           }
-                          initiatePayment(0, 'Queue', async (method: string, ref?: string, proofFile?: File | null) => {
+                          initiatePayment(evt.price || 0, 'Queue', async (method: string, ref?: string, proofFile?: File | null) => {
                             const res = await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
                             if (res && res.success !== false) {
                               const recordId = res.ticket?.id || res.id;
                               if (recordId && proofFile) {
                                 const previewUrl = await fileToBase64(proofFile);
                                 const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                await uploadPaymentProof(recordId.toString(), 'Appointment', previewUrl, guestUser.phone, ref, method);
+                                await uploadPaymentProof(recordId.toString(), 'QueueTicket', previewUrl, guestUser.phone, ref, method);
                               }
                               setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
                               refreshAllData(guestUser.phone);

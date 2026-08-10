@@ -1879,7 +1879,8 @@ export async function fetchGuestQueueTickets(p: any) {
     if (!guest) {
       const tickets = await prisma.queueTicket.findMany({
         where: { templeId, phone: normPhone },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: { queueEvent: true }
       });
       return tickets.map(t => ({
         id: t.id,
@@ -1890,7 +1891,11 @@ export async function fetchGuestQueueTickets(p: any) {
         guestName: t.guestName,
         status: t.status,
         assignedNumber: t.assignedNumber,
+        amount: t.queueEvent?.price || 0,
         paymentStatus: t.paymentStatus,
+        paymentMethod: t.paymentMethod,
+        paymentRef: t.paymentRef,
+        paymentProofUrl: t.paymentProofUrl,
         createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0]
       }));
     }
@@ -1903,7 +1908,8 @@ export async function fetchGuestQueueTickets(p: any) {
           { phone: normPhone }
         ]
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: { queueEvent: true }
     });
 
     return tickets.map(t => ({
@@ -1915,7 +1921,11 @@ export async function fetchGuestQueueTickets(p: any) {
       guestName: t.guestName,
       status: t.status,
       assignedNumber: t.assignedNumber,
+      amount: t.queueEvent?.price || 0,
       paymentStatus: t.paymentStatus,
+      paymentMethod: t.paymentMethod,
+      paymentRef: t.paymentRef,
+      paymentProofUrl: t.paymentProofUrl,
       createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0]
     }));
   } catch (error) {
@@ -2011,7 +2021,8 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
         eventTitle: ev.title,
         status: 'Pending',
         assignedNumber,
-        paymentStatus: pStatus
+        paymentStatus: pStatus,
+        paymentMethod: paymentMethod || undefined
       }
     });
 
@@ -3253,18 +3264,18 @@ export async function fetchFinancialOverview() {
         qtRes.forEach((t: any) => {
           revenue.push({
             id: t.id,
-            title: '現場排隊服務',
+            title: t.queueEvent?.title || '現場排隊服務',
             source: 'Queue',
-            amount: Number((t as any).price || 0) || 0,
-            timestamp: t.paymentUpdatedAt || (t.createdAt instanceof Date ? t.createdAt.toISOString().split('T')[0] : String(t.createdAt)),
+            amount: Number(t.queueEvent?.price || 0) || 0,
+            timestamp: t.paymentUpdatedAt ? t.paymentUpdatedAt.toISOString().split('T')[0] : (t.createdAt instanceof Date ? t.createdAt.toISOString().split('T')[0] : String(t.createdAt)),
             guestName: t.phone || '現場信眾',
-            paymentMethod: '現金/臨櫃',
+            paymentMethod: t.paymentMethod || '現金/臨櫃',
             status: t.paymentStatus || t.status || 'Paid',
             paymentRef: t.paymentRef,
             paymentProofUrl: t.paymentProofUrl,
             remarks: t.remarks
           });
-          totalRevenue += (Number((t as any).price || 0) || 0);
+          totalRevenue += (Number(t.queueEvent?.price || 0) || 0);
         });
       }
       if (deepRes) {
@@ -3369,7 +3380,7 @@ export async function fetchFinancialOverview() {
     [].filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
       revenue.push({
         id: t.id,
-        title: '現場排隊服務',
+        title: (t as any).queueEvent?.title || '現場排隊服務',
         source: 'Queue',
         amount: t.price || 0,
         timestamp: t.paymentUpdatedAt || t.scannedAt || t.date || new Date().toISOString().split('T')[0],

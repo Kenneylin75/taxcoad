@@ -15,7 +15,7 @@ export interface AdminNotificationRow {
 }
 
 // 1. Upload Payment Proof
-export async function uploadPaymentProof(recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration', imageUrl: string, guestId?: string, paymentRef?: string, paymentMethod?: string) {
+export async function uploadPaymentProof(recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration' | 'QueueTicket', imageUrl: string, guestId?: string, paymentRef?: string, paymentMethod?: string) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
   
@@ -60,7 +60,19 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
       });
       message = `法會報名 ${recordId} 上傳了匯款截圖/後五碼`;
       linkPath = `/${templeId}/admin/events`;
-    }
+      } else if (recordType === 'QueueTicket') {
+        await prisma.queueTicket.update({
+          where: { id: recordId },
+          data: {
+            paymentProofUrl: imageUrl || undefined,
+            paymentRef: paymentRef || undefined,
+            paymentMethod: paymentMethod || undefined,
+            paymentStatus: 'PENDING_REVIEW'
+          }
+        });
+        message = `排隊號碼 ${recordId} 上傳了匯款截圖/後五碼`;
+        linkPath = `/${templeId}/admin/customers`;
+      }
 
     await prisma.adminNotification.create({
       data: {
@@ -109,7 +121,7 @@ export async function getAdminNotifications() {
 }
 
 // 3. Toggle Payment Status
-export async function togglePaymentStatus(recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration', currentStatus: string) {
+export async function togglePaymentStatus(recordId: string, recordType: 'Appointment' | 'LampRecord' | 'EventRegistration' | 'QueueTicket', currentStatus: string) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
   // 由於是切換狀態，如果是 PAID 則切為 PENDING_REVIEW（待確認），否則就切回 PAID（已收款）
@@ -128,6 +140,11 @@ export async function togglePaymentStatus(recordId: string, recordType: 'Appoint
       });
     } else if (recordType === 'EventRegistration') {
       await prisma.eventRegistration.update({
+        where: { id: recordId },
+        data: { paymentStatus: nextStatus }
+      });
+    } else if (recordType === 'QueueTicket') {
+      await prisma.queueTicket.update({
         where: { id: recordId },
         data: { paymentStatus: nextStatus }
       });

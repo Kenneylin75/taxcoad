@@ -727,21 +727,24 @@ model QueueEvent {
 }
 
 model QueueTicket {
-  id          String   @id @default(cuid())
-  templeId    String?  @map("temple_id")
-  eventId     String?  @map("event_id")
-  guestId     String?  @map("guest_id")
-  guestName   String?  @map("guest_name")
-  phone         String?
-  eventTitle    String?  @map("event_title")
-  displayNum    String?  @map("display_num")
-  assignedNumber String? @map("assigned_number")
-  paymentStatus String?  @map("payment_status")
-  paymentRef    String?  @map("payment_ref")
-  remarks       String?
-  actualOrder   Int      @default(0) @map("actual_order")
-  status        String   @default("Queuing")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id              String   @id @default(cuid())
+  templeId        String?  @map("temple_id")
+  eventId         String?  @map("event_id")
+  guestId         String?  @map("guest_id")
+  guestName       String?  @map("guest_name")
+  phone           String?
+  eventTitle      String?  @map("event_title")
+  displayNum      String?  @map("display_num")
+  assignedNumber  String?  @map("assigned_number")
+  paymentStatus   String?  @map("payment_status")
+  paymentRef      String?  @map("payment_ref")
+  paymentProofUrl String?  @map("payment_proof_url")
+  paymentMethod   String?  @map("payment_method")
+  paymentUpdatedAt DateTime? @map("payment_updated_at")
+  remarks         String?
+  actualOrder     Int      @default(0) @map("actual_order")
+  status          String   @default("Queuing")
+  createdAt       DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   queueEvent QueueEvent? @relation(fields: [eventId], references: [id])

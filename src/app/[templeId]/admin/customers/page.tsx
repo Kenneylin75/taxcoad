@@ -921,7 +921,7 @@ function DeepFileCenterContent() {
                               </div>
                                <div className="flex flex-col items-end gap-2">
                                   <div className="flex gap-4 items-center">
-                                     {(tix.paymentStatus === 'Pending' || tix.paymentStatus === 'Unpaid') && (
+                                     {(tix.paymentStatus === 'Pending' || tix.paymentStatus === 'Unpaid' || tix.paymentStatus === 'PENDING_REVIEW') && (
                                         <button 
                                           onClick={async () => {
                                             if (confirm('確定要標記已收款？')) {
