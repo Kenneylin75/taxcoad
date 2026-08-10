@@ -2183,7 +2183,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                                   if (res.id && proofFile) {
                                     const previewUrl = await fileToBase64(proofFile);
                                     const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                    await uploadPaymentProof(res.id.toString(), 'Appointment', previewUrl, guestUser.phone);
+                                    await uploadPaymentProof(res.id.toString(), 'Appointment', previewUrl, guestUser.phone, ref, method);
                                   }
 
                                   setSuccessInfo({
@@ -2352,7 +2352,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                                    if (res.id && proofFile) {
                                      const previewUrl = await fileToBase64(proofFile);
                                      const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                     await uploadPaymentProof(res.id.toString(), 'EventRegistration', previewUrl, guestUser.phone);
+                                     await uploadPaymentProof(res.id.toString(), 'EventRegistration', previewUrl, guestUser.phone, ref, method);
                                    }
                                    setSuccessInfo({ title: '報名成功', message: method === 'Cash' ? '您已成功報名法會活動，請於當日現場完成繳費報到。' : method === 'Free' ? '報名成功！隨喜功德，平安喜樂。' : '您已成功報名法會活動與付款。' });
                                    refreshAllData(guestUser.phone);
@@ -2497,7 +2497,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                               if (recordId && proofFile) {
                                 const previewUrl = await fileToBase64(proofFile);
                                 const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                await uploadPaymentProof(recordId.toString(), 'Appointment', previewUrl, guestUser.phone);
+                                await uploadPaymentProof(recordId.toString(), 'Appointment', previewUrl, guestUser.phone, ref, method);
                               }
                               setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
                               refreshAllData(guestUser.phone);
@@ -2593,7 +2593,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             if (res.id && proofFile) {
                               const previewUrl = await fileToBase64(proofFile);
                               const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                              await uploadPaymentProof(res.id.toString(), 'LampRecord', previewUrl, guestUser.phone);
+                              await uploadPaymentProof(res.id.toString(), 'LampRecord', previewUrl, guestUser.phone, ref, method);
                             }
                             setSuccessInfo({
                               title: '辦理成功',
