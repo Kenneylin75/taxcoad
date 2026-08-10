@@ -3190,7 +3190,7 @@ export async function fetchFinancialOverview() {
       const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
         prisma.appointment.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
         prisma.lampRecord.findMany({ where: { templeId, actualPrice: { gt: 0 }, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
-        prisma.eventRegistration.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
+        prisma.eventRegistration.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } }, include: { event: true } }),
         prisma.queueTicket.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
         prisma.deepRecord.findMany({ where: { templeId, OR: [{ id: { startsWith: 'MERIT-' } }, { category: { contains: '功德' } }] } })
       ]);
@@ -3207,6 +3207,7 @@ export async function fetchFinancialOverview() {
             paymentMethod: a.paymentMethod || '現金/臨櫃',
             status: a.paymentStatus || 'Paid',
             paymentRef: a.paymentRef,
+            paymentProofUrl: a.paymentProofUrl,
             remarks: a.remarks
           });
           totalRevenue += (Number(a.amount) || 0);
@@ -3224,6 +3225,7 @@ export async function fetchFinancialOverview() {
             paymentMethod: r.paymentMethod || '現金/臨櫃',
             status: r.paymentStatus || 'Paid',
             paymentRef: r.paymentRef,
+            paymentProofUrl: r.paymentProofUrl,
             remarks: r.remarks
           });
           totalRevenue += (Number(r.actualPrice) || 0);
@@ -3233,7 +3235,7 @@ export async function fetchFinancialOverview() {
         evRes.forEach((r: any) => {
           revenue.push({
             id: r.id,
-            title: (r as any).eventTitle || (r as any).title,
+            title: r.event?.title || '法會活動',
             source: 'Event',
             amount: Number(r.actualPrice) || 0,
             timestamp: r.paymentUpdatedAt || (r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString())),
@@ -3241,6 +3243,7 @@ export async function fetchFinancialOverview() {
             paymentMethod: r.paymentMethod || '現金/臨櫃',
             status: r.paymentStatus || 'Paid',
             paymentRef: r.paymentRef,
+            paymentProofUrl: r.paymentProofUrl,
             remarks: r.remarks
           });
           totalRevenue += (Number(r.actualPrice) || 0);
@@ -3258,6 +3261,7 @@ export async function fetchFinancialOverview() {
             paymentMethod: '現金/臨櫃',
             status: t.paymentStatus || t.status || 'Paid',
             paymentRef: t.paymentRef,
+            paymentProofUrl: t.paymentProofUrl,
             remarks: t.remarks
           });
           totalRevenue += (Number((t as any).price || 0) || 0);

@@ -363,7 +363,7 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                         </td>
                         <td className="px-6 py-4">
                            <span className="text-[10px] font-black text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 uppercase tracking-wider">
-                              {rev.paymentMethod}
+                              {rev.paymentMethod?.toUpperCase() === 'TRANSFER' ? '匯款' : rev.paymentMethod}
                            </span>
                         </td>
                         <td className="px-6 py-4">
@@ -405,15 +405,22 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                            )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                           {rev.status === 'PENDING_REVIEW' ? (
-                             <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                               ⌛ 待審核
-                             </span>
-                           ) : (
-                             <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-                               ✓ Validated
-                             </span>
-                           )}
+                           <div className="flex items-center justify-end gap-2">
+                             {rev.paymentProofUrl && (
+                               <a href={rev.paymentProofUrl} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-amber-500 transition-colors text-lg" title="查看匯款截圖">
+                                 👁
+                               </a>
+                             )}
+                             {rev.status === 'PENDING_REVIEW' ? (
+                               <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                 ⌛ 待審核
+                               </span>
+                             ) : (
+                               <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                                 ✓ Validated
+                               </span>
+                             )}
+                           </div>
                         </td>
                       </tr>
                     ))}
