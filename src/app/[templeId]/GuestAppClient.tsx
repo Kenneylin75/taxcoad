@@ -69,25 +69,43 @@ function QRScannerComponent({ onScan, onClose }: { onScan: (data: string) => voi
   useEffect(() => {
     let html5QrCode: any;
     let isUnmounted = false;
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      alert("⚠️ 基於瀏覽器安全性限制，相機僅能在 HTTPS 安全連線或 localhost 下開啟。\n\n建議：若您正在區域網路測試手機版，請使用 ngrok 產生 HTTPS 網址來連線。");
+      onClose();
+      return;
+    }
 
     import('html5-qrcode').then(({ Html5Qrcode }) => {
       if (isUnmounted) return;
       html5QrCode = new Html5Qrcode("qr-reader");
       
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText: string) => {
-          if (isUnmounted) return;
-          html5QrCode.stop().then(() => {
-            html5QrCode.clear();
-            onScan(decodedText);
-          }).catch(console.error);
-        },
-        (error: any) => { /* ignore */ }
-      ).catch((err: any) => {
-        console.warn("相機啟動失敗", err);
-        alert("相機啟動失敗，請確認是否已給予相機權限");
+      const startCamera = (facingMode: string) => {
+        return html5QrCode.start(
+          { facingMode },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText: string) => {
+            if (isUnmounted) return;
+            html5QrCode.stop().then(() => {
+              html5QrCode.clear();
+              onScan(decodedText);
+            }).catch(console.error);
+          },
+          (error: any) => { /* ignore */ }
+        );
+      };
+
+      startCamera("environment").catch((err: any) => {
+        console.warn("後置鏡頭啟動失敗，嘗試啟動前置/預設鏡頭...", err);
+        return startCamera("user");
+      }).catch((err: any) => {
+        console.warn("相機啟動完全失敗", err);
+        if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
+          alert("相機權限被拒絕，請至瀏覽器設定中允許相機存取。");
+        } else if (err?.name === 'NotFoundError' || err?.message?.includes('Requested device not found')) {
+          alert("找不到可用的相機裝置，請確認相機是否已連接。");
+        } else {
+          alert("相機啟動失敗，請確認相機功能是否正常，或嘗試使用其他瀏覽器。");
+        }
         onClose();
       });
     });
