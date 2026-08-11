@@ -459,7 +459,6 @@ export default function SuperAdminClient({
                              <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">職級 (Role)</th>
                              <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">業務名稱</th>
                              <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
-                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
                              <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
                              <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">經銷商數量</th>
                              <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟數量</th>
