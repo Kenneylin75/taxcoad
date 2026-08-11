@@ -529,6 +529,17 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
             amount: amountVal
           }
         });
+          
+          await prisma.adminNotification.create({
+            data: {
+              templeId: templeId!,
+              guestId: guest.id,
+              category: 'PENDING_REVIEW',
+              message: `信眾 ${guestName} 已預約了 ${slot.description || '日常服務'}，金額：NT$ ${amountVal}`,
+              isRead: false,
+              linkPath: `/${templeId!}/admin/calendar`
+            }
+          });
         
         await revalidateTemple();
         return { success: true, id: newApp.id };
@@ -1845,6 +1856,16 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
             paymentStatus: pStatus
           }
         });
+
+          await prisma.adminNotification.create({
+            data: {
+              templeId: templeId!,
+              category: 'PENDING_REVIEW',
+              message: `信眾 ${data.participantName || data.phone} 報名了活動 (金額：NT$ ${data.amount || 0})`,
+              isRead: false,
+              linkPath: `/${templeId!}/admin/events`
+            }
+          });
         
         await revalidateTemple();
         return { success: true, id: newId };
@@ -2047,6 +2068,16 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
         paymentMethod: paymentMethod || undefined
       }
     });
+
+        await prisma.adminNotification.create({
+          data: {
+            templeId: templeId!,
+            category: 'PENDING_REVIEW',
+            message: `信眾取了排隊號碼 ${assignedNumber} (金額：NT$ ${data.amount || 0})`,
+            isRead: false,
+            linkPath: `/${templeId!}/admin/queue`
+          }
+        });
 
     return { 
       success: true, 
@@ -4632,6 +4663,16 @@ export async function createLampRecord(data: any) {
           create: { templeId: templeId!, phone: normPhone, name: guestName, status: 'Active' }
         });
 
+          await prisma.adminNotification.create({
+            data: {
+              templeId: templeId!,
+              category: 'GENERAL',
+              message: `信眾 ${data.name || originalPhone || data.phone} 更新了個人資料`,
+              isRead: false,
+              linkPath: `/${templeId!}/admin/customers`
+            }
+          });
+
         if (!durationDays) {
           durationDays = cat.durationDays || 365;
         }
@@ -4659,6 +4700,16 @@ export async function createLampRecord(data: any) {
             expiryDate
           }
         });
+
+          await prisma.adminNotification.create({
+            data: {
+              templeId: templeId!,
+              category: 'PENDING_REVIEW',
+              message: `信眾 ${data.guestName || data.phone} 點了 ${data.lampName || '點燈服務'} (金額：NT$ ${data.actualPrice || 0})`,
+              isRead: false,
+              linkPath: `/${templeId!}/admin/lamps`
+            }
+          });
         
         await revalidateTemple();
         return { success: true, id: newId };

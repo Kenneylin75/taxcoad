@@ -38,7 +38,7 @@ export default function AdminBell() {
     };
   }, [isOpen]);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter(n => !n.isRead && n.category === 'PENDING_REVIEW').length;
 
   const handleNotificationClick = async (notif: any) => {
     if (!notif.isRead) {
