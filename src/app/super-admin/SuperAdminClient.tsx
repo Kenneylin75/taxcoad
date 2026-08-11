@@ -456,21 +456,23 @@ export default function SuperAdminClient({
                     <table className="w-full bg-white rounded-[40px] shadow-sm overflow-hidden text-left border-collapse">
                        <thead className="bg-slate-50 border-b border-slate-100">
                           <tr>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">職級 (Role)</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">業務名稱</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">職級 (Role)</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">業務名稱</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">經銷商數量</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟數量</th>
+                             <th className="px-6 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-50">
                           {initialAccounts.filter(a => a.role === 'SuperSales').map((acc: any) => (
                             <tr key={acc.id} className="hover:bg-slate-50/30 transition-all group">
-                               <td className="px-12 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-indigo-50 text-indigo-600">{acc.role}</span></td>
-                               <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
-                               <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-12 py-8">
+                               <td className="px-6 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-indigo-50 text-indigo-600">{acc.role}</span></td>
+                               <td className="px-6 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
+                               <td className="px-6 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
+                               <td className="px-6 py-8">
                                   <button 
                                      onClick={async () => {
                                         if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
@@ -484,7 +486,9 @@ export default function SuperAdminClient({
                                      {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
                                   </button>
                                </td>
-                               <td className="px-12 py-8 text-right flex justify-end gap-4">
+                               <td className="px-6 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.distributorsCount || 0}</td>
+                               <td className="px-6 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
+                               <td className="px-6 py-8 text-right flex justify-end gap-4">
                                   <button onClick={() => setTransferModalData({id: acc.id, role: 'SuperSales', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
                                      window.location.href = `/super-sales/${acc.id}`;
@@ -529,6 +533,8 @@ export default function SuperAdminClient({
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">經銷商名稱</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">業務數量</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟數量</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
                        </thead>
@@ -552,6 +558,8 @@ export default function SuperAdminClient({
                                      {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
                                   </button>
                                </td>
+                               <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.salesCount || 0}</td>
+                               <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
                                   <button onClick={() => setTransferModalData({id: acc.id, role: 'Distributor', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
@@ -597,6 +605,8 @@ export default function SuperAdminClient({
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">業務數量</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟數量</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
                        </thead>
@@ -629,6 +639,8 @@ export default function SuperAdminClient({
                                      {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
                                   </button>
                                </td>
+                               <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.salesCount || 0}</td>
+                               <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
                                   <button onClick={() => {
                                      import('@/app/actions').then(async m => { const res = await m.impersonateTemple((acc.templeId || acc.id) as string, 'SuperAdmin'); if(res.success && res.redirectPath) window.location.href = res.redirectPath; })
