@@ -1,7 +1,7 @@
-export function normalizePhone(phone: string) { return phone.replace(/\D/g, ''); }
-
 // @ts-nocheck
 "use server";
+
+
 import prisma from '@/lib/prisma';
 
 

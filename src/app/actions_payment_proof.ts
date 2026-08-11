@@ -75,8 +75,7 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
       }
     let actualGuestId = null;
     if (guestId) {
-      const { normalizePhone } = await import('@/app/actions');
-      const normPhone = normalizePhone(guestId);
+      const normPhone = guestId.replace(/\D/g, '');
       const guest = await prisma.guest.findFirst({
         where: { templeId, phone: normPhone }
       });
