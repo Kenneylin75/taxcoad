@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { getAdminNotifications, markNotificationAsRead } from '@/app/actions_payment_proof';
-import { useRouter } from 'next/navigation';
+import { getTempleBasicInfo } from '@/app/actions';
+import { useRouter, useParams } from 'next/navigation';
 
 export default function AdminBell() {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,9 +12,33 @@ export default function AdminBell() {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const params = useParams();
+  const templeId = params.templeId as string;
   const loadNotifications = async () => {
-    const data = await getAdminNotifications();
-    setNotifications(data || []);
+    const data = await getAdminNotifications() || [];
+    let notifs = [...data];
+    try {
+      const templeInfo = await getTempleBasicInfo(templeId);
+      if (templeInfo && (templeInfo as any).billingStartDate) {
+         const expDate = new Date((templeInfo as any).billingStartDate);
+         const now = new Date();
+         const diffTime = expDate.getTime() - now.getTime();
+         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+         if (diffDays >= 0 && diffDays <= 5) {
+            notifs.unshift({
+               id: 'sys-billing-alert',
+               title: '系統通知：帳單即將到期',
+               message: `您的試用期/免費期間即將於 ${diffDays} 天後到期，請盡快前往帳務管理完成繳費，以免系統自動鎖定。`,
+               type: 'ALERT',
+               category: 'GENERAL',
+               isRead: false,
+               createdAt: new Date().toISOString(),
+               linkPath: `/${templeId}/admin/billing`
+            });
+         }
+      }
+    } catch(e) {}
+    setNotifications(notifs);
   };
 
   useEffect(() => {

@@ -7178,27 +7178,65 @@ export async function generateInitialBills(newTemple: any) {
     }
 
     const storagePlanId = newTemple.cloudStorage;
+    let plan = null;
     if (storagePlanId && storagePlanId.startsWith('SP-')) {
-       let plan = await prisma.storagePlan.findUnique({ where: { id: storagePlanId } }) as any;
-       if (!plan) plan = db_storage_plans.find(p => p.id === storagePlanId);
-       if (plan) {
-         const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
-         if (storageFee > 0) {
-           billsToInsert.push({
-             id: `BILL-STORAGE-${Date.now()}`,
-             templeId: newTemple.id,
-             type: 'StorageUpgrade',
-             item_name: '雲端空間升級專案 - ' + plan.name,
-             amount: storageFee,
-             billingDate: new Date().toISOString().substring(0, 7),
-             dueDate: billDueDate,
-             status: 'Unpaid',
-             payeeRole: 'SuperAdmin',
-             payeeId: 'system-hq',
-             timestamp: new Date().toISOString()
-           });
-         }
+       plan = await prisma.storagePlan.findUnique({ where: { id: storagePlanId } }) as any;
+    }
+    if (!plan) {
+       // Fetch cheapest storage plan
+       const plans = await prisma.storagePlan.findMany({ orderBy: { priceMonthly: 'asc' } }) as any[];
+       if (plans && plans.length > 0) {
+         plan = plans[0];
        }
+    }
+    if (plan) {
+      const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
+      if (storageFee > 0) {
+        billsToInsert.push({
+          id: `BILL-STORAGE-${Date.now()}`,
+          templeId: newTemple.id,
+          type: 'StorageUpgrade',
+          item_name: '雲端空間專案 - ' + plan.name,
+          amount: storageFee,
+          billingDate: new Date().toISOString().substring(0, 7),
+          dueDate: billDueDate,
+          status: 'Unpaid',
+          payeeRole: 'SuperAdmin',
+          payeeId: 'system-hq',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    let aiPlanId = newTemple.aiPlan;
+    let aiPlanInfo = null;
+    if (aiPlanId) {
+       aiPlanInfo = await prisma.aiPlan.findUnique({ where: { id: aiPlanId } }) as any;
+    }
+    if (!aiPlanInfo) {
+       // Fetch cheapest AI plan
+       const aiPlans = await prisma.aiPlan.findMany({ orderBy: { price: 'asc' } }) as any[];
+       if (aiPlans && aiPlans.length > 0) {
+         aiPlanInfo = aiPlans[0];
+       }
+    }
+    if (aiPlanInfo) {
+      const aiFee = isYearly ? (aiPlanInfo.price * 12 * 0.8) : aiPlanInfo.price;
+      if (aiFee > 0) {
+        billsToInsert.push({
+          id: `BILL-AI-${Date.now()}`,
+          templeId: newTemple.id,
+          type: 'AiUpgrade',
+          item_name: 'AI引擎方案 - ' + aiPlanInfo.name,
+          amount: aiFee,
+          billingDate: new Date().toISOString().substring(0, 7),
+          dueDate: billDueDate,
+          status: 'Unpaid',
+          payeeRole: 'SuperAdmin',
+          payeeId: 'system-hq',
+          timestamp: new Date().toISOString()
+        });
+      }
     }
 
     try {
@@ -8327,6 +8365,9 @@ export async function createTempleAccount(data: any) {
         setupFee: newTemple.setupFee || 0,
         monthlyRent: newTemple.monthlyRent || 0,
         paymentCycle: newTemple.paymentCycle || 'Monthly',
+        billingStartDate: newTemple.billingStartDate ? new Date(newTemple.billingStartDate) : undefined,
+        freeType: newTemple.freeType || 'Normal',
+        trialMonths: newTemple.trialMonths || 0,
       }
     });
 

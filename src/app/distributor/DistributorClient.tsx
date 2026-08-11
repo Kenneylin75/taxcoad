@@ -1257,7 +1257,14 @@ export default function DistributorClient({
                    onClick={() => { setActiveTab(t.id as any); setIsMoreMenuOpen(false); }} 
                    className="flex flex-col items-center justify-center p-4 bg-slate-50/50 rounded-3xl hover:bg-blue-50 hover:text-blue-600 transition-colors active:scale-95"
                  >
-                   <span className="text-3xl drop-shadow-sm mb-2">{t.icon}</span>
+                   <span className="text-3xl drop-shadow-sm mb-2 relative">
+                       {t.icon}
+                       {(t as any).count > 0 && (
+                         <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg border-2 border-white animate-pulse">
+                           {(t as any).count}
+                         </span>
+                       )}
+                     </span>
                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{t.label}</span>
                  </button>
                ))}

@@ -27,20 +27,19 @@ export default async function TempleLayout({ children, params }: { children: Rea
   const bills = await fetchTempleBills(templeId);
   const hasUnpaid = bills?.some((e: any) => e.status === 'Unpaid');
   
-  // 計算過期與寬限期邏輯 (3 天寬限期)
+  // 計算過期邏輯 (無寬限期)
   let isExpired = false;
   const isSuperAdmin = currentRole === 'SuperAdmin' || (currentRole as any) === 'super-admin';
   
   if (templeInfo && (templeInfo as any).billingStartDate) {
     const expirationDate = new Date((templeInfo as any).billingStartDate);
-    expirationDate.setDate(expirationDate.getDate() + 3); // 3 天寬限期
     
     if (new Date() >= expirationDate) {
       isExpired = true;
     }
   }
 
-  // 只有當「已過期(含寬限期)」且「有未繳帳單」，且「不是總部超級管理員」時，才強制阻斷跳轉
+  // 只有當「已過期」且「有未繳帳單」，且「不是總部超級管理員」時，才強制阻斷跳轉
   if (!isSuperAdmin && isExpired && hasUnpaid && !pathname.includes('/billing') && !pathname.includes('/payment-setup')) {
     redirect(`/${templeId}/admin/billing`);
   }

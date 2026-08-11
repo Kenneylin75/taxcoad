@@ -300,6 +300,11 @@ export default function SuperAdminClient({
                 className={`w-full flex items-center gap-5 px-8 py-5 rounded-[25px] text-[14px] font-black transition-all relative ${activeTab === item.id ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-50'}`}
              >
                <span className="text-xl">{item.icon}</span>
+                  {(item as any).count > 0 && (
+                    <span className="absolute top-1/2 -translate-y-1/2 right-4 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                      {(item as any).count}
+                    </span>
+                  )}
                <span className="tracking-wide uppercase italic">{item.label}</span>
                {item.count && item.count > 0 && <span className="absolute right-6 top-1/2 -translate-y-1/2 bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{item.count}</span>}
              </button>

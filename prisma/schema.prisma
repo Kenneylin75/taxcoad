@@ -180,6 +180,9 @@ model Temple {
   lineLoginClientId  String?  @map("line_login_client_id")
   linePushEnabled    Boolean? @default(false) @map("line_push_enabled")
   formTemplates      Json?    @map("form_templates")
+  billingStartDate   DateTime? @map("billing_start_date")
+  freeType           String?  @default("Normal") @map("free_type")
+  trialMonths        Int?     @default(0) @map("trial_months")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
