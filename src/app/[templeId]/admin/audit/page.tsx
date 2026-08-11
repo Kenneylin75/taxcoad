@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAdminNotifications, markNotificationAsRead } from "@/app/actions_payment_proof";
 import { fetchAllWithdrawals, approveWithdrawal, rejectWithdrawal, getCurrentRole, AppRole, fetchAuditLogs } from '@/app/actions';
 
 interface SystemLog {
@@ -17,8 +18,9 @@ export default function AuditCenterPage() {
   const [role, setRole] = useState<AppRole | null>(null);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'withdrawals' | 'contracts' | 'logs'>('logs');
+  const [activeTab, setActiveTab] = useState<'withdrawals' | 'contracts' | 'logs' | 'notifications'>('logs');
   const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState<string>('ALL');
   const [isExporting, setIsExporting] = useState(false);
@@ -55,8 +57,20 @@ export default function AuditCenterPage() {
     const r = await getCurrentRole();
     setRole(r);
     
+
     const logs = await fetchAuditLogs();
     setSystemLogs(logs);
+    
+    const notifs = await getAdminNotifications();
+    setNotifications(notifs);
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'notifications') {
+        setActiveTab('notifications');
+      }
+    }
+
 
     if (r === 'SuperAdmin') {
       const data = await fetchAllWithdrawals();
@@ -112,13 +126,16 @@ export default function AuditCenterPage() {
           <p className="text-slate-400 text-xs font-bold tracking-widest uppercase mt-1">Security Audit Infrastructure</p>
         </div>
 
-        {!isTemple && (
-          <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-             {[
+        <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+             {(isTemple ? [
+               { id: 'logs', label: '行為日誌' },
+               { id: 'notifications', label: '通知中心的資料' }
+             ] : [
                { id: 'withdrawals', label: '提領核定' },
                { id: 'contracts', label: '合約庫' },
-               { id: 'logs', label: '行為日誌' }
-             ].map((tab) => (
+               { id: 'logs', label: '行為日誌' },
+               { id: 'notifications', label: '通知中心的資料' }
+             ]).map((tab) => (
                 <button 
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
@@ -128,7 +145,6 @@ export default function AuditCenterPage() {
                 </button>
              ))}
           </div>
-        )}
       </div>
 
       {/* Filter Bar */}
@@ -223,6 +239,59 @@ export default function AuditCenterPage() {
                    </div>
                 )}
              </div>
+          </div>
+        )}
+
+
+        {activeTab === 'notifications' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 animate-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">通知中心的資料</h3>
+                <p className="text-xs font-bold text-slate-400 mt-1">Notification Logs</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {notifications.length === 0 ? (
+                <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl">
+                  <p className="text-xs font-black text-slate-300 uppercase tracking-widest">目前無任何通知</p>
+                </div>
+              ) : (
+                notifications.map(notif => (
+                  <div key={notif.id} className={`flex items-start gap-4 p-4 border rounded-xl transition-colors ${notif.isRead ? 'border-slate-100 bg-white' : 'border-amber-100 bg-amber-50/50'}`}>
+                    <div className="mt-1">
+                      {notif.isRead ? <span className="text-slate-300 text-xl">📭</span> : <span className="text-amber-500 text-xl">📬</span>}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${notif.category === 'GENERAL' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                          {notif.category === 'GENERAL' ? '一般資料' : '待確認'}
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">{new Date(notif.createdAt).toLocaleString()}</span>
+                      </div>
+                      <p className={`text-sm mt-1 ${notif.isRead ? 'text-slate-600 font-medium' : 'text-slate-800 font-bold'}`}>{notif.message}</p>
+                      {notif.linkPath && (
+                        <a href={notif.linkPath} className="text-xs text-amber-600 hover:text-amber-700 font-bold inline-block mt-2">
+                          前往查看 ➔
+                        </a>
+                      )}
+                    </div>
+                    {!notif.isRead && (
+                      <button 
+                        onClick={async () => {
+                           await markNotificationAsRead(notif.id);
+                           const updated = await getAdminNotifications();
+                           setNotifications(updated);
+                        }}
+                        className="text-[10px] font-bold bg-white text-slate-500 hover:text-amber-600 border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm hover:bg-slate-50 transition-colors"
+                      >
+                        標記已讀
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 export default function AdminBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'GENERAL' | 'PENDING_REVIEW' | 'IMPORTANT'>('PENDING_REVIEW');
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'PENDING_REVIEW'>('PENDING_REVIEW');
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -79,8 +79,7 @@ export default function AdminBell() {
           <div className="flex border-b border-slate-100">
             {[
               { id: 'GENERAL', label: '一般資料' },
-              { id: 'PENDING_REVIEW', label: '待確認' },
-              { id: 'IMPORTANT', label: '重要通知' }
+              { id: 'PENDING_REVIEW', label: '待確認' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -133,9 +132,19 @@ export default function AdminBell() {
             )}
           </div>
           
-          <div className="p-2 border-t border-slate-100 text-center bg-slate-50">
+          <div className="p-2 border-t border-slate-100 flex items-center justify-between bg-slate-50">
              <button className="text-[10px] font-bold text-slate-400 hover:text-amber-600 uppercase tracking-widest transition-colors">
                標記全部為已讀
+             </button>
+             <button 
+               onClick={() => {
+                 setIsOpen(false);
+                 const templeId = window.location.pathname.split('/')[1];
+                 router.push(`/${templeId}/admin/audit?tab=notifications`);
+               }}
+               className="text-[10px] font-black text-amber-600 hover:text-amber-700 uppercase tracking-widest transition-colors"
+             >
+               查看更多 ➔
              </button>
           </div>
         </div>
