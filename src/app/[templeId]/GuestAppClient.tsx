@@ -86,8 +86,9 @@ function QRScannerComponent({ onScan, onClose }: { onScan: (data: string) => voi
         },
         (error: any) => { /* ignore */ }
       ).catch((err: any) => {
-        console.error("相機啟動失敗", err);
-        alert("無法啟動相機，請確認是否已授予相機權限");
+        console.warn("相機啟動失敗", err);
+        alert("相機啟動失敗，請確認是否已給予相機權限");
+        onClose();
       });
     });
 
