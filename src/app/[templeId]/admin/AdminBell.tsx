@@ -27,6 +27,8 @@ export default function AdminBell() {
          if (diffDays >= 0 && diffDays <= 5) {
             notifs.unshift({
                id: 'sys-billing-alert',
+               templeId: templeId,
+               guestId: null,
                message: `您的試用期/免費期間即將於 ${diffDays} 天後到期，請盡快前往帳務管理完成繳費，以免系統自動鎖定。`,
                category: 'GENERAL',
                isRead: false,
