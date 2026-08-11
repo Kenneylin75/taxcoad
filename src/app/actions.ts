@@ -533,12 +533,17 @@ export async function bookAppointment(slotId: number, guestName: string, phone: 
           }
         });
           
+          let serviceName = '日常服務';
+          if (slot.boundServiceId) {
+            const svc = await prisma.service.findUnique({ where: { id: slot.boundServiceId } });
+            if (svc) serviceName = svc.name;
+          }
           await prisma.adminNotification.create({
             data: {
               templeId: templeId!,
               guestId: guest.id,
               category: 'PENDING_REVIEW',
-              message: `信眾 ${guestName} 已預約了 ${slot.description || '日常服務'}，金額：NT$ ${amountVal}`,
+              message: `信眾 ${guestName} 預約了「${serviceName}」 (${slot.date || ''} ${slot.time || ''})，金額：NT$ ${amountVal}，等待確認。`,
               isRead: false,
               linkPath: `/${templeId!}/admin/calendar`
             }
