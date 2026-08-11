@@ -131,18 +131,24 @@ export default function AdminSlotsPage() {
       const slotTime = slot.time || '--:--';
       const slotDesc = slot.description || '無描述';
       const batchId = slot.batchId || 'legacy';
-      
-      // 使用更精確的組合 Key，避免不同描述但同老師同時間的項目被混淆
-      const key = `${staffName}|${slotTime}|${slotDesc}|${batchId}`;
-      
-      if (!groups[key]) {
-        groups[key] = {
-          key,
-          staff: staffName,
-          time: slotTime,
-          description: slotDesc,
-          notice: slot.notice,
-          penalty_rule: slot.penalty_rule,
+        
+        // Find service name
+        const serviceId = slot.boundServiceId;
+        const service = availableServices.find(s => s.id === serviceId);
+        const serviceName = service ? service.name : '未綁定服務';
+        
+        // 使用更精確的組合 Key，避免不同描述的同老師在同時間項目被混在一起
+        const key = `${staffName}|${slotTime}|${slotDesc}|${batchId}`;
+        
+        if (!groups[key]) {
+          groups[key] = {
+            key,
+            staff: staffName,
+            time: slotTime,
+            description: slotDesc,
+            notice: slot.notice,
+            penalty_rule: slot.penalty_rule,
+            serviceName: serviceName,
           dates: [], // 準備存放該群組下的所有日期
           maxId: 0, // 紀錄該群組中最新的 ID，用於排序
         };
@@ -453,6 +459,9 @@ export default function AdminSlotsPage() {
                                     <span className="text-[10px] font-black text-white bg-slate-900 px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
                                       {group.dates.length} 班次已發布
                                     </span>
+                                      <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
+                                        {group.serviceName}
+                                      </span>
                                   </div>
                                   <button 
                                     onClick={(e) => handleRemoveGroup(e, key, group.dates)}
