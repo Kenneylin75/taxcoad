@@ -193,6 +193,18 @@ export default function BelieverNotificationsPage() {
               )}
 
               {/* Submit Button */}
+              <div className="space-y-1.5 mt-2 mb-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">發布有效天數 (選填)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  value={durationDays}
+                  onChange={e => setDurationDays(e.target.value)}
+                  placeholder="例如: 10 (天)"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-amber-500 focus:bg-white outline-none transition shadow-inner"
+                />
+              </div>
+
               <button 
                 type="submit" 
                 disabled={isSubmitting}
@@ -248,8 +260,14 @@ export default function BelieverNotificationsPage() {
 
                         <div className="flex items-center gap-3">
                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${sent ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                            {sent ? '已發送' : '定時預排'}
+                            {sent ? '已發送' : '定時發送'}
                           </span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(notif.id, notif.title); }}
+                            className="text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                          >
+                            刪除 🗑️
+                          </button>
                           <span className={`text-[10px] text-slate-400 font-black transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
                             ▼
                           </span>
