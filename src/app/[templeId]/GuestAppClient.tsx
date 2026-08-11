@@ -811,7 +811,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
               <div className="min-w-0">
                 <p className="text-sm font-bold text-gray-900">最新動態</p>
                 <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[180px] md:max-w-xs font-medium">
-                  {latestNotification ? latestNotification.title : '歡迎拜訪聖皇宮，祝您平安喜樂！'}
+                  {latestNotification ? latestNotification.title : `歡迎拜訪${templeInfo?.templeName || '本宮廟'}，祝您平安喜樂！`}
                 </p>
               </div>
             </div>
@@ -1283,7 +1283,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-xs">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">信眾案卡憑證</p>
                     <p className="text-[11px] text-gray-600 leading-relaxed font-mono">
-                      【聖皇宮 數位憑證專用】<br/>
+                      【{templeInfo?.templeName || '本宮廟'} 數位憑證專用】<br/>
                       歸檔手機：{previewFile.phone}<br/>
                       歸檔編號：{previewFile.id}<br/>
                       同步戳記：{new Date().toLocaleDateString('zh-TW')}<br/>
