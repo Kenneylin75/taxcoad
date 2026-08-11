@@ -133,7 +133,7 @@ export default function AdminSlotsPage() {
       const batchId = slot.batchId || 'legacy';
         
         // Find service name
-        const serviceId = slot.boundServiceId;
+        const serviceId = slot.bound_service_id;
         const service = availableServices.find(s => s.id === serviceId);
         const serviceName = service ? service.name : '未綁定服務';
         
