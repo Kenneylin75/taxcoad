@@ -1409,7 +1409,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
         <div className="max-w-md mx-auto px-5 pt-6 space-y-6">
           {/* Categories Tab */}
           <div className="flex flex-wrap gap-2 pb-2">
-            {['全部', '預約', '點燈', '活動', '排隊', '功德'].map(cat => (
+            {['全部', '預約', '點燈', '活動', '排隊'].map(cat => (
               <button 
                 key={cat} 
                 onClick={() => setRecordsTab(cat)}
