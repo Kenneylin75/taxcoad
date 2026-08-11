@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { fetchAvailableSlots, createSlot, updateSlot, removeSingleSlot, removeBatchSlots, analyzeAffectedAppointments, executeEmergencyReschedule, fetchPersonnel, getCurrentRole, AppRole, fetchServiceDefinitions } from '@/app/actions';
 
 export default function AdminSlotsPage() {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+
   const [slots, setSlots] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -83,7 +86,8 @@ export default function AdminSlotsPage() {
       const daysInMonth = new Date(y, m, 0).getDate();
       for (let d = 1; d <= daysInMonth; d++) {
         const dateObj = new Date(y, m - 1, d);
-        if (weekdays.includes(dateObj.getDay())) {
+        const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
+          if (weekdays.includes(dateObj.getDay()) && dateObj.getTime() >= today) {
           dates.push(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
         }
       }
@@ -317,7 +321,7 @@ export default function AdminSlotsPage() {
                         value={year} 
                         onChange={(e)=>setYear(e.target.value)} 
                         className="w-full bg-white border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-black focus:border-indigo-600 outline-none transition-all shadow-sm"
-                        min="2024"
+                        min={currentYear}
                         max="2100"
                         required
                      />
@@ -326,11 +330,19 @@ export default function AdminSlotsPage() {
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">月份區間</label>
                      <div className="flex items-center gap-3">
                         <select value={startMonth} onChange={(e)=>setStartMonth(Number(e.target.value))} className="flex-1 bg-white border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-black focus:border-indigo-600 outline-none shadow-sm">
-                           {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>{i+1}月</option>)}
+                           {[...Array(12)].map((_, i) => {
+                           const m = i + 1;
+                           if (parseInt(year) === currentYear && m < currentMonth) return null;
+                           return <option key={m} value={m}>{m}月</option>;
+                        })}
                         </select>
                         <span className="text-slate-300 font-black">→</span>
                         <select value={endMonth} onChange={(e)=>setEndMonth(Number(e.target.value))} className="flex-1 bg-white border-2 border-slate-100 rounded-2xl px-4 py-4 text-sm font-black focus:border-indigo-600 outline-none shadow-sm">
-                           {[...Array(12)].map((_, i) => <option key={i+1} value={i+1}>{i+1}月</option>)}
+                           {[...Array(12)].map((_, i) => {
+                           const m = i + 1;
+                           if (parseInt(year) === currentYear && m < currentMonth) return null;
+                           return <option key={m} value={m}>{m}月</option>;
+                        })}
                         </select>
                      </div>
                   </div>
