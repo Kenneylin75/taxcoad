@@ -2221,7 +2221,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                 <p className="text-sm font-bold text-gray-700 px-1">選擇具體時段</p>
                 <div className="grid grid-cols-2 gap-3">
                   {slots
-                    .filter(s => s.date === selectedDate && s.status === 'Available' && (!selectedStaff || s.staff === selectedStaff.name))
+                    .filter(s => s.date === selectedDate && s.status === 'Available' && (!selectedStaff || s.staff === selectedStaff.name) && (!selectedService || s.bound_service_id === selectedService.id))
                     .map(slot => (
                       <button 
                         key={slot.id} 
