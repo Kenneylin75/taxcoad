@@ -5362,20 +5362,21 @@ export interface TempleNotification {
 // (await jsonStore.find('temple_notifications')) synced
 
 // 1. 創立通知資料表與發佈公告
-export async function createNotification(title: string, content: string, sendTime: string, guestId?: string) {
-  try {
-    const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false };
-
-    await prisma.templeNotification.create({
-      data: {
-        templeId,
-        title,
-        content,
-        sendTime: new Date(sendTime),
-        guestId: guestId || null
-      }
-    });
+export async function createNotification(title: string, content: string, sendTime: string, guestId?: string, expiresAt?: string | null) {
+    try {
+      const templeId = await getDynamicTempleId();
+      if (!templeId) return { success: false };
+  
+      await prisma.templeNotification.create({
+        data: {
+          templeId,
+          title,
+          content,
+          sendTime: new Date(sendTime),
+          guestId: guestId || null,
+          expiresAt: expiresAt ? new Date(expiresAt) : null
+        }
+      });
 
     await revalidateTemple();
     return { success: true };
@@ -5387,21 +5388,22 @@ export async function createNotification(title: string, content: string, sendTim
 
 // 2. 獲取所有通知紀錄（管理端：含定時預排通知）
 export async function fetchTempleNotifications(): Promise<TempleNotification[]> {
-  try {
-    const templeId = await getDynamicTempleId();
-    if (!templeId) return [];
-
-    const notifs = await prisma.templeNotification.findMany({
-      where: { templeId },
-      orderBy: { sendTime: 'desc' }
-    });
-
-    return notifs.map(n => ({
-      id: n.id,
-      title: n.title,
-      content: n.content,
-      sendTime: n.sendTime.toISOString(),
-      createdAt: n.createdAt.toISOString(),
+    try {
+      const templeId = await getDynamicTempleId();
+      if (!templeId) return [];
+  
+      const notifs = await prisma.templeNotification.findMany({
+        where: { templeId },
+        orderBy: { sendTime: 'desc' }
+      });
+  
+      return notifs.map(n => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        sendTime: n.sendTime.toISOString(),
+        createdAt: n.createdAt.toISOString(),
+        expiresAt: n.expiresAt ? n.expiresAt.toISOString() : null,
       guestId: n.guestId
     }));
   } catch (e) {
@@ -5418,21 +5420,25 @@ export async function fetchLatestNotificationForGuest(): Promise<TempleNotificat
 
 // 4. 獲取所有已發送公告（信眾端歷史對話框）
 export async function fetchActiveNotificationsForGuest(): Promise<TempleNotification[]> {
-  try {
-    const templeId = await getDynamicTempleId();
-    if (!templeId) return [];
-
-    const now = new Date();
-    const notifs = await prisma.templeNotification.findMany({
-      where: { 
-        templeId,
-        sendTime: { lte: now },
-        guestId: null // Global broadcasts only for now
-      },
-      orderBy: { sendTime: 'desc' }
-    });
-
-    return notifs.map(n => ({
+    try {
+      const templeId = await getDynamicTempleId();
+      if (!templeId) return [];
+  
+      const now = new Date();
+      const notifs = await prisma.templeNotification.findMany({
+        where: { 
+          templeId,
+          sendTime: { lte: now },
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: now } }
+          ],
+          guestId: null // Global broadcasts only for now
+        },
+        orderBy: { sendTime: 'desc' }
+      });
+  
+      return notifs.map(n => ({
       id: n.id,
       title: n.title,
       content: n.content,
@@ -8880,4 +8886,21 @@ export async function fetchGuestDeepRecords(phone: string) {
         console.error('fetchGuestDeepRecords error:', error);
         return [];
       }
+}
+
+export async function deleteNotification(id: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false, message: '未設定宮廟' };
+
+    await prisma.templeNotification.delete({
+      where: { id, templeId }
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e: any) {
+    console.error('deleteNotification error:', e);
+    return { success: false, message: e.message || String(e) };
+  }
 }

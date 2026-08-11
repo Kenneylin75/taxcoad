@@ -921,6 +921,7 @@ model TempleNotification {
   title     String
   content   String
   sendTime  DateTime @map("send_time")
+  expiresAt DateTime? @map("expires_at")
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

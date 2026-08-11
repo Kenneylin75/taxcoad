@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  fetchTempleNotifications, 
+  fetchTempleNotifications,
+  deleteNotification, 
   createNotification, 
   TempleNotification 
 } from '@/app/actions';
@@ -18,6 +19,7 @@ export default function BelieverNotificationsPage() {
   const [content, setContent] = useState('');
   const [sendType, setSendType] = useState<'immediate' | 'scheduled'>('immediate');
   const [scheduledTime, setScheduledTime] = useState('');
+  const [durationDays, setDurationDays] = useState('');
 
   // Expand State
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -27,6 +29,21 @@ export default function BelieverNotificationsPage() {
   useEffect(() => {
     loadNotifications();
   }, []);
+
+  
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`確定要刪除「${title}」這則通知嗎？`)) return;
+    
+    setIsLoading(true);
+    const res = await deleteNotification(id);
+    if (res.success) {
+      alert('刪除成功');
+      loadNotifications();
+    } else {
+      alert('刪除失敗: ' + res.message);
+      setIsLoading(false);
+    }
+  };
 
   const loadNotifications = async () => {
     setIsLoading(true);
