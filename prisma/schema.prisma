@@ -561,6 +561,7 @@ model Slot {
   price          Int      @default(0)
   status         String   @default("Available")
   guestName      String?  @map("guest_name")
+  batchId        String?  @map("batch_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 

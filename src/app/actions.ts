@@ -354,7 +354,8 @@ export async function fetchAvailableSlots() {
           bound_service_id: r.boundServiceId,
           price: r.price,
           status: r.status,
-          guestName: r.guestName
+          guestName: r.guestName,
+          batchId: r.batchId
         }));
       } catch(e) {
         console.error(e);
@@ -384,6 +385,7 @@ export async function createSlot(data: any) {
         
         if (!datesStr) return { success: false, message: "無效的日期" };
         const dateList = datesStr?.includes(',') ? datesStr.split(",") : [datesStr];
+        const batchId = Date.now().toString();
         
         const createData = dateList.map(date => ({
           templeId,
@@ -394,7 +396,8 @@ export async function createSlot(data: any) {
           location,
           boundServiceId: bound_service_id,
           price,
-          status: 'Available'
+          status: 'Available',
+            batchId
         }));
         
         await prisma.slot.createMany({ data: createData });

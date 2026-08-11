@@ -126,9 +126,10 @@ export default function AdminSlotsPage() {
       const staffName = slot.staff || '未指定';
       const slotTime = slot.time || '--:--';
       const slotDesc = slot.description || '無描述';
+      const batchId = slot.batchId || 'legacy';
       
       // 使用更精確的組合 Key，避免不同描述但同老師同時間的項目被混淆
-      const key = `${staffName}|${slotTime}|${slotDesc}`;
+      const key = `${staffName}|${slotTime}|${slotDesc}|${batchId}`;
       
       if (!groups[key]) {
         groups[key] = {
