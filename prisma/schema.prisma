@@ -243,6 +243,7 @@ model TempleBill {
   billingDate String?  @map("billing_date")
   payeeRole   String?  @map("payee_role")
   payeeId     String?  @map("payee_id")
+  receiptUrl  String?  @map("receipt_url")
   timestamp   String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

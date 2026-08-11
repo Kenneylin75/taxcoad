@@ -526,7 +526,7 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                     <span className="text-sm font-bold text-slate-500">{getExpenseTypeLabel(currentPayingBill.type)}</span>
                     <span className="text-xl font-black text-slate-900">NT$ {currentPayingBill.amount.toLocaleString()}</span>
                  </div>
-                 <p className="text-[10px] text-slate-400">繳款期限: {currentPayingBill.dueDate}</p>
+                 <p className="text-[10px] text-slate-400">繳款期限: {currentPayingBill.dueDate || '開辦當日'}</p>
               </div>
 
               <div className="flex gap-2 mb-6 flex-wrap">
