@@ -1408,12 +1408,12 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
         <TopNav title="信眾提醒中心" onBack={() => setActiveView('home')} />
         <div className="max-w-md mx-auto px-5 pt-6 space-y-6">
           {/* Categories Tab */}
-          <div className="flex overflow-x-auto no-scrollbar gap-2 pb-2">
+          <div className="flex flex-wrap gap-2 pb-2">
             {['全部', '預約', '點燈', '活動', '排隊', '功德'].map(cat => (
               <button 
                 key={cat} 
                 onClick={() => setRecordsTab(cat)}
-                className={`whitespace-nowrap px-5 py-2 rounded-full font-bold text-sm transition-colors border ${
+                className={`px-5 py-2 rounded-full font-bold text-sm transition-colors border ${
                   recordsTab === cat ? 'bg-red-700 text-white border-red-700' : 'bg-white text-gray-600 border-gray-200'
                 }`}
               >
