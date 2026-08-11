@@ -136,7 +136,7 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">舉辦日期 (Event Date)</label>
-              <input required name="date" defaultValue={editingEvent?.date} type="date" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
+              <input required name="date" defaultValue={editingEvent?.date} type="date" min={new Date().toISOString().split('T')[0]} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
             </div>
 
             <div className="space-y-2">
