@@ -1,3 +1,5 @@
+export function normalizePhone(phone: string) { return phone.replace(/\D/g, ''); }
+
 // @ts-nocheck
 "use server";
 import prisma from '@/lib/prisma';
@@ -2535,14 +2537,30 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
     if (!plan) plan = db_ai_plans.find((p: any) => p.id === planId);
     if (!plan) return { success: false, message: '找不到選定的AI方案' };
 
-    await client.query(`
-        INSERT INTO "TempleBill" (id, "templeId", type, "itemName", amount, "billingDate", "dueDate", status, "payeeRole", "payeeId", "timestamp")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      `, [
-              `BILL-AI-${Date.now()}`, templeId, 'AiUpgrade', `AI 生活助理 - ${plan.name} (${planId})`,
-              plan.monthlyFee, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
-              'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
-            ]);
+    await prisma.templeBill.create({
+      data: {
+        id: `BILL-AI-${Date.now()}`,
+        templeId: templeId,
+        itemName: 'AiUpgrade',
+        amount: plan.price || 0,
+        billingDate: new Date().toISOString().substring(0, 7),
+        dueDate: new Date().toISOString().split('T')[0],
+        status: 'Unpaid',
+        payeeRole: 'SuperAdmin',
+        payeeId: 'system-hq',
+        timestamp: new Date()
+      }
+    });
+    
+    // update current planId
+    const currentUsage = await prisma.templeAiUsage.findFirst({ where: { templeId: templeId } });
+    if (currentUsage) {
+      await prisma.templeAiUsage.update({
+         where: { id: currentUsage.id },
+         data: { planId: planId }
+      });
+    }
+
     return { success: true };
   });
 }
@@ -5325,6 +5343,7 @@ export async function approveTempleApplication(appId: string) {
         usedBytes: 0,
         allocatedBytes: BigInt(5368709120),
         planName: '標準免費空間',
+          planId: 'FREE',
         city: '台北市'
       }
     });
@@ -7357,15 +7376,16 @@ export async function submitFreeAccountApplication(data: any) {
           usedBytes: 0n,
           allocatedBytes,
           planName: storagePlanName,
-          planId: data.cloudStorage === 'Free' ? 'FREE' : undefined
+          planId: (data.cloudStorage && data.cloudStorage !== 'Free') ? data.cloudStorage : 'FREE'
         }
       });
 
       let isAiVip = data.aiLife === 'Free' || data.freeType === 'Permanent';
+      let aiPlanId = isAiVip ? 'VIP-AI' : (data.aiLife ? data.aiLife : 'FREE');
       await prisma.templeAiUsage.create({
         data: {
           templeId: newTemple.id,
-          planId: isAiVip ? 'VIP-AI' : 'FREE',
+          planId: aiPlanId,
           enabled: data.enableAi ?? true,
           usedCount: 0
         }
@@ -8329,7 +8349,8 @@ export async function createTempleAccount(data: any) {
     city: newTemple.city || '未設定',
     usedBytes: 0,
     quotaGb: qGB,
-    planName: pName
+    planName: pName,
+      planId: newTemple.cloudStorage || 'FREE'
   };
   
   await null;
@@ -8377,6 +8398,7 @@ export async function createTempleAccount(data: any) {
         usedBytes: BigInt(0),
         allocatedBytes: BigInt(newStorage.quotaGb) * BigInt(1024 * 1024 * 1024),
         planName: newStorage.planName,
+          planId: newStorage.planId || 'FREE',
         city: '未設定'
       }
     });
