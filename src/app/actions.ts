@@ -3518,27 +3518,31 @@ export async function fetchFinancialOverview() {
     
   try {
     /* removed duplicate import */
-    const rows = await prisma.templeBill.findMany({ where: { templeId } });
-    if (rows && rows.length > 0) {
-      expenses = rows.map((r: any) => {
-        const t = temple;
-        const type = r.item_name || '';
-        const isSuperAdminService = type?.includes('空間') || type?.includes('AI') || type?.includes('Storage') || type?.includes('Agi');
-        const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
-        const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
-        
-        return {
-          id: r.id,
-          type: r.item_name,
-          amount: r.amount,
-          dueDate: r.due_date instanceof Date ? r.due_date.toISOString().split('T')[0] : r.due_date,
-          status: r.status,
-          billingDate: r.created_at instanceof Date ? r.created_at.toISOString().substring(0, 7) : String(r.created_at || '').substring(0, 7),
-          payeeRole: r.payee_role || r.payeeRole || fallbackRole,
-          payeeId: r.payee_id || r.payeeId || fallbackId
-        };
-      });
-    }
+          let rows = await prisma.templeBill.findMany({ where: { templeId } });
+      if (temple && isPermanentFree && (!temple.distributorId || temple.distributorId.trim() === '')) {
+        rows = []; // Do not show any bills for free temples created by SuperAdmin
+      }
+      
+      if (rows && rows.length > 0) {
+        expenses = rows.map((r: any) => {
+          const t = temple;
+          const type = r.itemName || r.item_name || '';
+          const isSuperAdminService = type?.includes('空間') || type?.includes('AI') || type?.includes('Storage') || type?.includes('Agi');
+          const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
+          const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
+          
+          return {
+            id: r.id,
+            type: r.itemName || r.item_name,
+            amount: r.amount,
+            dueDate: r.dueDate || r.due_date,
+            status: r.status,
+            billingDate: r.billingDate || r.billing_date || (r.createdAt instanceof Date ? r.createdAt.toISOString().substring(0, 7) : String(r.createdAt || r.created_at || '').substring(0, 7)),
+            payeeRole: r.payeeRole || r.payee_role || fallbackRole,
+            payeeId: r.payeeId || r.payee_id || fallbackId
+          };
+        });
+      }
   } catch (e) {
     console.error('Failed to fetch bills from DB in fetchFinancialOverview', e);
   }
