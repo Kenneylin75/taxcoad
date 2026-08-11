@@ -605,8 +605,6 @@ export default function SuperAdminClient({
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">直屬單位</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">業務數量</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟數量</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
                        </thead>
@@ -639,8 +637,6 @@ export default function SuperAdminClient({
                                      {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
                                   </button>
                                </td>
-                               <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.salesCount || 0}</td>
-                               <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
                                <td className="px-12 py-8 text-right flex justify-end gap-4">
                                   <button onClick={() => {
                                      import('@/app/actions').then(async m => { const res = await m.impersonateTemple((acc.templeId || acc.id) as string, 'SuperAdmin'); if(res.success && res.redirectPath) window.location.href = res.redirectPath; })
