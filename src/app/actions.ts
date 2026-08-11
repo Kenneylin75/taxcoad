@@ -4666,15 +4666,6 @@ export async function createLampRecord(data: any) {
           create: { templeId: templeId!, phone: normPhone, name: guestName, status: 'Active' }
         });
 
-          await prisma.adminNotification.create({
-            data: {
-              templeId: templeId!,
-              category: 'GENERAL',
-              message: `信眾 ${data.name || originalPhone || data.phone} 更新了個人資料`,
-              isRead: false,
-              linkPath: `/${templeId!}/admin/customers`
-            }
-          });
 
         if (!durationDays) {
           durationDays = cat.durationDays || 365;

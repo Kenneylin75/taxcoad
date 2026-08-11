@@ -73,11 +73,20 @@ export async function uploadPaymentProof(recordId: string, recordType: 'Appointm
         message = `排隊號碼 ${recordId} 上傳了匯款截圖/後五碼`;
         linkPath = `/${templeId}/admin/customers`;
       }
-
+    let actualGuestId = null;
+    if (guestId) {
+      const { normalizePhone } = await import('@/app/actions');
+      const normPhone = normalizePhone(guestId);
+      const guest = await prisma.guest.findFirst({
+        where: { templeId, phone: normPhone }
+      });
+      if (guest) actualGuestId = guest.id;
+    }
+    
     await prisma.adminNotification.create({
       data: {
         templeId,
-        guestId: guestId || null,
+        guestId: actualGuestId,
         category: 'PENDING_REVIEW',
         message,
         isRead: false,
