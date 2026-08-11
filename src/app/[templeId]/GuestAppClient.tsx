@@ -2191,7 +2191,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     const today = new Date();
                     const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
                     const isPast = dateStr < todayStr;
-                    const hasSlots = slots.some(s => s.date === dateStr && s.status === 'Available' && (!selectedStaff || s.staff === selectedStaff.name));
+                    const hasSlots = slots.some(s => s.date === dateStr && s.status === 'Available' && (!selectedStaff || s.staff === selectedStaff.name) && (!selectedService || s.bound_service_id === selectedService.id));
                     
                     const isDisabled = isPast || !hasSlots;
                     
