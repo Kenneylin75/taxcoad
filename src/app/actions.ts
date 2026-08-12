@@ -1948,7 +1948,8 @@ export async function fetchGuestQueueTickets(p: any) {
         paymentMethod: t.paymentMethod,
         paymentRef: t.paymentRef,
         paymentProofUrl: t.paymentProofUrl,
-        createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0]
+      createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0],
+      actualOrder: t.actualOrder
       }));
     }
 
@@ -1978,7 +1979,8 @@ export async function fetchGuestQueueTickets(p: any) {
       paymentMethod: t.paymentMethod,
       paymentRef: t.paymentRef,
       paymentProofUrl: t.paymentProofUrl,
-      createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0]
+      createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0],
+      actualOrder: t.actualOrder
     }));
   } catch (error) {
     console.error('fetchGuestQueueTickets error:', error);
@@ -4859,7 +4861,7 @@ export async function fetchQueueDashboard(eventId?: string) {
         return {
           tickets: tickets.map(r => ({
             id: r.id, eventId: r.eventId, templeId: r.templeId, eventTitle: (r as any).eventTitle, phone: r.phone, guestName: r.guestName,
-            status: r.status, assignedNumber: r.displayNum, createdAt: r.createdAt.toISOString(), scannedAt: (r as any).scannedAt, actualOrder: r.actualOrder
+            status: r.status, assignedNumber: r.assignedNumber, createdAt: r.createdAt.toISOString(), scannedAt: (r as any).scannedAt, actualOrder: r.actualOrder
           }))
         };
       } catch (e) {
