@@ -1088,8 +1088,8 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                 <h4 className="font-bold text-gray-900 truncate">{file.name}</h4>
                 <p className="text-xs text-gray-500 mt-1">{file.folder}</p>
                 <div className="mt-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${file.uploadedBy !== 'Member' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {file.uploadedBy !== 'Member' ? '宮廟上傳' : '個人收藏'}
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 w-fit ${file.uploadedBy !== 'Member' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {file.uploadedBy !== 'Member' ? '🏛️ 宮廟上傳' : '👤 個人收藏'}
                   </span>
                 </div>
               </div>
