@@ -1811,12 +1811,12 @@ export async function verifyQueueTicket(eventId: string, phone: string) {
 
     if (!ticket) return { success: false, error: 'No ticket found' };
 
-    if (ticket.status === 'Pending') {
+    if (ticket.status === 'Pending' || ticket.status === 'Registered') {
       const activeCount = await prisma.queueTicket.count({
         where: {
           eventId,
           templeId,
-          status: { not: 'Pending' }
+          status: { notIn: ['Pending', 'Registered'] }
         }
       });
       const actualOrder = activeCount + 1;
@@ -4875,7 +4875,7 @@ export async function fetchActiveQueueCount(): Promise<number> {
         const count = await prisma.queueTicket.count({
           where: {
             templeId: templeId!,
-            status: 'Queuing',
+            status: { in: ['Queuing', 'Calling'] },
             queueEvent: { status: 'Active' }
           }
         });
