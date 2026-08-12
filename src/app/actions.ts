@@ -1825,7 +1825,6 @@ export async function verifyQueueTicket(eventId: string, phone: string) {
         where: { id: ticket.id },
         data: {
           status: 'Queuing',
-          scannedAt: new Date().toLocaleTimeString(),
           actualOrder
         }
       });
