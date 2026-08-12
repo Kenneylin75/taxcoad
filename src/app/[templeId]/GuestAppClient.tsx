@@ -281,19 +281,36 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   const [isModifying, setIsModifying] = useState(false);
 
   const handleSecureCheckIn = async (qrData: string) => {
-    // 驗證格式: SECURE_CHECKIN_EVENTID_YYYY-MM-DD
-    if (!qrData.startsWith('SECURE_CHECKIN_')) {
-      alert("❌ 無效的報到 QR Code。");
-      return;
-    }
-
-    const parts = qrData.split('_');
-    const eventId = parts[2];
-    const qrDate = parts[3];
+    let eventId = '';
     const today = new Date().toISOString().split('T')[0];
 
-    if (qrDate !== today) {
-      alert("❌ 報到連結已過期，請掃描現場最新的 QR Code。");
+    if (qrData.startsWith('SECURE_CHECKIN_')) {
+      const parts = qrData.split('_');
+      eventId = parts[2];
+      const qrDate = parts[3];
+      if (qrDate !== today) {
+        alert("❌ 報到連結已過期，請掃描現場最新的 QR Code。");
+        setIsScanning(false);
+        return;
+      }
+    } else if (qrData.includes('action=checkin')) {
+      try {
+        const urlObj = new URL(qrData);
+        eventId = urlObj.searchParams.get('eventId') || '';
+        const qrDate = urlObj.searchParams.get('date');
+        if (qrDate && qrDate !== today) {
+          alert("❌ 報到連結已過期，請掃描現場最新的 QR Code。");
+          setIsScanning(false);
+          return;
+        }
+      } catch (e) {
+        eventId = qrData.split('eventId=')[1]?.split('&')[0];
+      }
+    }
+
+    if (!eventId) {
+      alert("❌ 無效的報到 QR Code。");
+      setIsScanning(false);
       return;
     }
 
