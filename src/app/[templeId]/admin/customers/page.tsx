@@ -1022,10 +1022,12 @@ function DeepFileCenterContent() {
                                        )}
                                     </div>
                                     <div className="px-2 text-center opacity-70 group-hover/item:opacity-100 transition-opacity">
-                                       <p className="text-xs font-bold text-slate-600 truncate flex items-center justify-center gap-1" title={file.name || '未知檔案'}>
-                                            {file.uploadedBy === 'Member' || file.uploadedBy === 'Guest' ? <span title="信眾上傳">👤</span> : <span title="宮廟上傳">🏛️</span>}
-                                            <span>{file.name || '未知檔案'}</span>
-                                        </p>
+                                       <div className="flex items-center justify-center gap-1 min-w-0">
+                                            {file.uploadedBy === 'Member' || file.uploadedBy === 'Guest' ? <span title="信眾上傳" className="flex-shrink-0">👤</span> : <span title="宮廟上傳" className="flex-shrink-0">🏛️</span>}
+                                            <p className="text-xs font-bold text-slate-600 truncate min-w-0" title={file.name || '未知檔案'}>
+                                                {file.name || '未知檔案'}
+                                            </p>
+                                        </div>
                                     </div>
                                  </div>
                                  ))}
