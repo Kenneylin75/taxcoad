@@ -79,33 +79,42 @@ function QRScannerComponent({ onScan, onClose }: { onScan: (data: string) => voi
       if (isUnmounted) return;
       html5QrCode = new Html5Qrcode("qr-reader");
       
-      const startCamera = (facingMode: string) => {
-        return html5QrCode.start(
-          { facingMode },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText: string) => {
-            if (isUnmounted) return;
-            html5QrCode.stop().then(() => {
-              html5QrCode.clear();
-              onScan(decodedText);
-            }).catch(console.error);
-          },
-          (error: any) => { /* ignore */ }
-        );
-      };
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          let cameraId = devices[0].id;
+          
+          if (devices.length > 1) {
+            const backCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment') || d.label.toLowerCase().includes('rear'));
+            if (backCamera) cameraId = backCamera.id;
+          }
 
-      startCamera("environment").catch((err: any) => {
-        console.warn("後置鏡頭啟動失敗，嘗試啟動前置/預設鏡頭...", err);
-        return startCamera("user");
-      }).catch((err: any) => {
-        console.warn("相機啟動完全失敗", err);
-        if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
-          alert("相機權限被拒絕，請至瀏覽器設定中允許相機存取。");
-        } else if (err?.name === 'NotFoundError' || err?.message?.includes('Requested device not found')) {
-          alert("找不到可用的相機裝置，請確認相機是否已連接。");
+          html5QrCode.start(
+            cameraId,
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText: string) => {
+              if (isUnmounted) return;
+              html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+                onScan(decodedText);
+              }).catch(console.error);
+            },
+            (error: any) => { /* ignore */ }
+          ).catch((err: any) => {
+            console.warn("相機啟動完全失敗", err);
+            if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
+              alert("相機權限被拒絕，請至瀏覽器設定中允許相機存取。");
+            } else {
+              alert("相機啟動失敗，請確認相機功能是否正常，或嘗試使用其他瀏覽器。");
+            }
+            onClose();
+          });
         } else {
-          alert("相機啟動失敗，請確認相機功能是否正常，或嘗試使用其他瀏覽器。");
+          alert("找不到可用的相機裝置，請確認相機是否已連接。");
+          onClose();
         }
+      }).catch(err => {
+        console.warn("取得相機清單失敗", err);
+        alert("無法存取相機，請至瀏覽器設定中允許相機存取權限。");
         onClose();
       });
     });
