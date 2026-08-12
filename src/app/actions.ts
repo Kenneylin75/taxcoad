@@ -1871,7 +1871,7 @@ export async function registerForEvent(id: any, phone: string, n: string, pr: nu
             data: {
               templeId: templeId!,
               category: 'PENDING_REVIEW',
-              message: `信眾 ${data.participantName || data.phone} 報名了活動 (金額：NT$ ${data.amount || 0})`,
+              message: `信眾 ${n || phone} 報名了活動 (金額：NT$ ${pr || 0})`,
               isRead: false,
               linkPath: `/${templeId!}/admin/events`
             }
@@ -2083,7 +2083,7 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
           data: {
             templeId: templeId!,
             category: 'PENDING_REVIEW',
-            message: `信眾取了排隊號碼 ${assignedNumber} (金額：NT$ ${data.amount || 0})`,
+            message: `信眾 ${guestName || phone} 取了排隊號碼 ${assignedNumber} (金額：NT$ ${ev.price || 0})`,
             isRead: false,
             linkPath: `/${templeId!}/admin/queue`
           }
@@ -4722,7 +4722,7 @@ export async function createLampRecord(data: any) {
             data: {
               templeId: templeId!,
               category: 'PENDING_REVIEW',
-              message: `信眾 ${data.guestName || data.phone} 點了 ${data.lampName || '點燈服務'} (金額：NT$ ${data.actualPrice || 0})`,
+              message: `信眾 ${guestName || phone} 點了 ${cat.name || '點燈服務'} (金額：NT$ ${cat.price || 0})`,
               isRead: false,
               linkPath: `/${templeId!}/admin/lamps`
             }
