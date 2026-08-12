@@ -1133,7 +1133,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
               
               const formData = new FormData();
               formData.append('file', file);
-              formData.append('templeId', params?.templeId as string || 'default');
+              formData.append('templeId', templeId || 'default');
               formData.append('type', activeFileTab);
 
               try {
