@@ -549,7 +549,7 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
                           <div className="flex flex-col items-center gap-6">
                              <div className="relative">
                                 <div className="text-[240px] font-black bg-gradient-to-b from-slate-900 via-slate-800 to-slate-400 bg-clip-text text-transparent leading-none font-serif tracking-tighter drop-shadow-xl animate-in zoom-in duration-1000">
-                                   {currentlyCalling ? currentlyCalling.assignedNumber.replace(/\D/g, '') : '--'}
+                                   {currentlyCalling ? (currentlyCalling.assignedNumber || '').replace(/\D/g, '') : '--'}
                                 </div>
                                 <div className="absolute -top-4 -right-12 bg-slate-900 text-amber-500 px-4 py-1.5 rounded-xl text-xs font-black rotate-12 shadow-2xl border-4 border-white">
                                    NOW
