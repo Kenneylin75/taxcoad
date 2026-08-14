@@ -2331,11 +2331,22 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   };
 
   const renderEvents = () => {
-    // Filter by the selected Year and Month
-    const eventsOnSelectedMonth = events.filter(e => {
+    const now = new Date();
+    const realYear = now.getFullYear();
+    const realMonth = now.getMonth() + 1;
+
+    // Filter by the selected Year and hide past events
+    const eventsOnSelectedYear = events.filter(e => {
       if (!e.date) return false;
       const [y, m] = e.date.split('-');
-      return parseInt(y) === currentYear && parseInt(m) === (currentMonth + 1);
+      const eventYear = parseInt(y);
+      const eventMonth = parseInt(m);
+      
+      if (eventYear !== currentYear) return false;
+      if (eventYear < realYear) return false;
+      if (eventYear === realYear && eventMonth < realMonth) return false;
+      
+      return true;
     });
     
     return (
@@ -2347,29 +2358,23 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
             <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Active Events</p>
           </div>
 
-          {/* Month Selector */}
+          {/* Year Selector */}
           <div className="app-card p-4">
             <div className="flex justify-between items-center px-2">
-              <button onClick={() => {
-                if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(v => v - 1); }
-                else setCurrentMonth(v => v - 1);
-              }} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">◀</button>
+              <button onClick={() => setCurrentYear(v => v - 1)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">◀</button>
               
               <div className="text-center">
-                <span className="font-bold text-xl text-gray-900">{currentYear}年 {currentMonth + 1}月</span>
+                <span className="font-bold text-xl text-gray-900">{currentYear}年 全年活動</span>
               </div>
 
-              <button onClick={() => {
-                if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(v => v + 1); }
-                else setCurrentMonth(v => v + 1);
-              }} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">▶</button>
+              <button onClick={() => setCurrentYear(v => v + 1)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">▶</button>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h5 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">{currentYear}年 {currentMonth + 1}月 活動列表</h5>
+            <h5 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">{currentYear}年 活動列表</h5>
             <div className="grid gap-6">
-              {eventsOnSelectedMonth.length > 0 ? eventsOnSelectedMonth.map(evt => {
+              {eventsOnSelectedYear.length > 0 ? eventsOnSelectedYear.map(evt => {
                 const isRegistered = guestRegistrations.some(r => r.eventId === evt.id && r.status !== 'Cancelled');
                 // Registration stats logic
                 const enrolled = evt.enrolled || 0;
@@ -2385,6 +2390,11 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     {evt.imageUrl ? (
                       <img src={evt.imageUrl} className="absolute inset-0 w-full h-full object-cover z-10" onError={(e) => { e.currentTarget.style.display='none'; }} />
                     ) : null}
+                    {/* Month Badge */}
+                    <div className="absolute top-4 right-4 z-20 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl shadow-sm border border-white/50 text-center">
+                       <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-0.5">月份</p>
+                       <p className="text-xl font-black text-gray-900 leading-none">{parseInt(evt.date.split('-')[1] || '0')}月</p>
+                    </div>
                   </div>
 
                   {/* Content Section */}
