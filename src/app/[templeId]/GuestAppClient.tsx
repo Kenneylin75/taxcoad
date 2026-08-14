@@ -2347,6 +2347,9 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       if (eventYear === realYear && eventMonth < realMonth) return false;
       
       return true;
+    }).sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
     
     return (
