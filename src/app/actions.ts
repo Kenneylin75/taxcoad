@@ -4973,6 +4973,10 @@ export async function deleteQueueEvent(id: string) {
             where: { id },
             data: { status: 'Cancelled' }
           });
+          await prisma.queueTicket.updateMany({
+            where: { eventId: id, status: { not: 'Cancelled' } },
+            data: { status: 'Cancelled' }
+          });
         } else {
           await prisma.queueEvent.delete({ where: { id } });
         }

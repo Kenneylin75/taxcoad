@@ -2505,7 +2505,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
   const renderQueue = () => {
     const myTickets = guestTickets.filter(t => t.phone === guestUser?.phone);
-    const hasActiveTicket = myTickets.some(t => t.status !== 'Completed');
+    const hasActiveTicket = myTickets.some(t => t.status !== 'Completed' && t.status !== 'Cancelled');
 
     return (
       <div className="min-h-screen pb-32">
@@ -2527,7 +2527,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
           {hasActiveTicket ? (
             <div className="space-y-6">
-              {myTickets.filter(t => t.status !== 'Completed').map(ticket => (
+              {myTickets.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled').map(ticket => (
                 <div key={ticket.id} className="app-card p-6 space-y-6 bg-white">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 text-2xl">🎟️</div>
