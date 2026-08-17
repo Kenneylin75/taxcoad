@@ -841,6 +841,8 @@ export default function DistributorClient({
                  <div className="flex justify-end mb-6">
                     <input 
                       type="month" 
+            min="2020-01"
+            max="2056-12"
                       value={monthFilter} 
                       onChange={(e) => setMonthFilter(e.target.value)}
                       className="bg-white/80 backdrop-blur-md border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
