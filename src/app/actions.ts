@@ -5944,15 +5944,32 @@ export async function fetchDistributorFinancials(distId: string) {
     const paymentRecords = temples.map((t: any) => {
       const tBills = bills.filter((b: any) => b.templeId === t.id || b.temple_id === t.id);
       const lastBill = tBills[0];
+      const history = tBills.map((b: any) => {
+          let m = '1';
+          if (b.billingMonth) m = b.billingMonth;
+          else if (b.createdAt) {
+              const d = new Date(b.createdAt);
+              m = (d.getMonth() + 1).toString();
+          }
+          return {
+              id: b.id,
+              month: m,
+              type: b.itemName || b.type || 'MonthlyFee',
+              amount: b.amount,
+              status: b.status,
+              receiptUrl: b.receiptUrl
+          };
+      });
       return {
         id: t.id,
-        temple: t.temple_name || t.name || '未知宮廟',
-        region: t.city || '未知縣市',
-        amount: lastBill ? lastBill.amount : (t.monthly_rent || t.monthlyRent || 0),
-        date: lastBill ? (lastBill.created_at instanceof Date ? lastBill.created_at.toISOString().split('T')[0] : lastBill.created_at) : (t.timestamp || t.created_at || '未知'),
+        temple: t.templeName || t.temple_name || t.name || '未命名宮廟',
+        region: t.city || '未設定',
+        amount: lastBill ? lastBill.amount : (t.monthlyRent || t.monthly_rent || 0),
+        date: lastBill ? (lastBill.createdAt instanceof Date ? lastBill.createdAt.toISOString().split('T')[0] : lastBill.createdAt) : (t.timestamp || t.createdAt || t.created_at || '未設定'),
         status: lastBill ? lastBill.status : 'Paid',
-        type: lastBill ? lastBill.item_name : 'Monthly',
-        templeStatus: t.status, 
+        type: lastBill ? (lastBill.itemName || lastBill.type || 'MonthlyFee') : 'MonthlyFee',
+        templeStatus: t.status,
+        history: history || []
       };
     });
 
