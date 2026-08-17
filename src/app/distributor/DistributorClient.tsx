@@ -439,8 +439,9 @@ export default function DistributorClient({
                              {app.status === 'Active' ? '已開通營運' : app.status === 'UnderReview' ? '待核款' : app.status === 'PendingPayment' ? '待付開辦費' : '審核中'}
                           </span>
                        </div>
-                       <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.chairpersonName}</p>
+                       <div className="flex flex-col gap-1 mt-0.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.chairpersonName || '未設定聯絡人'}</p>
+                          <p className="text-[10px] font-bold text-slate-500">開設時間: {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : (app.timestamp ? new Date(app.timestamp).toLocaleDateString() : '未記錄')}</p>
                        </div>
                     </div>
                  </div>
@@ -1321,6 +1322,10 @@ export default function DistributorClient({
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
+                       <div className="bg-white border border-slate-200 p-3 rounded-2xl">
+                          <p className="text-[9px] font-black text-slate-400 uppercase mb-1">開設時間</p>
+                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.createdAt ? new Date(viewTempleDetail.createdAt).toLocaleDateString() : (viewTempleDetail.timestamp ? new Date(viewTempleDetail.timestamp).toLocaleDateString() : '未記錄')}</p>
+                       </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡人 / 負責人</p>
                           <p className="text-xs font-black text-slate-800">{viewTempleDetail.chairpersonName || viewTempleDetail.contactName || (viewTempleDetail.creatorRole === 'DistSales' ? getSalesName(viewTempleDetail.salesId) : initialProfile?.name || initialProfile?.account || '未設定')}</p>
