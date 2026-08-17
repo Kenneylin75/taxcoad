@@ -824,7 +824,7 @@ export default function DistributorClient({
                         </div>
                         <div className="pl-8 space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">預計支出佣金</p>
-                           <h2 className="text-4xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
+                           <h2 className="text-4xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.filter((b: any) => String(b.date).startsWith(monthFilter)).reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
                         </div>
                      </div>
                   </div>
@@ -837,7 +837,7 @@ export default function DistributorClient({
                   ))}
                </div>
 
-               {(financialTab === 'payments' || financialTab === 'performance') && (
+               {true && (
                  <div className="flex justify-end mb-6">
                     <input 
                       type="month" 
@@ -929,7 +929,7 @@ export default function DistributorClient({
                   )}
                   {financialTab === 'bonuses' && (
                     <div className="space-y-4">
-                       {bonusRequests.map((b: any) => (
+                       {bonusRequests.filter((b: any) => String(b.date).startsWith(monthFilter)).map((b: any) => (
                           <div key={b.id} className="bg-white/60 backdrop-blur-xl p-8 rounded-[45px] border border-white shadow-2xl flex flex-col gap-4 group hover:bg-white transition-all duration-500 relative overflow-hidden">
                              <div className="flex justify-between items-start relative z-10 w-full">
                                 <div className="space-y-2">
