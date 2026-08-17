@@ -5933,7 +5933,7 @@ export async function fetchDistributorFinancials(distId: string) {
         AND (ds.role IS NULL OR ds.role != 'SuperSales')
     `;
     const templesRes = await prisma.temple.findMany({ where: { distributorId: distId } }) as any; // TODO manually fix
-    const temples = templesRes?.rows || [];
+    const temples = Array.isArray(templesRes) ? templesRes : (templesRes?.rows || []);
     const templeIds = temples.map((t: any) => t.id);
 
     let bills: any[] = [];
@@ -5942,7 +5942,7 @@ export async function fetchDistributorFinancials(distId: string) {
     }
     
     const paymentRecords = temples.map((t: any) => {
-      const tBills = bills.filter((b: any) => b.temple_id === t.id);
+      const tBills = bills.filter((b: any) => b.templeId === t.id || b.temple_id === t.id);
       const lastBill = tBills[0];
       return {
         id: t.id,
@@ -5957,7 +5957,7 @@ export async function fetchDistributorFinancials(distId: string) {
     });
 
     const salesRes = await prisma.distributorSales.findMany({ where: { distributorId: distId }, select: { id: true, name: true } }) as any;
-    const salesIds = (salesRes?.rows || []).map((s: any) => s.id);
+    const salesIds = (Array.isArray(salesRes) ? salesRes : (salesRes?.rows || [])).map((s: any) => s.id);
     
     let myBonusRequests: any[] = [];
     if (salesIds.length > 0) {
@@ -5985,7 +5985,7 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
 
     return await Promise.all(sales.map(async (s: any) => {
       const templesRes = await prisma.temple.findMany({ where: { salesId: s.id } }) as any;
-      const temples = templesRes?.rows || [];
+      const temples = Array.isArray(templesRes) ? templesRes : (templesRes?.rows || []);
       const templeIds = temples.map((t: any) => t.id);
       
       let totalSales = 0;
@@ -6447,7 +6447,7 @@ export async function fetchDistributorTempleBills(distributorId: string) {
         AND (ds.role IS NULL OR ds.role != 'SuperSales')
     `;
     const templesRes = await prisma.temple.findMany({ where: { distributorId: distributorId } }) as any;
-    const temples = templesRes?.rows || [];
+    const temples = Array.isArray(templesRes) ? templesRes : (templesRes?.rows || []);
     const templeIds = temples.map((t: any) => t.id);
 
     if (templeIds.length === 0) return [];

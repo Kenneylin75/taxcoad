@@ -136,7 +136,7 @@ export default function DistributorClient({
       customQR: { enabled: false, qrImageUrl: '', description: '' },
       cash: { enabled: false, description: '' }
    });
-   const [templePayments, setTemplePayments] = useState<any[]>([]);
+   const [templePayments, setTemplePayments] = useState<any[]>(initialFinancials?.paymentRecords || []);
    const [b2bReceiptViewerOpen, setB2bReceiptViewerOpen] = useState(false);
    const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
    const [currentReceiptImage, setCurrentReceiptImage] = useState<string | null>(null);
@@ -1323,7 +1323,7 @@ export default function DistributorClient({
                     <div className="grid grid-cols-2 gap-3">
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡人 / 負責人</p>
-                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.chairpersonName || viewTempleDetail.contactName || '未設定'}</p>
+                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.chairpersonName || viewTempleDetail.contactName || (viewTempleDetail.creatorRole === 'DistSales' ? getSalesName(viewTempleDetail.salesId) : initialProfile?.name || initialProfile?.account || '未設定')}</p>
                        </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡電話</p>
