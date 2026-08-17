@@ -4672,6 +4672,14 @@ export async function createLampRecord(data: any) {
         });
         
         if (!cat) return { success: false, error: '未找到燈種類別' };
+
+        const currentCount = await prisma.lampRecord.count({
+          where: { templeId: templeId!, categoryId: cat.id, status: { in: ['Active', 'Pending'] } }
+        });
+        
+        if (currentCount >= cat.totalSlots) {
+          return { success: false, error: '該點燈服務名額已滿，請選擇其他燈種。' };
+        }
         
         if (position) {
           const existing = await prisma.lampRecord.findFirst({
