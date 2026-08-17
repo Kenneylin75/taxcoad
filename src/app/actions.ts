@@ -209,6 +209,9 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       if (resTemple && resTemple.status === "Inactive") {
         return { success: false, error: "該宮廟已被停權，無法登入" };
       }
+      if (resTemple && resTemple.status !== "Active") {
+        return { success: false, error: "該宮廟已被停權，無法登入" };
+      }
       success = true; 
       redirectPath = `/${person.templeId}/admin`; 
       loggedInName = person.name;
@@ -262,6 +265,10 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
               }
               if (resTemple.status === "Inactive") {
                  loginStatus = "Inactive";
+              } else if (resTemple.status !== "Active") {
+                 return { success: false, error: "該宮廟尚在經銷商審核中，目前無法登入" };
+              } else if (false) {
+                 loginStatus = "Inactive";
               } else {
                  success = true; 
                  redirectPath = `/${person.templeId}/admin`; 
@@ -273,6 +280,10 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
               const mainTemple = await prisma.temple.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
               if (mainTemple) {
                 if (mainTemple.status === "Inactive") {
+                  loginStatus = "Inactive";
+                } else if (mainTemple.status !== "Active") {
+                  return { success: false, error: "該宮廟尚在經銷商審核中，目前無法登入" };
+                } else if (false) {
                   loginStatus = "Inactive";
                 } else {
                   success = true;
@@ -2932,11 +2943,12 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
 
 export async function approveTempleByDistributor(id: string) {
   const t = await prisma.temple.findUnique({ where: { id } });
-  if (t && t.status === 'PendingDistributor') {
+  if (t && (t.status === 'PendingDistributor' || t.status === 'Pending')) {
     await prisma.temple.update({
       where: { id },
-      data: { status: 'PendingSuperAdmin' }
+      data: { status: 'Active' }
     });
+    await generateInitialBills(t);
 
     if (t.account && t.password) {
       try {
@@ -7327,7 +7339,7 @@ export async function submitFreeAccountApplication(data: any) {
   }
   const { role, paymentCycle, ...formData } = data;
   
-  const status = (role === 'distributor' || role === 'super-admin' || role === 'dist-sales') ? 'Active' : 'Pending';
+  const status = (role === 'distributor' || role === 'super-admin') ? 'Active' : 'Pending';
 
   let sales: any = null;
   try {
