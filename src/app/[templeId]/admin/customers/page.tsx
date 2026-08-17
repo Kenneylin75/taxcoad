@@ -758,6 +758,8 @@ function DeepFileCenterContent() {
                            <input 
                               type="month" 
                               value={selectedNoteMonth} 
+                              min={`${new Date().getFullYear()}-01`}
+                              max={`${new Date().getFullYear() + 30}-12`}
                               onChange={e => setSelectedNoteMonth(e.target.value)} 
                               className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:border-indigo-500"
                            />
