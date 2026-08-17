@@ -811,6 +811,201 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays > 0 ? diffDays : 0;
     };
+    setAgiInput("");
+    setChatHistory(prev => [...prev, { role: 'user', text: query }]);
+    setAgiIsThinking(true);
+    const res = await askAgiAssistant(query, chatHistory.length);
+    setChatHistory(prev => [...prev, { role: 'agi', text: res.reply, action: res.suggestedAction }]);
+    setAgiIsThinking(false);
+  };
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatHistory, agiIsThinking]);
+
+  useEffect(() => {
+    if (activeView === 'queue') {
+      fetchActiveQueueCount().then(c => setActiveQueueCount(c));
+    }
+  }, [activeView]);
+
+  const renderDetailModal = () => {
+    if (!isDetailModalOpen || !detailContent) return null;
+    return (
+      <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 animate-in fade-in duration-300">
+        <div className="w-full max-w-md bg-white rounded-t-3xl p-6 space-y-6 animate-in slide-in-from-bottom duration-300">
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto -mt-2 mb-2"></div>
+          <div className="flex justify-between items-start">
+            <div className="space-y-2">
+              <h3 className="text-2xl font-bold text-gray-900 leading-tight">{detailContent.title}</h3>
+              <div className="flex flex-wrap gap-2">
+                <span className="bg-red-50 px-2 py-1 rounded text-xs font-bold text-red-700">{detailContent.category}</span>
+                {detailContent.price && <span className="bg-amber-50 px-2 py-1 rounded text-xs font-bold text-amber-700">{detailContent.price}</span>}
+              </div>
+            </div>
+            <button onClick={() => setIsDetailModalOpen(false)} className="p-2 text-gray-400 active:bg-gray-100 rounded-full transition-colors">✕</button>
+          </div>
+          
+          {detailContent.description && (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">詳細資訊</p>
+              <div className="text-gray-700 text-sm bg-gray-50 p-4 rounded-xl space-y-2">
+                 {detailContent.description.split('\n').map((line: string, i: number) => <p key={i} className="leading-relaxed">{line}</p>)}
+              </div>
+            </div>
+          )}
+
+          {detailContent.precautions && (
+            <div className="bg-amber-50 p-3 rounded-xl flex gap-3 items-start border border-amber-100 mt-4">
+              <span className="text-amber-600 text-sm">💡</span>
+              <div>
+                <p className="text-[10px] font-bold text-amber-700 uppercase">注意事項</p>
+                <div className="text-xs text-amber-800 mt-0.5 space-y-1">
+                  {detailContent.precautions.split('\n').map((line: string, i: number) => <p key={i}>{line}</p>)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {detailContent.onConfirm && (
+            <button 
+              onClick={() => {
+                detailContent.onConfirm();
+                setIsDetailModalOpen(false);
+              }}
+              className="btn-primary w-full py-4 mt-2"
+            >
+              確認辦理
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderNotificationsModal = () => {
+    if (!isNotificationsModalOpen) return null;
+
+    const formatNotifDate = (isoString: string) => {
+      const d = new Date(isoString);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${date} ${hours}:${minutes}`;
+    };
+
+    return (
+      <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 animate-in fade-in duration-300">
+        <div className="w-full max-w-md bg-white rounded-t-3xl p-6 space-y-5 animate-in slide-in-from-bottom duration-300 max-h-[85vh] flex flex-col">
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto -mt-2 mb-1 shrink-0"></div>
+          
+          <div className="flex justify-between items-center shrink-0">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">📢 歷史公告與通知</h3>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Sanctuary Broadcaster Logs</p>
+            </div>
+            <button 
+              onClick={() => setIsNotificationsModalOpen(false)} 
+              className="w-8 h-8 flex items-center justify-center bg-gray-50 hover:bg-gray-100 active:scale-90 text-gray-400 hover:text-gray-600 rounded-full transition-all text-sm font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1 py-1 custom-scrollbar">
+            {activeNotifications.length === 0 ? (
+              <div className="py-12 text-center space-y-2 opacity-30">
+                <span className="text-3xl">📭</span>
+                <p className="text-xs font-black uppercase tracking-widest text-gray-500">目前尚無歷史公告通知</p>
+              </div>
+            ) : (
+              activeNotifications.map((notif) => {
+                const isOpen = expandedNotifIds[notif.id] || false;
+                return (
+                  <div 
+                    key={notif.id}
+                    className="bg-gray-50/60 rounded-2xl border border-gray-150 overflow-hidden transition-all duration-300 hover:border-gray-200"
+                  >
+                    {/* Accordion Header */}
+                    <div 
+                      onClick={() => {
+                        setExpandedNotifIds(prev => ({
+                          ...prev,
+                          [notif.id]: !prev[notif.id]
+                        }));
+                      }}
+                      className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                    >
+                      <div className="flex items-start gap-3 min-w-0 pr-2">
+                        <span className="text-base shrink-0 mt-0.5">🔔</span>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-xs text-gray-800 tracking-tight leading-snug truncate">{notif.title}</h4>
+                          <p className="text-[8px] font-bold text-gray-400 font-mono mt-0.5">{formatNotifDate(notif.sendTime)}</p>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] text-gray-400 font-black transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''}`}>
+                        ▼
+                      </span>
+                    </div>
+
+                    {/* Accordion Content */}
+                    {isOpen && (
+                      <div className="px-4 pb-4 pt-1 border-t border-gray-100 bg-white/50 animate-in slide-in-from-top-1 duration-300">
+                        <div className="p-3 bg-white rounded-xl border border-gray-100 mt-2 text-xs text-gray-600 leading-relaxed font-semibold whitespace-pre-wrap">
+                          {notif.content}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          
+          <button 
+            onClick={() => setIsNotificationsModalOpen(false)}
+            className="w-full bg-slate-900 text-white font-black py-3 rounded-xl text-xs tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all shrink-0 active:scale-98"
+          >
+            關閉視窗 CLOSE
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // --- Intercept Feature Click ---
+  const handleFeatureClick = (viewName: 'booking' | 'lighting' | 'queue' | 'events') => {
+    if (!guestUser) return;
+    if (!guestUser.address || !guestUser.birthday) {
+      alert("請完善您的個人資料（出生日期與聯絡地址），才能使用預約與點燈等服務功能！");
+      setActiveView('profile');
+      return;
+    }
+    setActiveView(viewName);
+  };
+
+  // --- Sub-Renders ---
+
+  const renderHome = () => {
+    // 篩選未完成的項目
+    const activeAppointment = guestAppointments.find(a => a.status === 'Confirmed' || a.status === 'Pending');
+    const activeLamps = guestLamps.filter(l => l.status === 'Active' || l.status === 'Pending');
+    const activeTicket = guestTickets.find(t => t.status === 'Pending' || t.status === 'Queuing' || t.status === 'Calling');
+    const activeRegistration = guestRegistrations[0]; // 最新的活動報名
+
+    const getRemainingDays = (expiryDateStr: string) => {
+      const expiry = new Date(expiryDateStr);
+      const now = new Date();
+      expiry.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      const diffTime = expiry.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 0;
+    };
 
     return (
       <main className="max-w-md mx-auto min-h-screen pb-32">
@@ -831,14 +1026,29 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                 </div>
               )}
               <div>
-              <p className="text-xs text-red-200 font-medium mb-1">Premium Sanctuary</p>
-              <h2 className="text-2xl font-bold">平安，{guestUser?.name}</h2>
-            </div>
+                <p className="text-xs text-red-200 font-medium mb-1">Premium Sanctuary</p>
+                <h2 
+                  className="text-2xl font-bold cursor-pointer hover:opacity-80 active:scale-95 transition-all inline-block" 
+                  onClick={() => setActiveView('profile')}
+                >
+                  平安，{guestUser?.name}
+                </h2>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <button onClick={() => setIsScanning(true)} className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-all border border-white/20">
                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-6 h-6"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               </button>
+              
+              {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && templeAiUsage.aiTokens > 0 && (
+                <button 
+                  onClick={() => setIsAgiModalOpen(true)}
+                  className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white active:scale-90 transition-all shadow-md border border-white/20"
+                >
+                  <span className="text-xl">✨</span>
+                </button>
+              )}
+
               <button onClick={() => setActiveView('profile')} className="w-14 h-14 rounded-full border-2 border-white/50 overflow-hidden bg-white/10">
                 <img src={guestUser?.avatar || 'https://ui-avatars.com/api/?name=Guest'} className="w-full h-full object-cover" alt="User Avatar" />
               </button>
@@ -2398,486 +2608,6 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                        <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-0.5">月份</p>
                        <p className="text-xl font-black text-gray-900 leading-none">{parseInt(evt.date.split('-')[1] || '0')}月</p>
                     </div>
-                  </div>
-
-                  {/* Content Section */}
-                  <div className="p-5 space-y-5">
-                    {/* Basic Info */}
-                    <div className="flex justify-between items-start gap-3">
-                       <div>
-                         <h4 className="text-xl font-bold text-gray-900 leading-tight mb-1">{evt.title}</h4>
-                         <p className="text-sm font-bold text-red-600">{evt.date}</p>
-                       </div>
-                       <span className="font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-xl text-sm border border-red-100 shrink-0">
-                         ${evt.price}
-                       </span>
-                    </div>
-
-                    {/* Event Description Block */}
-                    {evt.description && (
-                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex gap-3">
-                        <div className="text-slate-500 mt-0.5">📝</div>
-                        <div>
-                          <h5 className="text-sm font-bold text-slate-800 mb-1">活動內容</h5>
-                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{evt.description}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Precautions Block */}
-                    {evt.precautions && (
-                      <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3">
-                        <div className="text-orange-500 mt-0.5">⚠️</div>
-                        <div>
-                          <h5 className="text-sm font-bold text-orange-800 mb-1">注意事項</h5>
-                          <p className="text-xs text-orange-700 leading-relaxed whitespace-pre-wrap">{evt.precautions}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Registration Stats */}
-                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
-                       <div className="flex justify-between text-xs font-bold">
-                         <span className="text-gray-500">能接受 {capacity > 0 ? capacity : '無限制'} 人</span>
-                         <span className={isFull ? "text-red-500" : "text-emerald-600"}>已經報名 {enrolled} 人</span>
-                       </div>
-                       {capacity > 0 && (
-                         <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                           <div className={`h-2.5 rounded-full ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${progressPercent}%` }}></div>
-                         </div>
-                       )}
-                    </div>
-
-                    {/* Action Button */}
-                    <div className="pt-2">
-                       <button 
-                         onClick={() => {
-                           if (isRegistered) {
-                             alert('您已經報名過此活動，無法重複報名！');
-                             return;
-                           }
-                           if (isFull && !isRegistered) {
-                             alert('很抱歉，此活動已額滿！');
-                             return;
-                           }
-                           setDetailContent({
-                             title: evt.title,
-                             category: '活動',
-                             price: `結緣價 $${evt.price}`,
-                             precautions: evt.precautions || '請於活動前 15 分鐘報到，並領取法器。',
-                             description: `活動內容：${evt.description || evt.content || '詳細內容請洽宮廟'}\n日期：${evt.date}`,
-                             onConfirm: async () => {
-                               initiatePayment(evt.price || 0, 'Event', async (method: string, ref?: string, proofFile?: File | null) => {
-                                 const res = await registerForEvent(evt.id, guestUser.phone, guestUser.name, evt.price || 0, method, ref);
-                                 if (res && res.success !== false) {
-                                   if (method === 'ecpay' || method === 'linepay') {
-                                     handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), evt.price || 0);
-                                     return;
-                                   }
-                                   if (res.id && proofFile) {
-                                     const previewUrl = await fileToBase64(proofFile);
-                                     const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                     await uploadPaymentProof(res.id.toString(), 'EventRegistration', previewUrl, guestUser.phone, ref, method);
-                                   }
-                                   setSuccessInfo({ title: '報名成功', message: method === 'Cash' ? '您已成功報名法會活動，請於當日現場完成繳費報到。' : method === 'Free' ? '報名成功！隨喜功德，平安喜樂。' : '您已成功報名法會活動與付款。' });
-                                   refreshAllData(guestUser.phone);
-                                 } else {
-                                   alert(`❌ 報名失敗: ${res?.message || '未知錯誤'}`);
-                                 }
-                               });
-                             }
-                           });
-                           setIsDetailModalOpen(true);
-                         }}
-                         className={`w-full py-3.5 rounded-2xl font-black text-[15px] tracking-wide transition-all ${
-                           isRegistered 
-                             ? "bg-gray-100 text-gray-400 cursor-default" 
-                             : isFull
-                               ? "bg-red-50 text-red-400 border border-red-100 cursor-not-allowed"
-                               : "btn-primary shadow-lg shadow-red-500/30"
-                         }`}
-                       >
-                         {isRegistered ? '已報名' : isFull ? '已額滿' : '立即報名'}
-                       </button>
-                    </div>
-                  </div>
-                </div>
-                );
-              }) : (
-                <div key="no-events" className="py-16 text-center app-card">
-                  <div className="text-5xl mb-4 opacity-50">🗓️</div>
-                  <p className="text-gray-500 font-bold text-sm">此月份暫無法會活動</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderQueue = () => {
-    const myTickets = guestTickets.filter(t => t.phone === guestUser?.phone);
-    const hasActiveTicket = myTickets.some(t => t.status !== 'Completed' && t.status !== 'Cancelled');
-
-    return (
-      <div className="min-h-screen pb-32">
-        <TopNav title="排隊" onBack={() => setActiveView('home')} />
-        <div className="max-w-md mx-auto px-5 pt-6 space-y-6">
-          {/* 現場排隊狀態看板 */}
-          <div className="app-card p-5 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/60 flex items-center justify-between shadow-xs animate-in fade-in duration-300">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-600 text-2xl">⚡</div>
-              <div>
-                <p className="text-[10px] font-bold text-amber-800/80 uppercase tracking-wider">即時現場狀態</p>
-                <h4 className="text-sm font-black text-gray-900 mt-0.5">目前現場排隊人數：{activeQueueCount} 人</h4>
-              </div>
-            </div>
-            <div className="bg-amber-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
-              LIVE
-            </div>
-          </div>
-
-          {hasActiveTicket ? (
-            <div className="space-y-6">
-              {myTickets.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled').map(ticket => (
-                <div key={ticket.id} className="app-card p-6 space-y-6 bg-white">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 text-2xl">🎟️</div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-gray-900">{ticket.eventTitle}</h4>
-                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Status: {ticket.queueEvent?.status === 'Draft' ? '未開始' : (ticket.status === 'Pending' || ticket.status === 'Registered' ? '未到現場' : '已到現場')}</p>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-[10px] font-bold text-gray-400 uppercase">持票號碼</p>
-                       <p className="text-2xl font-black text-gray-900">{ticket.assignedNumber}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 text-center space-y-4">
-                     {ticket.status === 'Pending' ? (
-                       <>
-                         <div className="w-16 h-16 bg-white rounded-2xl mx-auto flex items-center justify-center shadow-sm text-2xl">📸</div>
-                         <div className="space-y-1">
-                           <p className="text-sm font-bold text-gray-900">請抵達現場後掃碼報到</p>
-                           <p className="text-xs text-gray-500">掃描管理端 QR Code 以確認實際排隊順位</p>
-                         </div>
-                         <button 
-                           onClick={async () => {
-                             await verifyQueueTicket(ticket.eventId, guestUser.phone);
-                             setSuccessInfo({ title: "報到成功", message: "您已完成現場報到，請依照實際順位候位。" });
-                             refreshAllData(guestUser.phone);
-                           }}
-                           className="btn-primary py-3 w-full"
-                         >
-                           掃描 QR 報到
-                         </button>
-                       </>
-                     ) : (
-                       <>
-                         <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">實際排隊順位</p>
-                         <p className="text-6xl font-black text-amber-600">{ticket.actualOrder || '計算中'}</p>
-                         <p className="text-xs font-bold text-gray-500 mt-4">預計等待時間：15 分鐘</p>
-                       </>
-                     )}
-                  </div>
-                  <button className="btn-outline text-red-600 border-red-200 hover:bg-red-50 py-3">取消參加</button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-gray-900 px-1">可參加的排隊項目</h3>
-              <div className="grid gap-4">
-                {queueEvents.filter(e => e.status === 'Active').map(evt => {
-                  return (
-                    <div key={evt.id} className="app-card p-5 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-lg font-bold text-gray-900">{evt.title}</h4>
-                          <p className="text-xs text-gray-500 mt-1">{evt.location} • {evt.timeWindow}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-bold text-emerald-600 uppercase">已參加人數</p>
-                          <p className="text-lg font-bold text-emerald-700">{evt.participantCount || 0}人</p>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-gray-50 p-3 rounded-xl">
-                        <p className="text-[10px] font-bold text-gray-500 uppercase">活動說明</p>
-                        <p className="text-xs text-gray-600 mt-1 leading-relaxed whitespace-pre-line">{evt.description || '請依現場工作人員指示，依序排隊等候。'}</p>
-                      </div>
-
-                      <button 
-                        onClick={async () => {
-                          const isQueued = myTickets.some(t => t.eventId === evt.id && t.status !== 'Completed' && t.status !== 'Cancelled');
-                          if (isQueued) {
-                            alert('您已領取過此項目的號碼牌，無法重複領取！');
-                            return;
-                          }
-                          initiatePayment(evt.price || 0, 'Queue', async (method: string, ref?: string, proofFile?: File | null) => {
-                            const res = await joinQueue(evt.id, guestUser.phone, guestUser.name, method);
-                            if (res && res.success !== false) {
-                              const recordId = res.ticket?.id || res.id;
-                              if (recordId && proofFile) {
-                                const previewUrl = await fileToBase64(proofFile);
-                                const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                                await uploadPaymentProof(recordId.toString(), 'QueueTicket', previewUrl, guestUser.phone, ref, method);
-                              }
-                              setSuccessInfo({ title: "領號成功", message: "您已成功領取號碼牌，請抵達現場後掃描 QR 報到。" });
-                              refreshAllData(guestUser.phone);
-                            } else {
-                              alert(`❌ 領取失敗: ${res?.message || '未知錯誤'}`);
-                            }
-                          });
-                        }}
-                        className="btn-primary w-full py-3"
-                      >
-                        領取號碼牌
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderLighting = () => {
-    return (
-      <div className="min-h-screen pb-32">
-        <TopNav title="點燈" onBack={() => setActiveView('home')} />
-        <div className="max-w-md mx-auto px-5 pt-6 space-y-6">
-          <div className="app-card p-6 bg-amber-50">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm"><IconCandle /></div>
-              <div>
-                <h4 className="text-xl font-bold text-gray-900">點燈祈福</h4>
-                <p className="text-xs text-amber-700 font-bold tracking-widest mt-1">線上預約點燈</p>
-              </div>
-            </div>
-            <p className="text-sm font-bold text-gray-700 mt-4 leading-relaxed">
-              點亮平安燈，祈求新的一年萬事如意，閤家平安。本宮提供多種祈福燈項，歡迎信眾選取辦理。
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 w-full">
-            {lampCategories.map(item => (
-              <div key={item.id} className="app-card p-6 space-y-4 bg-white">
-                <div className="flex justify-between items-start">
-                   <div>
-                      <h4 className="text-lg font-bold text-gray-900">{item.name}</h4>
-                      <p className="text-xs text-gray-500 font-bold mt-1">{item.description}</p>
-                   </div>
-                   <span className="font-bold text-red-700 bg-red-50 px-2 py-1 rounded text-sm">{(!item.price || item.price === 0) ? '隨喜功德' : `$${item.price}`}</span>
-                </div>
-                
-                {item.precautions && (
-                  <div className="bg-amber-50 p-3 rounded-xl flex gap-3 items-start border border-amber-100">
-                    <span className="text-amber-600 text-sm">💡</span>
-                    <div>
-                      <p className="text-[10px] font-bold text-amber-700 uppercase">注意事項</p>
-                      <p className="text-xs text-amber-800 mt-0.5">{item.precautions}</p>
-                    </div>
-                  </div>
-                )}
-
-                <button 
-                  onClick={() => {
-                    const isLampActive = guestLamps.some(l => l.categoryName === item.name && (l.status === 'Active' || l.status === 'Pending' || l.status === 'WaitingLamp') && new Date(l.startDate || l.createdAt).getFullYear() === new Date().getFullYear());
-                    if (isLampActive) {
-                      alert('您今年已有生效中或辦理中的相同點燈項目，無法重複辦理！');
-                      return;
-                    }
-                    setDetailContent({
-                      title: item.name,
-                      category: '點燈',
-                      price: (!item.price || item.price === 0) ? '結緣價：隨喜功德' : `結緣價 $${item.price}`,
-                      precautions: item.precautions || '點燈後將於三日內為您上燈，並寄送電子通知。',
-                      description: `服務內容：${item.description || '祈福保平安'}`,
-                      onConfirm: async () => {
-                        const amt = item.price ?? 0;
-                        initiatePayment(amt, 'Lamp', async (method: string, ref?: string, proofFile?: File | null) => {
-                          const fd = new FormData();
-                          fd.append('phone', guestUser.phone);
-                          fd.append('guestName', guestUser.name);
-                          fd.append('categoryId', item.id);
-                          fd.append('categoryName', item.name);
-                          fd.append('price', amt.toString());
-                          fd.append('paymentMethod', method);
-                          if (ref) fd.append('paymentRef', ref);
-                          const res = await createLightingOrder(fd);
-                          if (res && res.success !== false) {
-                            if (method === 'ecpay' || method === 'linepay') {
-                              handleOnlinePaymentRedirect(method, res.id || Date.now().toString(), amt);
-                              return;
-                            }
-                            if (res.id && proofFile) {
-                              const previewUrl = await fileToBase64(proofFile);
-                              const { uploadPaymentProof } = await import('@/app/actions_payment_proof');
-                              await uploadPaymentProof(res.id.toString(), 'LampRecord', previewUrl, guestUser.phone, ref, method);
-                            }
-                            setSuccessInfo({
-                              title: '辦理成功',
-                              message: method === 'Cash' ? '您的點燈申請已提交，請至現場完成繳費以利上燈。' : method === 'Free' ? '申請成功！隨喜功德。' : '您的點燈申請與付款已完成，本宮將為您安排上燈法事。'
-                            });
-                            refreshAllData(guestUser.phone);
-                          } else {
-                            alert(`❌ 辦理失敗: ${res?.message || '未知錯誤'}`);
-                          }
-                        });
-                      }
-                    });
-                    setIsDetailModalOpen(true);
-                  }}
-                  className="btn-primary py-3"
-                >
-                  立即辦理
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-
-  if (showLoginWall) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-6">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center space-y-4">
-            <div className="w-20 h-20 bg-white rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-sm text-red-700">⛩️</div>
-            <div>
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight">PREMIUM <span className="text-red-700">Sanctuary</span></h1>
-              <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-1">Digital Sacred Portal</p>
-            </div>
-          </div>
-          
-          <div className="app-card p-8 space-y-8 bg-white border-2 border-red-950/20 shadow-xl rounded-[35px] overflow-hidden">
-            {isLiffLoading ? (
-              <div className="flex flex-col items-center justify-center py-10">
-                <div className="w-12 h-12 border-4 border-slate-200 border-t-amber-600 rounded-full animate-spin mb-4"></div>
-                <p className="text-slate-600 font-bold tracking-widest text-sm">LINE 安全連線中...</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="text-center space-y-1">
-                  <h3 className="text-xl font-black text-gray-900">信眾登入</h3>
-                  <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Enter the Path of Peace</p>
-                </div>
-                
-                {phoneStatus === "IDLE" ? (
-                  <form onSubmit={handlePhoneNext} className="space-y-6">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-2">手機號碼</label>
-                      <input 
-                        type="tel" 
-                        value={loginPhone} 
-                        onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
-                        className="app-input" 
-                        placeholder="0912345678" 
-                        pattern="^09\d{8}$" minLength={10} maxLength={10}
-                        required 
-                      />
-                    </div>
-                    <button 
-                      type="submit" 
-                      disabled={isCheckingPhone}
-                      className="btn-primary w-full py-4 flex items-center justify-center gap-2"
-                    >
-                      {isCheckingPhone ? '驗證中...' : '下一步'}
-                      <span className="text-lg">➔</span>
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleLogin} className="space-y-6">
-                    {phoneStatus === "NEW" && (
-                      <div>
-                        <div className="mb-4 bg-blue-50 text-blue-700 p-3 rounded-xl text-xs font-bold">歡迎新信眾！請設定您的姓名與密碼進行註冊。</div>
-                        <label className="block text-xs font-bold text-gray-500 mb-2">真實姓名</label>
-                        <input 
-                          type="text" 
-                          value={loginName} 
-                          onChange={(e) => setLoginName(e.target.value)} 
-                          className="app-input mb-4" 
-                          placeholder="請輸入姓名" 
-                          required 
-                        />
-                      </div>
-                    )}
-                    
-                    {phoneStatus === "NO_PASSWORD" && (
-                      <div className="mb-4 bg-amber-50 text-amber-700 p-3 rounded-xl text-xs font-bold">
-                        歡迎您, {loginName}！<br/>系統升級安全機制，請設定您的專屬密碼完成啟用。
-                      </div>
-                    )}
-
-                    {phoneStatus === "HAS_PASSWORD" && (
-                      <div className="mb-4 text-gray-700 text-sm font-bold text-center">
-                        歡迎回來, {loginName}
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 mb-2">{phoneStatus === "HAS_PASSWORD" ? "請輸入密碼" : "請設定密碼"}</label>
-                      <input 
-                        type="password" 
-                        value={loginPassword} 
-                        onChange={(e) => setLoginPassword(e.target.value)} 
-                        className="app-input" 
-                        placeholder="請輸入密碼" 
-                        required 
-                      />
-                    </div>
-                    <button 
-                      type="submit" 
-                      disabled={isLoggingIn}
-                      className="btn-primary w-full py-4 flex items-center justify-center gap-2"
-                    >
-                      {isLoggingIn ? '開啟中...' : (phoneStatus === "HAS_PASSWORD" ? '登入' : '設定並登入')}
-                      <span className="text-lg">➔</span>
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => { setPhoneStatus("IDLE"); setLoginPassword(""); setLoginName(""); }}
-                      className="w-full py-3 text-xs font-bold text-gray-400 hover:text-gray-600 tracking-widest text-center"
-                    >
-                      返回重填手機號碼
-                    </button>
-                  </form>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-900 pb-20 selection:bg-red-200">
-
-      <style dangerouslySetInnerHTML={{__html: `
-        :root {
-          --temple-primary: ${theme.primary} !important;
-          --temple-secondary: ${theme.secondary} !important;
-        }
-        .bg-red-700, .bg-red-600, .bg-amber-600 { background-color: var(--temple-primary) !important; }
-        .text-red-700, .text-red-600, .text-amber-600, .text-red-500 { color: var(--temple-primary) !important; }
-        .border-red-700, .border-red-600, .border-amber-600, .border-red-200 { border-color: var(--temple-primary) !important; }
-        .bg-red-800, .bg-amber-700 { background-color: var(--temple-secondary) !important; }
-        .bg-red-50, .bg-amber-50 { background-color: ${theme.light} !important; }
-      `}} />
-
-      
-      {activeView === 'home' && renderHome()}
-      {activeView === 'space' && renderPersonalSpace()}
-      {activeView === 'records' && renderAllRecords()}
       {activeView === 'profile' && renderProfile()}
       {activeView === 'booking' && renderBooking()}
       {activeView === 'events' && renderEvents()}
