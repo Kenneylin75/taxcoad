@@ -386,7 +386,7 @@ export default function DistributorClient({
   ];
 
   const filteredTemples = (initialTemples || []).filter(t => {
-    const matchSearch = t.templeName.includes(templeSearch) || (t.chairpersonName || "").includes(templeSearch);
+    const matchSearch = (t.templeName || t.name || "").includes(templeSearch) || (t.chairpersonName || "").includes(templeSearch);
     const matchLocation = templeLocationFilter === "" || t.city === templeLocationFilter;
     return matchSearch && matchLocation;
   });
