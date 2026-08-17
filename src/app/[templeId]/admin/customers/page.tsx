@@ -31,7 +31,9 @@ import {
   deleteGuestFile,
   updateDeepRecord,
   completeMeritPayment,
-  renewLampRecord
+  renewLampRecord,
+  saveGuestNote,
+  deleteGuestNote
 } from '@/app/actions';
 import { Solar } from 'lunar-javascript';
 
@@ -72,7 +74,7 @@ function DeepFileCenterContent() {
   const [selectedGuest, setSelectedGuest] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'guest' | 'daily'>('guest');
-  const [guestSubTab, setGuestSubTab] = useState<'appointments' | 'lamps' | 'media' | 'history' | 'merit' | 'account'>('appointments');
+  const [guestSubTab, setGuestSubTab] = useState<'appointments' | 'lamps' | 'media' | 'history' | 'merit' | 'account' | 'notes'>('appointments');
   const [previewFile, setPreviewFile] = useState<any | null>(null);
   
   const [showAddModal, setShowAddModal] = useState(false);
@@ -81,12 +83,13 @@ function DeepFileCenterContent() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [history, setHistory] = useState<{appointments: any[], records: DeepRecord[], files: GuestFile[], lampRecords: any[], activities: any[]}>({
+  const [history, setHistory] = useState<{appointments: any[], records: DeepRecord[], files: GuestFile[], lampRecords: any[], activities: any[], guestNotes?: any[]}>({
     appointments: [],
     records: [],
     files: [],
     lampRecords: [],
-    activities: []
+    activities: [],
+    guestNotes: []
   });
 
   const [forms, setForms] = useState<ServiceForm[]>([]);
@@ -104,6 +107,13 @@ function DeepFileCenterContent() {
   const [paymentMethod, setPaymentMethod] = useState<'現金' | '匯款'>('現金');
   const [lastFive, setLastFive] = useState('');
   const [viewingRecord, setViewingRecord] = useState<DeepRecord | null>(null);
+
+  // 備註狀態
+  const [selectedNoteMonth, setSelectedNoteMonth] = useState<string>(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [activeNote, setActiveNote] = useState<any>(null);
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const lunarInfo = useMemo(() => {
     if (!selectedGuest?.birthday) return null;
@@ -451,7 +461,7 @@ function DeepFileCenterContent() {
                  <button onClick={() => setShowAddModal(true)} className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">編輯資料</button>
               </div>
               <nav className="flex gap-8 overflow-x-auto scrollbar-hide w-full">
-{[{ id: 'appointments', label: '預約' }, { id: 'lamps', label: '點燈' }, { id: 'events', label: '活動' }, { id: 'queue', label: '排隊' }, { id: 'media', label: '媒體' }, { id: 'history', label: '紀錄' }, { id: 'merit', label: '功德' }, { id: 'account', label: '帳號' }].map((tab) => (<button key={tab.id} onClick={() => setGuestSubTab(tab.id as any)} className={`pb-4 text-sm font-medium transition-colors border-b-2 ${guestSubTab === tab.id ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>{tab.label}</button>))}</nav>
+{[{ id: 'appointments', label: '預約' }, { id: 'lamps', label: '點燈' }, { id: 'events', label: '活動' }, { id: 'queue', label: '排隊' }, { id: 'media', label: '媒體' }, { id: 'history', label: '紀錄' }, { id: 'merit', label: '功德' }, { id: 'account', label: '帳號' }, { id: 'notes', label: '備註' }].map((tab) => (<button key={tab.id} onClick={() => setGuestSubTab(tab.id as any)} className={`pb-4 text-sm font-medium transition-colors border-b-2 ${guestSubTab === tab.id ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>{tab.label}</button>))}</nav>
             </div>
 
             <div className="p-12 space-y-12 max-w-5xl">
@@ -719,6 +729,118 @@ function DeepFileCenterContent() {
                            </div>
                         )}
                         <button onClick={handleSaveMerit} disabled={isSaving} className="w-full py-10 bg-slate-900 text-amber-500 rounded-[40px] font-black text-sm uppercase tracking-[0.5em] shadow-3xl hover:bg-amber-500 hover:text-slate-950 transition-all active:scale-[0.98]">{isSaving ? '正在核定案卷...' : '確 定 核 定 功 德 錄 🚀'}</button>
+                     </div>
+                  </div>
+               )}
+
+               {/* TAB: 備註 (獨立左標主旨與日期/右內文版型) */}
+               {guestSubTab === 'notes' && (
+                  <div className="flex flex-col md:flex-row gap-6 animate-in fade-in duration-500 h-[700px]">
+                     {/* 左側欄：月份選擇與清單 */}
+                     <div className="w-full md:w-1/3 bg-slate-50 border-2 border-slate-100 rounded-[40px] flex flex-col overflow-hidden">
+                        <div className="p-6 border-b-2 border-slate-100 flex flex-col gap-4 bg-white">
+                           <div className="flex items-center justify-between">
+                              <h3 className="text-xl font-black text-slate-900">信眾備註錄</h3>
+                              <button 
+                                 onClick={() => {
+                                    setActiveNote(null);
+                                    setNoteTitle('');
+                                    setNoteContent('');
+                                    setSelectedNoteMonth(new Date().toISOString().substring(0, 7));
+                                 }}
+                                 className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-black shadow-lg hover:scale-105 transition-transform"
+                              >
+                                 ＋
+                              </button>
+                           </div>
+                           <input 
+                              type="month" 
+                              value={selectedNoteMonth} 
+                              onChange={e => setSelectedNoteMonth(e.target.value)} 
+                              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:border-indigo-500"
+                           />
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                           {history.guestNotes?.filter((n: any) => n.date.startsWith(selectedNoteMonth)).map((note: any) => (
+                              <div 
+                                 key={note.id} 
+                                 onClick={() => {
+                                    setActiveNote(note);
+                                    setNoteTitle(note.title);
+                                    setNoteContent(note.content);
+                                 }}
+                                 className={`cursor-pointer p-5 rounded-3xl border-2 transition-all ${activeNote?.id === note.id ? 'bg-indigo-50 border-indigo-200 shadow-md' : 'bg-white border-transparent hover:border-slate-200'}`}
+                              >
+                                 <h4 className={`text-base font-bold truncate ${activeNote?.id === note.id ? 'text-indigo-900' : 'text-slate-800'}`}>{note.title || '無主旨'}</h4>
+                                 <p className="text-[10px] font-black text-slate-400 mt-2 tracking-widest">{note.date}</p>
+                              </div>
+                           ))}
+                           {(!history.guestNotes || history.guestNotes.filter((n: any) => n.date.startsWith(selectedNoteMonth)).length === 0) && (
+                              <div className="text-center p-10 opacity-30">
+                                 <div className="text-4xl mb-4">📝</div>
+                                 <p className="text-xs font-black tracking-widest uppercase">此月份尚無備註</p>
+                              </div>
+                           )}
+                        </div>
+                     </div>
+
+                     {/* 右側欄：內容編輯區 */}
+                     <div className="w-full md:w-2/3 bg-white border-4 border-slate-900 rounded-[40px] flex flex-col shadow-2xl overflow-hidden relative">
+                        {activeNote && (
+                           <button 
+                              onClick={async () => {
+                                 if (confirm('確定要刪除這筆備註嗎？')) {
+                                    setIsSavingNote(true);
+                                    await deleteGuestNote(activeNote.id);
+                                    if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                    setActiveNote(null);
+                                    setNoteTitle('');
+                                    setNoteContent('');
+                                    setIsSavingNote(false);
+                                 }
+                              }}
+                              className="absolute top-6 right-6 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors z-10"
+                           >
+                              刪除紀錄
+                           </button>
+                        )}
+                        <div className="p-8 border-b-2 border-slate-100 bg-slate-50">
+                           <input 
+                              type="text" 
+                              placeholder="輸入主旨..." 
+                              value={noteTitle} 
+                              onChange={e => setNoteTitle(e.target.value)} 
+                              className="w-full text-2xl font-black bg-transparent border-none outline-none text-slate-900 placeholder:text-slate-300 pr-24"
+                           />
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">
+                              {activeNote ? `建檔日期：${activeNote.date}` : `新紀錄：${new Date().toISOString().substring(0, 10)}`}
+                           </p>
+                        </div>
+                        <div className="flex-1 p-8 bg-[#fafafa]">
+                           <textarea 
+                              placeholder="在這裡寫下信眾的專屬備註，此內容僅管理員可見..." 
+                              value={noteContent} 
+                              onChange={e => setNoteContent(e.target.value)} 
+                              className="w-full h-full resize-none bg-transparent outline-none text-base font-medium text-slate-700 leading-relaxed placeholder:text-slate-300"
+                           ></textarea>
+                        </div>
+                        <div className="p-6 bg-slate-900 flex justify-end">
+                           <button 
+                              onClick={async () => {
+                                 if (!noteTitle.trim()) return alert('請輸入主旨');
+                                 setIsSavingNote(true);
+                                 const dateToSave = activeNote ? activeNote.date : new Date().toISOString().substring(0, 10);
+                                 await saveGuestNote(selectedGuest.id, selectedGuest.phone, noteTitle, noteContent, dateToSave, activeNote?.id);
+                                 if (selectedGuest) await loadHistory(selectedGuest.phone);
+                                 setIsSavingNote(false);
+                                 alert('備註已儲存！');
+                              }}
+                              disabled={isSavingNote}
+                              className="px-8 py-4 bg-emerald-500 text-slate-900 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-emerald-400 transition-colors disabled:opacity-50"
+                           >
+                              {isSavingNote ? '儲存中...' : '儲存備註錄 ✓'}
+                           </button>
+                        </div>
                      </div>
                   </div>
                )}

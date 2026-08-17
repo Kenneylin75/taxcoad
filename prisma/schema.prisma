@@ -398,9 +398,27 @@ model Guest {
   deepRecords  DeepRecord[]
   activities   Activity[]
   templeNotifications TempleNotification[]
+  guestNotes   GuestNote[]
 
   @@unique([templeId, phone])
   @@map("guests")
+}
+
+model GuestNote {
+  id        String   @id @default(cuid())
+  templeId  String   @map("temple_id")
+  guestId   String   @map("guest_id")
+  phone     String?
+  title     String
+  content   String   @db.Text
+  date      String   // YYYY-MM-DD
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  guest     Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@index([templeId, guestId])
+  @@map("guest_notes")
 }
 
 model GuestFile {

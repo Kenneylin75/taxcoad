@@ -4439,6 +4439,7 @@ export async function fetchGuestHistory(p: string) {
           include: { event: true },
           orderBy: { createdAt: 'desc' } 
         });
+        const guestNotes = guest ? await prisma.guestNote.findMany({ where: { guestId: guest.id }, orderBy: { createdAt: 'desc' } }) : [];
 
         const rawDeepRecords = await prisma.deepRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
         const records = rawDeepRecords.map(r => ({
@@ -4463,11 +4464,12 @@ export async function fetchGuestHistory(p: string) {
           lampRecords,
           activities,
           queueTickets,
-          eventRegistrations
+          eventRegistrations,
+          guestNotes
         };
       } catch (error) {
         console.error('fetchGuestHistory error:', error);
-        return { files: [], records: [], appointments: [], lampRecords: [], activities: [], queueTickets: [], eventRegistrations: [] };
+        return { files: [], records: [], appointments: [], lampRecords: [], activities: [], queueTickets: [], eventRegistrations: [], guestNotes: [] };
       }
 }
 
@@ -8983,5 +8985,49 @@ export async function deleteNotification(id: string) {
   } catch (e: any) {
     console.error('deleteNotification error:', e);
     return { success: false, message: e.message || String(e) };
+  }
+}
+
+export async function saveGuestNote(guestId: string, phone: string, title: string, content: string, date: string, noteId?: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false, error: '未授權' };
+
+    if (noteId) {
+      await prisma.guestNote.update({
+        where: { id: noteId },
+        data: { title, content, date, phone }
+      });
+    } else {
+      await prisma.guestNote.create({
+        data: {
+          templeId,
+          guestId,
+          phone,
+          title,
+          content,
+          date
+        }
+      });
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('saveGuestNote error:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+export async function deleteGuestNote(noteId: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false, error: '未授權' };
+
+    await prisma.guestNote.delete({
+      where: { id: noteId }
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('deleteGuestNote error:', error);
+    return { success: false, error: String(error) };
   }
 }
