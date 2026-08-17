@@ -6738,7 +6738,7 @@ export async function fetchSalesProfileById(salesId: string) {
 export async function fetchTempleBills(templeId: string) {
 
       try {
-        return await prisma.templeBill.findMany({ where: { templeId }, orderBy: { date: 'desc' } });
+        return await prisma.templeBill.findMany({ where: { templeId }, orderBy: { createdAt: 'desc' } });
       } catch(e) {
         return [];
       }
