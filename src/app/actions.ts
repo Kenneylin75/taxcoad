@@ -7324,6 +7324,14 @@ export async function submitFreeAccountApplication(data: any) {
   const currentUser = await getCurrentUser();
   const templeNo = 1;
 
+  const targetDistId = role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null));
+  if (targetDistId) {
+    const capacity = await fetchDistributorCapacity(targetDistId);
+    if (!capacity.isUnlimited && capacity.used >= capacity.total) {
+      return { success: false, error: '該經銷商的系統配額已經用盡，無法部屬新節點' };
+    }
+  }
+
       const newTemple = {
       id: `temple-${Math.random().toString(36).substring(2, 10)}`,
       templeNo,
