@@ -18,7 +18,14 @@ export default function QueueManagerClient({ initialEvents, initialDashboard, se
 
   useEffect(() => {
     setBaseUrl(window.location.origin);
-  }, []);
+    
+    // Auto refresh the dashboard data every 10 seconds to keep queue in sync
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [router]);
 
   const today = new Date().toISOString().split('T')[0];
   const activeEvents = initialEvents.filter(e => e.status !== 'Completed' && e.status !== 'Cancelled' && e.date >= today);

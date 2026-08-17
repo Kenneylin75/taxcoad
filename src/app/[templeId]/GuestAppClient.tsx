@@ -2578,11 +2578,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                            <p className="text-xs text-gray-500">掃描管理端 QR Code 以確認實際排隊順位</p>
                          </div>
                          <button 
-                           onClick={async () => {
-                             await verifyQueueTicket(ticket.eventId, guestUser.phone);
-                             setSuccessInfo({ title: "報到成功", message: "您已完成現場報到，請依照實際順位候位。" });
-                             refreshAllData(guestUser.phone);
-                           }}
+                           onClick={() => setIsScanning(true)}
                            className="btn-primary py-3 w-full"
                          >
                            掃描 QR 報到
