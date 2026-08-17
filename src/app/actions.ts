@@ -5937,15 +5937,14 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
 }
 export async function fetchDistributorFinancials(distId: string) {
   try {
-    const templesQuery = `
-      SELECT t.* 
-      FROM "Temple" t
-      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
-      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
-        AND (ds.role IS NULL OR ds.role != 'SuperSales')
-    `;
-    const templesRes = await prisma.temple.findMany({ where: { distributorId: distId } }) as any; // TODO manually fix
-    const temples = Array.isArray(templesRes) ? templesRes : (templesRes?.rows || []);
+    const distSalesIdsForFinance = (await prisma.distributorSales.findMany({
+      where: { distributorId: distId, role: { not: 'SuperSales' } },
+      select: { id: true }
+    })).map((s: any) => s.id);
+
+    const temples = await prisma.temple.findMany({
+      where: { OR: [ { distributorId: distId }, { salesId: { in: distSalesIdsForFinance } } ] }
+    });
     const templeIds = temples.map((t: any) => t.id);
 
     let bills: any[] = [];
@@ -5954,14 +5953,15 @@ export async function fetchDistributorFinancials(distId: string) {
     }
     
     const paymentRecords = temples.map((t: any) => {
-      const tBills = bills.filter((b: any) => b.templeId === t.id || b.temple_id === t.id);
+      const tBills = bills.filter((b: any) => b.templeId === t.id);
       const lastBill = tBills[0];
       const history = tBills.map((b: any) => {
-          let m = '1';
-          if (b.billingMonth) m = b.billingMonth;
-          else if (b.createdAt) {
+          let m = '';
+          if (b.billingDate) {
+              m = b.billingDate.substring(0, 7);
+          } else if (b.createdAt) {
               const d = new Date(b.createdAt);
-              m = (d.getMonth() + 1).toString();
+              m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
           }
           return {
               id: b.id,
@@ -5974,19 +5974,20 @@ export async function fetchDistributorFinancials(distId: string) {
       });
       return {
         id: t.id,
-        temple: t.templeName || t.temple_name || t.name || '未命名宮廟',
+        temple: t.templeName || t.name || '未命名宮廟',
         region: t.city || '未設定',
-        amount: lastBill ? lastBill.amount : (t.monthlyRent || t.monthly_rent || 0),
-        date: lastBill ? (lastBill.createdAt instanceof Date ? lastBill.createdAt.toISOString().split('T')[0] : lastBill.createdAt) : (t.timestamp || t.createdAt || t.created_at || '未設定'),
+        amount: lastBill ? lastBill.amount : (t.monthlyRent || 0),
+        date: lastBill ? (lastBill.createdAt instanceof Date ? lastBill.createdAt.toISOString().split('T')[0] : lastBill.createdAt) : (t.createdAt ? new Date(t.createdAt).toISOString().split('T')[0] : '未設定'),
         status: lastBill ? lastBill.status : 'Paid',
         type: lastBill ? (lastBill.itemName || lastBill.type || 'MonthlyFee') : 'MonthlyFee',
         templeStatus: t.status,
+        trialMonths: t.trialMonths || 0,
         history: history || []
       };
     });
 
-    const salesRes = await prisma.distributorSales.findMany({ where: { distributorId: distId }, select: { id: true, name: true } }) as any;
-    const salesIds = (Array.isArray(salesRes) ? salesRes : (salesRes?.rows || [])).map((s: any) => s.id);
+    const salesRes = await prisma.distributorSales.findMany({ where: { distributorId: distId }, select: { id: true, name: true } });
+    const salesIds = salesRes.map((s: any) => s.id);
     
     let myBonusRequests: any[] = [];
     if (salesIds.length > 0) {
@@ -6003,82 +6004,75 @@ export async function fetchDistributorFinancials(distId: string) {
 
     return { paymentRecords, bonusRequests: myBonusRequests };
   } catch (e) {
+    console.error('fetchDistributorFinancials err:', e);
     return { paymentRecords: [], bonusRequests: [] };
   }
 }
-
 export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
   try {
-    const salesRes = await prisma.distributorSales.findMany({ where: { distributorId: distId } }) as any;
-    const sales = salesRes?.rows || [];
+    const sales = await prisma.distributorSales.findMany({ where: { distributorId: distId } });
 
     return await Promise.all(sales.map(async (s: any) => {
-      const templesRes = await prisma.temple.findMany({ where: { salesId: s.id } }) as any;
-      const temples = Array.isArray(templesRes) ? templesRes : (templesRes?.rows || []);
+      const temples = await prisma.temple.findMany({ where: { salesId: s.id } });
       const templeIds = temples.map((t: any) => t.id);
       
       let totalSales = 0;
       let commission = 0;
 
       if (templeIds.length > 0) {
-        const billsRes = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds }, status: 'Paid' } }) as any;
-        let bills = billsRes?.rows || [];
+        let bills = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds }, status: 'Paid' } });
         
         if (yearMonth) {
           bills = bills.filter((b: any) => {
-            const date = b.created_at instanceof Date ? b.created_at.toISOString().substring(0, 7) : 
-                         (b.created_at ? String(b.created_at).substring(0,7) : (b.date ? String(b.date).substring(0,7) : ''));
-            return date === yearMonth;
+            const dateStr = b.createdAt instanceof Date ? b.createdAt.toISOString().substring(0, 7) : 
+                         (b.createdAt ? String(b.createdAt).substring(0,7) : (b.billingDate ? String(b.billingDate).substring(0,7) : ''));
+            return dateStr === yearMonth;
           });
         }
 
         totalSales = bills.reduce((sum: number, b: any) => sum + b.amount, 0);
         commission = bills.reduce((sum: number, b: any) => {
-          const isSetup = b.item_name === 'SetupFee' || b.item_name === 'Setup';
+          const isSetup = b.itemName === 'SetupFee' || b.itemName === 'Setup';
           let sRules: any = {};
-          if (typeof s.commission_rules === 'string') {
-             sRules = JSON.parse(s.commission_rules);
-          } else if (s.commission_rules) {
-             sRules = s.commission_rules;
+          if (typeof s.commissionRules === 'string') {
+             try { sRules = JSON.parse(s.commissionRules); } catch(e){}
+          } else if (s.commissionRules) {
+             sRules = s.commissionRules;
           }
           const rate = isSetup ? (sRules.setupFeePercent || 20) : (sRules.rentYear1Percent || 15);
           return sum + (b.amount * rate / 100);
         }, 0);
       }
 
-      const myWithdrawals = await prisma.withdrawal.findMany({
+      const myWithdrawals = await prisma.bonusRequest.findMany({
         where: {
-          salesName: s.name,
-          status: { in: ['Approved', 'Verified'] }
+          salesId: s.id,
+          status: { in: ['Approved', 'Verified', 'Paid'] }
         }
       });
       const totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+      const availableBonus = commission - totalWithdrawn;
 
       const salesVisits = await prisma.salesVisit.findMany({
         where: { salesName: s.name }
       });
-      const convertedTempleNames = temples.map((t: any) => t.temple_name || t.name);
-      const uniqueVisitedTemples = [...new Set(salesVisits.map((v: any) => v.temple_name))];
-      const unconvertedVisitsCount = uniqueVisitedTemples.filter((name: any) => !convertedTempleNames?.includes(name)).length;
+      const convertedTempleNames = temples.map((t: any) => t.templeName || t.name);
 
       return {
-        id: s.id,
-        name: s.name,
-        account: s.account,
-        activeTemples: temples.filter((t: any) => t.status === 'Active').length,
-        totalTemplesCount: temples.length,
+        ...s,
         totalSales,
         commission,
         totalWithdrawn,
-        unconvertedVisitsCount,
-        recentVisitsCount: salesVisits.length
+        availableBonus: availableBonus > 0 ? availableBonus : 0,
+        totalTemplesCount: temples.length,
+        unconvertedVisitsCount: salesVisits.filter((v: any) => !convertedTempleNames.includes(v.templeName)).length
       };
     }));
   } catch (e) {
+    console.error('fetchDistributorSalesPerformance error:', e);
     return [];
   }
 }
-
 export async function fetchSuperAdminFinancials() {
   // 取得宮廟與帳單狀態
   let allTemples: any[] = [];

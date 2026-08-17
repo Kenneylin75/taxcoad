@@ -366,12 +366,12 @@ export default function DistributorClient({
   const groupedPayments = useMemo(() => {
     const groups: Record<string, typeof paymentRecords> = {};
     paymentRecords.forEach((p: any) => {
-      const hasPaidInMonth = p.history.some((h: any) => h.status === 'Paid' && h.month === monthFilter);
-      if (!hasPaidInMonth) return;
+      const hasBillInMonth = p.history.some((h: any) => h.month === monthFilter);
+      if (!hasBillInMonth) return;
       
       const filteredP = {
         ...p,
-        history: p.history.filter((h: any) => h.month === monthFilter && h.status === 'Paid')
+        history: p.history.filter((h: any) => h.month === monthFilter)
       };
 
       if (!groups[filteredP.region]) groups[filteredP.region] = [];
@@ -912,7 +912,11 @@ export default function DistributorClient({
                                       <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mb-1">總已提領獎金</p>
                                       <p className="text-lg font-black text-blue-700">${(s.totalWithdrawn || 0).toLocaleString()}</p>
                                   </div>
-                                  <div className="col-span-2 bg-amber-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-amber-100">
+                                  <div className="bg-purple-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-purple-100">
+                                      <p className="text-[10px] text-purple-600 font-bold uppercase tracking-widest mb-1">可提領獎金</p>
+                                      <p className="text-lg font-black text-purple-700">${(s.availableBonus || 0).toLocaleString()}</p>
+                                  </div>
+                                  <div className="bg-amber-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-amber-100">
                                       <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest mb-1">拜訪未成業務</p>
                                       <p className="text-lg font-black text-amber-700">{s.unconvertedVisitsCount || 0} <span className="text-[10px] text-amber-600/70">家</span></p>
                                   </div>
