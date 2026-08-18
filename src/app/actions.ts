@@ -4289,7 +4289,7 @@ export async function fetchGlobalTempleData() {
     console.error("fetchGlobalTempleData Prisma Error:", err);
     return { 
       analyticsSettings: {}, 
-      analyticsData: { todayAppointments: 0, completedAppointments: 0, totalGuests: 0, lampStats: { totalLamps: 0, activeLamps: 0 }, serviceHeat: [] }, 
+      analyticsData: { todayAppointments: 0, completedAppointments: 0, totalGuests: 0, lampStats: { totalLamps, activeLamps }, serviceHeat: [] }, 
       raw: { apps: [], agiStats: {}, guests: [], storageInfo: { used: 0, total: 100, isVip: false, planName: '未知方案' }, qActive: [] } 
     };
   }

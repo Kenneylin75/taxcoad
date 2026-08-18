@@ -380,6 +380,7 @@ model Guest {
   avatar        String?
   lineId        String?  @map("line_id")
   email         String?
+  account       String?
   password      String?
   status        String   @default("Active")
   setupFee      Int      @default(0)
