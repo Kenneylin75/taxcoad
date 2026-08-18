@@ -7326,8 +7326,15 @@ export async function submitFreeAccountApplication(data: any) {
 
   let sales: any = null;
   try {
-    const salesRes = await prisma.$queryRawUnsafe('SELECT id, distributor_id FROM dist_sales WHERE name = $1 OR account = $1', [data.submittedBy]);
-    sales = (salesRes as any)?.rows?.[0];
+    sales = await prisma.distributorSales.findFirst({
+      where: {
+        OR: [
+          { name: data.submittedBy },
+          { account: data.submittedBy }
+        ]
+      },
+      select: { id: true, distributorId: true }
+    });
   } catch (e) {
     console.error('Failed to fetch sales info', e);
   }
@@ -7384,7 +7391,9 @@ export async function submitFreeAccountApplication(data: any) {
           paymentCycle: newTemple.paymentCycle,
           account: newTemple.account,
           password: newTemple.password,
-          phone: newTemple.templePhone || newTemple.contactPhone || ''
+          phone: newTemple.templePhone || newTemple.contactPhone || '',
+          creatorRole: newTemple.creatorRole,
+          creatorId: newTemple.creatorId
         }
       });
       let allocatedBytes = 5368709120n;

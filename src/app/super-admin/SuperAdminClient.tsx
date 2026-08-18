@@ -685,7 +685,7 @@ export default function SuperAdminClient({
                                    <span className="bg-indigo-50 text-indigo-600 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Pending Review</span>
                                  </div>
                                 <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-                                    申請身份：{app.creatorRole === 'SuperSales' ? `超級業務員 ${app.creatorId || ''}` : app.creatorRole === 'Distributor' ? `經銷商 ${app.creatorId || ''}` : app.creatorRole === 'System' ? '超級管理員' : (app.creatorRole || '超級業務員')} | 
+                                    申請身份：{app.creatorRole === 'SuperSales' ? `超級業務員 ${app.creatorId || ''}` : app.creatorRole === 'Distributor' ? `經銷商 ${app.creatorId || ''}` : app.creatorRole === 'System' ? '超級管理員' : (app.creatorRole === 'DistSales' ? '經銷業務 ' + (app.creatorId || '') : (app.creatorRole ? app.creatorRole + ' ' + (app.creatorId || '') : '未知身份'))} | 
                                     提交：超級管理員 | 
                                     日期：{new Date(app.createdAt || app.timestamp || new Date()).toISOString().split('T')[0]}
                                  </p>
