@@ -5396,7 +5396,7 @@ export interface TempleNotification {
 // (await jsonStore.find('temple_notifications')) synced
 
 // 1. 創立通知資料表與發佈公告
-export async function createNotification(title: string, content: string, sendTime: string, guestId?: string, expiresAt?: string | null) {
+export async function createNotification(title: string, content: string, sendTime: string, guestId?: string, expiresAt?: string | null, isCarousel: boolean = true, carouselSeconds: number = 5) {
     try {
       const templeId = await getDynamicTempleId();
       if (!templeId) return { success: false };
@@ -5408,7 +5408,9 @@ export async function createNotification(title: string, content: string, sendTim
           content,
           sendTime: new Date(sendTime),
           guestId: guestId || null,
-          expiresAt: expiresAt ? new Date(expiresAt) : null
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          isCarousel,
+          carouselSeconds
         }
       });
 
@@ -5438,7 +5440,9 @@ export async function fetchTempleNotifications(): Promise<TempleNotification[]> 
         sendTime: n.sendTime.toISOString(),
         createdAt: n.createdAt.toISOString(),
         expiresAt: n.expiresAt ? n.expiresAt.toISOString() : null,
-      guestId: n.guestId
+      guestId: n.guestId,
+      isCarousel: n.isCarousel,
+      carouselSeconds: n.carouselSeconds
     }));
   } catch (e) {
     console.error(e);
@@ -5478,7 +5482,9 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
       content: n.content,
       sendTime: n.sendTime.toISOString(),
       createdAt: n.createdAt.toISOString(),
-      guestId: n.guestId
+      guestId: n.guestId,
+      isCarousel: n.isCarousel,
+      carouselSeconds: n.carouselSeconds
     }));
   } catch (e) {
     console.error(e);

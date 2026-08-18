@@ -224,6 +224,18 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   const [expandedNotifIds, setExpandedNotifIds] = useState<Record<string, boolean>>({});
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [activeQueueCount, setActiveQueueCount] = useState<number>(0);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  const carouselNotifs = activeNotifications.filter(n => n.isCarousel !== false);
+  useEffect(() => {
+    if (carouselNotifs.length <= 1) return;
+    const currentNotif = carouselNotifs[carouselIndex];
+    const delay = (currentNotif?.carouselSeconds || 5) * 1000;
+    const timer = setTimeout(() => {
+      setCarouselIndex(prev => (prev + 1) % carouselNotifs.length);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [carouselIndex, carouselNotifs]);
 
   // Multi-step Booking States
   const [selectedService, setSelectedService] = useState<any>(null);
@@ -868,11 +880,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
               <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 shrink-0">
                 <IconBell />
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-gray-900">最新動態</p>
-                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[180px] md:max-w-xs font-medium">
-                  {latestNotification ? latestNotification.title : `歡迎拜訪${templeInfo?.templeName || '本宮廟'}，祝您平安喜樂！`}
-                </p>
+              <div className="min-w-0 flex-1 overflow-hidden relative h-10">
+                <p className="text-sm font-bold text-gray-900 absolute top-0 left-0">最新動態</p>
+                <div key={carouselIndex} className="absolute bottom-0 left-0 w-full animate-in slide-in-from-right-4 fade-in duration-500">
+                  <p className="text-xs text-gray-500 truncate font-medium pr-2">
+                    {carouselNotifs.length > 0 ? carouselNotifs[carouselIndex].title : `歡迎拜訪${templeInfo?.templeName || '本宮廟'}，祝您平安喜樂！`}
+                  </p>
+                </div>
               </div>
             </div>
             <button 

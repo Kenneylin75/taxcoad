@@ -20,6 +20,8 @@ export default function BelieverNotificationsPage() {
   const [sendType, setSendType] = useState<'immediate' | 'scheduled'>('immediate');
   const [scheduledTime, setScheduledTime] = useState('');
   const [durationDays, setDurationDays] = useState('');
+  const [isCarousel, setIsCarousel] = useState(true);
+  const [carouselSeconds, setCarouselSeconds] = useState(5);
 
   // Expand State
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -77,7 +79,7 @@ export default function BelieverNotificationsPage() {
     }
 
     setIsSubmitting(true);
-    const res = await createNotification(title, content, finalSendTime);
+    const res = await createNotification(title, content, finalSendTime, undefined, undefined, isCarousel, carouselSeconds);
     setIsSubmitting(false);
 
     if (res.success) {
@@ -86,6 +88,8 @@ export default function BelieverNotificationsPage() {
       setContent('');
       setSendType('immediate');
       setScheduledTime('');
+      setIsCarousel(true);
+      setCarouselSeconds(5);
       loadNotifications();
     } else {
       alert("❌ 發布失敗，請稍後再試。");
@@ -192,7 +196,6 @@ export default function BelieverNotificationsPage() {
                 </div>
               )}
 
-              {/* Submit Button */}
               <div className="space-y-1.5 mt-2 mb-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">發布有效天數 (選填)</label>
                 <input 
@@ -205,6 +208,36 @@ export default function BelieverNotificationsPage() {
                 />
               </div>
 
+              {/* Carousel Settings */}
+              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-amber-900 flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isCarousel} 
+                      onChange={e => setIsCarousel(e.target.checked)} 
+                      className="accent-amber-600 w-4 h-4"
+                    />
+                    加入首頁跳轉模組 (跑馬燈)
+                  </label>
+                  <span className="text-[9px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">New</span>
+                </div>
+                {isCarousel && (
+                  <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
+                    <label className="text-[10px] font-black text-amber-800 uppercase tracking-wider ml-1">跳轉停留秒數</label>
+                    <input 
+                      type="number" 
+                      min="1"
+                      max="60"
+                      value={carouselSeconds}
+                      onChange={e => setCarouselSeconds(parseInt(e.target.value) || 5)}
+                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-xs font-bold focus:border-amber-500 outline-none transition shadow-sm text-amber-900"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Submit Button */}
               <button 
                 type="submit" 
                 disabled={isSubmitting}

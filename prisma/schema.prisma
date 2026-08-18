@@ -870,12 +870,14 @@ model TempleNotification {
   isRead    Boolean   @default(false) @map("is_read")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
-  guestId   String?   @map("guest_id")
-  sendTime  DateTime  @map("send_time")
-  title     String
-  expiresAt DateTime? @map("expires_at")
-  guest     Guest?    @relation(fields: [guestId], references: [id])
-  temple    Temple    @relation(fields: [templeId], references: [id])
+  guestId         String?   @map("guest_id")
+  sendTime        DateTime  @map("send_time")
+  title           String
+  expiresAt       DateTime? @map("expires_at")
+  isCarousel      Boolean   @default(true) @map("is_carousel")
+  carouselSeconds Int       @default(5) @map("carousel_seconds")
+  guest           Guest?    @relation(fields: [guestId], references: [id])
+  temple          Temple    @relation(fields: [templeId], references: [id])
 
   @@map("temple_notifications")
 }
