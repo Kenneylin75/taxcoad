@@ -505,6 +505,16 @@ function DeepFileCenterContent() {
                         <p className="text-base font-bold text-slate-900 leading-relaxed group-hover/item:text-indigo-600 transition-colors pr-20">{selectedGuest.address || '未提供'}</p>
                      </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mt-6 pt-6 border-t border-slate-200/50">
+                     <div className="md:col-span-3 space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">登入帳號 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                        <p className="text-xl font-black text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.account || '未提供 (預設為手機號碼)'}</p>
+                     </div>
+                     <div className="md:col-span-9 space-y-2 cursor-pointer group/item" onClick={() => setShowAddModal(true)}>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">預設登入密碼 <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">✏️</span></p>
+                        <p className="text-xl font-black text-slate-900 group-hover/item:text-indigo-600 transition-colors">{selectedGuest.password || '未設定'}</p>
+                     </div>
+                  </div>
                </div>
 
                {/* TAB: 點燈 (關鍵連動與視覺同步) */}
