@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { fetchRentPlans, fetchSystemConfig } from '../actions';
+import { fetchRentPlans, fetchSystemConfig, fetchStoragePlans, fetchAiPlans } from '../actions';
 
 interface FormProps {
   role: 'dist-sales' | 'distributor' | 'super-sales' | 'super-admin';
@@ -34,16 +34,21 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
     freeType: 'Normal' as 'Normal' | 'Trial' | 'Permanent',
     trialMonths: 0,
     enableAi: true,
-    cloudStorage: '50GB',
-    aiLife: 'Basic'
+    cloudStorage: '',
+    aiLife: ''
   });
   const [accountError, setAccountError] = useState('');
+
+  const [storagePlans, setStoragePlans] = useState<any[]>([]);
+  const [aiPlans, setAiPlans] = useState<any[]>([]);
 
   useEffect(() => {
     fetchRentPlans().then(setRentPlans);
     fetchSystemConfig().then(cfg => {
         if (cfg) setConfig(cfg as any);
     });
+    fetchStoragePlans().then(setStoragePlans);
+    fetchAiPlans().then(setAiPlans);
   }, []);
 
   const validateAccount = async (acc: string) => {
@@ -247,21 +252,24 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
             <div className="grid grid-cols-2 gap-3">
                <div className="relative group">
                   <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">雲端空間</p>
-                  <select value={form.cloudStorage || '50GB'} onChange={e => setForm({...form, cloudStorage: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
-                     <option value="50GB">50GB 標準版</option>
-                     <option value="100GB">100GB 進階版</option>
-                     <option value="500GB">500GB 專業版</option>
-                     {role === 'super-admin' && <option value="Free">免費 (Free)</option>}
+                  <select value={form.cloudStorage || ''} onChange={e => setForm({...form, cloudStorage: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
+                     <option value="" disabled>請選擇雲端空間方案</option>
+                     {storagePlans.map(plan => (
+                        <option key={plan.id} value={plan.id}>{plan.name} (${plan.priceMonthly}/月)</option>
+                     ))}
+                     {role === 'super-admin' && <option value="Free">無限使用 (Free)</option>}
                   </select>
                   <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
                </div>
 
                <div className="relative group">
                   <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 生活</p>
-                  <select value={form.aiLife || 'Basic'} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
-                     <option value="Basic">基礎版 (Basic)</option>
-                     <option value="Pro">專業版 (Pro)</option>
-                     {role === 'super-admin' && <option value="Free">免費 (Free)</option>}
+                  <select value={form.aiLife || ''} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
+                     <option value="" disabled>請選擇 AI 生活方案</option>
+                     {aiPlans.map(plan => (
+                        <option key={plan.id} value={plan.id}>{plan.name} (${plan.price}/月)</option>
+                     ))}
+                     {role === 'super-admin' && <option value="Free">無限使用 (Free)</option>}
                   </select>
                   <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
                </div>

@@ -7391,17 +7391,14 @@ export async function submitFreeAccountApplication(data: any) {
       let storagePlanName = '免費 5GB 空間';
 
       if (data.cloudStorage === 'Free' || data.freeType === 'Permanent') {
-         allocatedBytes = 1099511627776n;
-         storagePlanName = '進階免費空間';
-      } else if (data.cloudStorage === '100GB') {
-         allocatedBytes = 107374182400n;
-         storagePlanName = '100GB 進階版';
-      } else if (data.cloudStorage === '500GB') {
-         allocatedBytes = 536870912000n;
-         storagePlanName = '500GB 專業版';
-      } else if (data.cloudStorage === '50GB') {
-         allocatedBytes = 53687091200n;
-         storagePlanName = '50GB 標準版';
+         allocatedBytes = 21990232555520n; // 20TB
+         storagePlanName = '無限使用';
+      } else if (data.cloudStorage) {
+         let p = await prisma.storagePlan.findUnique({ where: { id: data.cloudStorage } }) as any;
+         if (p) {
+             allocatedBytes = BigInt(p.sizeGb) * 1073741824n; // sizeGb * 1024^3
+             storagePlanName = `${p.sizeGb}GB 雲端空間`;
+         }
       }
 
       await prisma.templeStorage.create({
@@ -7422,7 +7419,8 @@ export async function submitFreeAccountApplication(data: any) {
           templeId: newTemple.id,
           planId: aiPlanId,
           enabled: data.enableAi ?? true,
-          usedCount: 0
+          usedCount: 0,
+          isVip: isAiVip
         }
       });
 
@@ -8361,21 +8359,19 @@ export async function createTempleAccount(data: any) {
   // synced
   
   // Initialize temple storage immediately to prevent overriding
-  const isVip = newTemple.plan === 'Unlimited Node' || newTemple.plan === 'Free' || newTemple.plan === '?祥' || newTemple.cloudStorage?.includes('?⊿?') || newTemple.cloudStorage === 'Free' || newTemple.cloudStorage === '?祥' || !newTemple.cloudStorage;
+  // Initialize temple storage immediately to prevent overriding
+  const isVip = newTemple.plan === 'Unlimited Node' || newTemple.plan === 'Free' || newTemple.plan === '無限使用' || newTemple.cloudStorage?.includes('無限') || newTemple.cloudStorage === 'Free' || !newTemple.cloudStorage;
   let qGB = 5;
   let pName = '免費 5GB 空間';
   if (isVip) {
-      qGB = 999999;
-      pName = '進階免費空間';
+      qGB = 20480; // 20TB
+      pName = '無限使用';
   } else if (newTemple.cloudStorage) {
-     if (newTemple.cloudStorage.startsWith('SP-')) {
-         let p = await prisma.storagePlan.findUnique({ where: { id: newTemple.cloudStorage } }) as any;
-         if (!p) p = db_storage_plans.find(x => x.id === newTemple.cloudStorage);
-         if (p) { qGB = p.sizeGb; pName = p.name; }
-     } else {
-         qGB = parseInt(newTemple.cloudStorage) || 5;
-         pName = `${qGB}GB`;
-     }
+      let p = await prisma.storagePlan.findUnique({ where: { id: newTemple.cloudStorage } }) as any;
+      if (p) { 
+          qGB = p.sizeGb; 
+          pName = `${p.sizeGb}GB 雲端空間`; 
+      }
   }
   const newStorage = {
     id: `TS-${Date.now()}-${newTemple.id}`,
@@ -8435,6 +8431,17 @@ export async function createTempleAccount(data: any) {
         planName: newStorage.planName,
           planId: newStorage.planId || 'FREE',
         city: '未設定'
+      }
+    });
+
+    let aiPlanId = isVip ? 'VIP-AI' : (data.aiLife || 'FREE');
+    await prisma.templeAiUsage.create({
+      data: {
+        templeId: id,
+        planId: aiPlanId,
+        enabled: data.enableAi ?? true,
+        usedCount: 0,
+        isVip: isVip
       }
     });
 
