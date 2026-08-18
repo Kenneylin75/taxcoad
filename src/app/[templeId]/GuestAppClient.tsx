@@ -1011,7 +1011,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${lamp.status === 'Pending' ? 'text-slate-500 bg-slate-100' : 'text-amber-600 bg-amber-50/50'}`}>{lamp.status === 'Pending' ? '等待安奉' : '安奉中'}</span>
                               </div>
                             </div>
-                            <div className="flex justify-between items-center mt-1">
+                            <div className="flex flex-col mt-1">
+                              {lamp.startDate && lamp.expiryDate && (
+                                <p className="text-[11px] text-gray-800 font-bold mt-0.5">安奉期間：{lamp.startDate} ~ {lamp.expiryDate}</p>
+                              )}
+                              {lamp.createdAt && (
+                                <p className="text-[10px] text-gray-400 mt-0.5">報名時間：{lamp.createdAt}</p>
+                              )}
                             </div>
                           </div>
                         );
