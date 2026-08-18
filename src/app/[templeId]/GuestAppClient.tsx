@@ -799,7 +799,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
     // 篩選未完成的項目
     const activeAppointment = guestAppointments.find(a => a.status === 'Confirmed' || a.status === 'Pending');
     const activeLamps = guestLamps.filter(l => l.status === 'Active' || l.status === 'Pending');
-    const activeTicket = guestTickets.find(t => t.status === 'Pending' || t.status === 'Queuing' || t.status === 'Calling');
+    const activeTicket = guestTickets.find(t => t.status === 'Pending' || t.status === 'Registered' || t.status === 'Queuing' || t.status === 'Calling');
     const activeRegistration = guestRegistrations[0]; // 最新的活動報名
 
     const getRemainingDays = (expiryDateStr: string) => {
@@ -951,7 +951,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   {activeAppointment ? (
                     <>
                       <h4 className="font-bold text-gray-900 text-sm mt-1 truncate">{activeAppointment.service}</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">{activeAppointment.date} {activeAppointment.time} • {activeAppointment.staff}</p>
+                      <p className="text-[11px] text-gray-800 font-bold mt-0.5">預約時間：{activeAppointment.date} {activeAppointment.time}</p>
+                      {activeAppointment.staff && (
+                        <p className="text-[11px] text-gray-500 mt-0.5">服務人員：{activeAppointment.staff}</p>
+                      )}
+                      {activeAppointment.createdAt && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">報名時間：{activeAppointment.createdAt}</p>
+                      )}
                       <p className="text-[10px] font-bold text-amber-600 mt-1 uppercase">
                         {(!activeAppointment.amount && activeAppointment.paymentMethod !== 'Cash') ? '隨喜功德' : 
                          (activeAppointment.amount ? `${activeAppointment.amount === 0 ? '隨喜功德' : '結緣金'}: NT$ ${activeAppointment.amount}` : '現場付現')}

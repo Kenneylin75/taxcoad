@@ -1628,42 +1628,25 @@ export async function fetchGuestAppointments(p: any) {
     const guest = await prisma.guest.findFirst({
       where: { templeId, phone: normPhone }
     });
-    
+    let apps = [];
     if (!guest) {
       // Fallback to checking by phone if guest relation not properly linked
-      const apps = await prisma.appointment.findMany({
+      apps = await prisma.appointment.findMany({
         where: { templeId, phone: normPhone },
         orderBy: [{ date: 'desc' }, { time: 'desc' }]
       });
-      return apps.map(app => ({
-        id: app.id,
-        templeId: app.templeId,
-        date: app.date,
-        time: app.time,
-        staff: app.staff,
-        guestName: app.guestName,
-        service: app.service,
-        serviceId: app.serviceId,
-        status: app.status,
-        phone: app.phone,
-        paymentMethod: app.paymentMethod,
-        paymentRef: app.paymentRef,
-        paymentStatus: app.paymentStatus,
-        amount: app.amount,
-        paymentProofUrl: app.paymentProofUrl
-      }));
+    } else {
+      apps = await prisma.appointment.findMany({
+        where: { 
+          templeId, 
+          OR: [
+            { guestId: guest.id },
+            { phone: normPhone }
+          ]
+        },
+        orderBy: [{ date: 'desc' }, { time: 'desc' }]
+      });
     }
-
-    const apps = await prisma.appointment.findMany({
-      where: { 
-        templeId, 
-        OR: [
-          { guestId: guest.id },
-          { phone: normPhone }
-        ]
-      },
-      orderBy: [{ date: 'desc' }, { time: 'desc' }]
-    });
 
     return apps.map(app => ({
       id: app.id,
@@ -1680,7 +1663,8 @@ export async function fetchGuestAppointments(p: any) {
       paymentRef: app.paymentRef,
       paymentStatus: app.paymentStatus,
       amount: app.amount,
-      paymentProofUrl: app.paymentProofUrl
+      paymentProofUrl: app.paymentProofUrl,
+      createdAt: app.createdAt.toISOString().replace('T', ' ').split('.')[0]
     }));
   } catch (error) {
     console.error('fetchGuestAppointments error:', error);
