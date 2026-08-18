@@ -1057,7 +1057,10 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   {activeRegistration ? (
                     <>
                       <h4 className="font-bold text-gray-900 text-sm mt-1 truncate">{activeRegistration.title}</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">活動時間：{activeRegistration.timestamp}</p>
+                      {activeRegistration.eventDate && (
+                        <p className="text-[11px] text-gray-800 font-bold mt-0.5">舉辦時間：{activeRegistration.eventDate}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-0.5">報名時間：{new Date(activeRegistration.timestamp).toLocaleString()}</p>
                     </>
                   ) : (
                     <p className="text-xs text-gray-400 font-bold mt-1">目前無即將參加的法會活動</p>

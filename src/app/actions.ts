@@ -1921,6 +1921,7 @@ export async function fetchGuestRegistrations(p: any) {
           paymentRef: r.paymentRef,
           paymentProofUrl: r.paymentProofUrl,
           actualPrice: r.actualPrice,
+          eventDate: r.event?.date || null,
           timestamp: r.createdAt.toISOString()
         }));
       } catch (e) {
