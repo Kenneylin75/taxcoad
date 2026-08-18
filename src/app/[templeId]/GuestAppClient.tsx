@@ -1027,14 +1027,21 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     <span className="text-[10px] font-black text-emerald-600 tracking-wider uppercase">未完成排隊</span>
                     {activeTicket && (
                       <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700">
-                        {activeTicket.status === 'Calling' ? '叫號中' : activeTicket.status === 'Queuing' ? '排隊中' : '已登錄'}
+                        {activeTicket.status === 'Calling' ? '叫號中' : activeTicket.status === 'Queuing' ? '排隊中' : '已報名完成'}
                       </span>
                     )}
                   </div>
                   {activeTicket ? (
                     <>
                       <h4 className="font-bold text-gray-900 text-sm mt-1 truncate">{activeTicket.eventTitle}</h4>
+                      {activeTicket.eventDate && (
+                        <p className="text-[11px] text-gray-800 font-bold mt-0.5">活動日期：{activeTicket.eventDate}</p>
+                      )}
                       <p className="text-[11px] text-gray-500 mt-0.5">持票號碼：{activeTicket.assignedNumber} {activeTicket.actualOrder ? `• 順位 ${activeTicket.actualOrder}` : ''}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">報名成功日期：{activeTicket.createdAt}</p>
+                      {activeTicket.checkedInCount !== undefined && (
+                        <p className="text-[10px] text-emerald-600 font-bold mt-0.5">現場目前報到人數：{activeTicket.checkedInCount} 人</p>
+                      )}
                     </>
                   ) : (
                     <p className="text-xs text-gray-400 font-bold mt-1">目前無正在排隊的現場掛號</p>

@@ -1940,13 +1940,39 @@ export async function fetchGuestQueueTickets(p: any) {
       where: { templeId, phone: normPhone }
     });
     
+    let tickets = [];
     if (!guest) {
-      const tickets = await prisma.queueTicket.findMany({
+      tickets = await prisma.queueTicket.findMany({
         where: { templeId, phone: normPhone },
         orderBy: { createdAt: 'desc' },
         include: { queueEvent: true }
       });
-      return tickets.map(t => ({
+    } else {
+      tickets = await prisma.queueTicket.findMany({
+        where: { 
+          templeId,
+          OR: [
+            { guestId: guest.id },
+            { phone: normPhone }
+          ]
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { queueEvent: true }
+      });
+    }
+
+    return await Promise.all(tickets.map(async t => {
+      let checkedInCount = 0;
+      if (t.eventId) {
+        checkedInCount = await prisma.queueTicket.count({
+          where: {
+            eventId: t.eventId,
+            templeId: templeId,
+            status: { notIn: ['Pending', 'Registered', 'Draft'] }
+          }
+        });
+      }
+      return {
         id: t.id,
         eventId: t.eventId,
         templeId: t.templeId,
@@ -1960,39 +1986,11 @@ export async function fetchGuestQueueTickets(p: any) {
         paymentMethod: t.paymentMethod,
         paymentRef: t.paymentRef,
         paymentProofUrl: t.paymentProofUrl,
-      createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0],
-      actualOrder: t.actualOrder
-      }));
-    }
-
-    const tickets = await prisma.queueTicket.findMany({
-      where: { 
-        templeId,
-        OR: [
-          { guestId: guest.id },
-          { phone: normPhone }
-        ]
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { queueEvent: true }
-    });
-
-    return tickets.map(t => ({
-      id: t.id,
-      eventId: t.eventId,
-      templeId: t.templeId,
-      eventTitle: t.eventTitle,
-      phone: t.phone,
-      guestName: t.guestName,
-      status: t.status,
-      assignedNumber: t.assignedNumber,
-      amount: t.queueEvent?.price || 0,
-      paymentStatus: t.paymentStatus,
-      paymentMethod: t.paymentMethod,
-      paymentRef: t.paymentRef,
-      paymentProofUrl: t.paymentProofUrl,
-      createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0],
-      actualOrder: t.actualOrder
+        createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0],
+        actualOrder: t.actualOrder,
+        eventDate: t.queueEvent?.date || null,
+        checkedInCount
+      };
     }));
   } catch (error) {
     console.error('fetchGuestQueueTickets error:', error);
