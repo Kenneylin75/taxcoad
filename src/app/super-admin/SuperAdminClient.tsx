@@ -72,7 +72,8 @@ export default function SuperAdminClient({
     enabledMethods: [],
     ecpay: { merchantId: '', hashKey: '', hashIV: '' },
     linePay: { channelId: '', channelSecret: '' },
-    transfer: { bankCode: '', accountNumber: '', accountName: '' }
+    transfer: { bankCode: '', accountNumber: '', accountName: '' },
+    serviceMapping: {}
   });
   const [templePaymentFilter, setTemplePaymentFilter] = useState('ALL');
   const [allTempleAiUsage, setAllTempleAiUsage] = useState<any[]>([]);
@@ -134,7 +135,7 @@ export default function SuperAdminClient({
     fetchAggregatedAnalytics(trendYear).then(setAnalytics);
     fetchSystemConfig().then(c => {
        setConfig(c);
-       if (c.b2bPayment) setB2bPayment(c.b2bPayment);
+       if (c.b2bPayment) setB2bPayment({ ...c.b2bPayment, serviceMapping: c.b2bPayment.serviceMapping || {} });
     });
     fetchAdminLogs().then(setLogs);
     fetchSuperAdminFinancials().then(data => {
@@ -2111,7 +2112,7 @@ export default function SuperAdminClient({
 
         </div>
       
-           {activeTab === 'b2b_payment' && b2bPayment && b2bPayment.serviceMapping && (
+           {activeTab === 'b2b_payment' && b2bPayment && (
               <div className="p-16 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto space-y-12">
                  <div className="text-center space-y-4 mb-16">
                     <h3 className="text-4xl font-black text-slate-900 italic tracking-tighter">超級管理員 B2B 收款與分流設定</h3>
@@ -2197,7 +2198,7 @@ export default function SuperAdminClient({
                                 <div className="flex flex-wrap gap-4">
                                    {['thirdParty', 'linePay', 'customTransfer'].map(provider => {
                                       const label = provider === 'thirdParty' ? 'ECPay' : provider === 'linePay' ? 'LINE Pay' : '銀行匯款';
-                                      const isChecked = !!b2bPayment.serviceMapping[service.id]?.includes(provider);
+                                      const isChecked = !!b2bPayment.serviceMapping?.[service.id]?.includes(provider);
                                       return (
                                          <label key={provider} className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 cursor-pointer transition-all ${isChecked ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}>
                                             <input 
@@ -2205,7 +2206,7 @@ export default function SuperAdminClient({
                                               className="hidden" 
                                               checked={isChecked}
                                               onChange={(e) => {
-                                                 const current = b2bPayment.serviceMapping[service.id] || [];
+                                                 const current = b2bPayment.serviceMapping?.[service.id] || [];
                                                  const next = e.target.checked ? [...current, provider] : current.filter((p: string) => p !== provider);
                                                  setB2bPayment({
                                                     ...b2bPayment,
