@@ -1892,7 +1892,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                      value={paymentRefInput} onChange={e => setPaymentRefInput(e.target.value)} />
                </div>
                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">上傳匯款截圖 (可選)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">上傳匯款截圖</label>
                   <input type="file" accept="image/*" onChange={e => {
                      const file = e.target.files?.[0];
                      if(file) setCheckoutProofFile(file);
@@ -1932,7 +1932,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                      value={paymentRefInput} onChange={e => setPaymentRefInput(e.target.value)} />
                </div>
                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">上傳匯款截圖 (可選)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1 ml-1">上傳匯款截圖</label>
                   <input type="file" accept="image/*" onChange={e => {
                      const file = e.target.files?.[0];
                      if(file) setCheckoutProofFile(file);
@@ -2651,6 +2651,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
               <h3 className="text-lg font-bold text-gray-900 px-1">可參加的排隊項目</h3>
               <div className="grid gap-4">
                 {queueEvents.filter(e => e.status === 'Active').map(evt => {
+                  const isFull = evt.maxCapacity > 0 && (evt.participantCount || 0) >= evt.maxCapacity;
                   return (
                     <div key={evt.id} className="app-card p-5 space-y-4">
                       <div className="flex justify-between items-start">
@@ -2660,7 +2661,9 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] font-bold text-emerald-600 uppercase">已參加人數</p>
-                          <p className="text-lg font-bold text-emerald-700">{evt.participantCount || 0}人</p>
+                          <p className="text-lg font-bold text-emerald-700">
+                            {evt.participantCount || 0} / {evt.maxCapacity > 0 ? evt.maxCapacity : '無限制'} 人
+                          </p>
                         </div>
                       </div>
                       
@@ -2670,6 +2673,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                       </div>
 
                       <button 
+                        disabled={isFull}
                         onClick={async () => {
                           const isQueued = myTickets.some(t => t.eventId === evt.id && t.status !== 'Completed' && t.status !== 'Cancelled');
                           if (isQueued) {
@@ -2692,9 +2696,9 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                             }
                           });
                         }}
-                        className="btn-primary w-full py-3"
+                        className={`w-full py-3 ${isFull ? 'bg-gray-300 text-gray-500 cursor-not-allowed rounded-lg font-bold' : 'btn-primary'}`}
                       >
-                        領取號碼牌
+                        {isFull ? '人數已滿' : '領取號碼牌'}
                       </button>
                     </div>
                   );

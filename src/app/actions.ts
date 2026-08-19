@@ -2048,6 +2048,15 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
     const ev = await prisma.queueEvent.findUnique({ where: { id: String(eventId) } });
     if (!ev || ev.templeId !== templeId) return { success: false };
     
+    if (ev.maxCapacity > 0) {
+      const activeTickets = await prisma.queueTicket.count({
+        where: { eventId: String(eventId), templeId, status: { notIn: ['Cancelled'] } }
+      });
+      if (activeTickets >= ev.maxCapacity) {
+        return { success: false, message: '此排隊活動人數已滿！' };
+      }
+    }
+
     const count = await prisma.queueTicket.count({ where: { eventId: String(eventId), templeId } });
     const assignedNumber = `A${(count + 1).toString().padStart(3, '0')}`;
     const pStatus = paymentMethod === 'Cash' || !paymentMethod ? 'Pending' : 'Paid';
@@ -4814,7 +4823,7 @@ export async function fetchQueueEvents() {
         const events = await prisma.queueEvent.findMany({
           where: { templeId: templeId! },
           orderBy: [{ date: 'desc' }, { startTime: 'desc' }],
-          include: { tickets: { where: { status: 'Queuing' } } }
+          include: { tickets: { where: { status: { notIn: ['Cancelled'] } } } }
         });
         
         return events.map(r => ({
@@ -5096,7 +5105,9 @@ export async function registerGuestForQueue(eventId: string, data: { guestName: 
         });
         
         if (!ev) return { error: 'EVENT_NOT_FOUND' };
-        if (ev.maxCapacity > 0 && ev.tickets.length >= ev.maxCapacity) return { error: '活動預約已額滿！' };
+        
+        const activeTicketsCount = ev.tickets.filter(t => t.status !== 'Cancelled').length;
+        if (ev.maxCapacity > 0 && activeTicketsCount >= ev.maxCapacity) return { error: '活動預約已額滿！' };
         
         const nextNumber = `A${(ev.tickets.length + 1).toString().padStart(3, '0')}`;
         
