@@ -790,6 +790,34 @@ export default function SuperAdminClient({
            {/* --- 9. CLOUD STORAGE MANAGEMENT --- */}
            {activeTab === 'space' && (
               <div className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                 
+                 {/* Overall Storage Summary */}
+                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-12 rounded-[60px] shadow-lg text-white flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+                    <div className="absolute right-0 top-0 opacity-10 text-[180px] -translate-y-12 translate-x-12 pointer-events-none">☁️</div>
+                    <div className="relative z-10">
+                       <h4 className="text-sm font-black uppercase tracking-[0.3em] text-indigo-200 mb-2">Platform Overall Storage</h4>
+                       <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter">全平台雲端空間總覽</h2>
+                    </div>
+                    <div className="relative z-10 flex flex-col sm:flex-row items-center gap-8 bg-white/10 p-8 rounded-[40px] backdrop-blur-md border border-white/20 shadow-inner">
+                       <div className="text-center min-w-[120px]">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">總使用量 (Total Used)</p>
+                          <p className="text-4xl font-black text-white">{(() => {
+                             const totalUsed = templeStorages.reduce((acc, curr) => acc + (Number(curr.usedBytes) || 0), 0);
+                             return (totalUsed / (1024 * 1024 * 1024)).toFixed(2);
+                          })()} <span className="text-sm font-bold opacity-70">GB</span></p>
+                       </div>
+                       <div className="hidden sm:block w-px h-16 bg-white/20"></div>
+                       <div className="w-full h-px sm:hidden bg-white/20"></div>
+                       <div className="text-center min-w-[120px]">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">總配置上限 (Total Quota)</p>
+                          <p className="text-4xl font-black text-white">{(() => {
+                             const totalAllocated = templeStorages.reduce((acc, curr) => acc + (Number(curr.quotaGb) || 5), 0);
+                             return totalAllocated.toLocaleString();
+                          })()} <span className="text-sm font-bold opacity-70">GB</span></p>
+                       </div>
+                    </div>
+                 </div>
+
                  {/* Top pricing settings */}
                  <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
                     <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-indigo-500 underline-offset-8">雲端儲存方案定價設定 (Storage Pricing Model)</h4>
