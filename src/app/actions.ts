@@ -2437,7 +2437,7 @@ export async function fetchStoragePlans() {
         });
         return plans.map(r => ({
           id: r.id,
-          name: `${r.sizeGb}GB 雲端空間`,
+          name: r.name || `${r.sizeGb}GB 雲端空間`,
           sizeGb: r.sizeGb,
           priceMonthly: r.priceMonthly,
           priceYearly: r.priceYearly
@@ -2455,6 +2455,7 @@ export async function updateStoragePlans(plans: any[]) {
     for (const p of plans) {
       await prisma.storagePlan.create({
         data: {
+          name: p.name,
           sizeGb: p.sizeGb,
           priceMonthly: p.priceMonthly,
           priceYearly: p.priceYearly
@@ -2572,38 +2573,85 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
 
 export async function upgradeTempleStorage(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly', isManualGrant: boolean = false) {
   return withTempleSession(templeId, true, async (client) => {
-    const planRes = await client.query('SELECT * FROM storage_plans WHERE id::text = $1 OR size_gb::text = $1', [planId]);
-      if ((planRes.rowCount ?? 0) === 0) return { success: false, message: '找不到選定的空間方案' };
-      const plan = planRes.rows[0];
-      const discount = 20;
-      const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
-      const finalAmount = Math.round(plan.price_monthly * priceFactor);
-      const templeRes = await client.query('SELECT * FROM "Temple" WHERE id = $1', [templeId]);
-      const temple = templeRes.rows[0];
-      if (!isManualGrant) {
-              await client.query(
-                `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, $3, $4) 
-           ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance`,
-                ['SuperAdmin', '超級管理員', finalAmount]
-              );
+    let plan = await prisma.storagePlan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      // try to search by sizeGb if planId is a number string
+      const sizeGb = parseInt(planId);
+      if (!isNaN(sizeGb)) {
+        plan = await prisma.storagePlan.findFirst({ where: { sizeGb: sizeGb } });
+      }
+    }
+    if (!plan) return { success: false, message: '找不到選定的空間方案' };
 
-              await client.query(
-                'INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)',
-                [temple?.temple_name || '宮廟', `升級空間 ${plan.size_gb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`, finalAmount, 100, '超級管理員']
-              );
+    const discount = 20;
+    const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
+    const finalAmount = Math.round(plan.priceMonthly * priceFactor);
+    const temple = await prisma.temple.findUnique({ where: { id: templeId } });
+    
+    if (!isManualGrant) {
+      // update wallet
+      const walletName = '超級管理員';
+      const existingWallet = await prisma.wallet.findFirst({ where: { name: walletName } });
+      if (existingWallet) {
+        await prisma.wallet.update({
+          where: { id: existingWallet.id },
+          data: { balance: { increment: finalAmount } }
+        });
+      } else {
+        await prisma.wallet.create({
+          data: { role: 'SuperAdmin', name: walletName, balance: finalAmount }
+        });
+      }
 
-              await client.query(
-                `INSERT INTO "TempleBill" (id, temple_id, "itemName", amount, "dueDate", status, "payeeRole", "payeeId") VALUES ($1, $2, $3, $4, $5, 'Unpaid', $6, $7)`,
-                [`BILL-STORAGE-${Date.now()}`, templeId, '雲端空間擴充方案 - ' + plan.name, finalAmount, new Date().toISOString().split('T')[0], 'SuperAdmin', 'system-hq']
-              );
-            }
-      const allocatedBytes = plan.size_gb * 1024 * 1024 * 1024;
-      await client.query(
-              `INSERT INTO temple_storages (temple_id, used_bytes, allocated_bytes, plan_name, city) 
-         VALUES ($1, 0, $2, $3, $4)
-         ON CONFLICT (temple_id) DO UPDATE SET allocated_bytes = EXCLUDED.allocated_bytes, plan_name = EXCLUDED.plan_name`,
-              [templeId, allocatedBytes, `${plan.size_gb}GB 雲端空間`, temple?.city || '台北市']
-            );
+      await prisma.payoutRecord.create({
+        data: {
+          templeName: temple?.templeName || '宮廟',
+          type: `升級空間 ${plan.sizeGb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`,
+          amount: finalAmount,
+          percentage: 100,
+          roleName: '超級管理員'
+        }
+      });
+
+      await prisma.templeBill.create({
+        data: {
+          id: `BILL-STORAGE-${Date.now()}`,
+          templeId: templeId,
+          itemName: '雲端空間擴充方案 - ' + plan.name,
+          amount: finalAmount,
+          dueDate: new Date().toISOString().split('T')[0],
+          status: 'Unpaid',
+          payeeRole: 'SuperAdmin',
+          payeeId: 'system-hq'
+        }
+      });
+    }
+
+    const allocatedBytes = BigInt(plan.sizeGb) * BigInt(1024 * 1024 * 1024);
+    
+    const existingStorage = await prisma.templeStorage.findUnique({ where: { templeId: templeId } });
+    if (existingStorage) {
+      await prisma.templeStorage.update({
+        where: { templeId: templeId },
+        data: {
+          allocatedBytes: allocatedBytes,
+          planName: `${plan.sizeGb}GB 雲端空間`,
+          planId: plan.id
+        }
+      });
+    } else {
+      await prisma.templeStorage.create({
+        data: {
+          id: `TS-${Date.now()}-${templeId}`,
+          templeId: templeId,
+          usedBytes: BigInt(0),
+          allocatedBytes: allocatedBytes,
+          planName: `${plan.sizeGb}GB 雲端空間`,
+          planId: plan.id,
+          city: temple?.city || '未設定'
+        }
+      });
+    }
 
     revalidatePath('/super-admin');
     await revalidateTemple();
@@ -3947,10 +3995,6 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
       if (Number(storage.usedBytes) >= Number(storage.allocatedBytes)) {
         return { success: false, error: '宮廟雲端空間已滿，無法上傳檔案。' };
       }
-      await prisma.templeStorage.update({
-        where: { templeId },
-        data: { usedBytes: { increment: 5 * 1024 * 1024 } }
-      });
     }
 
     const newId = `f-${Date.now()}`;

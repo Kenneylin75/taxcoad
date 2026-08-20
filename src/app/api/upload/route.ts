@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import prisma from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 
 export async function POST(req: Request) {
   try {
@@ -16,6 +18,21 @@ export async function POST(req: Request) {
     // Convert to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const fileSize = buffer.length;
+
+    // Check storage limits
+    const storage = await prisma.templeStorage.findUnique({ where: { templeId } });
+    if (storage) {
+      if (Number(storage.usedBytes) + fileSize > Number(storage.allocatedBytes)) {
+        return NextResponse.json({ success: false, message: '宮廟雲端空間已滿，請聯繫廟方升級方案，或無法上傳新檔案。' }, { status: 403 });
+      }
+      
+      // Update usedBytes accurately
+      await prisma.templeStorage.update({
+        where: { templeId },
+        data: { usedBytes: { increment: fileSize } }
+      });
+    }
 
     // Create target directory public/uploads/temples/[templeId]
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'temples', templeId);
