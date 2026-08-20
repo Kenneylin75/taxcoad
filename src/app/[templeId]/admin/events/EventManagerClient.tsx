@@ -10,6 +10,7 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
   const [managingEvent, setManagingEvent] = useState<EventItem | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [registrations, setRegistrations] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,6 +49,7 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
         }
         setActiveTab('list');
         setEditingEvent(null);
+        setCurrentPage(1);
       }
     });
   };
@@ -205,73 +207,103 @@ export default function EventManagerClient({ initialEvents }: { initialEvents: E
         </form>
       )}
 
-      {activeTab === 'list' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.length === 0 ? (
-            <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white">
-               <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">目前無任何活動紀錄</p>
+      {activeTab === 'list' && (() => {
+        const ITEMS_PER_PAGE = 12;
+        const totalPages = Math.ceil(events.length / ITEMS_PER_PAGE) || 1;
+        const currentEvents = events.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {events.length === 0 ? (
+                <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white">
+                   <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">目前無任何活動紀錄</p>
+                </div>
+              ) : (
+                currentEvents.map(event => (
+                  <div key={event.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl hover:border-amber-300 transition-all">
+                    <div className="p-5 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                            event.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 
+                            event.status === 'Draft' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {event.status === 'Active' ? '開放報名中' : event.status === 'Draft' ? '草稿/籌備中' : '已結束'}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 tracking-tight group-hover:text-amber-600 transition-colors">{event.title}</h3>
+                      </div>
+                      <div className="flex gap-1">
+                        <button onClick={() => handleEdit(event)} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all" title="編輯活動">✏️</button>
+                        <button onClick={() => handleDelete(event.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="刪除活動">🗑️</button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 space-y-4 flex-1">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">活動日期</p>
+                          <p className="text-sm font-bold text-slate-700">{event.date}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">功德金</p>
+                          <p className="text-sm font-bold text-slate-700">{event.price === 0 ? '免費 / 隨喜' : `NT$ ${event.price}`}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">舉辦地點</p>
+                          <p className="text-sm font-bold text-slate-700 flex items-center gap-1">📍 {event.location}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-100">
+                        <div className="flex justify-between items-end mb-2">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">報名狀況</span>
+                          <span className="text-sm font-black text-slate-800">{event.enrolled} <span className="text-[10px] text-slate-400">/ {event.capacity} 人</span></span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${event.enrolled >= event.capacity ? 'bg-rose-500' : 'bg-amber-500'}`}
+                            style={{ width: `${Math.min((event.enrolled / event.capacity) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-900 border-t border-slate-800">
+                      <button onClick={() => handleManage(event)} className="w-full py-2 text-xs font-black text-amber-500 uppercase tracking-widest hover:text-white transition-colors">
+                        管理報名名單 →
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          ) : (
-            events.map(event => (
-              <div key={event.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl hover:border-amber-300 transition-all">
-                <div className="p-5 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
-                        event.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 
-                        event.status === 'Draft' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {event.status === 'Active' ? '開放報名中' : event.status === 'Draft' ? '草稿/籌備中' : '已結束'}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-black text-slate-800 tracking-tight group-hover:text-amber-600 transition-colors">{event.title}</h3>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => handleEdit(event)} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all" title="編輯活動">✏️</button>
-                    <button onClick={() => handleDelete(event.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all" title="刪除活動">🗑️</button>
-                  </div>
-                </div>
-                
-                <div className="p-5 space-y-4 flex-1">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">活動日期</p>
-                      <p className="text-sm font-bold text-slate-700">{event.date}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">功德金</p>
-                      <p className="text-sm font-bold text-slate-700">{event.price === 0 ? '免費 / 隨喜' : `NT$ ${event.price}`}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">舉辦地點</p>
-                      <p className="text-sm font-bold text-slate-700 flex items-center gap-1">📍 {event.location}</p>
-                    </div>
-                  </div>
 
-                  <div className="pt-4 border-t border-slate-100">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">報名狀況</span>
-                      <span className="text-sm font-black text-slate-800">{event.enrolled} <span className="text-[10px] text-slate-400">/ {event.capacity} 人</span></span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all ${event.enrolled >= event.capacity ? 'bg-rose-500' : 'bg-amber-500'}`}
-                        style={{ width: `${Math.min((event.enrolled / event.capacity) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-900 border-t border-slate-800">
-                  <button onClick={() => handleManage(event)} className="w-full py-2 text-xs font-black text-amber-500 uppercase tracking-widest hover:text-white transition-colors">
-                    管理報名名單 →
-                  </button>
-                </div>
+            {events.length > 0 && (
+              <div className="flex items-center justify-between bg-white px-6 py-4 rounded-2xl border border-slate-200 shadow-sm">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-6 py-2 bg-slate-50 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-slate-200"
+                >
+                  上一頁
+                </button>
+                <span className="text-xs font-black text-slate-500 tracking-widest uppercase">
+                  第 {currentPage} 頁 <span className="text-slate-300 mx-2">/</span> 共 {totalPages} 頁
+                </span>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-6 py-2 bg-slate-50 text-slate-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-slate-200"
+                >
+                  下一頁
+                </button>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       {activeTab === 'manage' && managingEvent && (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">

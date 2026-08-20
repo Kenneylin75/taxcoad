@@ -2121,6 +2121,7 @@ export async function fetchEvents() {
     const templeId = await getDynamicTempleId();
     const events = await prisma.event.findMany({
       where: { templeId: templeId! },
+      orderBy: { date: 'asc' },
       include: { registrations: true }
     });
 
