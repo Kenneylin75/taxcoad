@@ -2646,7 +2646,8 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
     }
     if (!plan) return { success: false, message: '找不到選定的空間方案' };
 
-    const discount = 20;
+    const config = (await prisma.systemConfig.findFirst()) as any;
+    const discount = config?.yearlyDiscountRate || 20;
     const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
     const temple = await prisma.temple.findUnique({ where: { id: templeId } });
@@ -2699,7 +2700,9 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
         data: {
           allocatedBytes: allocatedBytes,
           planName: `${20 + plan.sizeGb}GB 雲端空間`,
-          planId: plan.id
+          planId: plan.id,
+          paymentCycle: cycle,
+          billingStartDate: new Date()
         }
       });
     } else {
@@ -2711,7 +2714,9 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           allocatedBytes: allocatedBytes,
           planName: `${20 + plan.sizeGb}GB 雲端空間`,
           planId: plan.id,
-          city: temple?.city || '未設定'
+          city: temple?.city || '未設定',
+          paymentCycle: cycle,
+          billingStartDate: new Date()
         }
       });
     }
@@ -3466,6 +3471,7 @@ export async function fetchFinancialOverview() {
     if (!isPermanentFree && trialDaysRemaining === undefined) {
       await autoGenerateRecurringBills(temple);
     }
+    await autoGenerateStorageBills(temple.id);
   }
 
   let usedPgForRevenue = false;
@@ -6903,12 +6909,80 @@ export async function fetchSalesProfileById(salesId: string) {
 }
 
 export async function fetchTempleBills(templeId: string) {
-
       try {
+        await autoGenerateStorageBills(templeId);
         return await prisma.templeBill.findMany({ where: { templeId }, orderBy: { createdAt: 'desc' } });
       } catch(e) {
         return [];
       }
+}
+
+async function autoGenerateStorageBills(templeId: string) {
+  try {
+    const storage = await prisma.templeStorage.findUnique({ where: { templeId } });
+    if (!storage || !storage.planId || !storage.paymentCycle || !storage.billingStartDate) return;
+
+    const plan = await prisma.storagePlan.findUnique({ where: { id: storage.planId } });
+    if (!plan || plan.priceMonthly <= 0) return;
+
+    const isYearly = storage.paymentCycle === 'Yearly';
+    const config = (await prisma.systemConfig.findFirst()) as any;
+    const yearlyDiscount = config?.yearlyDiscountRate || 20;
+    
+    const priceFactor = isYearly ? (12 * (1 - yearlyDiscount / 100)) : 1;
+    const amount = Math.round(plan.priceMonthly * priceFactor);
+    const itemName = '雲端空間擴充方案 - ' + plan.name;
+
+    const existingBills = await prisma.templeBill.findMany({
+      where: { templeId, itemName: { contains: plan.name } }
+    });
+
+    const now = new Date();
+    let cycleDate = new Date(storage.billingStartDate);
+    
+    // Jump to next cycle since first cycle is paid upon upgrade
+    if (isYearly) {
+      cycleDate.setFullYear(cycleDate.getFullYear() + 1);
+    } else {
+      cycleDate.setMonth(cycleDate.getMonth() + 1);
+    }
+
+    const generateBills = [];
+    while (cycleDate <= now) {
+      const billingStr = cycleDate.toISOString().substring(0, 7);
+      
+      const hasBill = existingBills.some((b: any) => {
+         const bStr = (b.billingDate || (b.createdAt instanceof Date ? b.createdAt.toISOString() : '')).substring(0, 7);
+         return bStr === billingStr || b.id.includes(billingStr) || (b.dueDate && b.dueDate.startsWith(billingStr));
+      });
+
+      if (!hasBill) {
+        generateBills.push({
+          id: `BILL-STORAGE-${Date.now()}-${billingStr}`,
+          templeId,
+          itemName: `雲端空間擴充方案 - ${plan.name} (${plan.id})`,
+          amount,
+          dueDate: cycleDate.toISOString().split('T')[0],
+          billingDate: billingStr,
+          status: 'Unpaid',
+          payeeRole: 'SuperAdmin',
+          payeeId: 'system-hq'
+        });
+      }
+
+      if (isYearly) {
+        cycleDate.setFullYear(cycleDate.getFullYear() + 1);
+      } else {
+        cycleDate.setMonth(cycleDate.getMonth() + 1);
+      }
+    }
+
+    for (const newBill of generateBills) {
+      await prisma.templeBill.create({ data: newBill }).catch(e => console.error('Failed to gen storage bill', e));
+    }
+  } catch (error) {
+    console.error('autoGenerateStorageBills error:', error);
+  }
 }
 
 export async function uploadTempleBillReceipt(billId: string, imageUrl: string) {

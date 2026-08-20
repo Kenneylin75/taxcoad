@@ -262,6 +262,8 @@ model TempleStorage {
   city           String?
   planName       String?  @map("plan_name")
   temple         Temple   @relation(fields: [templeId], references: [id])
+  paymentCycle     String?   @map("payment_cycle")
+  billingStartDate DateTime? @map("billing_start_date")
 
   @@map("temple_storages")
 }

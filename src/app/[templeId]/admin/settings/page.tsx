@@ -7,7 +7,8 @@ import {
   fetchStoragePlans, 
   fetchTempleStorages, 
   upgradeTempleStorage, fetchTempleAiUsage, toggleTempleAiStatus, purchaseAiPlan, fetchAiPlans, fetchB2BPaymentConfig,
-  getTempleBasicInfo, updateTempleBasicInfo, getTempleCreatorInfo, createSaasOrder
+  getTempleBasicInfo, updateTempleBasicInfo, getTempleCreatorInfo, createSaasOrder,
+  fetchSystemConfig
 } from '@/app/actions';
 
 export default function AdvancedSettingsPage() {
@@ -63,12 +64,14 @@ export default function AdvancedSettingsPage() {
 
   const [basicInfo, setBasicInfo] = useState<any>(null);
   const [saasOrders, setSaasOrders] = useState<any[]>([]);
+  const [sysConfig, setSysConfig] = useState<any>({ yearlyDiscountRate: 20 });
 
   useEffect(() => {
     // Load storage info and plans
     fetchStoragePlans().then(setStoragePlans);
     fetchAiPlans().then(setAiPlans);
     fetchTempleAiUsage().then(setAiInfo);
+    fetchSystemConfig().then(cfg => { if(cfg) setSysConfig(cfg); });
     
     // We assume templeId is accessible via window.location or we can just pass dynamic ID
     const currentTempleId = decodeURIComponent(window.location.pathname.split('/')[1]);
@@ -544,15 +547,16 @@ export default function AdvancedSettingsPage() {
                        onClick={() => setSelectedCycle('Yearly')}
                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${selectedCycle === 'Yearly' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400'}`}
                     >
-                       年繳費 (省20%)
+                       年繳費 (省{sysConfig.yearlyDiscountRate || 20}%)
                     </button>
                  </div>
 
-                 {/* Storage Plans list */}
+                  {/* Storage Plans list */}
                  <div className="space-y-3">
                     {storagePlans.map(plan => {
                        const priceMonthly = plan.priceMonthly;
-                       const priceYearly = Math.round(plan.priceMonthly * 12 * 0.8); // 20% discount
+                       const discountRate = sysConfig.yearlyDiscountRate || 20;
+                       const priceYearly = Math.round(plan.priceMonthly * 12 * (1 - discountRate / 100));
                        const finalPrice = selectedCycle === 'Monthly' ? priceMonthly : priceYearly;
                        const isSelected = selectedPlanId === plan.id;
                        
