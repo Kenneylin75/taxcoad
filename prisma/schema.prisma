@@ -258,7 +258,7 @@ model TempleStorage {
   planId         String?  @map("plan_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
-  allocatedBytes BigInt   @default(5368709120) @map("allocated_bytes")
+  allocatedBytes BigInt   @default(21474836480) @map("allocated_bytes")
   city           String?
   planName       String?  @map("plan_name")
   temple         Temple   @relation(fields: [templeId], references: [id])

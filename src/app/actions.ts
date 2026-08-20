@@ -2635,7 +2635,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
       });
     }
 
-    const allocatedBytes = BigInt(plan.sizeGb) * BigInt(1024 * 1024 * 1024);
+    const allocatedBytes = BigInt(20 + plan.sizeGb) * BigInt(1024 * 1024 * 1024);
     
     const existingStorage = await prisma.templeStorage.findUnique({ where: { templeId: templeId } });
     if (existingStorage) {
@@ -2643,7 +2643,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
         where: { templeId: templeId },
         data: {
           allocatedBytes: allocatedBytes,
-          planName: `${plan.sizeGb}GB 雲端空間`,
+          planName: `${20 + plan.sizeGb}GB 雲端空間`,
           planId: plan.id
         }
       });
@@ -2654,7 +2654,7 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           templeId: templeId,
           usedBytes: BigInt(0),
           allocatedBytes: allocatedBytes,
-          planName: `${plan.sizeGb}GB 雲端空間`,
+          planName: `${20 + plan.sizeGb}GB 雲端空間`,
           planId: plan.id,
           city: temple?.city || '未設定'
         }
@@ -5415,8 +5415,8 @@ export async function approveTempleApplication(appId: string) {
       data: {
         templeId: newTempleId,
         usedBytes: 0,
-        allocatedBytes: BigInt(5368709120),
-        planName: '標準免費空間',
+        allocatedBytes: BigInt(21474836480),
+        planName: '免費 20GB 空間',
           planId: 'FREE',
         city: '台北市'
       }
@@ -6599,14 +6599,14 @@ export async function grantTempleStorageVip(templeId: string, isVip: boolean = t
       where: { templeId },
       update: {
         planId: isVip ? 'VIP-STORAGE' : 'FREE',
-        allocatedBytes: isVip ? 1099511627776n : 5368709120n,
-        planName: isVip ? '進階免費空間' : '免費 5GB 空間'
+        allocatedBytes: isVip ? 1099511627776n : 21474836480n,
+        planName: isVip ? '進階免費空間' : '免費 20GB 空間'
       },
       create: {
         templeId,
         planId: isVip ? 'VIP-STORAGE' : 'FREE',
-        allocatedBytes: isVip ? 1099511627776n : 5368709120n,
-        planName: isVip ? '進階免費空間' : '免費 5GB 空間',
+        allocatedBytes: isVip ? 1099511627776n : 21474836480n,
+        planName: isVip ? '進階免費空間' : '免費 20GB 空間',
         usedBytes: 0n
       }
     });
@@ -7494,8 +7494,8 @@ export async function submitFreeAccountApplication(data: any) {
           creatorId: newTemple.creatorId
         }
       });
-      let allocatedBytes = 5368709120n;
-      let storagePlanName = '免費 5GB 空間';
+      let allocatedBytes = 21474836480n;
+      let storagePlanName = '免費 20GB 空間';
 
       if (data.cloudStorage === 'Free' || data.freeType === 'Permanent') {
          allocatedBytes = 21990232555520n; // 20TB
@@ -7503,8 +7503,8 @@ export async function submitFreeAccountApplication(data: any) {
       } else if (data.cloudStorage) {
          let p = await prisma.storagePlan.findUnique({ where: { id: data.cloudStorage } }) as any;
          if (p) {
-             allocatedBytes = BigInt(p.sizeGb) * 1073741824n; // sizeGb * 1024^3
-             storagePlanName = `${p.sizeGb}GB 雲端空間`;
+             allocatedBytes = BigInt(20 + p.sizeGb) * 1073741824n; // (20 + sizeGb) * 1024^3
+             storagePlanName = `${20 + p.sizeGb}GB 雲端空間`;
          }
       }
 
