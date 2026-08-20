@@ -2470,7 +2470,7 @@ export async function updateStoragePlans(plans: any[]) {
               name: p.name,
               sizeGb: p.sizeGb,
               priceMonthly: p.priceMonthly,
-              priceYearly: p.priceYearly
+              priceYearly: p.priceYearly || 0
             }
           });
         } else {
@@ -2480,7 +2480,7 @@ export async function updateStoragePlans(plans: any[]) {
                name: p.name,
                sizeGb: p.sizeGb,
                priceMonthly: p.priceMonthly,
-               priceYearly: p.priceYearly
+               priceYearly: p.priceYearly || 0
              }
            });
         }
@@ -2491,14 +2491,14 @@ export async function updateStoragePlans(plans: any[]) {
             name: p.name,
             sizeGb: p.sizeGb,
             priceMonthly: p.priceMonthly,
-            priceYearly: p.priceYearly
+            priceYearly: p.priceYearly || 0
           },
           create: {
             id: p.id,
             name: p.name,
             sizeGb: p.sizeGb,
             priceMonthly: p.priceMonthly,
-            priceYearly: p.priceYearly
+            priceYearly: p.priceYearly || 0
           }
         });
       }
