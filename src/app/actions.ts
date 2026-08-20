@@ -2450,17 +2450,72 @@ export async function fetchStoragePlans() {
 
 export async function updateStoragePlans(plans: any[]) {
   try {
-    await prisma.storagePlan.deleteMany();
-    
+    const planIdsToKeep = plans.map(p => p.id).filter(Boolean);
+
+    await prisma.storagePlan.deleteMany({
+      where: {
+        id: { notIn: planIdsToKeep }
+      }
+    });
+
     for (const p of plans) {
-      await prisma.storagePlan.create({
-        data: {
-          name: p.name,
-          sizeGb: p.sizeGb,
-          priceMonthly: p.priceMonthly,
-          priceYearly: p.priceYearly
+      const planIdToSave = p.id || `SP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      if (!p.id || p.id.startsWith('SP-')) {
+        const existing = await prisma.storagePlan.findUnique({ where: { id: p.id } });
+        if (!existing) {
+          await prisma.storagePlan.create({
+            data: {
+              id: planIdToSave,
+              name: p.name,
+              sizeGb: p.sizeGb,
+              priceMonthly: p.priceMonthly,
+              priceYearly: p.priceYearly
+            }
+          });
+        } else {
+           await prisma.storagePlan.update({
+             where: { id: p.id },
+             data: {
+               name: p.name,
+               sizeGb: p.sizeGb,
+               priceMonthly: p.priceMonthly,
+               priceYearly: p.priceYearly
+             }
+           });
         }
-      });
+      } else {
+        await prisma.storagePlan.upsert({
+          where: { id: p.id },
+          update: {
+            name: p.name,
+            sizeGb: p.sizeGb,
+            priceMonthly: p.priceMonthly,
+            priceYearly: p.priceYearly
+          },
+          create: {
+            id: p.id,
+            name: p.name,
+            sizeGb: p.sizeGb,
+            priceMonthly: p.priceMonthly,
+            priceYearly: p.priceYearly
+          }
+        });
+      }
+
+      const totalGB = 20 + p.sizeGb;
+      const allocatedBytes = BigInt(totalGB) * BigInt(1024 * 1024 * 1024);
+      
+      const affected = await prisma.templeStorage.findMany({ where: { planId: p.id } });
+      for(const tStorage of affected) {
+        await prisma.templeStorage.update({
+          where: { id: tStorage.id },
+          data: {
+            allocatedBytes: allocatedBytes,
+            planName: `${totalGB}GB 雲端空間`
+          }
+        });
+      }
     }
     revalidatePath('/super-admin');
     return { success: true };
@@ -2476,8 +2531,8 @@ export async function fetchTempleStorages() {
         const temples = await prisma.temple.findMany();
         for (const t of temples) {
           const isVip = t.planId === 'Unlimited Node' || t.planId === 'Free' || t.planId === '免費';
-          let qGB = 5;
-          let pName = '免費 5GB 空間';
+          let qGB = 20;
+          let pName = '免費 20GB 空間';
           if (isVip) {
               qGB = 999999;
               pName = '無限免費方案';
