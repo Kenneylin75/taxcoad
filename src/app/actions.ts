@@ -2525,14 +2525,22 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
     const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
-    await client.query(`
-        INSERT INTO "TempleBill" (id, "templeId", type, "itemName", amount, "billingDate", "dueDate", status, "payeeRole", "payeeId", "timestamp")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      `, [
-              `BILL-STORAGE-${Date.now()}`, templeId, 'StorageUpgrade', `雲端空間擴充方案 - ${plan.name} (${planId})`,
-              finalAmount, new Date().toISOString().substring(0, 7), new Date().toISOString().split('T')[0],
-              'Unpaid', 'SuperAdmin', 'system-hq', new Date().toISOString()
-            ]);
+    await prisma.templeBill.create({
+      data: {
+        id: `BILL-STORAGE-${Date.now()}`,
+        templeId: templeId,
+        type: 'StorageUpgrade',
+        itemName: `雲端空間擴充方案 - ${plan.name} (${planId})`,
+        amount: finalAmount,
+        billingDate: new Date().toISOString().substring(0, 7),
+        dueDate: new Date().toISOString().split('T')[0],
+        status: 'Unpaid',
+        payeeRole: 'SuperAdmin',
+        payeeId: 'system-hq',
+        timestamp: new Date().toISOString()
+      }
+    });
+
     return { success: true };
   });
 }
@@ -2554,7 +2562,7 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
         status: 'Unpaid',
         payeeRole: 'SuperAdmin',
         payeeId: 'system-hq',
-        timestamp: new Date()
+        timestamp: new Date().toISOString()
       }
     });
     
@@ -6501,8 +6509,42 @@ export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: 
   }
 }
 export async function fetchSaasOrders() {
+  try {
+    return await prisma.saasOrder.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+  } catch (e) {
+    return [];
+  }
+}
 
-      return []; // Currently unused in new system
+export async function createSaasOrder(data: {
+  templeId: string,
+  type: string,
+  planId: string,
+  amount: number,
+  cycle: string,
+  paymentMethod: string,
+  receiptImage: string
+}) {
+  try {
+    const order = await prisma.saasOrder.create({
+      data: {
+        templeId: data.templeId,
+        type: data.type,
+        planId: data.planId,
+        amount: data.amount,
+        cycle: data.cycle,
+        paymentMethod: data.paymentMethod,
+        receiptImage: data.receiptImage,
+        status: 'pending'
+      }
+    });
+    return { success: true, orderId: order.id };
+  } catch (e) {
+    console.error("createSaasOrder error:", e);
+    return { success: false, message: '新增訂單失敗' };
+  }
 }
 
 export async function fetchDistributorTempleBills(distributorId: string) {
