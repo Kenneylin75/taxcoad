@@ -8942,7 +8942,8 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
         totalRevenue += bill.amount;
         records.push({
           id: bill.id,
-          templeName: t.templeName,
+          templeId: t.id,
+          templeName: t.templeName || t.name,
           date: bill.dueDate || bill.billingDate || (bill.timestamp ? new Date(bill.timestamp).toISOString().split('T')[0] : '未知'),
           type: label,
           amount: commission,
@@ -9007,7 +9008,8 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
       bills.forEach(b => {
           revenueRecords.push({
              id: b.id,
-             templeName: t.templeName,
+             templeId: t.id,
+             templeName: t.templeName || t.name,
              date: b.date || b.dueDate || b.billingDate,
              type: b.type === 'Setup' || b.type === 'SetupFee' ? '系統設定費' : '租用費',
              amount: b.amount,

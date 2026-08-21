@@ -408,9 +408,9 @@ export default function DistSalesPage() {
                                </p>
                            )}
                         </div>
-                        {commission?.revenueRecords?.filter((r: any) => r.templeName === app.templeName).length > 0 ? (
+                        {commission?.revenueRecords?.filter((r: any) => r.templeId === app.id || r.templeName === (app.templeName || app.name)).length > 0 ? (
                             <div className="space-y-2">
-                                {commission.revenueRecords.filter((r: any) => r.templeName === app.templeName).map((r: any, idx: number) => (
+                                {commission.revenueRecords.filter((r: any) => r.templeId === app.id || r.templeName === (app.templeName || app.name)).map((r: any, idx: number) => (
                                     <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100">
                                         <div className="flex gap-3 items-center">
                                             <span className="text-[10px] font-black text-slate-900">{r.date}</span>
