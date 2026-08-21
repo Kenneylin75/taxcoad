@@ -6149,40 +6149,56 @@ export async function fetchDistributorSalesPerformance(distId: string, yearMonth
       
       let totalSales = 0;
       let commission = 0;
+      let availableBonus = 0;
+      let totalWithdrawn = 0;
 
       if (templeIds.length > 0) {
-        let bills = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds }, status: 'Paid' } });
+        const allBills = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds }, status: 'Paid' } });
         
-        if (yearMonth) {
-          bills = bills.filter((b: any) => {
-            const dateStr = b.createdAt instanceof Date ? b.createdAt.toISOString().substring(0, 7) : 
-                         (b.createdAt ? String(b.createdAt).substring(0,7) : (b.billingDate ? String(b.billingDate).substring(0,7) : ''));
-            return dateStr === yearMonth;
-          });
-        }
-
-        totalSales = bills.reduce((sum: number, b: any) => sum + b.amount, 0);
-        commission = bills.reduce((sum: number, b: any) => {
-          const isSetup = b.itemName === 'SetupFee' || b.itemName === 'Setup';
+        // Calculate lifetime commission for available balance
+        const lifetimeCommission = allBills.reduce((sum: number, b: any) => {
+          const isSetup = b.itemName === 'SetupFee' || b.itemName === 'Setup' || b.type === 'SetupFee' || b.type === 'Setup';
           let sRules: any = {};
           if (typeof s.commissionRules === 'string') {
              try { sRules = JSON.parse(s.commissionRules); } catch(e){}
           } else if (s.commissionRules) {
              sRules = s.commissionRules;
           }
-          const rate = isSetup ? (sRules.setupFeePercent || 20) : (sRules.rentYear1Percent || 15);
+          const rate = isSetup ? (sRules.setupFeePercent || sRules.setupRate || 20) : (sRules.rentYear1Percent || sRules.rentYear1Rate || 15);
           return sum + (b.amount * rate / 100);
         }, 0);
-      }
 
-      const myWithdrawals = await prisma.bonusRequest.findMany({
-        where: {
-          salesId: s.id,
-          status: { in: ['Approved', 'Verified', 'Paid'] }
+        let monthBills = allBills;
+        if (yearMonth) {
+          monthBills = allBills.filter((b: any) => {
+            const dateStr = b.createdAt instanceof Date ? b.createdAt.toISOString().substring(0, 7) : 
+                         (b.createdAt ? String(b.createdAt).substring(0,7) : (b.billingDate ? String(b.billingDate).substring(0,7) : (b.timestamp ? new Date(b.timestamp).toISOString().substring(0,7) : '')));
+            return dateStr === yearMonth;
+          });
         }
-      });
-      const totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
-      const availableBonus = commission - totalWithdrawn;
+
+        totalSales = monthBills.reduce((sum: number, b: any) => sum + b.amount, 0);
+        commission = monthBills.reduce((sum: number, b: any) => {
+          const isSetup = b.itemName === 'SetupFee' || b.itemName === 'Setup' || b.type === 'SetupFee' || b.type === 'Setup';
+          let sRules: any = {};
+          if (typeof s.commissionRules === 'string') {
+             try { sRules = JSON.parse(s.commissionRules); } catch(e){}
+          } else if (s.commissionRules) {
+             sRules = s.commissionRules;
+          }
+          const rate = isSetup ? (sRules.setupFeePercent || sRules.setupRate || 20) : (sRules.rentYear1Percent || sRules.rentYear1Rate || 15);
+          return sum + (b.amount * rate / 100);
+        }, 0);
+        
+        const myWithdrawals = await prisma.bonusRequest.findMany({
+          where: {
+            salesId: s.id,
+            status: { in: ['Approved', 'Verified', 'Paid'] }
+          }
+        });
+        totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+        availableBonus = lifetimeCommission - totalWithdrawn;
+      }
 
       const salesVisits = await prisma.salesVisit.findMany({
         where: { salesName: s.name }
@@ -8908,18 +8924,27 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     }
   }
   
-  let totalEarned = 0;
-  let totalPending = 0;
-  let totalRevenue = 0;
+  let lifetimeTotalEarned = 0;
+  let lifetimeTotalPending = 0;
+  let monthEarned = 0;
+  let monthPending = 0;
+  let monthRevenue = 0;
   const records: any[] = [];
+  const revenueRecords: any[] = [];
   
   const overrides = salesName ? [][salesName] : null;
   const config = await fetchSystemConfig();
-  const rules = sales?.commissionRules || overrides || config.defaultSuperSalesRates;
-  const setupRate = rules.templeSetupRate ?? rules.setupFeePercent ?? 20;
-  const rentY1 = rules.templeRentRates?.[0] ?? rules.rentYear1Percent ?? 15;
-  const rentY2 = rules.templeRentRates?.[1] ?? rules.rentYear2Percent ?? 12;
-  const rentY3 = rules.templeRentRates?.[2] ?? rules.rentYear3PlusPercent ?? 10;
+  const rawRules = sales?.commissionRules || overrides || config.defaultSuperSalesRates;
+  let parsedRules: any = {};
+  if (typeof rawRules === 'string') {
+     try { parsedRules = JSON.parse(rawRules); } catch(e){}
+  } else if (rawRules) {
+     parsedRules = rawRules;
+  }
+  const setupRate = parsedRules.templeSetupRate ?? parsedRules.setupFeePercent ?? parsedRules.setupRate ?? 20;
+  const rentY1 = parsedRules.templeRentRates?.[0] ?? parsedRules.rentYear1Percent ?? parsedRules.rentYear1Rate ?? 15;
+  const rentY2 = parsedRules.templeRentRates?.[1] ?? parsedRules.rentYear2Percent ?? parsedRules.rentYear2Rate ?? 12;
+  const rentY3 = parsedRules.templeRentRates?.[2] ?? parsedRules.rentYear3PlusPercent ?? parsedRules.rentYear3PlusRate ?? 10;
 
   myTemples.forEach(t => {
     const bills = listBills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
@@ -8957,22 +8982,40 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
         commission = bill.amount * (percent / 100);
       }
       
+      const bDate = bill.dueDate || bill.billingDate || (bill.timestamp ? new Date(bill.timestamp).toISOString().split('T')[0] : '未知');
+      const bYearMonth = bDate ? String(bDate).substring(0, 7) : '';
+      const isCurrentMonth = (year && month) ? bYearMonth === `${year}-${month}` : true;
+
       if (isPaid) {
-        totalEarned += commission;
-        totalRevenue += bill.amount;
-        records.push({
-          id: bill.id,
-          templeId: t.id,
-          templeName: t.templeName || t.name,
-          date: bill.dueDate || bill.billingDate || (bill.timestamp ? new Date(bill.timestamp).toISOString().split('T')[0] : '未知'),
-          type: label,
-          amount: commission,
-          percent,
-          phase: bill.type?.includes('Setup') ? 'Setup' : 'Rent',
-          calculation: `${bill.type?.includes('Setup') ? '系統設定費' : (bill.type === 'YearlyFee' ? '年租費' : '月租費')} $${bill.amount.toLocaleString()} * ${percent}%`
-        });
+        lifetimeTotalEarned += commission;
+        if (isCurrentMonth) {
+           monthEarned += commission;
+           monthRevenue += bill.amount;
+           records.push({
+             id: bill.id,
+             templeId: t.id,
+             templeName: t.templeName || t.name,
+             date: bDate,
+             type: label,
+             amount: commission,
+             percent,
+             phase: bill.type?.includes('Setup') ? 'Setup' : 'Rent',
+             calculation: `${bill.type?.includes('Setup') ? '系統設定費' : (bill.type === 'YearlyFee' ? '年租費' : '月租費')} $${bill.amount.toLocaleString()} * ${percent}%`
+           });
+           revenueRecords.push({
+             id: bill.id,
+             templeId: t.id,
+             templeName: t.templeName || t.name,
+             date: bDate,
+             type: bill.type === 'Setup' || bill.type === 'SetupFee' ? '系統設定費' : '租用費',
+             amount: bill.amount,
+             status: bill.status,
+             receiptUrl: bill.receiptUrl
+           });
+        }
       } else {
-        totalPending += commission;
+        lifetimeTotalPending += commission;
+        if (isCurrentMonth) monthPending += commission;
       }
     });
   });
@@ -8993,16 +9036,20 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   } catch (e) {}
 
   myBonuses.forEach((b: any) => {
-    totalEarned += b.amount;
-    records.push({
-      id: b.id,
-      templeName: '專案獎金',
-      date: b.date,
-      type: '額外獎金',
-      amount: b.amount,
-      phase: 'Bonus',
-      calculation: `?: ${b.reason}`
-    });
+    lifetimeTotalEarned += b.amount;
+    const isCurrentMonth = (year && month) ? String(b.date).substring(0, 7) === `${year}-${month}` : true;
+    if (isCurrentMonth) {
+       monthEarned += b.amount;
+       records.push({
+         id: b.id,
+         templeName: '專案獎金',
+         date: b.date,
+         type: '額外獎金',
+         amount: b.amount,
+         phase: 'Bonus',
+         calculation: `備註: ${b.reason}`
+       });
+    }
   });
   
   let myWithdrawals: any[] = [];
@@ -9022,33 +9069,21 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   const pendingRequests = myWithdrawals.filter(w => w.status === 'Pending' || w.status === '審核中');
   const calculatedTotalWithdrawn = myWithdrawals.filter(w => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').reduce((acc, curr) => acc + curr.amount, 0);
   
-  const revenueRecords: any[] = [];
-  myTemples.forEach(t => {
-      const bills = listBills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
-      bills.forEach(b => {
-          revenueRecords.push({
-             id: b.id,
-             templeId: t.id,
-             templeName: t.templeName || t.name,
-             date: b.date || b.dueDate || b.billingDate,
-             type: b.type === 'Setup' || b.type === 'SetupFee' ? '系統設定費' : '租用費',
-             amount: b.amount,
-             status: b.status,
-             receiptUrl: b.receiptUrl
-          });
-      });
-  });
-  
   return {
-    totalEarned,
-    totalPending,
-    totalRevenue,
-    netProfit: totalRevenue - totalEarned,
-    balance: totalEarned - calculatedTotalWithdrawn,
+    totalEarned: monthEarned,
+    totalPending: monthPending,
+    totalRevenue: monthRevenue,
+    netProfit: monthRevenue - monthEarned,
+    balance: lifetimeTotalEarned - calculatedTotalWithdrawn,
     totalWithdrawn: calculatedTotalWithdrawn,
     records,
     revenueRecords,
-    rules,
+    rules: {
+       setupFeePercent: setupRate,
+       rentYear1Percent: rentY1,
+       rentYear2Percent: rentY2,
+       rentYear3PlusPercent: rentY3
+    },
     pendingRequests,
     withdrawals: myWithdrawals
   }; 
