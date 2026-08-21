@@ -2872,8 +2872,15 @@ export async function fetchFreeApplications(distId?: string) {
     const sysConfig = await prisma.systemConfig.findFirst();
     const discountRate = sysConfig?.yearlyDiscountRate ?? 20;
 
+    const templeIds = list.map((t: any) => t.id);
+    const bills = await prisma.templeBill.findMany({
+       where: { templeId: { in: templeIds } },
+       orderBy: { createdAt: 'desc' }
+    });
+
     return list.map((t: any) => {
-       const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
+       const lastBill = bills.find((b: any) => b.templeId === t.id);
+       const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t, lastBill);
        return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
     });
   } catch (e) {
@@ -8848,13 +8855,13 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
           listTemples = resTemples.rows.map((r: any) => ({
             ...r,
             status: r.status,
-            templeName: r.temple_name,
-            salesId: r.sales_id,
-            distributorId: r.distributor_id,
-            monthlyRent: r.monthly_rent,
-            setupFee: r.setup_fee,
-            paymentCycle: r.payment_cycle,
-            timestamp: r.created_at
+            templeName: r.templeName || r.temple_name,
+            salesId: r.salesId || r.sales_id,
+            distributorId: r.distributorId || r.distributor_id,
+            monthlyRent: r.monthlyRent || r.monthly_rent,
+            setupFee: r.setupFee || r.setup_fee,
+            paymentCycle: r.paymentCycle || r.payment_cycle,
+            timestamp: r.createdAt || r.created_at
           }));
         }
     const resSales = { rows: await prisma.distributorSales.findMany() };
@@ -8863,7 +8870,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
         }
     const resBills = { rows: await prisma.templeBill.findMany() };
     if (resBills && resBills.rows) {
-          listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.temple_id, status: r.status, amount: r.amount }));
+          listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.templeId || r.temple_id, status: r.status, amount: r.amount }));
         }
     const resWD = await prisma.withdrawal.findMany();
     listWithdrawals = resWD.map((r: any) => ({ ...r, salesName: r.salesName, status: r.status, amount: r.amount }));
