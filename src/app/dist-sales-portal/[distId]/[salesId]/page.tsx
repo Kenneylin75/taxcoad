@@ -183,7 +183,8 @@ export default function DistSalesPage() {
 
   const filteredTemples = useMemo(() => {
     return applications.filter(app => {
-      const matchSearch = app.templeName.includes(templeSearch) || 
+      const searchName = app.templeName || app.name || '';
+      const matchSearch = searchName.includes(templeSearch) || 
                           app.creatorId?.includes(templeSearch) || 
                           app.contactPhone?.includes(templeSearch);
       const matchLocation = !locationFilter || app.city === locationFilter;
