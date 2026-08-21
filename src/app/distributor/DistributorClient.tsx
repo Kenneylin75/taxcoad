@@ -79,7 +79,6 @@ export default function DistributorClient({
   const [contractTemple, setContractTemple] = useState("");
 
   // --- Profile Edit State ---
-  const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
   const [editingSales, setEditingSales] = useState<any>(null);
 
   const [viewVisitDetail, setViewVisitDetail] = useState<any>(null);
