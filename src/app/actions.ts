@@ -3748,7 +3748,7 @@ export async function fetchFinancialOverview() {
           let dist = [].find((d: any) => d.id === pId);
           if (!dist) {
              const dRes = await prisma.distributor.findUnique({ where: { id: pId } }) as any;
-             if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
+             if (dRes) dist = dRes;
           }
           if (dist) {
             let b2b = dist.b2bPayment || dist.b2b_payment;
@@ -3773,9 +3773,8 @@ export async function fetchFinancialOverview() {
   if (payeeRole === 'Distributor' && payeeId) {
     let dist = [].find((d: any) => d.id === payeeId);
     if (!dist) {
-      /* removed duplicate import */
         const dRes = await prisma.distributor.findUnique({ where: { id: payeeId } }) as any;
-        if (dRes && dRes.rowCount > 0) dist = dRes.rows[0];
+        if (dRes) dist = dRes;
     }
     payeeInfo = {
       bankName: dist?.bank_name || dist?.bankName || '未設定銀行',
@@ -7088,38 +7087,42 @@ export async function approveTempleBill(billId: string) {
         if (temple && temple.salesId) {
           const salesPerson = await prisma.distributorSales.findUnique({ where: { id: temple.salesId } });
           if (salesPerson) {
-             const sysConfig = await fetchSystemConfig();
-             const rates = salesPerson.commissionRules as any || sysConfig?.defaultSuperSalesRates || {};
-             const rate = rates.templeSetupRate || 20; 
-             const commissionAmt = Math.floor(bill.amount * (rate / 100));
-             
-             if (commissionAmt > 0) {
-               await prisma.commission.create({
-                 data: {
-                   salesId: salesPerson.id,
-                   templeId: temple.id,
-                   billId: bill.id,
-                   amount: commissionAmt,
-                   date: new Date()
-                 }
-               });
+             try {
+               const sysConfig = await fetchSystemConfig();
+               const rates = (salesPerson.commissionRules as any) || sysConfig?.defaultSuperSalesRates || {};
+               const rate = Number(rates.templeSetupRate) || 20; 
+               const commissionAmt = Math.floor(bill.amount * (rate / 100));
                
-               const wallet = await prisma.wallet.findFirst({ where: { name: salesPerson.name } });
-               if (wallet) {
-                 await prisma.wallet.update({
-                   where: { id: wallet.id },
-                   data: { balance: { increment: commissionAmt } }
-                 });
-               } else {
-                 await prisma.wallet.create({
+               if (commissionAmt > 0) {
+                 await prisma.commission.create({
                    data: {
-                     ownerId: salesPerson.id,
-                     name: salesPerson.name,
-                     role: salesPerson.role,
-                     balance: commissionAmt
+                     salesId: salesPerson.id,
+                     templeId: temple.id,
+                     billId: bill.id,
+                     amount: commissionAmt,
+                     date: new Date()
                    }
                  });
+                 
+                 const wallet = await prisma.wallet.findFirst({ where: { name: salesPerson.name } });
+                 if (wallet) {
+                   await prisma.wallet.update({
+                     where: { id: wallet.id },
+                     data: { balance: { increment: commissionAmt } }
+                   });
+                 } else {
+                   await prisma.wallet.create({
+                     data: {
+                       ownerId: salesPerson.id,
+                       name: salesPerson.name,
+                       role: salesPerson.role,
+                       balance: commissionAmt
+                     }
+                   });
+                 }
                }
+             } catch (comErr) {
+               console.error("Error generating commission for bill:", bill.id, comErr);
              }
           }
         }
@@ -7615,8 +7618,8 @@ export async function submitFreeAccountApplication(data: any) {
       status,
       creatorRole: role,
       creatorId: currentUser.name,
-      salesId: sales?.id || null,
-      distributorId: role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null)),
+      salesId: data.salesId || sales?.id || null,
+      distributorId: role === 'super-admin' ? null : (data.distributorId || sales?.distributorId || null),
       timestamp: new Date().toISOString(),
       billingStartDate: data.freeType === 'Trial' ? 
         new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
@@ -8370,7 +8373,12 @@ export async function fetchSuperSalesRegistry(salesId: string) {
        const startYear = lastBillDate.getFullYear();
        const startMonth = lastBillDate.getMonth() + 1;
        const cycle = t.paymentCycle || 'Monthly';
-       let paymentStatus = '';
+       let hasUnpaid = false;
+       let hasPending = false;
+       bills.forEach((b: any) => {
+         if (b.status === 'Unpaid' || b.status === 'Overdue' || b.status === '未繳費' || b.status === '未結帳') hasUnpaid = true;
+         if (b.status === 'PendingVerification') hasPending = true;
+       });
 
        if (t.paymentStatus === 'PendingPayment' || (bills.length === 0 && t.freeType !== 'Permanent' && t.status !== 'Pending')) {
           if (cycle === 'Yearly') {
@@ -8380,9 +8388,9 @@ export async function fetchSuperSalesRegistry(salesId: string) {
           }
        } else {
           if (cycle === 'Yearly') {
-             paymentStatus = hasUnpaid ? `${startYear}/${startMonth}-${startYear+1}/${startMonth} 未繳費` : `${startYear}/${startMonth}-${startYear+1}/${startMonth} 已付款`;
+             paymentStatus = hasUnpaid ? `${startYear}/${startMonth}-${startYear+1}/${startMonth} 未繳費` : hasPending ? `${startYear}/${startMonth}-${startYear+1}/${startMonth} 審核中` : `${startYear}/${startMonth}-${startYear+1}/${startMonth} 已付款`;
           } else {
-             paymentStatus = hasUnpaid ? `${startMonth}月未繳費` : `${startMonth}月已付款`;
+             paymentStatus = hasUnpaid ? `${startMonth}月未繳費` : hasPending ? `${startMonth}月審核中` : `${startMonth}月已付款`;
           }
        }
        

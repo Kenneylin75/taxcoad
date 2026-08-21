@@ -55,6 +55,7 @@ export default function DistSalesPage() {
   const [profile, setProfile] = useState<any>(null);
   const [rentPlans, setRentPlans] = useState<any[]>([]);
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
+  const [viewingTempleDetail, setViewingTempleDetail] = useState<any>(null);
   const [expandedTempleId, setExpandedTempleId] = useState<string | null>(null);
 
   // Search & Filter States

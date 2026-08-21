@@ -58,6 +58,9 @@ export default function SuperAdminClient({
   const [finance, setFinance] = useState<any>(null);
   const [financeMonth, setFinanceMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
   const [templePaymentMonth, setTemplePaymentMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
+  
+  const [previewImage, setPreviewImage] = useState<any>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [withdrawalProofs, setWithdrawalProofs] = useState<{[key:string]: string}>({});
   const [syncQueue, setSyncQueue] = useState<any[]>([]);
   const [pendingDistributors, setPendingDistributors] = useState<any[]>([]);
@@ -1576,14 +1579,12 @@ export default function SuperAdminClient({
                                         onClick={() => {
                                            const actualReceiptUrl = payment.receiptUrl || payment.receipt_url;
                                            if (actualReceiptUrl) {
-                                              if (actualReceiptUrl.startsWith('data:')) {
-                                                 const a = document.createElement('a');
-                                                 a.href = actualReceiptUrl;
-                                                 a.download = `receipt_${payment.templeName}_${payment.type}.png`;
-                                                 a.click();
-                                              } else {
-                                                 window.open(actualReceiptUrl, '_blank');
-                                              }
+                                              setPreviewImage({
+                                                url: actualReceiptUrl,
+                                                bankLast5: payment.bankLast5 || payment.bank_last5,
+                                                templeName: payment.templeName
+                                              });
+                                              setPreviewModalOpen(true);
                                            } else {
                                               alert('該宮廟尚未上傳付款截圖');
                                            }
@@ -2939,7 +2940,40 @@ export default function SuperAdminClient({
             </div>
          </div>
       )}
-</div>
+      {previewModalOpen && previewImage && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[30px] p-6 max-w-2xl w-full flex flex-col items-center">
+             <div className="w-full flex justify-between items-center mb-4">
+               <h3 className="text-xl font-black text-slate-800">{previewImage.templeName} - 匯款憑證</h3>
+               <button onClick={() => setPreviewModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                  ✕
+               </button>
+             </div>
+             {previewImage.bankLast5 && (
+               <div className="w-full bg-emerald-50 text-emerald-800 p-3 rounded-2xl mb-4 font-bold text-center text-lg shadow-sm border border-emerald-100">
+                  匯款後五碼: <span className="text-2xl">{previewImage.bankLast5}</span>
+               </div>
+             )}
+             <img src={previewImage.url} alt="Receipt Preview" className="max-w-full max-h-[60vh] rounded-2xl object-contain border border-slate-100 shadow-md" />
+             <div className="w-full flex justify-end gap-3 mt-6">
+                <button 
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = previewImage.url;
+                    a.download = `receipt_${previewImage.templeName}.png`;
+                    a.click();
+                  }}
+                  className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-[20px] hover:bg-slate-200 transition-all text-sm"
+                >
+                  下載圖片
+                </button>
+                <button onClick={() => setPreviewModalOpen(false)} className="px-6 py-3 bg-slate-900 text-white font-bold rounded-[20px] hover:bg-indigo-600 transition-all shadow-lg text-sm">
+                  關閉預覽
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-

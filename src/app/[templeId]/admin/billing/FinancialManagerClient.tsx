@@ -40,7 +40,8 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
   if (initialDataJson) initialData = JSON.parse(initialDataJson);
   if (freeAppsJson) freeApps = JSON.parse(freeAppsJson);
   const router = useRouter();
-  const [view, setView] = useState<'revenue' | 'expenses' | 'approvals'>('revenue');
+  const initialView = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('view') as any) || 'revenue' : 'revenue';
+  const [view, setView] = useState<'revenue' | 'expenses' | 'approvals'>(initialView);
   const [apps, setApps] = useState<FreeAccountApplication[]>(freeApps || []);
   const [isPending, startTransition] = useTransition();
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -95,7 +96,11 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
 
   const submitLinePay = async () => {
     if (!currentPayingBill) return;
-    const returnUrl = encodeURIComponent(window.location.href);
+    let currentUrl = window.location.href;
+    if (!currentUrl.includes('view=')) {
+      currentUrl += (currentUrl.includes('?') ? '&' : '?') + 'view=expenses';
+    }
+    const returnUrl = encodeURIComponent(currentUrl);
     window.location.href = `/mock-gateway?orderId=TEMPLE_BILL_${currentPayingBill.id}&amount=${currentPayingBill.amount}&method=linePay&returnUrl=${returnUrl}`;
   };
 
