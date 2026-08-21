@@ -2869,9 +2869,12 @@ export async function fetchFreeApplications(distId?: string) {
           return true;
        });
     }
+    const sysConfig = await prisma.systemConfig.findFirst();
+    const discountRate = sysConfig?.yearlyDiscountRate ?? 20;
+
     return list.map((t: any) => {
        const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
-       return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining };
+       return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
     });
   } catch (e) {
     console.error('fetchFreeApplications error', e);
@@ -6712,6 +6715,8 @@ export async function fetchDataBridgeTree() {
     const distSales = await prisma.distributorSales.findMany({ where: { role: 'DistSales' } });
     const temples = await prisma.temple.findMany();
     const distApps = await prisma.distributorApplication.findMany(); // For mapping dist to superSales
+    const config = await prisma.systemConfig.findFirst();
+    const yearlyDiscountRate = config?.yearlyDiscountRate ?? 20;
 
     const superSalesNodes = superSales.map((s: any) => ({
       id: s.id,
@@ -6754,7 +6759,7 @@ export async function fetchDataBridgeTree() {
       planName: t.freeType === 'Trial' ? '免費體驗方案' : 
                 t.freeType === 'Permanent' ? '永久免費' :
                 t.paymentCycle === 'Yearly' ? '年付優惠方案' : '月付標準方案',
-      price: t.monthlyRent || 0,
+      price: t.paymentCycle === 'Yearly' ? Math.round((t.monthlyRent || 0) * 12 * (1 - yearlyDiscountRate / 100)) : (t.monthlyRent || 0),
       freeType: t.freeType,
       plan: t.plan,
       paymentCycle: t.paymentCycle,
@@ -7473,7 +7478,7 @@ export async function generateInitialBills(newTemple: any) {
        }
     }
     if (plan) {
-      const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * 0.8)) : plan.priceMonthly;
+      const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * (1 - (config?.yearlyDiscountRate || 20) / 100))) : plan.priceMonthly;
       if (storageFee > 0) {
         billsToInsert.push({
           id: `BILL-STORAGE-${Date.now()}`,
@@ -7504,7 +7509,7 @@ export async function generateInitialBills(newTemple: any) {
        }
     }
     if (aiPlanInfo) {
-      const aiFee = isYearly ? (aiPlanInfo.price * 12 * 0.8) : aiPlanInfo.price;
+      const aiFee = isYearly ? (aiPlanInfo.price * 12 * (1 - (config?.yearlyDiscountRate || 20) / 100)) : aiPlanInfo.price;
       if (aiFee > 0) {
         billsToInsert.push({
           id: `BILL-AI-${Date.now()}`,

@@ -693,7 +693,7 @@ export default function SuperAdminClient({
                                     <span className="bg-slate-100 px-2 py-1 rounded">方案：{app.freeType === 'Trial' ? '免費試用' : app.freeType === 'Permanent' ? '永久免費' : '標準方案'}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded">開辦費：NT$ {Number(app.setupFee || 0).toLocaleString()}</span>
                                     <span className="bg-slate-100 px-2 py-1 rounded">繳費：{app.paymentCycle === 'Yearly' ? '年繳' : '月繳'}</span>
-                                    <span className="bg-slate-100 px-2 py-1 rounded">{app.paymentCycle === 'Yearly' ? '年費' : '月費'}：NT$ {app.paymentCycle === 'Yearly' ? Number((app.monthlyRent || 3600) * 12 * 0.8).toLocaleString() : Number(app.monthlyRent || 0).toLocaleString()}</span>
+                                    <span className="bg-slate-100 px-2 py-1 rounded">{app.paymentCycle === 'Yearly' ? '年費' : '月費'}：NT$ {app.paymentCycle === 'Yearly' ? Number((app.monthlyRent || 3600) * 12 * (1 - (app.appliedDiscountRate || 20) / 100)).toLocaleString() : Number(app.monthlyRent || 0).toLocaleString()}</span>
                                  </div>
                                  <div className="flex gap-4 text-[11px] font-medium text-slate-400 mt-1">
                                     <span>負責人：{app.owner || app.contactName || app.name || '未提供'}</span>

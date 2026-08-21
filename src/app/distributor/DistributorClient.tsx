@@ -755,7 +755,7 @@ export default function DistributorClient({
                     </div>
                     <div className="p-8 bg-blue-50/50 rounded-[40px] space-y-5 border border-blue-100/30 shadow-inner">
                        <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">合約開辦費</span><span className="text-slate-900 font-black">${app.setupFee?.toLocaleString() || '12,000'}</span></div>
-                       <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">{app.paymentCycle === 'Yearly' ? '方案年繳' : '方案月租'}</span><span className="text-blue-600 underline decoration-2 font-black">${app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * 0.8).toLocaleString() : (app.monthlyRent?.toLocaleString() || '3,600')}</span></div>
+                       <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">{app.paymentCycle === 'Yearly' ? '方案年繳' : '方案月租'}</span><span className="text-blue-600 underline decoration-2 font-black">${app.paymentCycle === 'Yearly' ? ((app.monthlyRent || 3600) * 12 * (1 - (app.appliedDiscountRate || 20) / 100)).toLocaleString() : (app.monthlyRent?.toLocaleString() || '3,600')}</span></div>
                     </div>
                     <div className="flex gap-3 pt-2">
                        <button onClick={() => {setSelectedAppId(app.id); setIsRejectModalOpen(true);}} className="flex-1 py-5 bg-slate-50 text-slate-400 rounded-[28px] font-black text-[10px] uppercase tracking-widest transition-all hover:bg-rose-50 hover:text-rose-600">駁回申請</button>
