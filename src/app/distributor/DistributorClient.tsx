@@ -1211,7 +1211,7 @@ export default function DistributorClient({
                                       } else {
                                          await toggleBillStatusSimple(payment.id, 'Unpaid');
                                       }
-                                      window.location.reload();
+                                      setTemplePayments((prev: any[]) => prev.map(p => p.id === payment.id ? { ...p, status: newStatus } : p));
                                     }
                                  }}
                                  className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : payment.receiptUrl ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
