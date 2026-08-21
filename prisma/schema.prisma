@@ -93,6 +93,10 @@ model SalesVisit {
   templeName String?           @map("temple_name")
   content    String?
   date       String?
+  visitIndex Int?              @map("visit_index")
+  notes      String?
+  status     String?           @default("Planned")
+  importance String?           @default("Medium")
   createdAt  DateTime          @default(now()) @map("created_at")
   updatedAt  DateTime          @default(now()) @updatedAt @map("updated_at")
   salesName  String?           @map("sales_name")

@@ -8036,9 +8036,29 @@ export async function fetchSuperSalesAccounts() {
 }
 
 export async function addVisitationRecord(data: any) { 
-  await null;
-  revalidatePath('/dist-sales');
-  return { success: true }; 
+  try {
+    await prisma.salesVisit.create({
+      data: {
+        salesId: data.salesId,
+        salesName: data.salesName,
+        templeName: data.templeName,
+        date: data.date,
+        visitIndex: Number(data.visitIndex) || 1,
+        notes: data.notes,
+        status: data.status,
+        importance: data.importance,
+        content: data.notes
+      }
+    });
+    const { revalidatePath } = require("next/cache");
+    revalidatePath('/dist-sales');
+    revalidatePath('/dist-admin');
+    revalidatePath('/distributor');
+    return { success: true };
+  } catch (error) {
+    console.error('addVisitationRecord error:', error);
+    return { success: false, error: 'Failed to add visit record' };
+  }
 }
 
 export async function fetchSalesTools() {

@@ -98,6 +98,7 @@ export default function DistributorClient({
 
   const mockVisits = useMemo(() => initialVisits?.map((v, idx) => ({
     id: v.id || idx,
+    date: v.date || '',
     day: v.date ? parseInt(v.date.split('-')[2]) : 1,
     sales: v.salesName || '未知',
     temple: v.templeName || '未知',
@@ -779,7 +780,8 @@ export default function DistributorClient({
                   <div className="grid grid-cols-7 gap-3">
                      {Array.from({length: daysInMonth(currentYear, currentMonth)}).map((_, i) => {
                         const day = i + 1;
-                        const hasVisits = mockVisits.some(v => v.day === day);
+                        const dateStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                        const hasVisits = mockVisits.some(v => v.date === dateStr);
                         const isSelected = selectedDay === day;
                         return (
                           <div key={i} onClick={() => setSelectedDay(day)} className={`h-14 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${isSelected ? 'bg-slate-950 text-white shadow-2xl scale-110 z-10 ring-4 ring-blue-500/20' : 'bg-white/50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 hover:scale-105'}`}>
@@ -796,7 +798,7 @@ export default function DistributorClient({
                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">本日拜訪計畫 Schedule ({selectedDay}日)</h3>
                   </div>
                   <div className="space-y-3">
-                     {mockVisits.filter(v => v.day === selectedDay).map(visit => (
+                     {mockVisits.filter(v => v.date === `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${selectedDay?.toString().padStart(2, '0')}`).map(visit => (
                         <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500">
                            <div className="flex items-center gap-4">
                               <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xl shadow-2xl group-hover:bg-blue-600 transition-all">{visit.sales.substring(0,1)}</div>

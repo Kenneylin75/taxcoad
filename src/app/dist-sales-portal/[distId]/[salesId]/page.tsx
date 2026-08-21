@@ -230,7 +230,7 @@ export default function DistSalesPage() {
 
   const handleVisitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addVisitationRecord({ ...visitForm, salesName });
+    await addVisitationRecord({ ...visitForm, salesName, salesId });
     setIsVisitModalOpen(false);
     loadData();
   };
