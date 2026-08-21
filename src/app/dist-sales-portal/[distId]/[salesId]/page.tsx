@@ -232,6 +232,14 @@ export default function DistSalesPage() {
     e.preventDefault();
     await addVisitationRecord({ ...visitForm, salesName, salesId });
     setIsVisitModalOpen(false);
+    setVisitForm({
+      templeName: "",
+      date: new Date().toISOString().split('T')[0],
+      visitIndex: 1,
+      notes: "",
+      status: 'Planned' as any,
+      importance: 'Medium' as any
+    });
     loadData();
   };
 
