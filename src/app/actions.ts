@@ -6620,37 +6620,41 @@ export async function createSaasOrder(data: {
 
 export async function fetchDistributorTempleBills(distributorId: string) {
   try {
-    const templesQuery = `
-      SELECT t.id, t.name, t.temple_name 
-      FROM "Temple" t
-      LEFT JOIN distributor_sales ds ON t.sales_id = ds.id
-      WHERE (t.distributor_id = $1 OR ds.distributor_id = $1)
-        AND (ds.role IS NULL OR ds.role != 'SuperSales')
-    `;
-    const templesRes = await prisma.temple.findMany({ where: { distributorId: distributorId } }) as any;
-    const temples = Array.isArray(templesRes) ? templesRes : (templesRes?.rows || []);
-    const templeIds = temples.map((t: any) => t.id);
+    const temples = await prisma.temple.findMany({
+      where: {
+        OR: [
+          { distributorId: distributorId },
+          { sales: { distributorId: distributorId } }
+        ]
+      },
+      include: {
+        sales: true
+      }
+    });
+
+    const templeIds = temples.map(t => t.id);
 
     if (templeIds.length === 0) return [];
 
-    const billsQuery = `
-      SELECT * FROM "TempleBill" 
-      WHERE temple_id = ANY($1::varchar[]) OR payee_id = $2
-      ORDER BY "createdAt" DESC
-    `;
-    const billsRes = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds } } }) as any;
-    const bills = billsRes?.rows || [];
+    const bills = await prisma.templeBill.findMany({
+      where: { 
+        OR: [
+          { templeId: { in: templeIds } },
+          { payeeId: distributorId }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     return bills.map((b: any) => {
-      const t = temples.find((temple: any) => temple.id === b.temple_id);
+      const t = temples.find((temple: any) => temple.id === b.templeId);
       return {
         ...b,
-        templeId: b.temple_id,
-        payeeId: b.payee_id,
-        templeName: t ? (t.temple_name || t.name) : '未知宮廟'
+        templeName: t ? (t.templeName || t.name) : '未知宮廟'
       };
     });
   } catch (e) {
+    console.error("fetchDistributorTempleBills error:", e);
     return [];
   }
 }
