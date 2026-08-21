@@ -856,18 +856,18 @@ export default function DistributorClient({
                         return (
                            <>
                               {paginatedVisits.map(visit => (
-                                 <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500">
-                                    <div className="flex items-center gap-4">
-                                       <div className={`w-12 h-12 rounded-2xl text-white flex items-center justify-center text-xl shadow-lg transition-all group-hover:scale-105 ${
+                                 <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500 gap-4">
+                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                       <div className={`w-12 h-12 flex-shrink-0 rounded-2xl text-white flex items-center justify-center text-xl shadow-lg transition-all group-hover:scale-105 ${
                                          visit.importance === 'High' ? 'bg-rose-500' :
                                          visit.importance === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
                                        }`}>{visit.sales.substring(0,1)}</div>
-                                       <div>
-                                          <h4 className="text-sm font-black text-slate-900 tracking-tight">{visit.sales} 〈{visit.temple}〉</h4>
-                                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">{visit.purpose}</p>
+                                       <div className="min-w-0 flex-1">
+                                          <h4 className="text-sm font-black text-slate-900 tracking-tight truncate">{visit.sales} 〈{visit.temple}〉</h4>
+                                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed mt-1 break-words line-clamp-2">{visit.purpose}</p>
                                        </div>
                                     </div>
-                                    <div className={`text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter shadow-sm ${visit.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}>{visit.status === 'Completed' ? '已完成' : '進行中'}</div>
+                                    <div className={`flex-shrink-0 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter shadow-sm ${visit.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}>{visit.status === 'Completed' ? '已完成' : '進行中'}</div>
                                  </div>
                               ))}
                               
