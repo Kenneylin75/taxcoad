@@ -8982,8 +8982,9 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
         commission = bill.amount * (percent / 100);
       }
       
-      const bDate = bill.dueDate || bill.billingDate || (bill.timestamp ? new Date(bill.timestamp).toISOString().split('T')[0] : '未知');
-      const bYearMonth = bDate ? String(bDate).substring(0, 7) : '';
+      const bDateStr = bill.createdAt instanceof Date ? bill.createdAt.toISOString().substring(0, 10) : 
+                       (bill.createdAt ? String(bill.createdAt).substring(0, 10) : (bill.billingDate ? String(bill.billingDate).substring(0, 10) : (bill.timestamp ? new Date(bill.timestamp).toISOString().substring(0, 10) : '未知')));
+      const bYearMonth = bDateStr !== '未知' ? bDateStr.substring(0, 7) : '';
       const isCurrentMonth = (year && month) ? bYearMonth === `${year}-${month}` : true;
 
       if (isPaid) {
@@ -8995,7 +8996,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
              id: bill.id,
              templeId: t.id,
              templeName: t.templeName || t.name,
-             date: bDate,
+             date: bDateStr,
              type: label,
              amount: commission,
              percent,
@@ -9006,7 +9007,7 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
              id: bill.id,
              templeId: t.id,
              templeName: t.templeName || t.name,
-             date: bDate,
+             date: bDateStr,
              type: bill.type === 'Setup' || bill.type === 'SetupFee' ? '系統設定費' : '租用費',
              amount: bill.amount,
              status: bill.status,
