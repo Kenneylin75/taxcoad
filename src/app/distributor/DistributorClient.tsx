@@ -79,6 +79,10 @@ export default function DistributorClient({
   const [contractTemple, setContractTemple] = useState("");
 
   // --- Profile Edit State ---
+  const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
+  const [editingSales, setEditingSales] = useState<any>(null);
+
+  const [viewVisitDetail, setViewVisitDetail] = useState<any>(null);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState({ 
     name: initialProfile?.name || "", 
@@ -856,7 +860,7 @@ export default function DistributorClient({
                         return (
                            <>
                               {paginatedVisits.map(visit => (
-                                 <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500 gap-4">
+                                 <div key={visit.id} onClick={() => setViewVisitDetail(visit)} className="cursor-pointer bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500 gap-4">
                                     <div className="flex items-center gap-4 min-w-0 flex-1">
                                        <div className={`w-12 h-12 flex-shrink-0 rounded-2xl text-white flex items-center justify-center text-xl shadow-lg transition-all group-hover:scale-105 ${
                                          visit.importance === 'High' ? 'bg-rose-500' :
@@ -1386,6 +1390,44 @@ export default function DistributorClient({
        </nav>
 
        {/* --- MODALS --- */}
+       {viewVisitDetail && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[400] flex items-center justify-center p-6 animate-in fade-in duration-300">
+             <div className="bg-white w-full rounded-[40px] p-8 shadow-2xl space-y-6 relative max-w-sm">
+                <button onClick={() => setViewVisitDetail(null)} className="absolute top-4 right-4 w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-colors font-black">✕</button>
+                <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
+                   <div className={`w-14 h-14 rounded-2xl text-white flex items-center justify-center text-2xl shadow-inner ${
+                     viewVisitDetail.importance === 'High' ? 'bg-rose-500' :
+                     viewVisitDetail.importance === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
+                   }`}>{viewVisitDetail.sales.substring(0,1)}</div>
+                   <div>
+                      <h3 className="text-xl font-black text-slate-900">{viewVisitDetail.sales}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{viewVisitDetail.temple}</p>
+                   </div>
+                </div>
+                
+                <div className="space-y-4">
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2">計畫狀態與重要度</p>
+                        <div className="flex justify-between items-center">
+                            <span className={`text-xs font-black px-3 py-1.5 rounded-full uppercase ${viewVisitDetail.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{viewVisitDetail.status === 'Completed' ? '✅ 已完成' : '⏳ 進行中'}</span>
+                            <span className={`text-xs font-black px-3 py-1.5 rounded-full uppercase ${viewVisitDetail.importance === 'High' ? 'bg-rose-100 text-rose-700' : viewVisitDetail.importance === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{viewVisitDetail.importance === 'High' ? '🔥 高度重要' : viewVisitDetail.importance === 'Medium' ? '⭐ 中度重要' : '🌱 一般計畫'}</span>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-2">計畫日期</p>
+                        <p className="text-sm font-black text-slate-800">{viewVisitDetail.date}</p>
+                    </div>
+
+                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 max-h-48 overflow-y-auto">
+                        <p className="text-[10px] font-black text-blue-400 uppercase mb-2">拜訪內容 / 筆記</p>
+                        <p className="text-sm font-bold text-slate-700 leading-relaxed break-words whitespace-pre-wrap">{viewVisitDetail.purpose}</p>
+                    </div>
+                </div>
+             </div>
+          </div>
+       )}
+
        {viewTempleDetail && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[400] flex items-center justify-center p-6 animate-in fade-in duration-300">
              <div className="bg-white w-full rounded-[40px] p-8 shadow-2xl space-y-6 relative max-w-sm">
