@@ -42,6 +42,7 @@ model Distributor {
   customNodes  Int?               @default(100) @map("custom_nodes")
   nodes        Int?               @default(100)
   quota        Int?               @default(100)
+  superSalesId String?            @map("super_sales_id")
   temples      Temple[]
   sales        DistributorSales[]
 

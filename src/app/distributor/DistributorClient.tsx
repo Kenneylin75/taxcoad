@@ -386,7 +386,7 @@ export default function DistributorClient({
   ];
 
   const filteredTemples = (initialTemples || []).filter(t => {
-    const matchSearch = (t.templeName || t.name || "").includes(templeSearch) || (t.chairpersonName || "").includes(templeSearch);
+    const matchSearch = (t.templeName || t.name || "").includes(templeSearch) || (t.creatorId || "").includes(templeSearch);
     const matchLocation = templeLocationFilter === "" || t.city === templeLocationFilter;
     return matchSearch && matchLocation;
   });
@@ -434,13 +434,13 @@ export default function DistributorClient({
                     <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xl shadow-lg group-hover:bg-blue-600 transition-colors duration-500">🏛️</div>
                     <div>
                        <div className="flex items-center gap-3">
-                          <h4 className="font-black text-slate-900">{app.templeName}</h4>
+                          <h4 className="font-black text-slate-900">{app.templeName || app.name}</h4>
                           <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase shadow-sm ${app.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : app.status === 'UnderReview' ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' : app.status === 'PendingPayment' ? 'bg-purple-50 text-purple-600 border border-purple-100 animate-pulse' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
                              {app.status === 'Active' ? '已開通營運' : app.status === 'UnderReview' ? '待核款' : app.status === 'PendingPayment' ? '待付開辦費' : '審核中'}
                           </span>
                        </div>
                        <div className="flex flex-col gap-1 mt-0.5">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.chairpersonName || '未設定聯絡人'}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.creatorId || '未設定聯絡人'}</p>
                           <p className="text-[10px] font-bold text-slate-500">開設時間: {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : (app.timestamp ? new Date(app.timestamp).toLocaleDateString() : '未記錄')}</p>
                        </div>
                     </div>
@@ -1334,7 +1334,7 @@ export default function DistributorClient({
                        </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡人 / 負責人</p>
-                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.chairpersonName || viewTempleDetail.contactName || (viewTempleDetail.creatorRole === 'DistSales' ? getSalesName(viewTempleDetail.salesId) : initialProfile?.name || initialProfile?.account || '未設定')}</p>
+                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.creatorId || viewTempleDetail.contactName || (viewTempleDetail.creatorRole === 'DistSales' ? getSalesName(viewTempleDetail.salesId) : initialProfile?.name || initialProfile?.account || '未設定')}</p>
                        </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡電話</p>

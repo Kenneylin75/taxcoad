@@ -190,7 +190,7 @@ export default function DistSalesPage() {
   const filteredTemples = useMemo(() => {
     return applications.filter(app => {
       const matchSearch = app.templeName.includes(templeSearch) || 
-                          app.chairpersonName?.includes(templeSearch) || 
+                          app.creatorId?.includes(templeSearch) || 
                           app.contactPhone?.includes(templeSearch);
       const matchLocation = !locationFilter || app.city === locationFilter;
       return matchSearch && matchLocation;
@@ -352,7 +352,7 @@ export default function DistSalesPage() {
                     <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xl shadow-lg">🏛️</div>
                     <div>
                        <div className="flex items-center gap-3">
-                          <h4 className="font-black text-slate-900">{app.templeName}</h4>
+                          <h4 className="font-black text-slate-900">{app.templeName || app.name}</h4>
                            <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase ${app.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : app.status === 'UnderReview' ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' : app.status === 'PendingPayment' ? 'bg-purple-50 text-purple-600 border border-purple-100 animate-pulse' : 'bg-slate-50 text-slate-600 border border-slate-100'}`}>
                               {app.status === 'Active' ? '已開通營運' : app.status === 'UnderReview' ? '待經銷商核款' : app.status === 'PendingPayment' ? '待付開辦費' : '待經銷商審核'}
                            </span>
@@ -361,7 +361,7 @@ export default function DistSalesPage() {
                            )}
                        </div>
                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.chairpersonName}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.creatorId || '未設定聯絡人'}</p>
                           {app.currentUsers !== undefined && (
                              <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full text-[8px] font-black border border-emerald-100">
                                 <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></div>

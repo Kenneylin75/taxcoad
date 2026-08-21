@@ -6707,9 +6707,9 @@ export async function fetchDataBridgeTree() {
     const hqDistSalesNode: any = { id: 'HQ-DistSales', name: '總部直屬經銷業務', type: 'super-admin', children: [] };
 
     // Fetch all entities
-    const superSales = await prisma.user.findMany({ where: { role: 'SuperSales' } });
+    const superSales = await prisma.distributorSales.findMany({ where: { role: 'SuperSales' } });
     const distributors = await prisma.distributor.findMany();
-    const distSales = await prisma.distributorSales.findMany();
+    const distSales = await prisma.distributorSales.findMany({ where: { role: 'DistSales' } });
     const temples = await prisma.temple.findMany();
     const distApps = await prisma.distributorApplication.findMany(); // For mapping dist to superSales
 
@@ -6794,6 +6794,14 @@ export async function fetchDataBridgeTree() {
     });
 
     distNodes.forEach((dNode: any) => {
+      const dist = distributors.find((d: any) => d.id === dNode.id);
+      if (dist?.superSalesId) {
+        const parentSS = superSalesNodes.find(ss => ss.id === dist.superSalesId);
+        if (parentSS) {
+          parentSS.children.push(dNode);
+          return;
+        }
+      }
       const app = distApps.find((a: any) => (a.account && a.account === dNode.account) || (a.name && a.name === dNode.name));
       if (app && app.submittedBy) {
         const parentSS = superSalesNodes.find(ss => ss.id === app.submittedBy);
@@ -7814,7 +7822,8 @@ export async function approveDistributorBySuperAdmin(id: string, overrideQuota?:
             contactName: app.contact_name || '',
             contactPhone: app.phone || '',
             email: app.email || '',
-            address: app.address || ''
+            address: app.address || '',
+            superSalesId: app.submittedBy !== 'System Admin' ? app.submittedBy : null
           }
         });
 
@@ -8563,14 +8572,24 @@ export async function createTempleAccount(data: any) {
   const currentUser = await getCurrentUser();
   const creatorRole = reqRole;
   const creatorId = currentUser?.name || 'System';
+
+  if (reqRole !== 'SuperAdmin' && reqRole !== 'super-admin' && reqRole !== 'System' && (data.freeType === 'Permanent' || data.freeType === 'Trial')) {
+    return { success: false, error: '只有超級管理員可以開設免費宮廟帳戶' };
+  }
+
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
-    const templeNo = [].length + 1;
+  const templeNo = [].length + 1;
   const { paymentCycle, ...rest } = data;
   
   const config = await fetchSystemConfig();
   const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || config.fixedMonthlyRent || 3600);
   const trialMonths = data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0;
   
+  let status = 'Active';
+  if (reqRole === 'SuperSales' || reqRole === 'DistributorSales' || reqRole === 'DistSales') {
+    status = 'Pending';
+  }
+
   const newTemple = {
     id,
     templeNo,
@@ -8584,7 +8603,7 @@ export async function createTempleAccount(data: any) {
     monthlyRent,
     trialMonths,
     freeType: data.freeType || 'Normal',
-    status: 'Active',
+    status,
     timestamp: new Date().toISOString(),
     billingStartDate: data.freeType === 'Trial' && trialMonths > 0 ? 
       new Date(Date.now() + (trialMonths * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
@@ -8647,9 +8666,12 @@ export async function createTempleAccount(data: any) {
         city: newTemple.city || '未設定',
         address: data.address || null,
         phone: data.phone || null,
-        status: 'Active',
+        status: newTemple.status,
         salesId: newTemple.salesId || null,
         distributorId: newTemple.distributorId || null,
+        superSalesId: data.superSalesId || null,
+        creatorRole: newTemple.creatorRole,
+        creatorId: newTemple.creatorId,
         setupFee: newTemple.setupFee || 0,
         monthlyRent: newTemple.monthlyRent || 0,
         paymentCycle: newTemple.paymentCycle || 'Monthly',
