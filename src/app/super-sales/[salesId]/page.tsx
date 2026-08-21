@@ -55,6 +55,7 @@ export default function SuperSalesPage() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [viewingTempleDetail, setViewingTempleDetail] = useState<any>(null);
 
   useEffect(() => {
     fetchSuperSalesProfile(salesId).then(p => {
@@ -215,7 +216,7 @@ export default function SuperSalesPage() {
                          </div>
                       </div>
                    </div>
-                   <button className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all">⋯</button>
+                   <button onClick={() => setViewingTempleDetail(item)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all">⋯</button>
                 </div>
                 
                 {/* Detailed Monitor Info */}
@@ -950,6 +951,66 @@ export default function SuperSalesPage() {
              </div>
           </div>
         )}
+      {viewingTempleDetail && (
+         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setViewingTempleDetail(null)}>
+            <div className="max-w-2xl w-full bg-white p-8 rounded-[40px] shadow-2xl relative space-y-6" onClick={e => e.stopPropagation()}>
+               <button onClick={() => setViewingTempleDetail(null)} className="absolute top-6 right-6 w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-900 hover:bg-slate-200 transition-all font-black text-xl z-10">✕</button>
+               
+               <div className="space-y-1">
+                  <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mb-4 shadow-sm border border-indigo-100">🏛️</div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">宮廟基本訊息</h2>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Temple Details Overview</p>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">名稱 / Name</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.name || viewingTempleDetail.templeName || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">登入帳號 / Account</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.account || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">地區 / Region</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.region || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">城市 / City</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.city || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">完整地址 / Address</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.address || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">聯絡電話 / Phone</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.phone || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">狀態 / Status</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.status || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">付款週期 / Cycle</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.paymentCycle === 'Yearly' ? '年付 (Yearly)' : '月付 (Monthly)'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">開辦費 / Setup Fee</p>
+                     <p className="text-sm font-bold text-slate-900">${(viewingTempleDetail.setupFee || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">月租金 / Rent</p>
+                     <p className="text-sm font-bold text-slate-900">${(viewingTempleDetail.monthlyRent || viewingTempleDetail.revenue || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">加入日期 / Joined Date</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingTempleDetail.date || '未提供'}</p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      )}
 </div>
   );
 }

@@ -8386,7 +8386,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
           }
        }
        
-       temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階雲端方案', date: t.timestamp ? new Date(t.timestamp).toISOString().split('T')[0] : (t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '未知'), revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
+       temples.push({ ...t, id: t.id, name: t.templeName || t.name, status: t.status, plan: '進階雲端方案', date: t.timestamp ? new Date(t.timestamp).toISOString().split('T')[0] : (t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '未知'), revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
     }
   }
 

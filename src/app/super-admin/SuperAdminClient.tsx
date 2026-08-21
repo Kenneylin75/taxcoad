@@ -773,6 +773,7 @@ export default function SuperAdminClient({
                            <p className="text-6xl">✨</p>
                            <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.5em] italic">目前沒有待處理事項 All Clear</p>
                         </div>
+                     )}
                   </div>
               </div>
            )}
