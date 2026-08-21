@@ -6240,9 +6240,9 @@ export async function fetchSuperAdminFinancials() {
   const config = await fetchSystemConfig();
   const templePayments = allTemples.filter((t: any) => !t.distributorId && t.status !== 'Inactive').map((t: any) => {
     const bills = templeBills.filter(b => b.temple_id === t.id || b.templeId === t.id);
-    const unpaidBills = bills.filter(b => b.status === '未繳費' || b.status === '未結帳');
+    const unpaidBills = bills.filter(b => b.status === '未繳費' || b.status === '未結帳' || b.status === 'Unpaid' || b.status === 'Pending' || b.status === 'PendingVerification');
     const hasUnpaid = unpaidBills.length > 0;
-    const isPending = unpaidBills.some(b => b.status === 'PendingVerification');
+    const isPending = unpaidBills.some(b => b.status === 'PendingVerification' || b.status === 'Pending');
 
     const isYearly = t.paymentCycle === 'Yearly';
     const discountRate = config.yearlyDiscountRate || 20;
@@ -7000,12 +7000,12 @@ async function autoGenerateStorageBills(templeId: string) {
   }
 }
 
-export async function uploadTempleBillReceipt(billId: string, imageUrl: string) {
+export async function uploadTempleBillReceipt(billId: string, imageUrl: string, bankLast5?: string) {
 
       try {
         await prisma.templeBill.update({
           where: { id: billId },
-          data: { receiptUrl: imageUrl, status: 'Pending' }
+          data: { receiptUrl: imageUrl, status: 'PendingVerification', bankLast5: bankLast5 || null }
         });
         return { success: true };
       } catch(e) {

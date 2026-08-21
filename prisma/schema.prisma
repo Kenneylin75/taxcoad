@@ -237,6 +237,7 @@ model TempleBill {
   templeId    String   @map("temple_id")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
   receiptUrl  String?  @map("receipt_url")
+  bankLast5   String?  @map("bank_last5")
   temple      Temple   @relation(fields: [templeId], references: [id])
 }
 

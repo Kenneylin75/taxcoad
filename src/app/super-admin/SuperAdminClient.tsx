@@ -1574,6 +1574,9 @@ export default function SuperAdminClient({
                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{payment.billingDate || payment.dueDate}</p>
                                   <p className="text-lg font-black text-slate-900">{payment.templeName}</p>
                                   <p className="text-sm font-bold text-slate-500 mt-1">金額: NT$ {(payment.amount || 0).toLocaleString()} <span className="text-xs text-slate-400 ml-2">項目: {payment.type === 'MonthlyFee' ? '月租費' : payment.type}</span></p>
+                                  {(payment.bankLast5 || payment.bank_last5) && (
+                                     <p className="text-xs font-bold text-emerald-600 mt-1 bg-emerald-50 inline-block px-2 py-0.5 rounded-md">匯款後五碼: {payment.bankLast5 || payment.bank_last5}</p>
+                                  )}
                                </div>
                                <div className="flex flex-col items-end gap-2">
                                   <div className="flex items-center gap-2">

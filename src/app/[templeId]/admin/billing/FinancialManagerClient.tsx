@@ -11,6 +11,7 @@ import {
   rejectFreeAccount,
   updateRevenueRemark
 } from '@/app/actions';
+import { useRouter } from 'next/navigation';
 
 interface FinancialOverview {
   revenue: RevenueEntry[];
@@ -38,6 +39,7 @@ interface FinancialManagerClientProps {
 export default function FinancialManagerClient({ initialData, freeApps, initialDataJson, freeAppsJson }: FinancialManagerClientProps) {
   if (initialDataJson) initialData = JSON.parse(initialDataJson);
   if (freeAppsJson) freeApps = JSON.parse(freeAppsJson);
+  const router = useRouter();
   const [view, setView] = useState<'revenue' | 'expenses' | 'approvals'>('revenue');
   const [apps, setApps] = useState<FreeAccountApplication[]>(freeApps || []);
   const [isPending, startTransition] = useTransition();
@@ -45,6 +47,7 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
   const [currentPayingBill, setCurrentPayingBill] = useState<ExpenseEntry | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'linepay' | 'ecpay'>('linepay');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [bankLast5, setBankLast5] = useState('');
 
   const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
   const [editingRemarkText, setEditingRemarkText] = useState('');
@@ -54,7 +57,7 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
       const res = await updateRevenueRemark(revId, source, editingRemarkText);
       if (res.success) {
         setEditingRemarkId(null);
-        window.location.reload();
+        router.refresh();
       } else {
         alert(res.message || '儲存失敗');
       }
@@ -77,13 +80,15 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
   };
 
   const submitBankTransfer = async () => {
-    if (!receiptImage || !currentPayingBill) return alert('請先上傳匯款憑證');
+    if (!receiptImage || !currentPayingBill || !bankLast5.trim()) return alert('請完整上傳匯款憑證並填寫帳號後五碼');
     startTransition(async () => {
-      const res = await uploadTempleBillReceipt(currentPayingBill.id, receiptImage);
+      const res = await uploadTempleBillReceipt(currentPayingBill.id, receiptImage, bankLast5);
       if (res.success) {
-        alert('已成功上傳匯款憑證，等待經銷商確認後即會自動核銷。');
+        alert('已成功上傳匯款憑證與後五碼，等待經銷商確認後即會自動核銷。');
         setPaymentModalOpen(false);
-        window.location.reload();
+        setReceiptImage(null);
+        setBankLast5('');
+        router.refresh();
       }
     });
   };
@@ -595,6 +600,18 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                           )}
                           <input type="file" className="hidden" accept="image/*" onChange={handleUploadReceipt} />
                        </label>
+                    </div>
+
+                    <div className="space-y-2">
+                       <p className="text-xs font-bold text-slate-600">匯款帳號後五碼</p>
+                       <input 
+                         type="text" 
+                         value={bankLast5} 
+                         onChange={(e) => setBankLast5(e.target.value)} 
+                         maxLength={5}
+                         placeholder="例如：12345" 
+                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-red-500"
+                       />
                     </div>
 
                      {currentPayingBill.status === 'PendingVerification' ? (
