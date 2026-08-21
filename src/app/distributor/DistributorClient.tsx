@@ -686,6 +686,9 @@ export default function DistributorClient({
                 {activeTab === 'temple_payments' && '宮廟帳款審核'}
                 {activeTab === 'logs' && '系統日誌 Sys'}
              </h1>
+             <div className="mt-3 inline-block bg-blue-50/80 px-3 py-1.5 rounded-full border border-blue-100 backdrop-blur-sm shadow-sm">
+                <span className="text-[11px] font-black tracking-widest text-blue-700">{initialProfile?.name || initialProfile?.account}</span>
+             </div>
           </div>
           <div onClick={() => setActiveTab('logs')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-2xl transition-all duration-500 hover:rotate-12 ${activeTab === 'logs' ? 'bg-blue-600 text-white scale-110' : 'bg-white/80 backdrop-blur-md border border-white text-slate-300'}`}>🛰️</div>
        </header>
