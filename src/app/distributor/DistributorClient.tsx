@@ -775,7 +775,12 @@ export default function DistributorClient({
                <section className="bg-white/60 backdrop-blur-xl p-8 rounded-[50px] shadow-2xl border border-white">
                   <div className="flex justify-between items-center mb-10 px-4">
                      <button onClick={() => setCurrentMonth(m => m === 1 ? 12 : m - 1)} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〈</button>
-                     <h3 className="text-lg font-black text-slate-900 tracking-tighter italic underline decoration-blue-500 decoration-4 underline-offset-8">{currentYear}年 {currentMonth}月 監控</h3>
+                     <div className="text-center">
+                        <h3 className="text-lg font-black text-slate-900 tracking-tighter italic underline decoration-blue-500 decoration-4 underline-offset-8">{currentYear}年 {currentMonth}月 監控</h3>
+                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">
+                           本月共有 <span className="text-blue-600 font-black">{mockVisits.filter(v => v.date.startsWith(`${currentYear}-${currentMonth.toString().padStart(2, '0')}`)).length}</span> 筆計畫
+                        </p>
+                     </div>
                      <button onClick={() => setCurrentMonth(m => m === 12 ? 1 : m + 1)} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〉</button>
                   </div>
                   <div className="grid grid-cols-7 gap-3">
