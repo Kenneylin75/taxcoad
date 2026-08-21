@@ -773,16 +773,7 @@ export default function SuperAdminClient({
                            <p className="text-6xl">✨</p>
                            <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.5em] italic">目前沒有待處理事項 All Clear</p>
                         </div>
-                     )}
                   </div>
-                  {viewingReceiptUrl && (
-                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setViewingReceiptUrl(null)}>
-                        <div className="max-w-4xl w-full bg-white p-2 rounded-[40px] shadow-2xl relative" onClick={e => e.stopPropagation()}>
-                           <button onClick={() => setViewingReceiptUrl(null)} className="absolute top-6 right-6 w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-lg hover:scale-110 transition-all font-black text-xl z-10">✕</button>
-                           <img src={viewingReceiptUrl} alt="Receipt" className="w-full h-auto rounded-[30px]" />
-                        </div>
-                     </div>
-                  )}
               </div>
            )}
 
@@ -2923,6 +2914,29 @@ export default function SuperAdminClient({
               </div>
            </div>
         </div>
+      )}
+
+      {viewingReceiptUrl && (
+         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setViewingReceiptUrl(null)}>
+            <div className="max-w-4xl w-full bg-white p-2 rounded-[40px] shadow-2xl relative" onClick={e => e.stopPropagation()}>
+               <button onClick={() => setViewingReceiptUrl(null)} className="absolute top-6 right-6 w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-900 shadow-lg hover:scale-110 transition-all font-black text-xl z-10">✕</button>
+               <button 
+                 onClick={() => {
+                    if (viewingReceiptUrl.startsWith('data:')) {
+                       const a = document.createElement('a');
+                       a.href = viewingReceiptUrl;
+                       a.download = `receipt_${Date.now()}.png`;
+                       a.click();
+                    } else {
+                       window.open(viewingReceiptUrl, '_blank');
+                    }
+                 }} 
+                 className="absolute top-6 right-20 bg-indigo-600 text-white px-6 py-3 rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 transition-all font-bold text-sm z-10">
+                 ⬇ 下載圖片
+               </button>
+               <img src={viewingReceiptUrl} alt="Receipt" className="w-full h-auto max-h-[80vh] object-contain rounded-[30px]" />
+            </div>
+         </div>
       )}
 </div>
   );
