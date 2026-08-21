@@ -1,10 +1,7 @@
 // @ts-nocheck
 "use server";
 
-
-import prisma from '@/lib/prisma';
-
-
+import prisma from "@/lib/prisma";
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -13,21 +10,23 @@ import { withTempleSession, dbQuery } from "../db/db";
 // Helper to dynamically get templeId from cookies or fallback
 
 async function getRoleLabel(name: string): Promise<string> {
-  if (!name) return '未知人員';
-  
+  if (!name) return "未知人員";
+
   // 1. Check DistSales (SuperSales / DistSales)
   const sales = [].find((s: any) => s.name === name);
   if (sales) {
-    if (sales.role === 'SuperSales') return `超級業務 ${name}`;
-    if (sales.role === 'DistSales') {
+    if (sales.role === "SuperSales") return `超級業務 ${name}`;
+    if (sales.role === "DistSales") {
       const dist = [].find((d: any) => d.id === sales.distributorId);
-      const distName = dist ? dist.name : '經銷商';
+      const distName = dist ? dist.name : "經銷商";
       return `${distName} 經銷業務 ${name}`;
     }
   }
 
   // 2. Check Distributor Admin
-  const distAdmin = [].find((d: any) => d.name === name || d.contactName === name);
+  const distAdmin = [].find(
+    (d: any) => d.name === name || d.contactName === name,
+  );
   if (distAdmin) {
     return `經銷商 ${name}`;
   }
@@ -37,38 +36,42 @@ async function getRoleLabel(name: string): Promise<string> {
 }
 
 export async function revalidateTemple(templeId?: string) {
-  const tId = templeId || await getDynamicTempleId();
-    revalidatePath(`/${tId}`, 'layout');
-    revalidatePath('/super-admin', 'layout');
-    revalidatePath('/', 'layout');
+  const tId = templeId || (await getDynamicTempleId());
+  revalidatePath(`/${tId}`, "layout");
+  revalidatePath("/super-admin", "layout");
+  revalidatePath("/", "layout");
 }
 
 export async function setGuestTempleContext(templeId: string) {
   const store = await cookies();
-    store.set('templeId', templeId, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
+  store.set("templeId", templeId, {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    path: "/",
+  });
 }
 
 export async function getDynamicTempleId() {
   try {
     const store = await cookies();
-    return store.get('templeId')?.value || 'temple-1';
+    return store.get("templeId")?.value || "temple-1";
   } catch (e: any) {
-    return 'temple-1';
+    return "temple-1";
   }
 }
 
 export async function checkTempleSuspension(templeId?: string) {
-  const tId = templeId || await getDynamicTempleId();
+  const tId = templeId || (await getDynamicTempleId());
   try {
     const rows = await prisma.templeBill.findMany({
       where: {
         templeId: tId,
-        status: 'Unpaid',
-        dueDate: { lt: new Date().toISOString().split('T')[0] }
-      }
+        status: "Unpaid",
+        dueDate: { lt: new Date().toISOString().split("T")[0] },
+      },
     });
     return rows.length > 0;
-  } catch(e) {
+  } catch (e) {
     return false;
   }
 }
@@ -77,25 +80,59 @@ export async function checkTempleSuspension(templeId?: string) {
 // 🛡️ 服務管理系統 - 核心資料持久化模擬 (Global Scope Persistence)
 // -------------------------------------------------------------------------
 
-
-
-
-
-
-
 const DEFAULT_SERVICES = [
-  { id: '1', name: '光明燈祈福', price: 600, duration: '30 min', description: '消災解厄，前途光明', assignedStaff: [1, 2], color: '#f59e0b' },
-  { id: '2', name: '文昌開運', price: 800, duration: '45 min', description: '金榜題名，智慧大開', assignedStaff: [3], color: '#3b82f6' },
-  { id: '3', name: '太歲安奉', price: 1000, duration: '20 min', description: '歲歲平安，諸事順遂', assignedStaff: [1], color: '#ef4444' },
-  { id: '4', name: '問事服務', price: 0, duration: '20 min', description: '指點迷津，解惑人生', assignedStaff: [1, 2], color: '#8b5cf6' },
-  { id: '5', name: '例行祈福', price: 0, duration: '30 min', description: '日常平安祈福', assignedStaff: [1], color: '#10b981' },
+  {
+    id: "1",
+    name: "光明燈祈福",
+    price: 600,
+    duration: "30 min",
+    description: "消災解厄，前途光明",
+    assignedStaff: [1, 2],
+    color: "#f59e0b",
+  },
+  {
+    id: "2",
+    name: "文昌開運",
+    price: 800,
+    duration: "45 min",
+    description: "金榜題名，智慧大開",
+    assignedStaff: [3],
+    color: "#3b82f6",
+  },
+  {
+    id: "3",
+    name: "太歲安奉",
+    price: 1000,
+    duration: "20 min",
+    description: "歲歲平安，諸事順遂",
+    assignedStaff: [1],
+    color: "#ef4444",
+  },
+  {
+    id: "4",
+    name: "問事服務",
+    price: 0,
+    duration: "20 min",
+    description: "指點迷津，解惑人生",
+    assignedStaff: [1, 2],
+    color: "#8b5cf6",
+  },
+  {
+    id: "5",
+    name: "例行祈福",
+    price: 0,
+    duration: "30 min",
+    description: "日常平安祈福",
+    assignedStaff: [1],
+    color: "#10b981",
+  },
 ];
 
 // migrated (await jsonStore.find('services')) to (await jsonStore.find('services'))
 
 // Ensure core services are present and have correct colors, but DO NOT wipe other services
 for (const ds of DEFAULT_SERVICES) {
-  const existing = [].find(s => s.id === ds.id);
+  const existing = [].find((s) => s.id === ds.id);
   if (!existing) {
     await null;
   } else {
@@ -114,63 +151,73 @@ for (const ds of DEFAULT_SERVICES) {
 // 🚀 核心 Actions
 // -------------------------------------------------------------------------
 
-export type AppRole = 'SuperAdmin' | 'Distributor' | 'DistSales' | 'SuperSales' | 'SuperAgent' | 'TempleAdmin' | 'Staff' | 'Believer' | 'Admin';
+export type AppRole =
+  | "SuperAdmin"
+  | "Distributor"
+  | "DistSales"
+  | "SuperSales"
+  | "SuperAgent"
+  | "TempleAdmin"
+  | "Staff"
+  | "Believer"
+  | "Admin";
 
 export async function getCurrentRole(): Promise<AppRole> {
-  const { cookies } = require('next/headers');
+  const { cookies } = require("next/headers");
   const cookieStore = await cookies();
-  const role = cookieStore.get('admin_role')?.value as AppRole;
-  return role || 'TempleAdmin';
+  const role = cookieStore.get("admin_role")?.value as AppRole;
+  return role || "TempleAdmin";
 }
 
 export async function getCurrentUser() {
-  const { cookies } = await import('next/headers');
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
-  const account = cookieStore.get('admin_account')?.value;
-  const role = cookieStore.get('admin_role')?.value;
-  const templeId = cookieStore.get('templeId')?.value;
+  const account = cookieStore.get("admin_account")?.value;
+  const role = cookieStore.get("admin_role")?.value;
+  const templeId = cookieStore.get("templeId")?.value;
 
   if (!account) return null;
 
-  if (account === 'PIVOTADMIN01') {
+  if (account === "PIVOTADMIN01") {
     return {
       id: "super-1",
       name: "PIVOT 總裁",
       role: "SuperAdmin",
-      avatar: "https://ui-avatars.com/api/?name=PIVOT&background=0F172A&color=fff",
-      permissions: ['all']
+      avatar:
+        "https://ui-avatars.com/api/?name=PIVOT&background=0F172A&color=fff",
+      permissions: ["all"],
     };
   }
 
-  let permissions = ['all'];
+  let permissions = ["all"];
   let name = account;
   let id = "admin-1";
 
   if (templeId) {
     const person = await prisma.user.findFirst({
       where: {
-        account: { equals: account, mode: 'insensitive' },
-        templeId: templeId
-      }
+        account: { equals: account, mode: "insensitive" },
+        templeId: templeId,
+      },
     });
-    
+
     if (person) {
       name = person.name;
       id = person.id || person.templeId;
       if (person.permissions && Array.isArray(person.permissions)) {
         permissions = person.permissions as string[];
       } else {
-        permissions = role === 'TempleAdmin' ? ['all'] : [];
+        permissions = role === "TempleAdmin" ? ["all"] : [];
       }
     }
   }
 
-  return { 
-    id, 
-    name, 
-    role: role || "TempleAdmin", 
+  return {
+    id,
+    name,
+    role: role || "TempleAdmin",
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F172A&color=fff`,
-    permissions
+    permissions,
   };
 }
 
@@ -188,9 +235,12 @@ export async function logoutAccount() {
   return { success: true };
 }
 
-export async function loginAccount(formData: FormData, targetTempleId?: string) {
-  const account = (formData.get("account") as string || "").trim();
-  const password = (formData.get("password") as string || "").trim();
+export async function loginAccount(
+  formData: FormData,
+  targetTempleId?: string,
+) {
+  const account = ((formData.get("account") as string) || "").trim();
+  const password = ((formData.get("password") as string) || "").trim();
 
   if (!account || !password) return { success: false, error: "請輸入帳號密碼" };
 
@@ -201,21 +251,27 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
   let loginStatus = "Active";
   if (targetTempleId) {
     const person = await prisma.user.findFirst({
-      where: { account: { equals: account, mode: 'insensitive' }, password, templeId: targetTempleId }
+      where: {
+        account: { equals: account, mode: "insensitive" },
+        password,
+        templeId: targetTempleId,
+      },
     });
 
     if (person) {
-      const resTemple = await prisma.temple.findUnique({ where: { id: person.templeId || '' } });
+      const resTemple = await prisma.temple.findUnique({
+        where: { id: person.templeId || "" },
+      });
       if (resTemple && resTemple.status === "Inactive") {
         return { success: false, error: "該宮廟已被停權，無法登入" };
       }
       if (resTemple && resTemple.status !== "Active") {
         return { success: false, error: "該宮廟已被停權，無法登入" };
       }
-      success = true; 
-      redirectPath = `/${person.templeId}/admin`; 
+      success = true;
+      redirectPath = `/${person.templeId}/admin`;
       loggedInName = person.name;
-      assignedRole = "TempleAdmin"; 
+      assignedRole = "TempleAdmin";
     } else {
       return { success: false, error: "無效的帳號或密碼" };
     }
@@ -226,63 +282,105 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
       loggedInName = "超級總裁";
       assignedRole = "SuperAdmin";
     } else {
-      const admin = await prisma.admin.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
+      const admin = await prisma.admin.findFirst({
+        where: { account: { equals: account, mode: "insensitive" }, password },
+      });
 
       if (admin) {
         success = true;
         redirectPath = "/super-admin";
         assignedRole = "SuperAdmin";
       } else {
-        const distributor = await prisma.distributor.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
+        const distributor = await prisma.distributor.findFirst({
+          where: {
+            account: { equals: account, mode: "insensitive" },
+            password,
+          },
+        });
 
         if (distributor) {
-          if (distributor.status === "Inactive") { loginStatus = "Inactive"; }
-          else {
+          if (distributor.status === "Inactive") {
+            loginStatus = "Inactive";
+          } else {
             success = true;
             redirectPath = `/distributor/${distributor.id}`;
             assignedRole = "Distributor";
           }
         } else {
-          const salesPerson = await prisma.distributorSales.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
+          const salesPerson = await prisma.distributorSales.findFirst({
+            where: {
+              account: { equals: account, mode: "insensitive" },
+              password,
+            },
+          });
 
           if (salesPerson) {
-            if (salesPerson.status === "Inactive") { loginStatus = "Inactive"; }
-            else {
+            if (salesPerson.status === "Inactive") {
+              loginStatus = "Inactive";
+            } else {
               success = true;
-              redirectPath = salesPerson.role === "SuperSales" ? `/super-sales/${salesPerson.id}` : `/dist-sales-portal/${salesPerson.distributorId || 'dist-hq'}/${salesPerson.id}`;
-              assignedRole = salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
+              redirectPath =
+                salesPerson.role === "SuperSales"
+                  ? `/super-sales/${salesPerson.id}`
+                  : `/dist-sales-portal/${salesPerson.distributorId || "dist-hq"}/${salesPerson.id}`;
+              assignedRole =
+                salesPerson.role === "SuperSales" ? "SuperSales" : "DistSales";
             }
           } else {
-            const person = await prisma.user.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
+            const person = await prisma.user.findFirst({
+              where: {
+                account: { equals: account, mode: "insensitive" },
+                password,
+              },
+            });
 
-            if (person) { 
-              if (person.role !== 'TempleAdmin') {
-                return { success: false, error: "一般行政人員請透過各宮廟專屬登入連結進行登入。" };
+            if (person) {
+              if (person.role !== "TempleAdmin") {
+                return {
+                  success: false,
+                  error: "一般行政人員請透過各宮廟專屬登入連結進行登入。",
+                };
               }
-              const resTemple = await prisma.temple.findUnique({ where: { id: person.templeId || '' } });
+              const resTemple = await prisma.temple.findUnique({
+                where: { id: person.templeId || "" },
+              });
               if (!resTemple) {
-                 return { success: false, error: "無法取得宮廟資料，可能正在建立中或資料庫異常" };
+                return {
+                  success: false,
+                  error: "無法取得宮廟資料，可能正在建立中或資料庫異常",
+                };
               }
               if (resTemple.status === "Inactive") {
-                 loginStatus = "Inactive";
+                loginStatus = "Inactive";
               } else if (resTemple.status !== "Active") {
-                 return { success: false, error: "該宮廟尚在經銷商審核中，目前無法登入" };
+                return {
+                  success: false,
+                  error: "該宮廟尚在經銷商審核中，目前無法登入",
+                };
               } else if (false) {
-                 loginStatus = "Inactive";
+                loginStatus = "Inactive";
               } else {
-                 success = true; 
-                 redirectPath = `/${person.templeId}/admin`; 
-                 loggedInName = person.name;
-                 assignedRole = "TempleAdmin"; 
+                success = true;
+                redirectPath = `/${person.templeId}/admin`;
+                loggedInName = person.name;
+                assignedRole = "TempleAdmin";
               }
             } else {
               // Try finding temple master account directly
-              const mainTemple = await prisma.temple.findFirst({ where: { account: { equals: account, mode: 'insensitive' }, password } });
+              const mainTemple = await prisma.temple.findFirst({
+                where: {
+                  account: { equals: account, mode: "insensitive" },
+                  password,
+                },
+              });
               if (mainTemple) {
                 if (mainTemple.status === "Inactive") {
                   loginStatus = "Inactive";
                 } else if (mainTemple.status !== "Active") {
-                  return { success: false, error: "該宮廟尚在經銷商審核中，目前無法登入" };
+                  return {
+                    success: false,
+                    error: "該宮廟尚在經銷商審核中，目前無法登入",
+                  };
                 } else if (false) {
                   loginStatus = "Inactive";
                 } else {
@@ -300,7 +398,7 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
   }
 
   if (loginStatus === "Inactive") {
-     return { success: false, error: "該帳戶已被停權或關閉，無法登入" };
+    return { success: false, error: "該帳戶已被停權或關閉，無法登入" };
   }
 
   if (success) {
@@ -308,11 +406,12 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
     const cookieStore = await cookies();
     cookieStore.set("admin_role", assignedRole);
     cookieStore.set("admin_account", account);
-    if (assignedRole === "TempleAdmin" && redirectPath.split('/')[1]) {
-       cookieStore.set("templeId", redirectPath.split('/')[1]);
+    if (assignedRole === "TempleAdmin" && redirectPath.split("/")[1]) {
+      cookieStore.set("templeId", redirectPath.split("/")[1]);
     }
-    
-    const logMsg = "使用者 " + loggedInName + " (" + assignedRole + ") 登入成功";
+
+    const logMsg =
+      "使用者 " + loggedInName + " (" + assignedRole + ") 登入成功";
     const newLogTimestamp = new Date().toISOString();
 
     try {
@@ -321,12 +420,20 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
           action: "LOGIN",
           details: logMsg,
           timestamp: newLogTimestamp,
-          performedBy: loggedInName
-        }
+          performedBy: loggedInName,
+        },
       });
-    } catch(e) { console.error("Log error", e); }
-    
-    await logSystemEvent('INFO', '帳號登入', logMsg, loggedInName, redirectPath.split('/')[1] || 'hq');
+    } catch (e) {
+      console.error("Log error", e);
+    }
+
+    await logSystemEvent(
+      "INFO",
+      "帳號登入",
+      logMsg,
+      loggedInName,
+      redirectPath.split("/")[1] || "hq",
+    );
 
     return { success: true, redirectPath, role: assignedRole };
   }
@@ -335,130 +442,180 @@ export async function loginAccount(formData: FormData, targetTempleId?: string) 
 }
 export async function checkAccountExists(account: string) {
   if (!account) return false;
-  
+
   if (account === "PIVOTADMIN01") return true;
-  
-  if (await prisma.user.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
-  if (await prisma.distributor.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
-  if (await prisma.distributorSales.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
-  if (await prisma.temple.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
-  if (await prisma.admin.findFirst({ where: { account: { equals: account, mode: 'insensitive' } } })) return true;
-  
+
+  if (
+    await prisma.user.findFirst({
+      where: { account: { equals: account, mode: "insensitive" } },
+    })
+  )
+    return true;
+  if (
+    await prisma.distributor.findFirst({
+      where: { account: { equals: account, mode: "insensitive" } },
+    })
+  )
+    return true;
+  if (
+    await prisma.distributorSales.findFirst({
+      where: { account: { equals: account, mode: "insensitive" } },
+    })
+  )
+    return true;
+  if (
+    await prisma.temple.findFirst({
+      where: { account: { equals: account, mode: "insensitive" } },
+    })
+  )
+    return true;
+  if (
+    await prisma.admin.findFirst({
+      where: { account: { equals: account, mode: "insensitive" } },
+    })
+  )
+    return true;
+
   return false;
 }
 
 // 1. 抓取排班
 export async function fetchAvailableSlots() {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        const slots = await prisma.slot.findMany({
-          where: { templeId },
-          orderBy: [{ date: 'asc' }, { time: 'asc' }]
-        });
-        return slots.map(r => ({
-          id: r.id,
-          date: r.date,
-          time: r.time,
-          staff: r.staff,
-          description: r.description,
-          location: r.location,
-          bound_service_id: r.boundServiceId,
-          price: r.price,
-          status: r.status,
-          guestName: r.guestName,
-          batchId: r.batchId
-        }));
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+    const slots = await prisma.slot.findMany({
+      where: { templeId },
+      orderBy: [{ date: "asc" }, { time: "asc" }],
+    });
+    return slots.map((r) => ({
+      id: r.id,
+      date: r.date,
+      time: r.time,
+      staff: r.staff,
+      description: r.description,
+      location: r.location,
+      bound_service_id: r.boundServiceId,
+      price: r.price,
+      status: r.status,
+      guestName: r.guestName,
+      batchId: r.batchId,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 // 2. 批量建立排班
 export async function createSlot(data: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return { success: false };
-        
-        let datesStr = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
-        if (data instanceof FormData) {
-          datesStr = data.get("dates") as string || data.get("date") as string;
-          time = data.get("time") as string;
-          staff = data.get("staff") as string;
-          description = data.get("description") as string;
-          location = data.get("location") as string;
-          bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
-          price = Number(data.get("price")) || 0;
-        } else {
-          datesStr = data.dates || data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
-        }
-        
-        if (!datesStr) return { success: false, message: "無效的日期" };
-        const dateList = datesStr?.includes(',') ? datesStr.split(",") : [datesStr];
-        const batchId = Date.now().toString();
-        
-        const createData = dateList.map(date => ({
-          templeId,
-          date,
-          time,
-          staff,
-          description,
-          location,
-          boundServiceId: bound_service_id,
-          price,
-          status: 'Available',
-            batchId
-        }));
-        
-        await prisma.slot.createMany({ data: createData });
-        await revalidateTemple();
-        return { success: true, count: dateList.length };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    let datesStr = "";
+    let time = "";
+    let staff = "";
+    let description = "";
+    let location = "";
+    let bound_service_id = "";
+    let price = 0;
+    if (data instanceof FormData) {
+      datesStr = (data.get("dates") as string) || (data.get("date") as string);
+      time = data.get("time") as string;
+      staff = data.get("staff") as string;
+      description = data.get("description") as string;
+      location = data.get("location") as string;
+      bound_service_id =
+        (data.get("bound_service_id") as string) ||
+        (data.get("serviceId") as string);
+      price = Number(data.get("price")) || 0;
+    } else {
+      datesStr = data.dates || data.date;
+      time = data.time;
+      staff = data.staff;
+      description = data.description || "";
+      location = data.location || "";
+      bound_service_id = data.bound_service_id || data.serviceId;
+      price = Number(data.price) || 0;
+    }
+
+    if (!datesStr) return { success: false, message: "無效的日期" };
+    const dateList = datesStr?.includes(",") ? datesStr.split(",") : [datesStr];
+    const batchId = Date.now().toString();
+
+    const createData = dateList.map((date) => ({
+      templeId,
+      date,
+      time,
+      staff,
+      description,
+      location,
+      boundServiceId: bound_service_id,
+      price,
+      status: "Available",
+      batchId,
+    }));
+
+    await prisma.slot.createMany({ data: createData });
+    await revalidateTemple();
+    return { success: true, count: dateList.length };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function updateSlot(id: number, data: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    let date = "";
+    let time = "";
+    let staff = "";
+    let description = "";
+    let location = "";
+    let bound_service_id = "";
+    let price = 0;
 
-      try {
-        const templeId = await getDynamicTempleId();
-        let date = ''; let time = ''; let staff = ''; let description = ''; let location = ''; let bound_service_id = ''; let price = 0;
-        
-        if (data instanceof FormData) {
-          date = data.get("date") as string;
-          time = data.get("time") as string;
-          staff = data.get("staff") as string;
-          description = data.get("description") as string;
-          location = data.get("location") as string;
-          bound_service_id = data.get("bound_service_id") as string || data.get("serviceId") as string;
-          price = Number(data.get("price")) || 0;
-        } else {
-          date = data.date; time = data.time; staff = data.staff; description = data.description || ''; location = data.location || ''; bound_service_id = data.bound_service_id || data.serviceId; price = Number(data.price) || 0;
-        }
-        
-        await prisma.slot.updateMany({
-          where: { id: String(id), templeId: templeId! },
-          data: {
-            date,
-            time,
-            staff,
-            description,
-            location,
-            boundServiceId: bound_service_id,
-            price
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    if (data instanceof FormData) {
+      date = data.get("date") as string;
+      time = data.get("time") as string;
+      staff = data.get("staff") as string;
+      description = data.get("description") as string;
+      location = data.get("location") as string;
+      bound_service_id =
+        (data.get("bound_service_id") as string) ||
+        (data.get("serviceId") as string);
+      price = Number(data.get("price")) || 0;
+    } else {
+      date = data.date;
+      time = data.time;
+      staff = data.staff;
+      description = data.description || "";
+      location = data.location || "";
+      bound_service_id = data.bound_service_id || data.serviceId;
+      price = Number(data.price) || 0;
+    }
+
+    await prisma.slot.updateMany({
+      where: { id: String(id), templeId: templeId! },
+      data: {
+        date,
+        time,
+        staff,
+        description,
+        location,
+        boundServiceId: bound_service_id,
+        price,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 3.5 信眾預約動作
@@ -466,19 +623,29 @@ export async function updateSlot(id: number, data: any) {
 // ==========================================
 // 🚀 LINE 推播觸發引擎 (Simulation)
 // ==========================================
-export async function triggerLinePush(templeId: string, serviceId: string, targetName: string, targetPhone: string, serviceTitle: string) {
+export async function triggerLinePush(
+  templeId: string,
+  serviceId: string,
+  targetName: string,
+  targetPhone: string,
+  serviceTitle: string,
+) {
   const tSettings = await prisma.serviceSetting.findFirst({
-    where: { templeId }
+    where: { templeId },
   });
   if (!tSettings || !tSettings.pushConfigs) return;
 
-  const pushConfigs = Array.isArray(tSettings.pushConfigs) ? tSettings.pushConfigs : [];
+  const pushConfigs = Array.isArray(tSettings.pushConfigs)
+    ? tSettings.pushConfigs
+    : [];
   const config = pushConfigs.find((c: any) => c.serviceId === serviceId);
   if (!config) return;
 
   // Find 'Immediate' stages that are enabled
-  const immediateStages = config.stages.filter((s: any) => s.enabled && s.timeType === 'Immediate');
-  
+  const immediateStages = config.stages.filter(
+    (s: any) => s.enabled && s.timeType === "Immediate",
+  );
+
   for (const stage of immediateStages) {
     const logMsg = `[LINE 推播成功] 已發送【${serviceTitle}】通知至信眾 ${targetName} (${targetPhone}) | 內容: ${stage.content}`;
     await prisma.auditLog.create({
@@ -486,353 +653,376 @@ export async function triggerLinePush(templeId: string, serviceId: string, targe
         templeId,
         action: "LINE_PUSH",
         details: logMsg,
-        performedBy: 'System (Auto)'
-      }
+        performedBy: "System (Auto)",
+      },
     });
   }
 }
 
-export async function bookAppointment(slotId: number, guestName: string, phone: string, paymentMethod?: string, paymentRef?: string, amount?: number) {
+export async function bookAppointment(
+  slotId: number,
+  guestName: string,
+  phone: string,
+  paymentMethod?: string,
+  paymentRef?: string,
+  amount?: number,
+) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (await checkTempleSuspension(templeId))
+      return { success: false, message: "宮廟服務已暫停，請聯繫宮廟管理員" };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (await checkTempleSuspension(templeId)) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
-        
-        const slot = await prisma.slot.findUnique({ where: { id: String(slotId) } });
-        if (!slot) return { success: false, message: "找不到該時段" };
-        if (slot.status === 'Booked') return { success: false, message: "該時段已被預約" };
-        
-        await prisma.slot.update({
-          where: { id: String(slotId) },
-          data: { status: 'Booked', guestName }
-        });
-        
-        const paymentStatus = (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') ? 'Paid' : 'Pending';
-        const amountVal = amount || 0;
-        
-        const normPhone = normalizePhone(phone);
-        const guest = await prisma.guest.upsert({
-          where: { 
-            templeId_phone: {
-              templeId,
-              phone: normPhone
-            }
-          },
-          update: {},
-          create: {
-            templeId,
-            phone: normPhone,
-            name: guestName,
-            status: 'Active'
-          }
-        });
+    const slot = await prisma.slot.findUnique({
+      where: { id: String(slotId) },
+    });
+    if (!slot) return { success: false, message: "找不到該時段" };
+    if (slot.status === "Booked")
+      return { success: false, message: "該時段已被預約" };
 
-        const newApp = await prisma.appointment.create({
-          data: {
-            templeId: templeId!,
-            guestId: guest.id,
-            date: slot.date,
-            time: slot.time,
-            staff: slot.staff,
-            guestName,
-            service: slot.description || '日常預約',
-            serviceId: slot.boundServiceId || null,
-            status: 'Confirmed',
-            phone,
-            paymentMethod: paymentMethod || null,
-            paymentRef: paymentRef || null,
-            paymentStatus,
-            amount: amountVal
-          }
-        });
-          
-          let serviceName = '日常服務';
-          if (slot.boundServiceId) {
-            const svc = await prisma.service.findUnique({ where: { id: slot.boundServiceId } });
-            if (svc) serviceName = svc.name;
-          }
-          await prisma.adminNotification.create({
-            data: {
-              templeId: templeId!,
-              guestId: guest.id,
-              category: 'PENDING_REVIEW',
-              message: `信眾 ${guestName} 預約了「${serviceName}」 (${slot.date || ''} ${slot.time || ''})，金額：NT$ ${amountVal}，等待確認。`,
-              isRead: false,
-              linkPath: `/${templeId!}/admin/calendar`
-            }
-          });
-        
-        await revalidateTemple();
-        return { success: true, id: newApp.id };
-      } catch(e) {
-        console.error(e);
-        return { success: false, message: '預約失敗' };
-      }
+    await prisma.slot.update({
+      where: { id: String(slotId) },
+      data: { status: "Booked", guestName },
+    });
+
+    const paymentStatus =
+      paymentMethod === "LinePayApi" || paymentMethod === "ThirdPartyApi"
+        ? "Paid"
+        : "Pending";
+    const amountVal = amount || 0;
+
+    const normPhone = normalizePhone(phone);
+    const guest = await prisma.guest.upsert({
+      where: {
+        templeId_phone: {
+          templeId,
+          phone: normPhone,
+        },
+      },
+      update: {},
+      create: {
+        templeId,
+        phone: normPhone,
+        name: guestName,
+        status: "Active",
+      },
+    });
+
+    const newApp = await prisma.appointment.create({
+      data: {
+        templeId: templeId!,
+        guestId: guest.id,
+        date: slot.date,
+        time: slot.time,
+        staff: slot.staff,
+        guestName,
+        service: slot.description || "日常預約",
+        serviceId: slot.boundServiceId || null,
+        status: "Confirmed",
+        phone,
+        paymentMethod: paymentMethod || null,
+        paymentRef: paymentRef || null,
+        paymentStatus,
+        amount: amountVal,
+      },
+    });
+
+    let serviceName = "日常服務";
+    if (slot.boundServiceId) {
+      const svc = await prisma.service.findUnique({
+        where: { id: slot.boundServiceId },
+      });
+      if (svc) serviceName = svc.name;
+    }
+    await prisma.adminNotification.create({
+      data: {
+        templeId: templeId!,
+        guestId: guest.id,
+        category: "PENDING_REVIEW",
+        message: `信眾 ${guestName} 預約了「${serviceName}」 (${slot.date || ""} ${slot.time || ""})，金額：NT$ ${amountVal}，等待確認。`,
+        isRead: false,
+        linkPath: `/${templeId!}/admin/calendar`,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true, id: newApp.id };
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: "預約失敗" };
+  }
 }
 
 export async function cancelAppointment(appId: number) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const app = await prisma.appointment.findFirst({
+      where: { id: String(appId), templeId: templeId! },
+    });
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const app = await prisma.appointment.findFirst({
-          where: { id: String(appId), templeId: templeId! }
-        });
-        
-        if (!app) return { success: false, message: '找不到該預約' };
-        
-        await prisma.appointment.update({
-          where: { id: app.id },
-          data: { status: 'Cancelled' }
-        });
-        
-        await prisma.slot.updateMany({
-          where: {
-            date: app.date,
-            time: app.time,
-            staff: app.staff,
-            templeId: templeId!,
-            status: 'Booked'
-          },
-          data: {
-            status: 'Available',
-            guestName: null
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    if (!app) return { success: false, message: "找不到該預約" };
+
+    await prisma.appointment.update({
+      where: { id: app.id },
+      data: { status: "Cancelled" },
+    });
+
+    await prisma.slot.updateMany({
+      where: {
+        date: app.date,
+        time: app.time,
+        staff: app.staff,
+        templeId: templeId!,
+        status: "Booked",
+      },
+      data: {
+        status: "Available",
+        guestName: null,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
-export async function rescheduleSingleAppointment(appointmentId: number, newSlotId: number) {
+export async function rescheduleSingleAppointment(
+  appointmentId: number,
+  newSlotId: number,
+) {
+  try {
+    const templeId = await getDynamicTempleId();
 
-      try {
-        const templeId = await getDynamicTempleId();
-        
-        const app = await prisma.appointment.findFirst({
-          where: { id: String(appointmentId), templeId: templeId! }
-        });
-        if (!app) return { success: false, message: '找不到該預約' };
-        
-        const newSlot = await prisma.slot.findFirst({
-          where: { id: String(newSlotId), templeId: templeId! }
-        });
-        if (!newSlot) return { success: false, message: '找不到新選擇的時段' };
-        if (newSlot.status === 'Booked') return { success: false, message: '該新時段已被預約' };
-        
-        const oldTimeStr = `${app.date} ${app.time}`;
-        const newTimeStr = `${newSlot.date} ${newSlot.time}`;
-        
-        await prisma.slot.updateMany({
-          where: {
-            date: app.date,
-            time: app.time,
-            staff: app.staff,
-            templeId: templeId!,
-            status: 'Booked'
-          },
-          data: { status: 'Available', guestName: null }
-        });
-        
-        await prisma.slot.update({
-          where: { id: newSlot.id },
-          data: { status: 'Booked', guestName: app.guestName }
-        });
-        
-        await prisma.appointment.update({
-          where: { id: app.id },
-          data: {
-            date: newSlot.date,
-            time: newSlot.time,
-            staff: newSlot.staff,
-            serviceId: newSlot.boundServiceId
-          }
-        });
-        
-        const content = `親愛的信眾 ${app.guestName} 您好，您原本預約的 ${oldTimeStr} 時段，已由宮廟方為您手動改期至 ${newTimeStr}。造成不便敬請見諒，如有疑問請洽宮廟管理員。`;
-        await createNotification('【系統通知】您的預約已改期', content, new Date().toISOString());
-        await logSystemEvent('INFO', '預約單筆改期', `將預約 ${appointmentId} 改至時段 ${newSlotId}`, '系統管理員', templeId!);
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    const app = await prisma.appointment.findFirst({
+      where: { id: String(appointmentId), templeId: templeId! },
+    });
+    if (!app) return { success: false, message: "找不到該預約" };
+
+    const newSlot = await prisma.slot.findFirst({
+      where: { id: String(newSlotId), templeId: templeId! },
+    });
+    if (!newSlot) return { success: false, message: "找不到新選擇的時段" };
+    if (newSlot.status === "Booked")
+      return { success: false, message: "該新時段已被預約" };
+
+    const oldTimeStr = `${app.date} ${app.time}`;
+    const newTimeStr = `${newSlot.date} ${newSlot.time}`;
+
+    await prisma.slot.updateMany({
+      where: {
+        date: app.date,
+        time: app.time,
+        staff: app.staff,
+        templeId: templeId!,
+        status: "Booked",
+      },
+      data: { status: "Available", guestName: null },
+    });
+
+    await prisma.slot.update({
+      where: { id: newSlot.id },
+      data: { status: "Booked", guestName: app.guestName },
+    });
+
+    await prisma.appointment.update({
+      where: { id: app.id },
+      data: {
+        date: newSlot.date,
+        time: newSlot.time,
+        staff: newSlot.staff,
+        serviceId: newSlot.boundServiceId,
+      },
+    });
+
+    const content = `親愛的信眾 ${app.guestName} 您好，您原本預約的 ${oldTimeStr} 時段，已由宮廟方為您手動改期至 ${newTimeStr}。造成不便敬請見諒，如有疑問請洽宮廟管理員。`;
+    await createNotification(
+      "【系統通知】您的預約已改期",
+      content,
+      new Date().toISOString(),
+    );
+    await logSystemEvent(
+      "INFO",
+      "預約單筆改期",
+      `將預約 ${appointmentId} 改至時段 ${newSlotId}`,
+      "系統管理員",
+      templeId!,
+    );
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function cancelServiceRecord(recordId: string, type: string) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, message: '未指定宮廟' };
+  if (!templeId) return { success: false, message: "未指定宮廟" };
 
   try {
-    if (type === '點燈') {
+    if (type === "點燈") {
       await prisma.lampRecord.updateMany({
         where: { id: recordId, templeId },
-        data: { status: 'Cancelled' }
+        data: { status: "Cancelled" },
       });
-    } else if (type === '活動') {
+    } else if (type === "活動") {
       await prisma.eventRegistration.updateMany({
         where: { id: recordId, templeId },
-        data: { paymentStatus: 'Cancelled' }
+        data: { paymentStatus: "Cancelled" },
       });
-    } else if (type === '排隊') {
+    } else if (type === "排隊") {
       await prisma.queueTicket.updateMany({
         where: { id: recordId, templeId },
-        data: { status: 'Cancelled' }
+        data: { status: "Cancelled" },
       });
-    } else if (type === '預約') {
+    } else if (type === "預約") {
       const app = await prisma.appointment.findFirst({
-        where: { id: recordId, templeId }
+        where: { id: recordId, templeId },
       });
-      
+
       if (app) {
         await prisma.appointment.update({
           where: { id: recordId },
-          data: { status: 'Cancelled' }
+          data: { status: "Cancelled" },
         });
-        
+
         await prisma.slot.updateMany({
           where: {
             date: app.date,
             time: app.time,
             staff: app.staff,
-            templeId
+            templeId,
           },
           data: {
-            status: 'Available',
-            guestName: null
-          }
+            status: "Available",
+            guestName: null,
+          },
         });
       }
     }
-    
+
     await revalidateTemple(templeId);
     return { success: true };
   } catch (error: any) {
-    console.error('cancelServiceRecord error:', error);
+    console.error("cancelServiceRecord error:", error);
     return { success: false, message: error.message };
   }
 }
 
 export async function modifyAppointment(appId: number, newSlotId: number) {
+  try {
+    const templeId = await getDynamicTempleId();
 
-      try {
-        const templeId = await getDynamicTempleId();
-        
-        const app = await prisma.appointment.findFirst({
-          where: { id: String(appId), templeId: templeId! }
-        });
-        if (!app) return { success: false, message: '找不到該預約' };
-        
-        const newSlot = await prisma.slot.findFirst({
-          where: { id: String(newSlotId), templeId: templeId! }
-        });
-        if (!newSlot) return { success: false, message: '找不到新選擇的時段' };
-        if (newSlot.status === 'Booked') return { success: false, message: '新時段已被預約' };
-        
-        await prisma.slot.updateMany({
-          where: {
-            date: app.date,
-            time: app.time,
-            staff: app.staff,
-            templeId: templeId!,
-            status: 'Booked'
-          },
-          data: { status: 'Available', guestName: null }
-        });
-        
-        await prisma.slot.update({
-          where: { id: newSlot.id },
-          data: { status: 'Booked', guestName: app.guestName }
-        });
-        
-        await prisma.appointment.update({
-          where: { id: app.id },
-          data: {
-            date: newSlot.date,
-            time: newSlot.time,
-            staff: newSlot.staff
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    const app = await prisma.appointment.findFirst({
+      where: { id: String(appId), templeId: templeId! },
+    });
+    if (!app) return { success: false, message: "找不到該預約" };
+
+    const newSlot = await prisma.slot.findFirst({
+      where: { id: String(newSlotId), templeId: templeId! },
+    });
+    if (!newSlot) return { success: false, message: "找不到新選擇的時段" };
+    if (newSlot.status === "Booked")
+      return { success: false, message: "新時段已被預約" };
+
+    await prisma.slot.updateMany({
+      where: {
+        date: app.date,
+        time: app.time,
+        staff: app.staff,
+        templeId: templeId!,
+        status: "Booked",
+      },
+      data: { status: "Available", guestName: null },
+    });
+
+    await prisma.slot.update({
+      where: { id: newSlot.id },
+      data: { status: "Booked", guestName: app.guestName },
+    });
+
+    await prisma.appointment.update({
+      where: { id: app.id },
+      data: {
+        date: newSlot.date,
+        time: newSlot.time,
+        staff: newSlot.staff,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 3.5 標記預約為已到場
 export async function markAppointmentAsArrived(appointmentId: number) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.appointment.updateMany({
-          where: { id: String(appointmentId), templeId: templeId! },
-          data: { status: 'Arrived' }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.appointment.updateMany({
+      where: { id: String(appointmentId), templeId: templeId! },
+      data: { status: "Arrived" },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 3.6 標記預約為已付款
 export async function markAppointmentAsPaid(appointmentId: number) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.appointment.updateMany({
-          where: { id: String(appointmentId), templeId: templeId! },
-          data: { status: 'Paid' }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.appointment.updateMany({
+      where: { id: String(appointmentId), templeId: templeId! },
+      data: { status: "Paid" },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
-
 
 // 4. 抓取預約紀錄
 export async function fetchAppointments() {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        
-        const apps = await prisma.appointment.findMany({
-          where: { templeId },
-          orderBy: [{ date: 'asc' }, { time: 'asc' }]
-        });
-        
-        return apps.map(r => ({
-          id: r.id,
-          date: r.date,
-          time: r.time,
-          staff: r.staff,
-          guestName: r.guestName,
-          service: r.service,
-          serviceId: r.serviceId,
-          status: r.status,
-          phone: r.phone,
-          paymentMethod: r.paymentMethod,
-          paymentRef: r.paymentRef,
-          paymentStatus: r.paymentStatus,
-          amount: r.amount
-        }));
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+    const apps = await prisma.appointment.findMany({
+      where: { templeId },
+      orderBy: [{ date: "asc" }, { time: "asc" }],
+    });
+
+    return apps.map((r) => ({
+      id: r.id,
+      date: r.date,
+      time: r.time,
+      staff: r.staff,
+      guestName: r.guestName,
+      service: r.service,
+      serviceId: r.serviceId,
+      status: r.status,
+      phone: r.phone,
+      paymentMethod: r.paymentMethod,
+      paymentRef: r.paymentRef,
+      paymentStatus: r.paymentStatus,
+      amount: r.amount,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 // 5. 抓取與儲存服務項目
@@ -841,20 +1031,22 @@ export async function fetchServiceDefinitions() {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
     const services = await prisma.service.findMany({
-      where: { templeId }
+      where: { templeId },
     });
-    return services.map(r => ({
+    return services.map((r) => ({
       id: r.id,
       templeId: r.templeId,
       name: r.name,
       price: r.price,
-      duration: r.duration || '',
-      description: r.description || '',
-      color: r.color || '#6366f1',
+      duration: r.duration || "",
+      description: r.description || "",
+      color: r.color || "#6366f1",
       status: r.status,
-      assignedStaff: r.assignedStaff ? JSON.parse(JSON.stringify(r.assignedStaff)) : [],
+      assignedStaff: r.assignedStaff
+        ? JSON.parse(JSON.stringify(r.assignedStaff))
+        : [],
       linkedFormId: r.linkedFormId || null,
-      linkedPrintTemplateId: r.linkedPrintTemplateId || null
+      linkedPrintTemplateId: r.linkedPrintTemplateId || null,
     }));
   } catch (e) {
     console.error(e);
@@ -866,23 +1058,25 @@ export async function saveServiceDefinition(data: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    const newColor = data.color || '#6366f1';
-    
-    const existing = data.id ? await prisma.service.findFirst({ where: { id: data.id, templeId } }) : null;
+    const newColor = data.color || "#6366f1";
+
+    const existing = data.id
+      ? await prisma.service.findFirst({ where: { id: data.id, templeId } })
+      : null;
     if (existing) {
       await prisma.service.updateMany({
         where: { id: data.id, templeId },
         data: {
           name: data.name,
           price: data.price || 0,
-          duration: data.duration || '',
-          description: data.description || '',
+          duration: data.duration || "",
+          description: data.description || "",
           color: newColor,
           assignedStaff: data.assignedStaff || [],
-          status: data.status || 'Active',
+          status: data.status || "Active",
           linkedFormId: data.linkedFormId || null,
-          linkedPrintTemplateId: data.linkedPrintTemplateId || null
-        }
+          linkedPrintTemplateId: data.linkedPrintTemplateId || null,
+        },
       });
     } else {
       const id = data.id || `s-${Date.now()}`;
@@ -892,19 +1086,25 @@ export async function saveServiceDefinition(data: any) {
           templeId,
           name: data.name,
           price: data.price || 0,
-          duration: data.duration || '',
-          description: data.description || '',
+          duration: data.duration || "",
+          description: data.description || "",
           color: newColor,
           assignedStaff: data.assignedStaff || [],
-          status: data.status || 'Active',
+          status: data.status || "Active",
           linkedFormId: data.linkedFormId || null,
-          linkedPrintTemplateId: data.linkedPrintTemplateId || null
-        }
+          linkedPrintTemplateId: data.linkedPrintTemplateId || null,
+        },
       });
     }
-    
+
     await revalidateTemple();
-    await logSystemEvent('SUCCESS', '設定服務項目', `服務名稱：${data.name}`, '管理員', templeId);
+    await logSystemEvent(
+      "SUCCESS",
+      "設定服務項目",
+      `服務名稱：${data.name}`,
+      "管理員",
+      templeId,
+    );
     return { success: true };
   } catch (e) {
     console.error(e);
@@ -916,11 +1116,11 @@ export async function deleteServiceDefinition(id: string) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    
+
     await prisma.service.deleteMany({
-      where: { id, templeId }
+      where: { id, templeId },
     });
-    
+
     await revalidateTemple();
     return { success: true };
   } catch (e) {
@@ -934,8 +1134,10 @@ export async function fetchPrintTemplates() {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
-    const templates = await prisma.printTemplate.findMany({ where: { templeId } });
-    return templates.map(t => ({
+    const templates = await prisma.printTemplate.findMany({
+      where: { templeId },
+    });
+    return templates.map((t) => ({
       id: t.id,
       name: t.name,
       templeName: t.templeName,
@@ -943,7 +1145,7 @@ export async function fetchPrintTemplates() {
       watermarkLocalUrl: t.watermarkLocalUrl,
       watermarkOpacity: t.watermarkOpacity,
       borderStyle: t.borderStyle,
-      content: t.content ? JSON.parse(JSON.stringify(t.content)) : []
+      content: t.content ? JSON.parse(JSON.stringify(t.content)) : [],
     }));
   } catch (e) {
     console.error(e);
@@ -955,7 +1157,11 @@ export async function savePrintTemplate(data: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    const existing = data.id ? await prisma.printTemplate.findFirst({ where: { id: data.id, templeId } }) : null;
+    const existing = data.id
+      ? await prisma.printTemplate.findFirst({
+          where: { id: data.id, templeId },
+        })
+      : null;
     if (existing) {
       await prisma.printTemplate.updateMany({
         where: { id: data.id, templeId },
@@ -966,8 +1172,8 @@ export async function savePrintTemplate(data: any) {
           watermarkLocalUrl: data.watermarkLocalUrl,
           watermarkOpacity: data.watermarkOpacity,
           borderStyle: data.borderStyle,
-          content: data.content || []
-        }
+          content: data.content || [],
+        },
       });
     } else {
       await prisma.printTemplate.create({
@@ -980,8 +1186,8 @@ export async function savePrintTemplate(data: any) {
           watermarkLocalUrl: data.watermarkLocalUrl,
           watermarkOpacity: data.watermarkOpacity,
           borderStyle: data.borderStyle,
-          content: data.content || []
-        }
+          content: data.content || [],
+        },
       });
     }
     await revalidateTemple();
@@ -1010,10 +1216,10 @@ export async function fetchForms() {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
     const forms = await prisma.form.findMany({ where: { templeId } });
-    return forms.map(f => ({
+    return forms.map((f) => ({
       id: f.id,
       name: f.name,
-      fields: f.fields ? JSON.parse(JSON.stringify(f.fields)) : []
+      fields: f.fields ? JSON.parse(JSON.stringify(f.fields)) : [],
     }));
   } catch (e) {
     console.error(e);
@@ -1025,15 +1231,22 @@ export async function saveForm(data: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    const existing = data.id ? await prisma.form.findFirst({ where: { id: data.id, templeId } }) : null;
+    const existing = data.id
+      ? await prisma.form.findFirst({ where: { id: data.id, templeId } })
+      : null;
     if (existing) {
       await prisma.form.updateMany({
         where: { id: data.id, templeId },
-        data: { name: data.name, fields: data.fields || [] }
+        data: { name: data.name, fields: data.fields || [] },
       });
     } else {
       await prisma.form.create({
-        data: { id: data.id || `form-${Date.now()}`, templeId, name: data.name, fields: data.fields || [] }
+        data: {
+          id: data.id || `form-${Date.now()}`,
+          templeId,
+          name: data.name,
+          fields: data.fields || [],
+        },
       });
     }
     await revalidateTemple();
@@ -1061,22 +1274,22 @@ export async function deleteForm(id: string) {
 export async function fetchPersonnel() {
   const templeId = await getDynamicTempleId();
   if (!templeId) return [];
-  
+
   try {
     const users = await prisma.user.findMany({
-      where: { templeId }
+      where: { templeId },
     });
-    
-    return users.map(r => ({
+
+    return users.map((r) => ({
       id: r.id,
       name: r.name,
       role: r.role as any,
-      account: r.account || '',
-      phone: r.phone || '',
+      account: r.account || "",
+      phone: r.phone || "",
       status: r.status,
-      avatar: r.avatar || '',
+      avatar: r.avatar || "",
       permissions: (r.permissions as any) || [],
-      serviceCount: 0
+      serviceCount: 0,
     }));
   } catch (e) {
     console.error("fetchPersonnel error:", e);
@@ -1091,66 +1304,68 @@ export async function fetchStaff() {
 
 // 8. 刪除單個時段
 export async function removeSingleSlot(id: any) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.slot.deleteMany({
-          where: { id: String(id), templeId: templeId! }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.slot.deleteMany({
+      where: { id: String(id), templeId: templeId! },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 8.1 批次刪除多個時段
 export async function removeBatchSlots(ids: any[]) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.slot.deleteMany({
-          where: {
-            id: { in: ids.map(String) },
-            templeId: templeId!
-          }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.slot.deleteMany({
+      where: {
+        id: { in: ids.map(String) },
+        templeId: templeId!,
+      },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // 9. 智能分析受影響預約
-export async function analyzeAffectedAppointments(staff: string, start: string, end: string) {
+export async function analyzeAffectedAppointments(
+  staff: string,
+  start: string,
+  end: string,
+) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
-    
+
     const apps = await prisma.appointment.findMany({
       where: {
         templeId,
         staff,
         date: {
           gte: start,
-          lte: end
+          lte: end,
         },
-        status: { in: ['Pending', 'Confirmed'] }
-      }
+        status: { in: ["Pending", "Confirmed"] },
+      },
     });
-    
-    return apps.map(app => ({
+
+    return apps.map((app) => ({
       id: app.id,
       guestName: app.guestName,
       phone: app.phone,
       service: app.service,
       date: app.date,
-      time: app.time
+      time: app.time,
     }));
-  } catch(e) {
+  } catch (e) {
     console.error(e);
     return [];
   }
@@ -1165,13 +1380,49 @@ export async function analyzeAffectedAppointments(staff: string, start: string, 
 
 export interface TemplePaymentConfig {
   templeId: string;
-  linePay: { enabled: boolean; channelId: string; channelSecret: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
-  thirdParty: { enabled: boolean; provider: string; merchantId: string; hashKey: string; hashIV: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
-  customTransfer: { enabled: boolean; bankCode: string; bankName: string; accountName: string; accountNo: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
-  customQR: { enabled: boolean; qrImageUrl: string; description: string; allowBooking?: boolean; allowLamp?: boolean; allowEvent?: boolean; allowQueue?: boolean; };
-  cash?: { 
-    enabled: boolean; 
-    description: string; 
+  linePay: {
+    enabled: boolean;
+    channelId: string;
+    channelSecret: string;
+    allowBooking?: boolean;
+    allowLamp?: boolean;
+    allowEvent?: boolean;
+    allowQueue?: boolean;
+  };
+  thirdParty: {
+    enabled: boolean;
+    provider: string;
+    merchantId: string;
+    hashKey: string;
+    hashIV: string;
+    allowBooking?: boolean;
+    allowLamp?: boolean;
+    allowEvent?: boolean;
+    allowQueue?: boolean;
+  };
+  customTransfer: {
+    enabled: boolean;
+    bankCode: string;
+    bankName: string;
+    accountName: string;
+    accountNo: string;
+    allowBooking?: boolean;
+    allowLamp?: boolean;
+    allowEvent?: boolean;
+    allowQueue?: boolean;
+  };
+  customQR: {
+    enabled: boolean;
+    qrImageUrl: string;
+    description: string;
+    allowBooking?: boolean;
+    allowLamp?: boolean;
+    allowEvent?: boolean;
+    allowQueue?: boolean;
+  };
+  cash?: {
+    enabled: boolean;
+    description: string;
     allowBooking?: boolean;
     allowLamp?: boolean;
     allowEvent?: boolean;
@@ -1183,34 +1434,107 @@ export async function fetchPaymentConfig(): Promise<TemplePaymentConfig> {
   const templeId = await getDynamicTempleId();
   if (!templeId) {
     return {
-      templeId: '',
-      cash: { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-      linePay: { enabled: false, channelId: '', channelSecret: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-      thirdParty: { enabled: false, provider: '', merchantId: '', hashKey: '', hashIV: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-      customTransfer: { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-      customQR: { enabled: false, qrImageUrl: '', description: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true }
+      templeId: "",
+      cash: {
+        enabled: true,
+        description: "現場現金付款",
+        allowBooking: true,
+        allowLamp: true,
+        allowEvent: true,
+        allowQueue: true,
+      },
+      linePay: {
+        enabled: false,
+        channelId: "",
+        channelSecret: "",
+        allowBooking: true,
+        allowLamp: true,
+        allowEvent: true,
+        allowQueue: true,
+      },
+      thirdParty: {
+        enabled: false,
+        provider: "",
+        merchantId: "",
+        hashKey: "",
+        hashIV: "",
+        allowBooking: true,
+        allowLamp: true,
+        allowEvent: true,
+        allowQueue: true,
+      },
+      customTransfer: {
+        enabled: false,
+        bankCode: "",
+        bankName: "",
+        accountName: "",
+        accountNo: "",
+        allowBooking: true,
+        allowLamp: true,
+        allowEvent: true,
+        allowQueue: true,
+      },
+      customQR: {
+        enabled: false,
+        qrImageUrl: "",
+        description: "",
+        allowBooking: true,
+        allowLamp: true,
+        allowEvent: true,
+        allowQueue: true,
+      },
     };
   }
 
   const record = await prisma.templePaymentConfig.findUnique({
-    where: { templeId }
+    where: { templeId },
   });
 
   if (record) {
     const config = {
       templeId,
-      linePay: (record.linePay as any) || { enabled: false, channelId: '', channelSecret: '' },
-      thirdParty: (record.thirdParty as any) || { enabled: false, provider: '', merchantId: '', hashKey: '', hashIV: '' },
-      customTransfer: (record.customTransfer as any) || { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '' },
-      customQR: (record.customQR as any) || { enabled: false, qrImageUrl: '', description: '' },
-      cash: (record.cash as any) || { enabled: true, description: '現場現金付款' }
+      linePay: (record.linePay as any) || {
+        enabled: false,
+        channelId: "",
+        channelSecret: "",
+      },
+      thirdParty: (record.thirdParty as any) || {
+        enabled: false,
+        provider: "",
+        merchantId: "",
+        hashKey: "",
+        hashIV: "",
+      },
+      customTransfer: (record.customTransfer as any) || {
+        enabled: false,
+        bankCode: "",
+        bankName: "",
+        accountName: "",
+        accountNo: "",
+      },
+      customQR: (record.customQR as any) || {
+        enabled: false,
+        qrImageUrl: "",
+        description: "",
+      },
+      cash: (record.cash as any) || {
+        enabled: true,
+        description: "現場現金付款",
+      },
     };
 
     if (!config.cash.enabled && config.cash.description === undefined) {
-      config.cash = { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true };
+      config.cash = {
+        enabled: true,
+        description: "現場現金付款",
+        allowBooking: true,
+        allowLamp: true,
+        allowEvent: true,
+        allowQueue: true,
+      };
     }
 
-    ['linePay', 'thirdParty', 'customTransfer', 'customQR'].forEach(key => {
+    ["linePay", "thirdParty", "customTransfer", "customQR"].forEach((key) => {
       const k = key as keyof typeof config;
       if (config[k] && (config[k] as any).allowBooking === undefined) {
         (config[k] as any).allowBooking = true;
@@ -1225,11 +1549,54 @@ export async function fetchPaymentConfig(): Promise<TemplePaymentConfig> {
 
   return {
     templeId,
-    cash: { enabled: true, description: '現場現金付款', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-    linePay: { enabled: false, channelId: '', channelSecret: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-    thirdParty: { enabled: false, provider: '', merchantId: '', hashKey: '', hashIV: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-    customTransfer: { enabled: false, bankCode: '', bankName: '', accountName: '', accountNo: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true },
-    customQR: { enabled: false, qrImageUrl: '', description: '', allowBooking: true, allowLamp: true, allowEvent: true, allowQueue: true }
+    cash: {
+      enabled: true,
+      description: "現場現金付款",
+      allowBooking: true,
+      allowLamp: true,
+      allowEvent: true,
+      allowQueue: true,
+    },
+    linePay: {
+      enabled: false,
+      channelId: "",
+      channelSecret: "",
+      allowBooking: true,
+      allowLamp: true,
+      allowEvent: true,
+      allowQueue: true,
+    },
+    thirdParty: {
+      enabled: false,
+      provider: "",
+      merchantId: "",
+      hashKey: "",
+      hashIV: "",
+      allowBooking: true,
+      allowLamp: true,
+      allowEvent: true,
+      allowQueue: true,
+    },
+    customTransfer: {
+      enabled: false,
+      bankCode: "",
+      bankName: "",
+      accountName: "",
+      accountNo: "",
+      allowBooking: true,
+      allowLamp: true,
+      allowEvent: true,
+      allowQueue: true,
+    },
+    customQR: {
+      enabled: false,
+      qrImageUrl: "",
+      description: "",
+      allowBooking: true,
+      allowLamp: true,
+      allowEvent: true,
+      allowQueue: true,
+    },
   };
 }
 
@@ -1245,7 +1612,7 @@ export async function savePaymentConfig(data: TemplePaymentConfig) {
         thirdParty: data.thirdParty as any,
         customTransfer: data.customTransfer as any,
         customQR: data.customQR as any,
-        cash: data.cash as any
+        cash: data.cash as any,
       },
       create: {
         templeId,
@@ -1253,8 +1620,8 @@ export async function savePaymentConfig(data: TemplePaymentConfig) {
         thirdParty: data.thirdParty as any,
         customTransfer: data.customTransfer as any,
         customQR: data.customQR as any,
-        cash: data.cash as any
-      }
+        cash: data.cash as any,
+      },
     });
 
     await revalidateTemple();
@@ -1270,29 +1637,45 @@ export async function executeEmergencyReschedule(formData: FormData) {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
 
-    const staff = formData.get('staff') as string;
-    const startDate = formData.get('start') as string;
-    const endDate = formData.get('end') as string;
-    const reason = formData.get('reason') as string || '突發請假';
+    const staff = formData.get("staff") as string;
+    const startDate = formData.get("start") as string;
+    const endDate = formData.get("end") as string;
+    const reason = (formData.get("reason") as string) || "突發請假";
 
-    if (!staff || !startDate || !endDate) return { success: false, message: '參數錯誤' };
+    if (!staff || !startDate || !endDate)
+      return { success: false, message: "參數錯誤" };
 
     await prisma.leaveRecord.create({
-      data: { templeId, staff, startDate, endDate, reason }
+      data: { templeId, staff, startDate, endDate, reason },
     });
 
     await prisma.slot.deleteMany({
-      where: { templeId, staff, date: { gte: startDate, lte: endDate }, status: 'Available' }
+      where: {
+        templeId,
+        staff,
+        date: { gte: startDate, lte: endDate },
+        status: "Available",
+      },
     });
 
     await prisma.appointment.updateMany({
-      where: { templeId, staff, date: { gte: startDate, lte: endDate }, status: { in: ['Pending', 'Confirmed'] } },
-      data: { status: 'Cancelled' }
+      where: {
+        templeId,
+        staff,
+        date: { gte: startDate, lte: endDate },
+        status: { in: ["Pending", "Confirmed"] },
+      },
+      data: { status: "Cancelled" },
     });
 
     await prisma.slot.updateMany({
-      where: { templeId, staff, date: { gte: startDate, lte: endDate }, status: 'Booked' },
-      data: { status: 'Unavailable' }
+      where: {
+        templeId,
+        staff,
+        date: { gte: startDate, lte: endDate },
+        status: "Booked",
+      },
+      data: { status: "Unavailable" },
     });
 
     await revalidateTemple();
@@ -1307,64 +1690,63 @@ export async function executeEmergencyReschedule(formData: FormData) {
 export async function syncExpiredLamps(templeId: string) {
   try {
     await prisma.lampRecord.updateMany({
-      where: { templeId, status: 'Active', expiryDate: { lt: new Date() } },
-      data: { status: 'Expired' }
+      where: { templeId, status: "Active", expiryDate: { lt: new Date() } },
+      data: { status: "Expired" },
     });
   } catch (e) {
-    console.error('syncExpiredLamps error:', e);
+    console.error("syncExpiredLamps error:", e);
   }
 }
 
 export async function fetchLampRecords() {
-      try {
-        const templeId = await getDynamicTempleId();
-        if (templeId) {
-          await syncExpiredLamps(templeId);
-        }
-        const records = await prisma.lampRecord.findMany({
-          where: { templeId: templeId! },
-          orderBy: { createdAt: 'desc' }
-        });
-        
-        return records.map(r => ({
-          id: r.id,
-          templeId: r.templeId,
-          categoryId: r.categoryId,
-          guestName: r.guestName,
-          phone: r.phone,
-          lampType: r.categoryName || '',
-          price: r.actualPrice,
-          amount: r.actualPrice,
-          durationDays: r.durationDays,
-          startDate: r.startDate?.toISOString() || null,
-          expiryDate: r.expiryDate?.toISOString() || null,
-          status: r.status,
-          createdAt: r.createdAt.toISOString(),
-          paymentMethod: r.paymentMethod,
-          paymentRef: r.paymentRef,
-          paymentProofUrl: r.paymentProofUrl,
-          paymentStatus: r.paymentStatus
-        }));
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    if (templeId) {
+      await syncExpiredLamps(templeId);
+    }
+    const records = await prisma.lampRecord.findMany({
+      where: { templeId: templeId! },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return records.map((r) => ({
+      id: r.id,
+      templeId: r.templeId,
+      categoryId: r.categoryId,
+      guestName: r.guestName,
+      phone: r.phone,
+      lampType: r.categoryName || "",
+      price: r.actualPrice,
+      amount: r.actualPrice,
+      durationDays: r.durationDays,
+      startDate: r.startDate?.toISOString() || null,
+      expiryDate: r.expiryDate?.toISOString() || null,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+      paymentMethod: r.paymentMethod,
+      paymentRef: r.paymentRef,
+      paymentProofUrl: r.paymentProofUrl,
+      paymentStatus: r.paymentStatus,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 // migrated (await jsonStore.find('lamp_categories')) to (await jsonStore.find('lamp_categories'))
 export async function fetchLampCategories() {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        return await prisma.lampCategory.findMany({
-          where: { templeId: templeId! }
-        });
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    return await prisma.lampCategory.findMany({
+      where: { templeId: templeId! },
+    });
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 // migrated (await jsonStore.find('lamp_records')) to (await jsonStore.find('lamp_records'))
-export async function createLightingOrder(fd: FormData) { 
+export async function createLightingOrder(fd: FormData) {
   return createLampRecord(fd);
 }
 export async function getGuestUser() {
@@ -1373,10 +1755,10 @@ export async function getGuestUser() {
   if (!templeId) return null;
   const phone = store.get(`guestPhone_${templeId}`)?.value;
   if (!phone) return null;
-  
+
   try {
     const r = await prisma.guest.findFirst({
-      where: { templeId, phone }
+      where: { templeId, phone },
     });
     if (r) {
       return {
@@ -1390,20 +1772,20 @@ export async function getGuestUser() {
         lunarBirthday: r.lunarBirthday,
         birthHour: r.birthHour,
         lineId: r.lineId,
-        status: r.status
+        status: r.status,
       };
     }
     return null;
   } catch (error) {
-    console.error('getGuestUser error:', error);
+    console.error("getGuestUser error:", error);
     return null;
   }
 }
 
 export async function checkPhoneStatus(phone: string) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { status: 'NEW' };
-  
+  if (!templeId) return { status: "NEW" };
+
   try {
     const normLogin = normalizePhone(phone);
     const existing = await prisma.guest.findFirst({
@@ -1411,45 +1793,54 @@ export async function checkPhoneStatus(phone: string) {
         templeId,
         phone: {
           equals: normLogin,
-          mode: 'insensitive'
-        }
-      }
+          mode: "insensitive",
+        },
+      },
     });
 
-    if (!existing) return { status: 'NEW' };
-    if (!existing.password) return { status: 'NO_PASSWORD', name: existing.name };
-    return { status: 'HAS_PASSWORD', name: existing.name };
+    if (!existing) return { status: "NEW" };
+    if (!existing.password)
+      return { status: "NO_PASSWORD", name: existing.name };
+    return { status: "HAS_PASSWORD", name: existing.name };
   } catch (error) {
-    console.error('checkPhoneStatus error:', error);
-    return { status: 'NEW' };
+    console.error("checkPhoneStatus error:", error);
+    return { status: "NEW" };
   }
 }
 
 export async function liffAutoLogin(lineId: string) {
   const templeId = await getDynamicTempleId();
   if (!templeId) return { success: false };
-  
+
   try {
     const existing = await prisma.guest.findFirst({
-      where: { templeId, lineId }
+      where: { templeId, lineId },
     });
-    
+
     if (existing) {
       const store = await cookies();
-      store.set(`guestPhone_${templeId}`, existing.phone, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
+      store.set(`guestPhone_${templeId}`, existing.phone, {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        path: "/",
+      });
       return { success: true, guest: existing };
     }
     return { success: false };
   } catch (error) {
-    console.error('liffAutoLogin error:', error);
+    console.error("liffAutoLogin error:", error);
     return { success: false };
   }
 }
 
-export async function guestLogin(phone: string, password?: string, inputName?: string) {
+export async function guestLogin(
+  phone: string,
+  password?: string,
+  inputName?: string,
+) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, error: '未指定宮廟' };
-  
+  if (!templeId) return { success: false, error: "未指定宮廟" };
+
   try {
     const normLogin = normalizePhone(phone);
     let existing = await prisma.guest.findFirst({
@@ -1457,9 +1848,9 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
         templeId,
         phone: {
           equals: normLogin,
-          mode: 'insensitive'
-        }
-      }
+          mode: "insensitive",
+        },
+      },
     });
 
     if (existing) {
@@ -1470,7 +1861,7 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
         // 首次綁定密碼
         existing = await prisma.guest.update({
           where: { id: existing.id },
-          data: { password }
+          data: { password },
         });
       }
     } else if (!inputName || !password) {
@@ -1478,7 +1869,7 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
     }
 
     const guestName = existing ? existing.name : inputName;
-    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName || '')}&background=B91C1C&color=fff`;
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(guestName || "")}&background=B91C1C&color=fff`;
 
     if (!existing) {
       existing = await prisma.guest.create({
@@ -1486,22 +1877,26 @@ export async function guestLogin(phone: string, password?: string, inputName?: s
           id: `g-${Date.now()}`,
           templeId,
           phone: normLogin,
-          name: guestName || '無名氏',
+          name: guestName || "無名氏",
           password,
-          status: 'Active',
-          avatar
-        }
+          status: "Active",
+          avatar,
+        },
       });
     }
 
     const store = await cookies();
-    store.set(`guestPhone_${templeId}`, normLogin, { secure: process.env.NODE_ENV === 'production', httpOnly: true, path: '/' });
-    
+    store.set(`guestPhone_${templeId}`, normLogin, {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      path: "/",
+    });
+
     await revalidateTemple(templeId);
     return { success: true, guestName: existing.name, fullGuest: existing };
   } catch (error) {
-    console.error('guestLogin error:', error);
-    return { success: false, error: '登入失敗' };
+    console.error("guestLogin error:", error);
+    return { success: false, error: "登入失敗" };
   }
 }
 
@@ -1518,8 +1913,14 @@ export async function fetchGuestSettings() {
     if (!templeId) return {};
     const t = await prisma.temple.findUnique({ where: { id: templeId } });
     if (!t) return {};
-    return (t.guestSettings as any) || { requireBirthday: false, requireAddress: false, requireNeeds: false };
-  } catch(e) {
+    return (
+      (t.guestSettings as any) || {
+        requireBirthday: false,
+        requireAddress: false,
+        requireNeeds: false,
+      }
+    );
+  } catch (e) {
     console.error(e);
     return {};
   }
@@ -1531,10 +1932,10 @@ export async function updateGuestSettings(settings: any) {
     if (!templeId) return { success: false };
     await prisma.temple.update({
       where: { id: templeId },
-      data: { guestSettings: settings }
+      data: { guestSettings: settings },
     });
     return { success: true };
-  } catch(e) {
+  } catch (e) {
     console.error(e);
     return { success: false };
   }
@@ -1542,49 +1943,69 @@ export async function updateGuestSettings(settings: any) {
 export async function askAgiAssistant(q: string, h: number) {
   const store = await cookies();
   const templeId = await getDynamicTempleId();
-  const phone = store.get(`guestPhone_${templeId}`)?.value || 'unknown';
+  const phone = store.get(`guestPhone_${templeId}`)?.value || "unknown";
 
   if (!templeId) return { reply: "未找到宮廟", suggestedAction: "none" };
 
   try {
-    const temple = await prisma.temple.findUnique({ where: { id: templeId }, select: { aiTokens: true } });
+    const temple = await prisma.temple.findUnique({
+      where: { id: templeId },
+      select: { aiTokens: true },
+    });
     if (!temple) return { reply: "未找到宮廟", suggestedAction: "none" };
-    if (temple.aiTokens <= 0) return { reply: "抱歉，本宮廟的 AI 服務額度已用罄。", suggestedAction: "none" };
+    if (temple.aiTokens <= 0)
+      return {
+        reply: "抱歉，本宮廟的 AI 服務額度已用罄。",
+        suggestedAction: "none",
+      };
 
-    let reply = "您好！我是宮廟專屬的 AI 生活助手，有任何關於點燈、預約、法會報名或排隊的問題，都可以問我喔！";
-    if (q.includes('預約') || q.includes('問事') || q.includes('收驚') || q.includes('掛號')) {
-      reply = '您可以點擊下方的「服務預約」按鈕，我們提供收驚、問事等服務，並且可以線上排隊喔！';
-    } else if (q.includes('點燈') || q.includes('燈')) {
-      reply = '我們有光明燈、太歲燈、財神燈等多種選擇，您可以點擊「服務預約」或「線上點燈」來了解詳情與報名喔！';
-    } else if (q.includes('法會') || q.includes('普渡')) {
-      reply = '近期的法會活動可以透過「法會報名」按鈕查看，點擊進去就能看到時間與詳細內容了。';
-    } else if (q.includes('排隊')) {
-      reply = '您可以在首頁點擊「預約」或「排隊」按鈕，系統會給您專屬的號碼牌，您可以隨時查看目前的叫號進度喔！';
+    let reply =
+      "您好！我是宮廟專屬的 AI 生活助手，有任何關於點燈、預約、法會報名或排隊的問題，都可以問我喔！";
+    if (
+      q.includes("預約") ||
+      q.includes("問事") ||
+      q.includes("收驚") ||
+      q.includes("掛號")
+    ) {
+      reply =
+        "您可以點擊下方的「服務預約」按鈕，我們提供收驚、問事等服務，並且可以線上排隊喔！";
+    } else if (q.includes("點燈") || q.includes("燈")) {
+      reply =
+        "我們有光明燈、太歲燈、財神燈等多種選擇，您可以點擊「服務預約」或「線上點燈」來了解詳情與報名喔！";
+    } else if (q.includes("法會") || q.includes("普渡")) {
+      reply =
+        "近期的法會活動可以透過「法會報名」按鈕查看，點擊進去就能看到時間與詳細內容了。";
+    } else if (q.includes("排隊")) {
+      reply =
+        "您可以在首頁點擊「預約」或「排隊」按鈕，系統會給您專屬的號碼牌，您可以隨時查看目前的叫號進度喔！";
     }
 
     const cost = q.length + reply.length;
     if (temple.aiTokens < cost) {
-      return { reply: "抱歉，本宮廟的 AI 服務額度不足。", suggestedAction: "none" };
+      return {
+        reply: "抱歉，本宮廟的 AI 服務額度不足。",
+        suggestedAction: "none",
+      };
     }
 
     await prisma.$transaction([
       prisma.temple.update({
         where: { id: templeId },
-        data: { aiTokens: { decrement: cost } }
+        data: { aiTokens: { decrement: cost } },
       }),
       prisma.aiChatLog.create({
         data: {
           templeId,
           phone,
           userQuery: q,
-          aiReply: reply
-        }
-      })
+          aiReply: reply,
+        },
+      }),
     ]);
 
     return { reply, suggestedAction: "none" };
   } catch (error) {
-    console.error('Failed to log AI chat:', error);
+    console.error("Failed to log AI chat:", error);
     return { reply: "系統發生錯誤，請稍後再試。", suggestedAction: "none" };
   }
 }
@@ -1596,8 +2017,8 @@ export async function fetchAiChatLogs() {
   try {
     const logs = await prisma.aiChatLog.findMany({
       where: { templeId },
-      orderBy: { createdAt: 'desc' },
-      take: 100
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return logs.map((r: any) => ({
@@ -1605,10 +2026,10 @@ export async function fetchAiChatLogs() {
       phone: r.phone,
       userQuery: r.userQuery,
       aiReply: r.aiReply,
-      createdAt: r.createdAt.toISOString()
+      createdAt: r.createdAt.toISOString(),
     }));
   } catch (error) {
-    console.error('Failed to fetch AI chat logs:', error);
+    console.error("Failed to fetch AI chat logs:", error);
     return [];
   }
 }
@@ -1622,33 +2043,30 @@ export async function fetchGuestAppointments(p: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
-    
+
     const normPhone = normalizePhone(p);
-    
+
     const guest = await prisma.guest.findFirst({
-      where: { templeId, phone: normPhone }
+      where: { templeId, phone: normPhone },
     });
     let apps = [];
     if (!guest) {
       // Fallback to checking by phone if guest relation not properly linked
       apps = await prisma.appointment.findMany({
         where: { templeId, phone: normPhone },
-        orderBy: [{ date: 'desc' }, { time: 'desc' }]
+        orderBy: [{ date: "desc" }, { time: "desc" }],
       });
     } else {
       apps = await prisma.appointment.findMany({
-        where: { 
-          templeId, 
-          OR: [
-            { guestId: guest.id },
-            { phone: normPhone }
-          ]
+        where: {
+          templeId,
+          OR: [{ guestId: guest.id }, { phone: normPhone }],
         },
-        orderBy: [{ date: 'desc' }, { time: 'desc' }]
+        orderBy: [{ date: "desc" }, { time: "desc" }],
       });
     }
 
-    return apps.map(app => ({
+    return apps.map((app) => ({
       id: app.id,
       templeId: app.templeId,
       date: app.date,
@@ -1664,21 +2082,35 @@ export async function fetchGuestAppointments(p: any) {
       paymentStatus: app.paymentStatus,
       amount: app.amount,
       paymentProofUrl: app.paymentProofUrl,
-      createdAt: app.createdAt.toISOString().replace('T', ' ').split('.')[0]
+      createdAt: app.createdAt.toISOString().replace("T", " ").split(".")[0],
     }));
   } catch (error) {
-    console.error('fetchGuestAppointments error:', error);
+    console.error("fetchGuestAppointments error:", error);
     return [];
   }
 }
-export async function fetchServiceSettings() { 
+export async function fetchServiceSettings() {
   const templeId = await getDynamicTempleId();
-  const defaultSettings = { cancelHoursBefore: 24, modifyHoursBefore: 24, allowCancel: true, allowModify: true, pushConfigs: [], modules: { calendar: true, lamps: true, queue: true, events: true, analytics: true, agi: true } };
+  const defaultSettings = {
+    cancelHoursBefore: 24,
+    modifyHoursBefore: 24,
+    allowCancel: true,
+    allowModify: true,
+    pushConfigs: [],
+    modules: {
+      calendar: true,
+      lamps: true,
+      queue: true,
+      events: true,
+      analytics: true,
+      agi: true,
+    },
+  };
   if (!templeId) return defaultSettings;
 
   try {
     const existing = await prisma.serviceSetting.findFirst({
-      where: { templeId }
+      where: { templeId },
     });
 
     if (existing) {
@@ -1688,12 +2120,12 @@ export async function fetchServiceSettings() {
         allowCancel: existing.allowCancel ?? true,
         allowModify: existing.allowModify ?? true,
         pushConfigs: (existing.pushConfigs as any) || [],
-        modules: (existing.modules as any) || defaultSettings.modules
+        modules: (existing.modules as any) || defaultSettings.modules,
       };
     }
     return defaultSettings;
   } catch (error) {
-    console.error('fetchServiceSettings error:', error);
+    console.error("fetchServiceSettings error:", error);
     return defaultSettings;
   }
 }
@@ -1709,24 +2141,24 @@ export async function fetchGuestFiles(phone: string) {
         templeId,
         phone: {
           equals: normPhone,
-          mode: 'insensitive'
-        }
-      }
+          mode: "insensitive",
+        },
+      },
     });
-    
+
     const dbPhone = guest?.phone || normPhone;
-    
+
     const files = await prisma.guestFile.findMany({
       where: {
         templeId,
-        phone: dbPhone
+        phone: dbPhone,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: "desc",
+      },
     });
 
-    return files.map(r => ({
+    return files.map((r) => ({
       id: r.id,
       phone: r.phone,
       url: r.url,
@@ -1734,10 +2166,12 @@ export async function fetchGuestFiles(phone: string) {
       name: r.name,
       folder: r.folder,
       uploadedBy: r.uploadedBy,
-      uploadedAt: r.createdAt ? r.createdAt.toISOString().replace('T', ' ').slice(0, 19) : new Date().toISOString()
+      uploadedAt: r.createdAt
+        ? r.createdAt.toISOString().replace("T", " ").slice(0, 19)
+        : new Date().toISOString(),
     }));
   } catch (error) {
-    console.error('fetchGuestFiles error:', error);
+    console.error("fetchGuestFiles error:", error);
     return [];
   }
 }
@@ -1750,9 +2184,9 @@ export async function fetchEventRegistrationsByEventId(eventId: string) {
     if (!templeId) return [];
     const records = await prisma.eventRegistration.findMany({
       where: { eventId, templeId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
-    return records.map(r => ({
+    return records.map((r) => ({
       id: r.id,
       eventId: r.eventId,
       templeId: r.templeId,
@@ -1761,20 +2195,23 @@ export async function fetchEventRegistrationsByEventId(eventId: string) {
       price: r.actualPrice,
       paymentStatus: r.paymentStatus,
       actualPrice: r.actualPrice,
-      timestamp: r.createdAt.toISOString()
+      timestamp: r.createdAt.toISOString(),
     }));
   } catch (e) {
     console.error(e);
     return [];
   }
 }
-export async function markRegistrationAsPaid(registrationId: string, actualPrice: number) {
+export async function markRegistrationAsPaid(
+  registrationId: string,
+  actualPrice: number,
+) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
     await prisma.eventRegistration.updateMany({
       where: { id: registrationId, templeId },
-      data: { paymentStatus: 'Paid', actualPrice }
+      data: { paymentStatus: "Paid", actualPrice },
     });
     await revalidateTemple();
     return { success: true };
@@ -1789,195 +2226,205 @@ export async function markRegistrationAsPaid(registrationId: string, actualPrice
 // (Removed duplicate createOrUpdateGuest)
 export async function verifyQueueTicket(eventId: string, phone: string) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, error: '未指定宮廟' };
+  if (!templeId) return { success: false, error: "未指定宮廟" };
 
   try {
-    const normPhone = phone.replace(/-/g, '');
+    const normPhone = phone.replace(/-/g, "");
     const ticket = await prisma.queueTicket.findFirst({
       where: {
         eventId,
         templeId,
         phone: {
           equals: normPhone,
-          mode: 'insensitive'
-        }
-      }
+          mode: "insensitive",
+        },
+      },
     });
 
-    if (!ticket) return { success: false, error: 'No ticket found' };
+    if (!ticket) return { success: false, error: "No ticket found" };
 
-    if (ticket.status === 'Pending' || ticket.status === 'Registered') {
+    if (ticket.status === "Pending" || ticket.status === "Registered") {
       const activeCount = await prisma.queueTicket.count({
         where: {
           eventId,
           templeId,
-          status: { notIn: ['Pending', 'Registered'] }
-        }
+          status: { notIn: ["Pending", "Registered"] },
+        },
       });
       const actualOrder = activeCount + 1;
 
       await prisma.queueTicket.update({
         where: { id: ticket.id },
         data: {
-          status: 'Queuing',
-          actualOrder
-        }
+          status: "Queuing",
+          actualOrder,
+        },
       });
     }
 
     await revalidateTemple(templeId);
     return { success: true };
   } catch (error) {
-    console.error('verifyQueueTicket error:', error);
-    return { success: false, error: '驗證失敗' };
+    console.error("verifyQueueTicket error:", error);
+    return { success: false, error: "驗證失敗" };
   }
 }
-export async function registerForEvent(id: any, phone: string, n: string, pr: number, paymentMethod?: string) {
+export async function registerForEvent(
+  id: any,
+  phone: string,
+  n: string,
+  pr: number,
+  paymentMethod?: string,
+) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (await checkTempleSuspension())
+      return { success: false, message: "宮廟服務已暫停，請聯繫宮廟管理員" };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (await checkTempleSuspension()) return { success: false, message: '宮廟服務已暫停，請聯繫宮廟管理員' };
-        
-        const ev = await prisma.event.findFirst({
-          where: { id: String(id), templeId: templeId! },
-          include: { registrations: true }
-        });
-        if (!ev) return { success: false };
-        
-        if (ev.capacity > 0 && ev.registrations.length >= ev.capacity) return { success: false, message: '名額已滿' };
-        
-        const pStatus = paymentMethod === 'Cash' || !paymentMethod ? (pr > 0 ? 'Pending' : 'Unpaid') : 'Paid';
-        const newId = `REG-${Date.now()}`;
-        
-        await prisma.eventRegistration.create({
-          data: {
-            id: newId,
-            eventId: ev.id,
-            templeId: templeId!,
-            phone,
-            guestName: n,
-            actualPrice: pr > 0 ? pr : 0,
-            paymentStatus: pStatus
-          }
-        });
+    const ev = await prisma.event.findFirst({
+      where: { id: String(id), templeId: templeId! },
+      include: { registrations: true },
+    });
+    if (!ev) return { success: false };
 
-          await prisma.adminNotification.create({
-            data: {
-              templeId: templeId!,
-              category: 'PENDING_REVIEW',
-              message: `信眾 ${n || phone} 報名了活動 (金額：NT$ ${pr || 0})`,
-              isRead: false,
-              linkPath: `/${templeId!}/admin/events`
-            }
-          });
-        
-        await revalidateTemple();
-        return { success: true, id: newId };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    if (ev.capacity > 0 && ev.registrations.length >= ev.capacity)
+      return { success: false, message: "名額已滿" };
+
+    const pStatus =
+      paymentMethod === "Cash" || !paymentMethod
+        ? pr > 0
+          ? "Pending"
+          : "Unpaid"
+        : "Paid";
+    const newId = `REG-${Date.now()}`;
+
+    await prisma.eventRegistration.create({
+      data: {
+        id: newId,
+        eventId: ev.id,
+        templeId: templeId!,
+        phone,
+        guestName: n,
+        actualPrice: pr > 0 ? pr : 0,
+        paymentStatus: pStatus,
+      },
+    });
+
+    await prisma.adminNotification.create({
+      data: {
+        templeId: templeId!,
+        category: "PENDING_REVIEW",
+        message: `信眾 ${n || phone} 報名了活動 (金額：NT$ ${pr || 0})`,
+        isRead: false,
+        linkPath: `/${templeId!}/admin/events`,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true, id: newId };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 export async function fetchGuestRegistrations(p: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const normPhone = normalizePhone(p || "");
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const normPhone = normalizePhone(p || '');
-        
-        const regs = await prisma.eventRegistration.findMany({
-          where: {
-            templeId: templeId!,
-            phone: normPhone
-          },
-          include: { event: true },
-          orderBy: { createdAt: 'desc' }
-        });
-        
-        return regs.map(r => ({
-          id: r.id,
-          eventId: r.eventId,
-          templeId: r.templeId,
-          title: (r as any).title || r.event?.title,
-          phone: r.phone,
-          guestName: r.guestName,
-          price: r.event?.price || 0,
-          paymentStatus: r.paymentStatus,
-          paymentRef: r.paymentRef,
-          paymentProofUrl: r.paymentProofUrl,
-          actualPrice: r.actualPrice,
-          eventDate: r.event?.date || null,
-          timestamp: r.createdAt.toISOString()
-        }));
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
+    const regs = await prisma.eventRegistration.findMany({
+      where: {
+        templeId: templeId!,
+        phone: normPhone,
+      },
+      include: { event: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return regs.map((r) => ({
+      id: r.id,
+      eventId: r.eventId,
+      templeId: r.templeId,
+      title: (r as any).title || r.event?.title,
+      phone: r.phone,
+      guestName: r.guestName,
+      price: r.event?.price || 0,
+      paymentStatus: r.paymentStatus,
+      paymentRef: r.paymentRef,
+      paymentProofUrl: r.paymentProofUrl,
+      actualPrice: r.actualPrice,
+      eventDate: r.event?.date || null,
+      timestamp: r.createdAt.toISOString(),
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function fetchGuestQueueTickets(p: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
-    
+
     const normPhone = normalizePhone(p);
-    
+
     const guest = await prisma.guest.findFirst({
-      where: { templeId, phone: normPhone }
+      where: { templeId, phone: normPhone },
     });
-    
+
     let tickets = [];
     if (!guest) {
       tickets = await prisma.queueTicket.findMany({
         where: { templeId, phone: normPhone },
-        orderBy: { createdAt: 'desc' },
-        include: { queueEvent: true }
+        orderBy: { createdAt: "desc" },
+        include: { queueEvent: true },
       });
     } else {
       tickets = await prisma.queueTicket.findMany({
-        where: { 
+        where: {
           templeId,
-          OR: [
-            { guestId: guest.id },
-            { phone: normPhone }
-          ]
+          OR: [{ guestId: guest.id }, { phone: normPhone }],
         },
-        orderBy: { createdAt: 'desc' },
-        include: { queueEvent: true }
+        orderBy: { createdAt: "desc" },
+        include: { queueEvent: true },
       });
     }
 
-    return await Promise.all(tickets.map(async t => {
-      let checkedInCount = 0;
-      if (t.eventId) {
-        checkedInCount = await prisma.queueTicket.count({
-          where: {
-            eventId: t.eventId,
-            templeId: templeId,
-            status: { notIn: ['Pending', 'Registered', 'Draft'] }
-          }
-        });
-      }
-      return {
-        id: t.id,
-        eventId: t.eventId,
-        templeId: t.templeId,
-        eventTitle: t.eventTitle,
-        phone: t.phone,
-        guestName: t.guestName,
-        status: t.status,
-        assignedNumber: t.assignedNumber,
-        amount: t.queueEvent?.price || 0,
-        paymentStatus: t.paymentStatus,
-        paymentMethod: t.paymentMethod,
-        paymentRef: t.paymentRef,
-        paymentProofUrl: t.paymentProofUrl,
-        createdAt: t.createdAt.toISOString().replace('T', ' ').split('.')[0],
-        actualOrder: t.actualOrder,
-        eventDate: t.queueEvent?.date || null,
-        checkedInCount
-      };
-    }));
+    return await Promise.all(
+      tickets.map(async (t) => {
+        let checkedInCount = 0;
+        if (t.eventId) {
+          checkedInCount = await prisma.queueTicket.count({
+            where: {
+              eventId: t.eventId,
+              templeId: templeId,
+              status: { notIn: ["Pending", "Registered", "Draft"] },
+            },
+          });
+        }
+        return {
+          id: t.id,
+          eventId: t.eventId,
+          templeId: t.templeId,
+          eventTitle: t.eventTitle,
+          phone: t.phone,
+          guestName: t.guestName,
+          status: t.status,
+          assignedNumber: t.assignedNumber,
+          amount: t.queueEvent?.price || 0,
+          paymentStatus: t.paymentStatus,
+          paymentMethod: t.paymentMethod,
+          paymentRef: t.paymentRef,
+          paymentProofUrl: t.paymentProofUrl,
+          createdAt: t.createdAt.toISOString().replace("T", " ").split(".")[0],
+          actualOrder: t.actualOrder,
+          eventDate: t.queueEvent?.date || null,
+          checkedInCount,
+        };
+      }),
+    );
   } catch (error) {
-    console.error('fetchGuestQueueTickets error:', error);
+    console.error("fetchGuestQueueTickets error:", error);
     return [];
   }
 }
@@ -1985,87 +2432,114 @@ export async function fetchGuestLampRecords(p: any) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return [];
-    
+
     const normPhone = normalizePhone(p);
-    
+
     const guest = await prisma.guest.findFirst({
-      where: { templeId, phone: normPhone }
+      where: { templeId, phone: normPhone },
     });
-    
+
     let records = [];
     if (!guest) {
       records = await prisma.lampRecord.findMany({
         where: { templeId, phone: normPhone },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: "desc" },
       });
     } else {
       records = await prisma.lampRecord.findMany({
-        where: { 
+        where: {
           templeId,
-          OR: [
-            { guestId: guest.id },
-            { phone: normPhone }
-          ]
+          OR: [{ guestId: guest.id }, { phone: normPhone }],
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: "desc" },
       });
     }
 
-    const formatLocal = (val: any) => val ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(val)).replace(/\//g, '-') : '';
+    const formatLocal = (val: any) =>
+      val
+        ? new Intl.DateTimeFormat("zh-TW", {
+            timeZone: "Asia/Taipei",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          })
+            .format(new Date(val))
+            .replace(/\//g, "-")
+        : "";
 
-    return records.map(r => {
+    return records.map((r) => {
       let startStr = formatLocal(r.startDate || r.createdAt || new Date());
-      let expStr = formatLocal(r.expiryDate || new Date((r.startDate || r.createdAt || new Date()).getTime() + 365 * 24 * 60 * 60 * 1000));
-      
+      let expStr = formatLocal(
+        r.expiryDate ||
+          new Date(
+            (r.startDate || r.createdAt || new Date()).getTime() +
+              365 * 24 * 60 * 60 * 1000,
+          ),
+      );
+
       return {
-        id: r.id, 
-        templeId: r.templeId, 
-        guestName: r.guestName, 
+        id: r.id,
+        templeId: r.templeId,
+        guestName: r.guestName,
         phone: r.phone,
-        categoryName: r.categoryName, 
-        price: r.actualPrice, 
+        categoryName: r.categoryName,
+        price: r.actualPrice,
         status: r.status,
-        startDate: startStr, 
+        startDate: startStr,
         expiryDate: expStr,
-        paymentMethod: r.paymentMethod, 
-        paymentStatus: r.paymentStatus, 
-        createdAt: r.createdAt.toISOString().replace('T', ' ').split('.')[0],
+        paymentMethod: r.paymentMethod,
+        paymentStatus: r.paymentStatus,
+        createdAt: r.createdAt.toISOString().replace("T", " ").split(".")[0],
         paymentRef: r.paymentRef || null,
-        paymentProofUrl: r.paymentProofUrl || null
+        paymentProofUrl: r.paymentProofUrl || null,
       };
     });
   } catch (error) {
-    console.error('fetchGuestLampRecords error:', error);
+    console.error("fetchGuestLampRecords error:", error);
     return [];
   }
 }
 
-export async function joinQueue(eventId: any, phone: string, guestName: string, paymentMethod?: string) {
+export async function joinQueue(
+  eventId: any,
+  phone: string,
+  guestName: string,
+  paymentMethod?: string,
+) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    
-    const ev = await prisma.queueEvent.findUnique({ where: { id: String(eventId) } });
+
+    const ev = await prisma.queueEvent.findUnique({
+      where: { id: String(eventId) },
+    });
     if (!ev || ev.templeId !== templeId) return { success: false };
-    
+
     if (ev.maxCapacity > 0) {
       const activeTickets = await prisma.queueTicket.count({
-        where: { eventId: String(eventId), templeId, status: { notIn: ['Cancelled'] } }
+        where: {
+          eventId: String(eventId),
+          templeId,
+          status: { notIn: ["Cancelled"] },
+        },
       });
       if (activeTickets >= ev.maxCapacity) {
-        return { success: false, message: '此排隊活動人數已滿！' };
+        return { success: false, message: "此排隊活動人數已滿！" };
       }
     }
 
-    const count = await prisma.queueTicket.count({ where: { eventId: String(eventId), templeId } });
-    const assignedNumber = `A${(count + 1).toString().padStart(3, '0')}`;
-    const pStatus = paymentMethod === 'Cash' || !paymentMethod ? 'Pending' : 'Paid';
-    
+    const count = await prisma.queueTicket.count({
+      where: { eventId: String(eventId), templeId },
+    });
+    const assignedNumber = `A${(count + 1).toString().padStart(3, "0")}`;
+    const pStatus =
+      paymentMethod === "Cash" || !paymentMethod ? "Pending" : "Paid";
+
     const normPhone = normalizePhone(phone);
     const guest = await prisma.guest.upsert({
       where: { templeId_phone: { templeId, phone: normPhone } },
       update: {},
-      create: { templeId, phone: normPhone, name: guestName, status: 'Active' }
+      create: { templeId, phone: normPhone, name: guestName, status: "Active" },
     });
 
     const ticket = await prisma.queueTicket.create({
@@ -2076,149 +2550,183 @@ export async function joinQueue(eventId: any, phone: string, guestName: string, 
         phone,
         guestName,
         eventTitle: ev.title,
-        status: 'Pending',
+        status: "Pending",
         assignedNumber,
         paymentStatus: pStatus,
-        paymentMethod: paymentMethod || undefined
-      }
+        paymentMethod: paymentMethod || undefined,
+      },
     });
 
-        await prisma.adminNotification.create({
-          data: {
-            templeId: templeId!,
-            category: 'PENDING_REVIEW',
-            message: `信眾 ${guestName || phone} 取了排隊號碼 ${assignedNumber} (金額：NT$ ${ev.price || 0})`,
-            isRead: false,
-            linkPath: `/${templeId!}/admin/queue`
-          }
-        });
+    await prisma.adminNotification.create({
+      data: {
+        templeId: templeId!,
+        category: "PENDING_REVIEW",
+        message: `信眾 ${guestName || phone} 取了排隊號碼 ${assignedNumber} (金額：NT$ ${ev.price || 0})`,
+        isRead: false,
+        linkPath: `/${templeId!}/admin/queue`,
+      },
+    });
 
-    return { 
-      success: true, 
-      ticket: { 
-        id: ticket.id, 
-        eventId, 
-        templeId, 
-        eventTitle: ev.title, 
-        phone, 
-        guestName, 
-        status: 'Pending', 
-        assignedNumber, 
-        paymentStatus: pStatus, 
-        createdAt: ticket.createdAt.toISOString().replace('T', ' ').split('.')[0] 
-      } 
+    return {
+      success: true,
+      ticket: {
+        id: ticket.id,
+        eventId,
+        templeId,
+        eventTitle: ev.title,
+        phone,
+        guestName,
+        status: "Pending",
+        assignedNumber,
+        paymentStatus: pStatus,
+        createdAt: ticket.createdAt
+          .toISOString()
+          .replace("T", " ")
+          .split(".")[0],
+      },
     };
   } catch (error) {
-    console.error('joinQueue error:', error);
+    console.error("joinQueue error:", error);
     return { success: false };
   }
 }
-export type EventItem = { id: string; title: string; date: string; location: string; price: number; status: 'Active' | 'Draft' | 'Completed'; capacity: number; enrolled: number; imageUrl?: string; description?: string; precautions?: string };
+export type EventItem = {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  price: number;
+  status: "Active" | "Draft" | "Completed";
+  capacity: number;
+  enrolled: number;
+  imageUrl?: string;
+  description?: string;
+  precautions?: string;
+};
 // migrated (await jsonStore.find('events')) to (await jsonStore.find('events'))
 
 export async function fetchEvents() {
-    try {
+  try {
     const templeId = await getDynamicTempleId();
     const events = await prisma.event.findMany({
       where: { templeId: templeId! },
-      orderBy: { date: 'asc' },
-      include: { registrations: true }
+      orderBy: { date: "asc" },
+      include: { registrations: true },
     });
 
-    return events.map(r => ({
+    return events.map((r) => ({
       id: r.id,
       templeId: r.templeId,
       title: r.title,
-      date: r.date || '',
-      location: r.location || '',
+      date: r.date || "",
+      location: r.location || "",
       price: r.price,
       status: r.status as "Active" | "Completed" | "Draft",
       capacity: r.capacity,
       enrolled: r.registrations.length,
-      imageUrl: r.imageUrl || '',
-      description: r.description || '',
-      precautions: (r as any).precautions
+      imageUrl: r.imageUrl || "",
+      description: r.description || "",
+      precautions: (r as any).precautions,
     }));
-    } catch (e) {
+  } catch (e) {
     console.error(e);
     return [];
-    }
+  }
 }
 export async function saveEvent(fd: FormData) {
+  try {
+    const id = fd.get("id") as string;
+    const title = fd.get("title") as string;
+    const date = fd.get("date") as string;
+    const location = fd.get("location") as string;
+    const price = Number(fd.get("price")) || 0;
+    const capacity = Number(fd.get("capacity")) || 0;
+    const status = (fd.get("status") as any) || "Draft";
+    const description = (fd.get("description") as string) || "";
+    const precautions = (fd.get("precautions") as string) || "";
+    let imageUrl = fd.get("imageUrl") as string;
+    const imageFile = fd.get("imageFile") as File | null;
 
-      try {
-        const id = fd.get('id') as string;
-        const title = fd.get('title') as string;
-        const date = fd.get('date') as string;
-        const location = fd.get('location') as string;
-        const price = Number(fd.get('price')) || 0;
-        const capacity = Number(fd.get('capacity')) || 0;
-        const status = (fd.get('status') as any) || 'Draft';
-        const description = fd.get('description') as string || '';
-        const precautions = fd.get('precautions') as string || '';
-        let imageUrl = fd.get('imageUrl') as string;
-        const imageFile = fd.get('imageFile') as File | null;
-        
-        if (imageFile && imageFile.size > 0) {
-          const fs = require('fs');
-          const path = require('path');
-          const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-          if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-          
-          const ext = imageFile.name.split('.').pop() || 'jpg';
-          const filename = `evt-${Date.now()}.${ext}`;
-          const filePath = path.join(uploadsDir, filename);
-          const arrayBuffer = await imageFile.arrayBuffer();
-          fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-          imageUrl = `/uploads/${filename}`;
-        }
-        
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return { success: false };
+    if (imageFile && imageFile.size > 0) {
+      const fs = require("fs");
+      const path = require("path");
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      if (!fs.existsSync(uploadsDir))
+        fs.mkdirSync(uploadsDir, { recursive: true });
 
-        if (id) {
-          await prisma.event.updateMany({
-            where: { id, templeId },
-            data: {
-              title, date, location, price, capacity, status, imageUrl, description, precautions
-            }
-          });
-        } else {
-          await prisma.event.create({
-            data: {
-              id: `ev-${Date.now()}`,
-              templeId,
-              title, date, location, price, capacity, status, imageUrl, description, precautions
-            }
-          });
-        }
-        await revalidateTemple();
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+      const ext = imageFile.name.split(".").pop() || "jpg";
+      const filename = `evt-${Date.now()}.${ext}`;
+      const filePath = path.join(uploadsDir, filename);
+      const arrayBuffer = await imageFile.arrayBuffer();
+      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+      imageUrl = `/uploads/${filename}`;
+    }
+
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+
+    if (id) {
+      await prisma.event.updateMany({
+        where: { id, templeId },
+        data: {
+          title,
+          date,
+          location,
+          price,
+          capacity,
+          status,
+          imageUrl,
+          description,
+          precautions,
+        },
+      });
+    } else {
+      await prisma.event.create({
+        data: {
+          id: `ev-${Date.now()}`,
+          templeId,
+          title,
+          date,
+          location,
+          price,
+          capacity,
+          status,
+          imageUrl,
+          description,
+          precautions,
+        },
+      });
+    }
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 export async function deleteEvent(id: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const regCount = await prisma.eventRegistration.count({
+      where: { eventId: id, templeId: templeId! },
+    });
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const regCount = await prisma.eventRegistration.count({
-          where: { eventId: id, templeId: templeId! }
-        });
-        
-        if (regCount > 0) return { success: false, error: '該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。' };
-        
-        await prisma.event.deleteMany({
-          where: { id, templeId: templeId! }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    if (regCount > 0)
+      return {
+        success: false,
+        error: "該活動已有信眾報名，請先移除相關報名紀錄後再進行刪除。",
+      };
+
+    await prisma.event.deleteMany({
+      where: { id, templeId: templeId! },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // --- B2B SaaS 平台層資料表初始化 ---
@@ -2236,36 +2744,71 @@ const db_config = {
   defaultSuperSalesRates: {
     distributorAuthRate: 15,
     templeSetupRate: 10,
-    templeSetupType: 'percent',
-    templeRentRates: [15, 12, 10]
+    templeSetupType: "percent",
+    templeRentRates: [15, 12, 10],
   },
   distributorPlans: [
-    { id: 'PLAN-A', name: '標準經銷方案', price: 1600000, durationYears: 2, nodes: 100, color: 'indigo' },
-    { id: 'PLAN-B', name: '菁英經銷方案', price: 3200000, durationYears: 4, nodes: 250, color: 'emerald' },
-    { id: 'PLAN-C', name: '企業戰略方案', price: 8000000, durationYears: 10, nodes: 1000, color: 'slate' }
+    {
+      id: "PLAN-A",
+      name: "標準經銷方案",
+      price: 1600000,
+      durationYears: 2,
+      nodes: 100,
+      color: "indigo",
+    },
+    {
+      id: "PLAN-B",
+      name: "菁英經銷方案",
+      price: 3200000,
+      durationYears: 4,
+      nodes: 250,
+      color: "emerald",
+    },
+    {
+      id: "PLAN-C",
+      name: "企業戰略方案",
+      price: 8000000,
+      durationYears: 10,
+      nodes: 1000,
+      color: "slate",
+    },
   ],
   b2bPayment: {
-    thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
-    linePay: { enabled: false, channelId: '', channelSecret: '' },
-    customTransfer: { enabled: true, bankCode: '808', accountName: '天首科技有限公司', accountNo: '808-1234-5678-901' },
+    thirdParty: {
+      enabled: true,
+      merchantId: "HQ_MERCHANT_999",
+      hashKey: "HQ_HASH_KEY",
+      hashIV: "HQ_HASH_IV",
+    },
+    linePay: { enabled: false, channelId: "", channelSecret: "" },
+    customTransfer: {
+      enabled: true,
+      bankCode: "808",
+      accountName: "天首科技有限公司",
+      accountNo: "808-1234-5678-901",
+    },
     serviceMapping: {
-      'new-temple': ['customTransfer'],
-      'monthly-rent': ['thirdParty', 'customTransfer'],
-      'distributor-auth': ['customTransfer']
-    }
+      "new-temple": ["customTransfer"],
+      "monthly-rent": ["thirdParty", "customTransfer"],
+      "distributor-auth": ["customTransfer"],
+    },
   },
   aiEndpoints: {
-    ocrApiUrl: '',
-    ocrApiKey: '',
-    chatApiUrl: '',
-    chatApiKey: ''
+    ocrApiUrl: "",
+    ocrApiKey: "",
+    chatApiUrl: "",
+    chatApiKey: "",
   },
   b2bPayment: {
-    enabledMethods: ['transfer', 'creditCard', 'linePay'],
-    ecpay: { merchantId: '', hashKey: '', hashIV: '' },
-    linePay: { channelId: '', channelSecret: '' },
-    transfer: { bankCode: '822', accountNumber: '1234567890', accountName: '系統科技股份有限公司' }
-  }
+    enabledMethods: ["transfer", "creditCard", "linePay"],
+    ecpay: { merchantId: "", hashKey: "", hashIV: "" },
+    linePay: { channelId: "", channelSecret: "" },
+    transfer: {
+      bankCode: "822",
+      accountNumber: "1234567890",
+      accountName: "系統科技股份有限公司",
+    },
+  },
 };
 
 // --- NEW GLOBAL DATA STRUCTURES ---
@@ -2276,9 +2819,9 @@ const db_config = {
 // migrated (await jsonStore.find('sync_queue')) to (await jsonStore.find('sync_queue'))
 
 const db_storage_plans: any[] = [
-  { id: 'SP-50', name: '50GB 大容量方案', sizeGb: 50, priceMonthly: 300 },
-  { id: 'SP-200', name: '200GB 旗艦方案', sizeGb: 200, priceMonthly: 900 },
-  { id: 'SP-1000', name: '1TB 至尊方案', sizeGb: 1000, priceMonthly: 3000 }
+  { id: "SP-50", name: "50GB 大容量方案", sizeGb: 50, priceMonthly: 300 },
+  { id: "SP-200", name: "200GB 旗艦方案", sizeGb: 200, priceMonthly: 900 },
+  { id: "SP-1000", name: "1TB 至尊方案", sizeGb: 1000, priceMonthly: 3000 },
 ];
 
 // migrated (await jsonStore.find('temple_storages')) to (await jsonStore.find('temple_storages'))
@@ -2290,8 +2833,8 @@ export interface TempleBill {
   amount: number;
   billingDate: string; // e.g. '2026-06'
   dueDate: string; // YYYY-MM-DD
-  status: 'Paid' | 'Unpaid';
-  payeeRole: 'SuperAdmin' | 'Distributor';
+  status: "Paid" | "Unpaid";
+  payeeRole: "SuperAdmin" | "Distributor";
   payeeId: string;
   timestamp: string;
 }
@@ -2304,8 +2847,13 @@ export interface AiPlan {
   chatLimit: number;
 }
 const db_ai_plans: AiPlan[] = [
-  { id: 'AI-500', name: '基礎智慧助理方案', monthlyFee: 500, chatLimit: 2000 },
-  { id: 'AI-1500', name: '進階智慧助理方案', monthlyFee: 1500, chatLimit: 10000 }
+  { id: "AI-500", name: "基礎智慧助理方案", monthlyFee: 500, chatLimit: 2000 },
+  {
+    id: "AI-1500",
+    name: "進階智慧助理方案",
+    monthlyFee: 1500,
+    chatLimit: 10000,
+  },
 ];
 
 export interface AiApiModel {
@@ -2330,31 +2878,28 @@ export interface TempleAiUsage {
 
 // migrated (await jsonStore.readJson('super_sales_overrides')) to (await jsonStore.readJson('super_sales_overrides'))
 
-
-
 export async function fetchAdminLogs() {
-
-      try {
-        const logs = await prisma.adminLog.findMany({
-          orderBy: { createdAt: 'desc' }
-        });
-        return logs;
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    const logs = await prisma.adminLog.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    return logs;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function logAdminAction(action: string, target: string) {
   try {
     const user = await getCurrentUser();
     await prisma.adminLog.create({
       data: {
-        adminName: user?.name || 'System Admin',
-        performedBy: user?.name || 'System Admin',
+        adminName: user?.name || "System Admin",
+        performedBy: user?.name || "System Admin",
         action,
         target,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (e) {
     console.error("Failed to log admin action:", e);
@@ -2365,13 +2910,18 @@ export async function logAdminAction(action: string, target: string) {
 export async function downloadAdminLogsCsv() {
   const logs = await fetchAdminLogs();
   const header = "ID,User,Action,Target,Timestamp\n";
-  const rows = logs.map((l: any) => `${l.id},${l.adminName || l.performedBy || 'Unknown'},${l.action},${l.target},${l.timestamp}`).join("\n");
+  const rows = logs
+    .map(
+      (l: any) =>
+        `${l.id},${l.adminName || l.performedBy || "Unknown"},${l.action},${l.target},${l.timestamp}`,
+    )
+    .join("\n");
   return header + rows;
 }
 
 export async function createAdminAccount(data: any) {
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被註冊，請更換' };
+  if (data.account && (await checkAccountExists(data.account))) {
+    return { success: false, error: "帳號已被註冊，請更換" };
   }
   const id = `adm-${Date.now()}`;
   try {
@@ -2380,30 +2930,36 @@ export async function createAdminAccount(data: any) {
         id,
         name: data.name,
         account: data.account,
-        password: data.password || '123456',
-        role: 'Admin',
-        status: 'Active'
-      }
+        password: data.password || "123456",
+        role: "Admin",
+        status: "Active",
+      },
     });
   } catch (e) {
     console.error("DB Insert Error for admin:", e);
     return { success: false, error: String(e) };
   }
-  await logAdminAction('CREATE_ADMIN', data.name);
-  revalidatePath('/super-admin');
+  await logAdminAction("CREATE_ADMIN", data.name);
+  revalidatePath("/super-admin");
   return { success: true };
 }
 
 export async function fetchFinanceData() {
-  const incomes = [].filter(r => r.type === 'INCOME').reduce((acc, r) => acc + r.amount, 0);
-  const expenses = [].filter(r => r.type === 'EXPENSE').reduce((acc, r) => acc + r.amount, 0);
+  const incomes = []
+    .filter((r) => r.type === "INCOME")
+    .reduce((acc, r) => acc + r.amount, 0);
+  const expenses = []
+    .filter((r) => r.type === "EXPENSE")
+    .reduce((acc, r) => acc + r.amount, 0);
   return {
     records: [],
     summary: {
       totalRevenue: incomes,
-      totalCommission: [].filter(r => r.category === 'COMMISSION').reduce((acc, r) => acc + r.amount, 0),
-      netProfit: incomes - expenses
-    }
+      totalCommission: []
+        .filter((r) => r.category === "COMMISSION")
+        .reduce((acc, r) => acc + r.amount, 0),
+      netProfit: incomes - expenses,
+    },
   };
 }
 
@@ -2416,7 +2972,9 @@ export async function fetchB2BPaymentConfig(templeId: string) {
     const distributorId = temple?.distributorId;
 
     if (distributorId) {
-      const dist = await prisma.distributor.findUnique({ where: { id: distributorId } });
+      const dist = await prisma.distributor.findUnique({
+        where: { id: distributorId },
+      });
       return dist?.b2bPayment || null;
     } else {
       const sysConfig = await fetchSystemConfig();
@@ -2430,39 +2988,41 @@ export async function fetchB2BPaymentConfig(templeId: string) {
 
 // --- STORAGE & BILLING APIS ---
 export async function fetchStoragePlans() {
-
-      try {
-        const plans = await prisma.storagePlan.findMany({
-          orderBy: { sizeGb: 'asc' }
-        });
-        return plans.map(r => ({
-          id: r.id,
-          name: r.name || `${r.sizeGb}GB 雲端空間`,
-          sizeGb: r.sizeGb,
-          priceMonthly: r.priceMonthly,
-          priceYearly: r.priceYearly
-        }));
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    const plans = await prisma.storagePlan.findMany({
+      orderBy: { sizeGb: "asc" },
+    });
+    return plans.map((r) => ({
+      id: r.id,
+      name: r.name || `${r.sizeGb}GB 雲端空間`,
+      sizeGb: r.sizeGb,
+      priceMonthly: r.priceMonthly,
+      priceYearly: r.priceYearly,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export async function updateStoragePlans(plans: any[]) {
   try {
-    const planIdsToKeep = plans.map(p => p.id).filter(Boolean);
+    const planIdsToKeep = plans.map((p) => p.id).filter(Boolean);
 
     await prisma.storagePlan.deleteMany({
       where: {
-        id: { notIn: planIdsToKeep }
-      }
+        id: { notIn: planIdsToKeep },
+      },
     });
 
     for (const p of plans) {
-      const planIdToSave = p.id || `SP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      if (!p.id || p.id.startsWith('SP-')) {
-        const existing = await prisma.storagePlan.findUnique({ where: { id: p.id } });
+      const planIdToSave =
+        p.id || `SP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      if (!p.id || p.id.startsWith("SP-")) {
+        const existing = await prisma.storagePlan.findUnique({
+          where: { id: p.id },
+        });
         if (!existing) {
           await prisma.storagePlan.create({
             data: {
@@ -2470,19 +3030,19 @@ export async function updateStoragePlans(plans: any[]) {
               name: p.name,
               sizeGb: p.sizeGb,
               priceMonthly: p.priceMonthly,
-              priceYearly: p.priceYearly || 0
-            }
+              priceYearly: p.priceYearly || 0,
+            },
           });
         } else {
-           await prisma.storagePlan.update({
-             where: { id: p.id },
-             data: {
-               name: p.name,
-               sizeGb: p.sizeGb,
-               priceMonthly: p.priceMonthly,
-               priceYearly: p.priceYearly || 0
-             }
-           });
+          await prisma.storagePlan.update({
+            where: { id: p.id },
+            data: {
+              name: p.name,
+              sizeGb: p.sizeGb,
+              priceMonthly: p.priceMonthly,
+              priceYearly: p.priceYearly || 0,
+            },
+          });
         }
       } else {
         await prisma.storagePlan.upsert({
@@ -2491,109 +3051,119 @@ export async function updateStoragePlans(plans: any[]) {
             name: p.name,
             sizeGb: p.sizeGb,
             priceMonthly: p.priceMonthly,
-            priceYearly: p.priceYearly || 0
+            priceYearly: p.priceYearly || 0,
           },
           create: {
             id: p.id,
             name: p.name,
             sizeGb: p.sizeGb,
             priceMonthly: p.priceMonthly,
-            priceYearly: p.priceYearly || 0
-          }
+            priceYearly: p.priceYearly || 0,
+          },
         });
       }
 
       const totalGB = 20 + p.sizeGb;
       const allocatedBytes = BigInt(totalGB) * BigInt(1024 * 1024 * 1024);
-      
-      const affected = await prisma.templeStorage.findMany({ where: { planId: p.id } });
-      for(const tStorage of affected) {
+
+      const affected = await prisma.templeStorage.findMany({
+        where: { planId: p.id },
+      });
+      for (const tStorage of affected) {
         await prisma.templeStorage.update({
           where: { id: tStorage.id },
           data: {
             allocatedBytes: allocatedBytes,
-            planName: `${totalGB}GB 雲端空間`
-          }
+            planName: `${totalGB}GB 雲端空間`,
+          },
         });
       }
     }
-    revalidatePath('/super-admin');
+    revalidatePath("/super-admin");
     return { success: true };
   } catch (error) {
-    console.error('Failed to update storage plans:', error);
-    return { success: false, message: '更新失敗' };
+    console.error("Failed to update storage plans:", error);
+    return { success: false, message: "更新失敗" };
   }
 }
 
 export async function fetchTempleStorages() {
-
-      try {
-        const temples = await prisma.temple.findMany();
-        for (const t of temples) {
-          const isVip = t.planId === 'Unlimited Node' || t.planId === 'Free' || t.planId === '免費';
-          let qGB = 20;
-          let pName = '免費 20GB 空間';
-          if (isVip) {
-              qGB = 999999;
-              pName = '無限免費方案';
-          }
-          await prisma.templeStorage.upsert({
-            where: { templeId: t.id },
-            update: {},
-            create: {
-              templeId: t.id,
-              usedBytes: 0,
-              allocatedBytes: BigInt(qGB) * BigInt(1024 * 1024 * 1024),
-              planName: pName,
-              city: t.city || '台北市'
-            }
-          });
-        }
-        
-        const storages = await prisma.templeStorage.findMany({
-          include: { temple: true }
-        });
-        
-        return storages.map(r => ({
-          id: r.id,
-          templeId: r.templeId,
-          templeName: r.temple?.templeName || r.temple?.name,
-          city: r.city,
-          usedBytes: Number(r.usedBytes),
-          quotaGb: Number(r.allocatedBytes) / (1024 * 1024 * 1024),
-          planName: r.planName
-        }));
-      } catch (e) {
-        console.error(e);
-        return [];
+  try {
+    const temples = await prisma.temple.findMany();
+    for (const t of temples) {
+      const isVip =
+        t.planId === "Unlimited Node" ||
+        t.planId === "Free" ||
+        t.planId === "免費";
+      let qGB = 20;
+      let pName = "免費 20GB 空間";
+      if (isVip) {
+        qGB = 999999;
+        pName = "無限免費方案";
       }
+      await prisma.templeStorage.upsert({
+        where: { templeId: t.id },
+        update: {},
+        create: {
+          templeId: t.id,
+          usedBytes: 0,
+          allocatedBytes: BigInt(qGB) * BigInt(1024 * 1024 * 1024),
+          planName: pName,
+          city: t.city || "台北市",
+        },
+      });
+    }
+
+    const storages = await prisma.templeStorage.findMany({
+      include: { temple: true },
+    });
+
+    return storages.map((r) => ({
+      id: r.id,
+      templeId: r.templeId,
+      templeName: r.temple?.templeName || r.temple?.name,
+      city: r.city,
+      usedBytes: Number(r.usedBytes),
+      quotaGb: Number(r.allocatedBytes) / (1024 * 1024 * 1024),
+      planName: r.planName,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
-export async function requestTempleStorageUpgrade(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly') {
+export async function requestTempleStorageUpgrade(
+  templeId: string,
+  planId: string,
+  cycle: "Monthly" | "Yearly",
+) {
   return withTempleSession(templeId, true, async (client) => {
-    let plan = await prisma.storagePlan.findUnique({ where: { id: planId } }) as any;
+    let plan = (await prisma.storagePlan.findUnique({
+      where: { id: planId },
+    })) as any;
     if (!plan) plan = db_storage_plans.find((p: any) => p.id === planId);
-    if (!plan) return { success: false, message: '找不到選定的空間方案' };
+    if (!plan) return { success: false, message: "找不到選定的空間方案" };
 
     const config = await fetchSystemConfig();
     const discount = config.yearlyDiscountRate || 20;
-    const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
+    const priceFactor = cycle === "Yearly" ? 12 * (1 - discount / 100) : 1;
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
 
     await prisma.templeBill.create({
       data: {
         id: `BILL-STORAGE-${Date.now()}`,
         templeId: templeId,
-        type: 'StorageUpgrade',
+        type: "StorageUpgrade",
         itemName: `雲端空間擴充方案 - ${plan.name} (${planId})`,
         amount: finalAmount,
         billingDate: new Date().toISOString().substring(0, 7),
-        dueDate: new Date().toISOString().split('T')[0],
-        status: 'Unpaid',
-        payeeRole: 'SuperAdmin',
-        payeeId: 'system-hq',
-        timestamp: new Date().toISOString()
-      }
+        dueDate: new Date().toISOString().split("T")[0],
+        status: "Unpaid",
+        payeeRole: "SuperAdmin",
+        payeeId: "system-hq",
+        timestamp: new Date().toISOString(),
+      },
     });
 
     return { success: true };
@@ -2602,31 +3172,35 @@ export async function requestTempleStorageUpgrade(templeId: string, planId: stri
 
 export async function requestAiPlanUpgrade(templeId: string, planId: string) {
   return withTempleSession(templeId, true, async (client) => {
-    let plan = await prisma.aiPlan.findUnique({ where: { id: planId } }) as any;
+    let plan = (await prisma.aiPlan.findUnique({
+      where: { id: planId },
+    })) as any;
     if (!plan) plan = db_ai_plans.find((p: any) => p.id === planId);
-    if (!plan) return { success: false, message: '找不到選定的AI方案' };
+    if (!plan) return { success: false, message: "找不到選定的AI方案" };
 
     await prisma.templeBill.create({
       data: {
         id: `BILL-AI-${Date.now()}`,
         templeId: templeId,
-        itemName: 'AiUpgrade',
+        itemName: "AiUpgrade",
         amount: plan.price || 0,
         billingDate: new Date().toISOString().substring(0, 7),
-        dueDate: new Date().toISOString().split('T')[0],
-        status: 'Unpaid',
-        payeeRole: 'SuperAdmin',
-        payeeId: 'system-hq',
-        timestamp: new Date().toISOString()
-      }
+        dueDate: new Date().toISOString().split("T")[0],
+        status: "Unpaid",
+        payeeRole: "SuperAdmin",
+        payeeId: "system-hq",
+        timestamp: new Date().toISOString(),
+      },
     });
-    
+
     // update current planId
-    const currentUsage = await prisma.templeAiUsage.findFirst({ where: { templeId: templeId } });
+    const currentUsage = await prisma.templeAiUsage.findFirst({
+      where: { templeId: templeId },
+    });
     if (currentUsage) {
       await prisma.templeAiUsage.update({
-         where: { id: currentUsage.id },
-         data: { planId: planId }
+        where: { id: currentUsage.id },
+        data: { planId: planId },
       });
     }
 
@@ -2634,66 +3208,78 @@ export async function requestAiPlanUpgrade(templeId: string, planId: string) {
   });
 }
 
-export async function upgradeTempleStorage(templeId: string, planId: string, cycle: 'Monthly' | 'Yearly', isManualGrant: boolean = false) {
+export async function upgradeTempleStorage(
+  templeId: string,
+  planId: string,
+  cycle: "Monthly" | "Yearly",
+  isManualGrant: boolean = false,
+) {
   return withTempleSession(templeId, true, async (client) => {
     let plan = await prisma.storagePlan.findUnique({ where: { id: planId } });
     if (!plan) {
       // try to search by sizeGb if planId is a number string
       const sizeGb = parseInt(planId);
       if (!isNaN(sizeGb)) {
-        plan = await prisma.storagePlan.findFirst({ where: { sizeGb: sizeGb } });
+        plan = await prisma.storagePlan.findFirst({
+          where: { sizeGb: sizeGb },
+        });
       }
     }
-    if (!plan) return { success: false, message: '找不到選定的空間方案' };
+    if (!plan) return { success: false, message: "找不到選定的空間方案" };
 
     const config = (await prisma.systemConfig.findFirst()) as any;
     const discount = config?.yearlyDiscountRate || 20;
-    const priceFactor = cycle === 'Yearly' ? (12 * (1 - discount / 100)) : 1;
+    const priceFactor = cycle === "Yearly" ? 12 * (1 - discount / 100) : 1;
     const finalAmount = Math.round(plan.priceMonthly * priceFactor);
     const temple = await prisma.temple.findUnique({ where: { id: templeId } });
-    
+
     if (!isManualGrant) {
       // update wallet
-      const walletName = '超級管理員';
-      const existingWallet = await prisma.wallet.findFirst({ where: { name: walletName } });
+      const walletName = "超級管理員";
+      const existingWallet = await prisma.wallet.findFirst({
+        where: { name: walletName },
+      });
       if (existingWallet) {
         await prisma.wallet.update({
           where: { id: existingWallet.id },
-          data: { balance: { increment: finalAmount } }
+          data: { balance: { increment: finalAmount } },
         });
       } else {
         await prisma.wallet.create({
-          data: { role: 'SuperAdmin', name: walletName, balance: finalAmount }
+          data: { role: "SuperAdmin", name: walletName, balance: finalAmount },
         });
       }
 
       await prisma.payoutRecord.create({
         data: {
-          templeName: temple?.templeName || '宮廟',
-          type: `升級空間 ${plan.sizeGb}GB (${cycle === 'Monthly' ? '月繳' : '年繳'})`,
+          templeName: temple?.templeName || "宮廟",
+          type: `升級空間 ${plan.sizeGb}GB (${cycle === "Monthly" ? "月繳" : "年繳"})`,
           amount: finalAmount,
           percentage: 100,
-          roleName: '超級管理員'
-        }
+          roleName: "超級管理員",
+        },
       });
 
       await prisma.templeBill.create({
         data: {
           id: `BILL-STORAGE-${Date.now()}`,
           templeId: templeId,
-          itemName: '雲端空間擴充方案 - ' + plan.name,
+          itemName: "雲端空間擴充方案 - " + plan.name,
           amount: finalAmount,
-          dueDate: new Date().toISOString().split('T')[0],
-          status: 'Unpaid',
-          payeeRole: 'SuperAdmin',
-          payeeId: 'system-hq'
-        }
+          dueDate: new Date().toISOString().split("T")[0],
+          status: "Unpaid",
+          payeeRole: "SuperAdmin",
+          payeeId: "system-hq",
+        },
       });
     }
 
-    const allocatedBytes = BigInt(20 + plan.sizeGb) * BigInt(1024 * 1024 * 1024);
-    
-    const existingStorage = await prisma.templeStorage.findUnique({ where: { templeId: templeId } });
+    const allocatedBytes =
+      BigInt(20 + plan.sizeGb) * BigInt(1024 * 1024 * 1024);
+
+    const existingStorage = await prisma.templeStorage.findUnique({
+      where: { templeId: templeId },
+    });
     if (existingStorage) {
       await prisma.templeStorage.update({
         where: { templeId: templeId },
@@ -2702,8 +3288,8 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           planName: `${20 + plan.sizeGb}GB 雲端空間`,
           planId: plan.id,
           paymentCycle: cycle,
-          billingStartDate: new Date()
-        }
+          billingStartDate: new Date(),
+        },
       });
     } else {
       await prisma.templeStorage.create({
@@ -2714,14 +3300,14 @@ export async function upgradeTempleStorage(templeId: string, planId: string, cyc
           allocatedBytes: allocatedBytes,
           planName: `${20 + plan.sizeGb}GB 雲端空間`,
           planId: plan.id,
-          city: temple?.city || '未設定',
+          city: temple?.city || "未設定",
           paymentCycle: cycle,
-          billingStartDate: new Date()
-        }
+          billingStartDate: new Date(),
+        },
       });
     }
 
-    revalidatePath('/super-admin');
+    revalidatePath("/super-admin");
     await revalidateTemple();
     return { success: true };
   });
@@ -2739,186 +3325,292 @@ export async function fetchRoleWallets() {
       ON CONFLICT (name) DO NOTHING
     `);
 
-    const dists = await client.query('SELECT * FROM distributors');
+    const dists = await client.query("SELECT * FROM distributors");
     for (const d of dists.rows) {
       await client.query(
         `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, 0) ON CONFLICT (name) DO NOTHING`,
-        ['Distributor', d.name]
+        ["Distributor", d.name],
       );
     }
-    const sales = await client.query('SELECT * FROM dist_sales');
+    const sales = await client.query("SELECT * FROM dist_sales");
     for (const s of sales.rows) {
       await client.query(
         `INSERT INTO wallets (role, name, balance) VALUES ($1, $2, 0) ON CONFLICT (name) DO NOTHING`,
-        [s.role || 'DistSales', s.name]
+        [s.role || "DistSales", s.name],
       );
     }
-    const res = await client.query('SELECT * FROM wallets');
+    const res = await client.query("SELECT * FROM wallets");
     return res.rows.map((r: any) => ({
       id: r.id,
       role: r.role,
       name: r.name,
-      balance: Number(r.balance)
+      balance: Number(r.balance),
     }));
   });
 }
 
-export async function simulateSaaSPayment(category: 'MONTHLY_RENT' | 'SETUP_FEE' | 'AUTH_FEE', amount: number, templeId?: string, distributorId?: string, salesId?: string) {
+export async function simulateSaaSPayment(
+  category: "MONTHLY_RENT" | "SETUP_FEE" | "AUTH_FEE",
+  amount: number,
+  templeId?: string,
+  distributorId?: string,
+  salesId?: string,
+) {
   return withTempleSession(templeId || null, true, async (client) => {
-    const tRes = templeId ? await client.query('SELECT * FROM "Temple" WHERE id = $1', [templeId]) : null;
-      const t = tRes && (tRes.rowCount ?? 0) > 0 ? tRes.rows[0] : null;
-      const distId = t?.sales_id ? (await client.query('SELECT "distributorId" FROM dist_sales WHERE id = $1', [t.sales_id])).rows[0]?.distributor_id : distributorId || 'system-hq';
-      const sId = t?.sales_id || salesId || '';
-      const templeName = t?.temple_name || '系統交易';
-      if (category === 'AUTH_FEE') {
-              const saAmt = Math.round(amount * 0.85);
-              const ssAmt = Math.round(amount * 0.15);
+    const tRes = templeId
+      ? await client.query('SELECT * FROM "Temple" WHERE id = $1', [templeId])
+      : null;
+    const t = tRes && (tRes.rowCount ?? 0) > 0 ? tRes.rows[0] : null;
+    const distId = t?.sales_id
+      ? (
+          await client.query(
+            'SELECT "distributorId" FROM dist_sales WHERE id = $1',
+            [t.sales_id],
+          )
+        ).rows[0]?.distributor_id
+      : distributorId || "system-hq";
+    const sId = t?.sales_id || salesId || "";
+    const templeName = t?.temple_name || "系統交易";
+    if (category === "AUTH_FEE") {
+      const saAmt = Math.round(amount * 0.85);
+      const ssAmt = Math.round(amount * 0.15);
 
-              await client.query(`
+      await client.query(
+        `
           INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', $1) 
           ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-        `, [saAmt]);
+        `,
+        [saAmt],
+      );
 
-              await client.query(`
+      await client.query(
+        `
           INSERT INTO wallets (role, name, balance) VALUES ('SuperSales', '超級精英業務', $1) 
           ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-        `, [ssAmt]);
+        `,
+        [ssAmt],
+      );
 
-              await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                [templeName, '授權金總部提成', saAmt, 85, '超級管理員']);
-              await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                [templeName, '授權金業務提成', ssAmt, 15, '超級精英業務']);
+      await client.query(
+        "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+        [templeName, "授權金總部提成", saAmt, 85, "超級管理員"],
+      );
+      await client.query(
+        "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+        [templeName, "授權金業務提成", ssAmt, 15, "超級精英業務"],
+      );
+    } else if (category === "MONTHLY_RENT" || category === "SETUP_FEE") {
+      const typeLabel = category === "MONTHLY_RENT" ? "月租費" : "開辦費";
 
-            } else if (category === 'MONTHLY_RENT' || category === 'SETUP_FEE') {
-              const typeLabel = category === 'MONTHLY_RENT' ? '月租費' : '開辦費';
-              
-              if (!distId || distId === 'system-hq') {
-                const saAmt = Math.round(amount * 0.85);
-                const ssAmt = Math.round(amount * 0.15);
+      if (!distId || distId === "system-hq") {
+        const saAmt = Math.round(amount * 0.85);
+        const ssAmt = Math.round(amount * 0.15);
 
-                await client.query(`
+        await client.query(
+          `
             INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', $1) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-          `, [saAmt]);
+          `,
+          [saAmt],
+        );
 
-                await client.query(`
+        await client.query(
+          `
             INSERT INTO wallets (role, name, balance) VALUES ('SuperSales', '超級精英業務', $1) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-          `, [ssAmt]);
+          `,
+          [ssAmt],
+        );
 
-                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                  [templeName, `${typeLabel}直屬提成`, saAmt, 85, '超級管理員']);
-                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                  [templeName, `${typeLabel}業務提成`, ssAmt, 15, '超級精英業務']);
-              } else {
-                const distAmt = Math.round(amount * 0.65);
-                const saAmt = Math.round(amount * 0.20);
-                const dsAmt = Math.round(amount * 0.15);
+        await client.query(
+          "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+          [templeName, `${typeLabel}直屬提成`, saAmt, 85, "超級管理員"],
+        );
+        await client.query(
+          "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+          [templeName, `${typeLabel}業務提成`, ssAmt, 15, "超級精英業務"],
+        );
+      } else {
+        const distAmt = Math.round(amount * 0.65);
+        const saAmt = Math.round(amount * 0.2);
+        const dsAmt = Math.round(amount * 0.15);
 
-                const distNameRes = await client.query('SELECT name FROM distributors WHERE id = $1', [distId]);
-                const distName = distNameRes.rows[0]?.name || '經銷商';
+        const distNameRes = await client.query(
+          "SELECT name FROM distributors WHERE id = $1",
+          [distId],
+        );
+        const distName = distNameRes.rows[0]?.name || "經銷商";
 
-                const dsNameRes = await client.query('SELECT name FROM dist_sales WHERE id = $1', [sId]);
-                const dsName = dsNameRes.rows[0]?.name || '經銷業務';
+        const dsNameRes = await client.query(
+          "SELECT name FROM dist_sales WHERE id = $1",
+          [sId],
+        );
+        const dsName = dsNameRes.rows[0]?.name || "經銷業務";
 
-                await client.query(`
+        await client.query(
+          `
             INSERT INTO wallets (role, name, balance) VALUES ('Distributor', $1, $2) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-          `, [distName, distAmt]);
+          `,
+          [distName, distAmt],
+        );
 
-                await client.query(`
+        await client.query(
+          `
             INSERT INTO wallets (role, name, balance) VALUES ('SuperAdmin', '超級管理員', $1) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-          `, [saAmt]);
+          `,
+          [saAmt],
+        );
 
-                await client.query(`
+        await client.query(
+          `
             INSERT INTO wallets (role, name, balance) VALUES ('DistributorSales', $1, $2) 
             ON CONFLICT (name) DO UPDATE SET balance = wallets.balance + EXCLUDED.balance
-          `, [dsName, dsAmt]);
+          `,
+          [dsName, dsAmt],
+        );
 
-                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                  [templeName, `${typeLabel}經銷提成`, distAmt, 65, distName]);
-                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                  [templeName, `${typeLabel}總部提成`, saAmt, 20, '超級管理員']);
-                await client.query('INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)', 
-                  [templeName, `${typeLabel}經銷業務提成`, dsAmt, 15, dsName]);
-              }
-            }
+        await client.query(
+          "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+          [templeName, `${typeLabel}經銷提成`, distAmt, 65, distName],
+        );
+        await client.query(
+          "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+          [templeName, `${typeLabel}總部提成`, saAmt, 20, "超級管理員"],
+        );
+        await client.query(
+          "INSERT INTO payout_records (temple_name, type, amount, percentage, role_name) VALUES ($1, $2, $3, $4, $5)",
+          [templeName, `${typeLabel}經銷業務提成`, dsAmt, 15, dsName],
+        );
+      }
+    }
 
-    revalidatePath('/super-admin');
-    revalidatePath('/distributor');
-    revalidatePath('/dist-sales');
-    revalidatePath('/super-sales');
+    revalidatePath("/super-admin");
+    revalidatePath("/distributor");
+    revalidatePath("/dist-sales");
+    revalidatePath("/super-sales");
     return { success: true };
   });
 }
 
-export async function fetchSyncQueue() { return [...[]]; }
+export async function fetchSyncQueue() {
+  return [...[]];
+}
 
 export async function fetchFreeApplications(distId?: string) {
   try {
     let list = await prisma.temple.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
     if (distId) {
-       const allSales2 = await prisma.distributorSales.findMany();
-       list = list.filter((t: any) => {
-          if (t.distributorId !== distId) return false;
-          const sales = allSales2.find(s => s.id === t.salesId);
-          if (sales && sales.role === 'SuperSales') return false;
-          return true;
-       });
+      const allSales2 = await prisma.distributorSales.findMany();
+      list = list.filter((t: any) => {
+        if (t.distributorId !== distId) return false;
+        const sales = allSales2.find((s) => s.id === t.salesId);
+        if (sales && sales.role === "SuperSales") return false;
+        return true;
+      });
     }
     const sysConfig = await prisma.systemConfig.findFirst();
     const discountRate = sysConfig?.yearlyDiscountRate ?? 20;
 
     const templeIds = list.map((t: any) => t.id);
     const bills = await prisma.templeBill.findMany({
-       where: { templeId: { in: templeIds } },
-       orderBy: { createdAt: 'desc' }
+      where: { templeId: { in: templeIds } },
+      orderBy: { createdAt: "desc" },
     });
 
     return list.map((t: any) => {
-       const lastBill = bills.find((b: any) => b.templeId === t.id);
-       const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t, lastBill);
-       return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
+      const lastBill = bills.find((b: any) => b.templeId === t.id);
+      const { paymentStatusLabel, contractEndDate, trialDaysRemaining } =
+        enrichTempleWithFinancialStatus(t, lastBill);
+      return {
+        ...t,
+        paymentStatusLabel,
+        contractEndDate,
+        trialDaysRemaining,
+        appliedDiscountRate: discountRate,
+      };
     });
   } catch (e) {
-    console.error('fetchFreeApplications error', e);
+    console.error("fetchFreeApplications error", e);
     return [];
   }
 }
 
 export async function fetchSystemConfig() {
   try {
-    const config = await prisma.systemConfig.findUnique({ where: { key: 'global' } });
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: "global" },
+    });
     if (config && config.value) {
       return config.value as any;
     }
     const defaultConfig = {
       fixedMonthlyRent: 3600,
       yearlyDiscountRate: 20,
-      defaultSuperSalesRates: { distributorAuthRate: 15, templeSetupRate: 10, templeSetupType: 'percent', templeRentRates: [15, 12, 10] },
+      defaultSuperSalesRates: {
+        distributorAuthRate: 15,
+        templeSetupRate: 10,
+        templeSetupType: "percent",
+        templeRentRates: [15, 12, 10],
+      },
       distributorPlans: [
-        { id: 'PLAN-A', name: '基礎體驗版', price: 1600000, durationYears: 2, nodes: 100, color: 'indigo' },
-        { id: 'PLAN-B', name: '標準專業版', price: 3200000, durationYears: 4, nodes: 250, color: 'emerald' },
-        { id: 'PLAN-C', name: '企業無限制', price: 8000000, durationYears: 10, nodes: 1000, color: 'slate' }
+        {
+          id: "PLAN-A",
+          name: "基礎體驗版",
+          price: 1600000,
+          durationYears: 2,
+          nodes: 100,
+          color: "indigo",
+        },
+        {
+          id: "PLAN-B",
+          name: "標準專業版",
+          price: 3200000,
+          durationYears: 4,
+          nodes: 250,
+          color: "emerald",
+        },
+        {
+          id: "PLAN-C",
+          name: "企業無限制",
+          price: 8000000,
+          durationYears: 10,
+          nodes: 1000,
+          color: "slate",
+        },
       ],
       b2bPayment: {
-        thirdParty: { enabled: true, merchantId: 'HQ_MERCHANT_999', hashKey: 'HQ_HASH_KEY', hashIV: 'HQ_HASH_IV' },
-        linePay: { enabled: false, channelId: '', channelSecret: '' },
-        customTransfer: { enabled: true, bankCode: '808', accountName: '天樞科技股份有限公司', accountNo: '808-1234-5678-901' },
-        serviceMapping: { 'new-temple': ['customTransfer'], 'monthly-rent': ['thirdParty', 'customTransfer'], 'distributor-auth': ['customTransfer'] }
-      }
+        thirdParty: {
+          enabled: true,
+          merchantId: "HQ_MERCHANT_999",
+          hashKey: "HQ_HASH_KEY",
+          hashIV: "HQ_HASH_IV",
+        },
+        linePay: { enabled: false, channelId: "", channelSecret: "" },
+        customTransfer: {
+          enabled: true,
+          bankCode: "808",
+          accountName: "天樞科技股份有限公司",
+          accountNo: "808-1234-5678-901",
+        },
+        serviceMapping: {
+          "new-temple": ["customTransfer"],
+          "monthly-rent": ["thirdParty", "customTransfer"],
+          "distributor-auth": ["customTransfer"],
+        },
+      },
     };
     await prisma.systemConfig.upsert({
-      where: { key: 'global' },
+      where: { key: "global" },
       update: { value: defaultConfig },
-      create: { key: 'global', value: defaultConfig }
+      create: { key: "global", value: defaultConfig },
     });
     return defaultConfig as any;
   } catch (error) {
-    console.error('fetchSystemConfig error:', error);
+    console.error("fetchSystemConfig error:", error);
     return {};
   }
 }
@@ -2928,114 +3620,130 @@ export async function updateSystemConfig(data: any) {
     const currentConfig = await fetchSystemConfig();
     const newConfig = { ...currentConfig, ...data };
     await prisma.systemConfig.upsert({
-      where: { key: 'global' },
+      where: { key: "global" },
       update: { value: newConfig },
-      create: { key: 'global', value: newConfig }
+      create: { key: "global", value: newConfig },
     });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
-    revalidatePath('/super-sales');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    revalidatePath("/super-sales");
     return { success: true };
   } catch (error) {
-    console.error('updateSystemConfig error:', error);
+    console.error("updateSystemConfig error:", error);
     return { success: false, error: String(error) };
   }
 }
 
 export async function fetchDistributorTeam(distributorId: string) {
   let pgSales: any[] = [];
-  const rows = await prisma.distributorSales.findMany({ where: { distributorId } });
+  const rows = await prisma.distributorSales.findMany({
+    where: { distributorId },
+  });
   if (rows) {
     pgSales = rows;
   }
 
-  const memSales = [].filter(s => s.distributorId === distributorId);
+  const memSales = [].filter((s) => s.distributorId === distributorId);
   const salesMap = new Map();
-  memSales.forEach(s => salesMap.set(s.id, s));
-  pgSales.forEach(s => salesMap.set(s.id, { ...s, distributorId: s.distributorId, joinedAt: s.joinedAt }));
+  memSales.forEach((s) => salesMap.set(s.id, s));
+  pgSales.forEach((s) =>
+    salesMap.set(s.id, {
+      ...s,
+      distributorId: s.distributorId,
+      joinedAt: s.joinedAt,
+    }),
+  );
 
   return Array.from(salesMap.values());
 }
 export async function fetchDistributorTemples(distributorId: string) {
+  try {
+    const distSales = await prisma.distributorSales.findMany({
+      where: { distributorId, role: { not: "SuperSales" } },
+    });
+    const salesIds = distSales.map((s: any) => s.id);
 
-      try {
-        const distSales = await prisma.distributorSales.findMany({
-          where: { distributorId, role: { not: 'SuperSales' } }
-        });
-        const salesIds = distSales.map((s: any) => s.id);
-        
-        const temples = await prisma.temple.findMany({
-          where: {
-            OR: [
-              { distributorId },
-              { salesId: { in: salesIds } }
-            ]
-          }
-        }) as any;
-        
-        temples.forEach((t: any) => {
-          if (t.salesId) {
-             t.sales = distSales.find((s: any) => s.id === t.salesId) || null;
-          }
-        });
-        
-        const sysConfig = await prisma.systemConfig.findFirst();
-        const discountRate = sysConfig?.yearlyDiscountRate || 20;
-        
-        return temples.map((t: any) => {
-           const { paymentStatusLabel, contractEndDate, trialDaysRemaining } = enrichTempleWithFinancialStatus(t);
-           return { ...t, paymentStatusLabel, contractEndDate, trialDaysRemaining, appliedDiscountRate: discountRate };
-        });
-      } catch(e) {
-        console.error(e);
-        return [];
+    const temples = (await prisma.temple.findMany({
+      where: {
+        OR: [{ distributorId }, { salesId: { in: salesIds } }],
+      },
+    })) as any;
+
+    temples.forEach((t: any) => {
+      if (t.salesId) {
+        t.sales = distSales.find((s: any) => s.id === t.salesId) || null;
       }
+    });
+
+    const sysConfig = await prisma.systemConfig.findFirst();
+    const discountRate = sysConfig?.yearlyDiscountRate || 20;
+
+    return temples.map((t: any) => {
+      const { paymentStatusLabel, contractEndDate, trialDaysRemaining } =
+        enrichTempleWithFinancialStatus(t);
+      return {
+        ...t,
+        paymentStatusLabel,
+        contractEndDate,
+        trialDaysRemaining,
+        appliedDiscountRate: discountRate,
+      };
+    });
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function fetchDistributorVisits(distributorId: string) {
   try {
-    const resSales = await prisma.distributorSales.findMany({ select: { name: true }, where: { distributorId } });
+    const resSales = await prisma.distributorSales.findMany({
+      select: { name: true },
+      where: { distributorId },
+    });
     if (!resSales || resSales.length === 0) return [];
-    
+
     const teamNames = resSales.map((r: any) => r.name);
     const visits = await prisma.salesVisit.findMany({
       where: {
-        salesName: { in: teamNames }
+        salesName: { in: teamNames },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
     return visits;
-  } catch(e) {
+  } catch (e) {
     console.error(e);
     return [];
   }
 }
 export async function fetchDistributorFinanceSummary(distributorId: string) {
   try {
-    const distSalesIdsForFinance = (await prisma.distributorSales.findMany({
-      where: { distributorId: distributorId, role: { not: 'SuperSales' } },
-      select: { id: true }
-    })).map((s: any) => s.id);
+    const distSalesIdsForFinance = (
+      await prisma.distributorSales.findMany({
+        where: { distributorId: distributorId, role: { not: "SuperSales" } },
+        select: { id: true },
+      })
+    ).map((s: any) => s.id);
 
     const myTemples = await prisma.temple.findMany({
       where: {
-        status: 'Active',
+        status: "Active",
         OR: [
           { distributorId: distributorId },
-          { salesId: { in: distSalesIdsForFinance } }
-        ]
-      }
+          { salesId: { in: distSalesIdsForFinance } },
+        ],
+      },
     });
-    
+
     let totalRevenue = 0;
     let totalCommissionPayout = 0;
-    
+
     const now = new Date();
     const templeIds = myTemples.map((t: any) => t.id);
 
     let bills: any[] = [];
     if (templeIds.length > 0) {
       bills = await prisma.templeBill.findMany({
-        where: { templeId: { in: templeIds } }
+        where: { templeId: { in: templeIds } },
       });
     }
 
@@ -3045,76 +3753,98 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
       const diffTime = Math.abs(now.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 30) {
-         totalRevenue += (t.monthlyRent || 0);
+        totalRevenue += t.monthlyRent || 0;
       }
     }
-    
+
     return {
       totalRevenue,
       totalCommissionPayout,
-      activeTemples: myTemples.length
+      activeTemples: myTemples.length,
     };
   } catch (e) {
-    console.error('fetchDistributorFinanceSummary error:', e);
+    console.error("fetchDistributorFinanceSummary error:", e);
     return { totalRevenue: 0, totalCommissionPayout: 0, activeTemples: 0 };
   }
 }
 
 export async function approveTempleByDistributor(id: string) {
   const t = await prisma.temple.findUnique({ where: { id } });
-  if (t && (t.status === 'PendingDistributor' || t.status === 'Pending')) {
+  if (t && (t.status === "PendingDistributor" || t.status === "Pending")) {
     await prisma.temple.update({
       where: { id },
-      data: { status: 'Active' }
+      data: { status: "Active" },
     });
     await generateInitialBills(t);
 
     if (t.account && t.password) {
       try {
-        const existingUser = await prisma.user.findFirst({ where: { account: t.account } });
+        const existingUser = await prisma.user.findFirst({
+          where: { account: t.account },
+        });
         if (!existingUser) {
-          const newPersonId = 'user_' + Date.now();
+          const newPersonId = "user_" + Date.now();
           await prisma.user.create({
             data: {
               id: newPersonId,
               templeId: id,
-              name: t.templeName || '宮廟管理員',
+              name: t.templeName || "宮廟管理員",
               account: t.account,
               password: t.password,
-              role: 'TempleAdmin',
-              status: 'Active'
-            }
+              role: "TempleAdmin",
+              status: "Active",
+            },
           });
         }
       } catch (e) {
-        console.error('Failed to insert User into postgres during distributor approval:', e);
+        console.error(
+          "Failed to insert User into postgres during distributor approval:",
+          e,
+        );
       }
     }
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/distributor');
-    revalidatePath('/dist-sales');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/distributor");
+    revalidatePath("/dist-sales");
   }
   return { success: true };
 }
-export async function rejectTempleByDistributor(templeId: string) { 
+export async function rejectTempleByDistributor(templeId: string) {
   await null;
-  revalidatePath('/distributor');
-  revalidatePath('/dist-sales');
-  return { success: true }; 
+  revalidatePath("/distributor");
+  revalidatePath("/dist-sales");
+  return { success: true };
 }
 export type Organization = any;
 export async function fetchOrganizations() {
   try {
     const temples = await prisma.temple.findMany({
-      select: { id: true, templeName: true, name: true, status: true, planId: true }
+      select: {
+        id: true,
+        templeName: true,
+        name: true,
+        status: true,
+        planId: true,
+      },
     });
     const dists = await prisma.distributor.findMany({
-      select: { id: true, name: true, status: true }
+      select: { id: true, name: true, status: true },
     });
-    
+
     const orgs = [
-      ...temples.map(t => ({ id: t.id, name: t.templeName || t.name, type: 'Temple', status: t.status, planInfo: t.planId })),
-      ...dists.map(d => ({ id: d.id, name: d.name, type: 'DistributorOffice', status: d.status }))
+      ...temples.map((t) => ({
+        id: t.id,
+        name: t.templeName || t.name,
+        type: "Temple",
+        status: t.status,
+        planInfo: t.planId,
+      })),
+      ...dists.map((d) => ({
+        id: d.id,
+        name: d.name,
+        type: "DistributorOffice",
+        status: d.status,
+      })),
     ];
     return orgs;
   } catch (e) {
@@ -3131,7 +3861,7 @@ export async function updateAnalyticsSettings(settings: any) {
     if (!templeId) return { success: false };
     await prisma.temple.update({
       where: { id: templeId },
-      data: { analyticsData: settings }
+      data: { analyticsData: settings },
     });
     return { success: true };
   } catch (e) {
@@ -3152,25 +3882,43 @@ export async function fetchAnalyticsSettings() {
     return {};
   }
 }
-export async function fetchComplexAnalyticsData() { 
+export async function fetchComplexAnalyticsData() {
   const templeId = await getDynamicTempleId();
 
-  if (!templeId) return {
-    revenueTrends: [], ageDemographics: [], queueStats: { avgWaitTime: '0', totalTickets: '0', completionRate: '0' },
-    overview: { totalRevenue: 0, totalGuests: 0, conversionRate: 0, avgProcessingTime: 0 },
-    genderDemographics: { newGuest: 0, returning: 0, hasData: false }, serviceHeat: []
-  };
+  if (!templeId)
+    return {
+      revenueTrends: [],
+      ageDemographics: [],
+      queueStats: { avgWaitTime: "0", totalTickets: "0", completionRate: "0" },
+      overview: {
+        totalRevenue: 0,
+        totalGuests: 0,
+        conversionRate: 0,
+        avgProcessingTime: 0,
+      },
+      genderDemographics: { newGuest: 0, returning: 0, hasData: false },
+      serviceHeat: [],
+    };
 
-  const [apps, lamps, events, queues, deeps, guests, queueEvents, lampCats] = await Promise.all([
-    prisma.appointment.findMany({ where: { templeId } }),
-    prisma.lampRecord.findMany({ where: { templeId } }),
-    prisma.eventRegistration.findMany({ where: { templeId } }),
-    prisma.queueTicket.findMany({ where: { templeId } }),
-    prisma.deepRecord.findMany({ where: { templeId, OR: [{ id: { startsWith: 'MERIT-' } }, { category: { contains: '功德' } }] } }),
-    prisma.guest.findMany({ where: { templeId } }),
-    prisma.queueEvent.findMany({ where: { templeId } }),
-    prisma.lampCategory.findMany({ where: { templeId } })
-  ]);
+  const [apps, lamps, events, queues, deeps, guests, queueEvents, lampCats] =
+    await Promise.all([
+      prisma.appointment.findMany({ where: { templeId } }),
+      prisma.lampRecord.findMany({ where: { templeId } }),
+      prisma.eventRegistration.findMany({ where: { templeId } }),
+      prisma.queueTicket.findMany({ where: { templeId } }),
+      prisma.deepRecord.findMany({
+        where: {
+          templeId,
+          OR: [
+            { id: { startsWith: "MERIT-" } },
+            { category: { contains: "功德" } },
+          ],
+        },
+      }),
+      prisma.guest.findMany({ where: { templeId } }),
+      prisma.queueEvent.findMany({ where: { templeId } }),
+      prisma.lampCategory.findMany({ where: { templeId } }),
+    ]);
 
   // 1. Revenue Trends (Group by month for the past 6 months)
   const now = new Date();
@@ -3181,110 +3929,138 @@ export async function fetchComplexAnalyticsData() {
       year: d.getFullYear(),
       month: d.getMonth() + 1,
       label: `${d.getMonth() + 1}月`,
-      amount: 0
+      amount: 0,
     });
   }
 
   const addRevenue = (dateStr: string | undefined | Date, amount: number) => {
     if (!dateStr || amount <= 0) return;
-    
+
     const d = new Date(dateStr as any);
     if (isNaN(d.getTime())) return;
-    
+
     const y = d.getFullYear();
     const m = d.getMonth() + 1;
-    
-    const monthObj = months.find(x => x.year === y && x.month === m);
+
+    const monthObj = months.find((x) => x.year === y && x.month === m);
     if (monthObj) {
       monthObj.amount += amount;
     }
   };
 
   apps.forEach((a: any) => {
-    if (a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid' && a.status !== 'Cancelled') {
+    if (
+      a.paymentStatus !== "Pending" &&
+      a.paymentStatus !== "Unpaid" &&
+      a.status !== "Cancelled"
+    ) {
       addRevenue(a.date || a.createdAt || a.timestamp, Number(a.amount) || 0);
     }
   });
 
   lamps.forEach((r: any) => {
-    if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
+    if (r.paymentStatus !== "Pending" && r.paymentStatus !== "Unpaid") {
       let price = r.actualPrice || r.price || 0;
       if (!price && r.categoryId) {
-         const cat = lampCats.find((c: any) => c.id === r.categoryId);
-         if (cat) price = cat.price;
+        const cat = lampCats.find((c: any) => c.id === r.categoryId);
+        if (cat) price = cat.price;
       }
       addRevenue(r.createdAt || r.date || r.timestamp, Number(price) || 0);
     }
   });
 
   events.forEach((r: any) => {
-    if (r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid') {
-      addRevenue(r.createdAt || r.timestamp || r.date, Number(r.actualPrice || r.price) || 0);
+    if (r.paymentStatus !== "Pending" && r.paymentStatus !== "Unpaid") {
+      addRevenue(
+        r.createdAt || r.timestamp || r.date,
+        Number(r.actualPrice || r.price) || 0,
+      );
     }
   });
 
   queues.forEach((t: any) => {
-    if (t.paymentStatus === 'Paid' || t.status === 'Paid') {
+    if (t.paymentStatus === "Paid" || t.status === "Paid") {
       let price = t.price || 0;
       if (!price && t.eventId) {
-         const qe = queueEvents.find((e: any) => e.id === t.eventId);
-         if (qe) price = qe.price || 0;
+        const qe = queueEvents.find((e: any) => e.id === t.eventId);
+        if (qe) price = qe.price || 0;
       }
-      addRevenue(t.paymentUpdatedAt || t.scannedAt || t.createdAt, Number(price) || 0);
+      addRevenue(
+        t.paymentUpdatedAt || t.scannedAt || t.createdAt,
+        Number(price) || 0,
+      );
     }
   });
 
   deeps.forEach((r: any) => {
-    let paymentStatus = (r as any).paymentStatus || 'Paid';
-    if ((r.id.startsWith('MERIT-') || (r.category && r.category.includes('功德'))) && (paymentStatus !== 'Pending' && paymentStatus !== 'Unpaid')) {
+    let paymentStatus = (r as any).paymentStatus || "Paid";
+    if (
+      (r.id.startsWith("MERIT-") ||
+        (r.category && r.category.includes("功德"))) &&
+      paymentStatus !== "Pending" &&
+      paymentStatus !== "Unpaid"
+    ) {
       let amt = 0;
-      const vals = typeof r.content === 'string' ? JSON.parse(r.content || '{}') : (r.content || {});
-      if (vals && vals['金額']) {
-        amt = Number(String(vals['金額']).replace(/[^0-9]/g, ''));
+      const vals =
+        typeof r.content === "string"
+          ? JSON.parse(r.content || "{}")
+          : r.content || {};
+      if (vals && vals["金額"]) {
+        amt = Number(String(vals["金額"]).replace(/[^0-9]/g, ""));
       }
-      addRevenue((r as any).paymentUpdatedAt || r.createdAt || (r as any).date, amt);
+      addRevenue(
+        (r as any).paymentUpdatedAt || r.createdAt || (r as any).date,
+        amt,
+      );
     }
   });
 
   // 2. Age Demographics
   let ageGroups: Record<string, number> = {
-    '20歲以下': 0, '20-30歲': 0, '31-40歲': 0, '41-50歲': 0, '51-60歲': 0, '60歲以上': 0, '未提供': 0
+    "20歲以下": 0,
+    "20-30歲": 0,
+    "31-40歲": 0,
+    "41-50歲": 0,
+    "51-60歲": 0,
+    "60歲以上": 0,
+    未提供: 0,
   };
-  
+
   let totalGuests = 0;
 
   guests.forEach((g: any) => {
     totalGuests++;
     if (!g.birthday) {
-      ageGroups['未提供']++;
+      ageGroups["未提供"]++;
       return;
     }
-    
+
     const birthDate = new Date(g.birthday);
     if (isNaN(birthDate.getTime())) {
-      ageGroups['未提供']++;
+      ageGroups["未提供"]++;
       return;
     }
-    
+
     let age = now.getFullYear() - birthDate.getFullYear();
     const mm = now.getMonth() - birthDate.getMonth();
     if (mm < 0 || (mm === 0 && now.getDate() < birthDate.getDate())) {
-        age--;
+      age--;
     }
 
-    if (age < 20) ageGroups['20歲以下']++;
-    else if (age <= 30) ageGroups['20-30歲']++;
-    else if (age <= 40) ageGroups['31-40歲']++;
-    else if (age <= 50) ageGroups['41-50歲']++;
-    else if (age <= 60) ageGroups['51-60歲']++;
-    else ageGroups['60歲以上']++;
+    if (age < 20) ageGroups["20歲以下"]++;
+    else if (age <= 30) ageGroups["20-30歲"]++;
+    else if (age <= 40) ageGroups["31-40歲"]++;
+    else if (age <= 50) ageGroups["41-50歲"]++;
+    else if (age <= 60) ageGroups["51-60歲"]++;
+    else ageGroups["60歲以上"]++;
   });
 
   const ageDemographics = Object.entries(ageGroups)
-    .filter(([k, v]) => v > 0 || k !== '未提供')
+    .filter(([k, v]) => v > 0 || k !== "未提供")
     .map(([range, count]) => ({
       range,
-      percentage: totalGuests === 0 ? 0 : Math.round((count / totalGuests) * 100)
+      percentage:
+        totalGuests === 0 ? 0 : Math.round((count / totalGuests) * 100),
     }));
 
   // 3. Queue Stats
@@ -3292,49 +4068,56 @@ export async function fetchComplexAnalyticsData() {
 
   let totalTickets = 0;
   let completedTickets = 0;
-  
+
   queues.forEach((t: any) => {
     if (validEventIds.length > 0 && !validEventIds.includes(t.eventId)) return;
     totalTickets++;
-    if (t.status === 'Completed') completedTickets++;
+    if (t.status === "Completed") completedTickets++;
   });
 
-  const completionRate = totalTickets === 0 ? 0 : Math.round((completedTickets / totalTickets) * 100);
+  const completionRate =
+    totalTickets === 0
+      ? 0
+      : Math.round((completedTickets / totalTickets) * 100);
 
   // A. Overview
   let totalRevenue = 0;
   if (months.length > 0) {
-    totalRevenue = months[months.length - 1].amount; 
+    totalRevenue = months[months.length - 1].amount;
   }
-  
+
   // Calculate Conversion Rate
   let totalOrders = 0;
   let paidOrders = 0;
   const allOrders = [...apps, ...lamps, ...events, ...queues];
   allOrders.forEach((a: any) => {
     totalOrders++;
-    if (a.paymentStatus === 'Paid' || a.status === 'Paid') paidOrders++;
+    if (a.paymentStatus === "Paid" || a.status === "Paid") paidOrders++;
   });
-  const conversionRate = totalOrders === 0 ? 0 : Math.round((paidOrders / totalOrders) * 100);
+  const conversionRate =
+    totalOrders === 0 ? 0 : Math.round((paidOrders / totalOrders) * 100);
 
   // B. Guest Demographics (New vs Returning)
   let newGuestCount = 0;
   let returningGuestCount = 0;
-  
+
   const guestApptCounts: Record<string, number> = {};
   allOrders.forEach((a: any) => {
     if (a.phone) {
       guestApptCounts[a.phone] = (guestApptCounts[a.phone] || 0) + 1;
     }
   });
-  
+
   Object.values(guestApptCounts).forEach((count) => {
     if (count > 1) returningGuestCount++;
     else newGuestCount++;
   });
-  
+
   const totalGuestTypes = newGuestCount + returningGuestCount;
-  const newPercentage = totalGuestTypes === 0 ? 40 : Math.round((newGuestCount / totalGuestTypes) * 100);
+  const newPercentage =
+    totalGuestTypes === 0
+      ? 40
+      : Math.round((newGuestCount / totalGuestTypes) * 100);
   const returningPercentage = totalGuestTypes === 0 ? 60 : 100 - newPercentage;
 
   // C. Service Heat
@@ -3346,96 +4129,125 @@ export async function fetchComplexAnalyticsData() {
       totalServices++;
     }
   });
-  
+
   const sortedServices = Object.entries(serviceCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
     .map(([label, count], index) => {
-       const colors = ['bg-slate-900', 'bg-amber-500', 'bg-slate-300', 'bg-slate-200'];
-       return {
-         label,
-         val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100),
-         color: colors[index % colors.length]
-       };
+      const colors = [
+        "bg-slate-900",
+        "bg-amber-500",
+        "bg-slate-300",
+        "bg-slate-200",
+      ];
+      return {
+        label,
+        val:
+          totalServices === 0 ? 0 : Math.round((count / totalServices) * 100),
+        color: colors[index % colors.length],
+      };
     });
 
   if (sortedServices.length === 0) {
-     sortedServices.push({ label: '暫無資料', val: 0, color: 'bg-slate-200' });
+    sortedServices.push({ label: "暫無資料", val: 0, color: "bg-slate-200" });
   }
 
   return {
-    revenueTrends: months.map(m => ({ month: m.label, amount: m.amount })),
-    ageDemographics: ageDemographics.length > 0 ? ageDemographics : [{ range: '無資料', percentage: 100 }],
+    revenueTrends: months.map((m) => ({ month: m.label, amount: m.amount })),
+    ageDemographics:
+      ageDemographics.length > 0
+        ? ageDemographics
+        : [{ range: "無資料", percentage: 100 }],
     queueStats: {
-      avgWaitTime: totalTickets > 0 ? '12' : '0',
+      avgWaitTime: totalTickets > 0 ? "12" : "0",
       totalTickets: totalTickets.toString(),
-      completionRate: completionRate.toString()
+      completionRate: completionRate.toString(),
     },
     overview: {
       totalRevenue: totalRevenue,
       totalGuests: totalGuests,
       conversionRate: conversionRate,
-      avgProcessingTime: totalTickets > 0 ? 12 : 0
+      avgProcessingTime: totalTickets > 0 ? 12 : 0,
     },
     genderDemographics: {
       newGuest: newPercentage,
       returning: returningPercentage,
-      hasData: totalGuestTypes > 0
+      hasData: totalGuestTypes > 0,
     },
-    serviceHeat: sortedServices
-  }; 
+    serviceHeat: sortedServices,
+  };
 }
 
 async function autoGenerateRecurringBills(temple: any) {
-  if (!temple || (temple as any).freeType === 'Permanent' || temple.monthlyRent === 0) return;
+  if (
+    !temple ||
+    (temple as any).freeType === "Permanent" ||
+    temple.monthlyRent === 0
+  )
+    return;
 
-  const isYearly = temple.paymentCycle === 'Yearly';
-  const rentType = isYearly ? 'YearlyFee' : 'MonthlyFee';
-  const payeeRole = temple.distributorId ? 'Distributor' : 'SuperAdmin';
-  const payeeId = temple.distributorId || 'system-hq';
-  
+  const isYearly = temple.paymentCycle === "Yearly";
+  const rentType = isYearly ? "YearlyFee" : "MonthlyFee";
+  const payeeRole = temple.distributorId ? "Distributor" : "SuperAdmin";
+  const payeeId = temple.distributorId || "system-hq";
+
   const config = await prisma.systemConfig.findFirst();
   const yearlyDiscount = config?.yearlyDiscountRate || 20;
-  
+
   const monthlyRent = temple.monthlyRent || 0;
   if (monthlyRent <= 0) return;
 
-  const rentAmount = isYearly ? (monthlyRent * 12 * (1 - yearlyDiscount / 100)) : monthlyRent;
-  const trialMonths = (temple as any).trialMonths || (temple as any).freeMonths || 0;
-  
-  const createdDate = new Date(temple.billingStartDate || temple.createdAt || temple.timestamp || Date.now());
+  const rentAmount = isYearly
+    ? monthlyRent * 12 * (1 - yearlyDiscount / 100)
+    : monthlyRent;
+  const trialMonths =
+    (temple as any).trialMonths || (temple as any).freeMonths || 0;
+
+  const createdDate = new Date(
+    temple.billingStartDate ||
+      temple.createdAt ||
+      temple.timestamp ||
+      Date.now(),
+  );
   const startDate = new Date(createdDate);
   startDate.setMonth(startDate.getMonth() + trialMonths);
-  
+
   const now = new Date();
-  if (now < startDate) return; 
+  if (now < startDate) return;
 
   const existingBills = await prisma.templeBill.findMany({
-    where: { templeId: temple.id, itemName: rentType }
+    where: { templeId: temple.id, itemName: rentType },
   });
 
   const generateBills = [];
   let cycleDate = new Date(startDate);
-  
+
   while (cycleDate <= now) {
     const billingStr = cycleDate.toISOString().substring(0, 7);
-    
+
     const hasBill = existingBills.some((b: any) => {
-       const bStr = (b.billingDate || (b.createdAt instanceof Date ? b.createdAt.toISOString() : '')).substring(0, 7);
-       return bStr === billingStr || b.id.includes(billingStr) || (b.dueDate && b.dueDate.startsWith(billingStr));
+      const bStr = (
+        b.billingDate ||
+        (b.createdAt instanceof Date ? b.createdAt.toISOString() : "")
+      ).substring(0, 7);
+      return (
+        bStr === billingStr ||
+        b.id.includes(billingStr) ||
+        (b.dueDate && b.dueDate.startsWith(billingStr))
+      );
     });
 
     if (!hasBill) {
       generateBills.push({
-        id: `BILL-RENT-${temple.id.substring(0,4)}-${billingStr}`,
+        id: `BILL-RENT-${temple.id.substring(0, 4)}-${billingStr}`,
         templeId: temple.id,
         itemName: rentType,
         amount: rentAmount,
-        dueDate: cycleDate.toISOString().split('T')[0],
-        status: 'Unpaid',
+        dueDate: cycleDate.toISOString().split("T")[0],
+        status: "Unpaid",
         payeeRole,
         payeeId,
-        billingDate: billingStr
+        billingDate: billingStr,
       });
     }
 
@@ -3447,36 +4259,42 @@ async function autoGenerateRecurringBills(temple: any) {
   }
 
   for (const newBill of generateBills) {
-    await prisma.templeBill.create({ data: newBill }).catch(e => console.error('Failed to auto gen bill', e));
+    await prisma.templeBill
+      .create({ data: newBill })
+      .catch((e) => console.error("Failed to auto gen bill", e));
   }
 }
 
 export async function fetchFinancialOverview() {
   const templeId = await getDynamicTempleId();
-  
+
   const revenue: RevenueEntry[] = [];
   let totalRevenue = 0;
 
   const temple = await prisma.temple.findUnique({ where: { id: templeId } });
   let trialDaysRemaining: number | undefined = undefined;
   let isPermanentFree = false;
-  
+
   if (temple) {
-    if ((temple as any).freeType === 'Permanent' || temple.monthlyRent === 0) {
+    if ((temple as any).freeType === "Permanent" || temple.monthlyRent === 0) {
       isPermanentFree = true;
     } else {
       const trialMonths = temple.trialMonths || temple.freeMonths || 0;
       if (trialMonths > 0) {
-        const createdDate = new Date(temple.timestamp || temple.created_at || Date.now());
+        const createdDate = new Date(
+          temple.timestamp || temple.created_at || Date.now(),
+        );
         const endFreeDate = new Date(createdDate);
-        endFreeDate.setDate(endFreeDate.getDate() + (trialMonths * 30));
+        endFreeDate.setDate(endFreeDate.getDate() + trialMonths * 30);
         const now = new Date();
         if (now < endFreeDate) {
-          trialDaysRemaining = Math.ceil((endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          trialDaysRemaining = Math.ceil(
+            (endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          );
         }
       }
     }
-    
+
     // Auto Generate Recurring Bills for existing temples
     if (!isPermanentFree && trialDaysRemaining === undefined) {
       await autoGenerateRecurringBills(temple);
@@ -3486,214 +4304,315 @@ export async function fetchFinancialOverview() {
 
   let usedPgForRevenue = false;
   try {
-      usedPgForRevenue = true;
+    usedPgForRevenue = true;
 
-      const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
-        prisma.appointment.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
-        prisma.lampRecord.findMany({ where: { templeId, actualPrice: { gt: 0 }, paymentStatus: { notIn: ['Pending', 'Unpaid'] } } }),
-        prisma.eventRegistration.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } }, include: { event: true } }),
-        prisma.queueTicket.findMany({ where: { templeId, paymentStatus: { notIn: ['Pending', 'Unpaid'] } }, include: { queueEvent: true } }),
-        prisma.deepRecord.findMany({ where: { templeId, OR: [{ id: { startsWith: 'MERIT-' } }, { category: { contains: '功德' } }] } })
-      ]);
-      
-      if (appRes) {
-        appRes.forEach((a: any) => {
-          revenue.push({
-            id: a.id,
-            title: a.service,
-            source: 'Appointment',
-            amount: Number(a.amount) || 0,
-            timestamp: a.paymentUpdatedAt || a.createdAt || (a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date)),
-            guestName: a.guestName || a.phone,
-            paymentMethod: a.paymentMethod || '現金/臨櫃',
-            status: a.paymentStatus || 'Paid',
-            paymentRef: a.paymentRef,
-            paymentProofUrl: a.paymentProofUrl,
-            remarks: a.remarks
-          });
-          totalRevenue += (Number(a.amount) || 0);
+    const [appRes, lampRes, evRes, qtRes, deepRes] = await Promise.all([
+      prisma.appointment.findMany({
+        where: { templeId, paymentStatus: { notIn: ["Pending", "Unpaid"] } },
+      }),
+      prisma.lampRecord.findMany({
+        where: {
+          templeId,
+          actualPrice: { gt: 0 },
+          paymentStatus: { notIn: ["Pending", "Unpaid"] },
+        },
+      }),
+      prisma.eventRegistration.findMany({
+        where: { templeId, paymentStatus: { notIn: ["Pending", "Unpaid"] } },
+        include: { event: true },
+      }),
+      prisma.queueTicket.findMany({
+        where: { templeId, paymentStatus: { notIn: ["Pending", "Unpaid"] } },
+        include: { queueEvent: true },
+      }),
+      prisma.deepRecord.findMany({
+        where: {
+          templeId,
+          OR: [
+            { id: { startsWith: "MERIT-" } },
+            { category: { contains: "功德" } },
+          ],
+        },
+      }),
+    ]);
+
+    if (appRes) {
+      appRes.forEach((a: any) => {
+        revenue.push({
+          id: a.id,
+          title: a.service,
+          source: "Appointment",
+          amount: Number(a.amount) || 0,
+          timestamp:
+            a.paymentUpdatedAt ||
+            a.createdAt ||
+            (a.date instanceof Date
+              ? a.date.toISOString().split("T")[0]
+              : String(a.date)),
+          guestName: a.guestName || a.phone,
+          paymentMethod: a.paymentMethod || "現金/臨櫃",
+          status: a.paymentStatus || "Paid",
+          paymentRef: a.paymentRef,
+          paymentProofUrl: a.paymentProofUrl,
+          remarks: a.remarks,
         });
-      }
-      if (lampRes) {
-        lampRes.forEach((r: any) => {
-          revenue.push({
-            id: r.id,
-            title: r.categoryName,
-            source: 'Lamp',
-            amount: Number(r.actualPrice) || 0,
-            timestamp: r.paymentUpdatedAt || (r.createdAt instanceof Date ? r.createdAt.toISOString().split('T')[0] : String(r.createdAt)),
-            guestName: r.guestName || r.phone,
-            paymentMethod: r.paymentMethod || '現金/臨櫃',
-            status: r.paymentStatus || 'Paid',
-            paymentRef: r.paymentRef,
-            paymentProofUrl: r.paymentProofUrl,
-            remarks: r.remarks
-          });
-          totalRevenue += (Number(r.actualPrice) || 0);
-        });
-      }
-      if (evRes) {
-        evRes.forEach((r: any) => {
-          revenue.push({
-            id: r.id,
-            title: r.event?.title || '法會活動',
-            source: 'Event',
-            amount: Number(r.actualPrice) || 0,
-            timestamp: r.paymentUpdatedAt || (r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt || new Date().toISOString())),
-            guestName: r.guestName || r.phone,
-            paymentMethod: r.paymentMethod || '現金/臨櫃',
-            status: r.paymentStatus || 'Paid',
-            paymentRef: r.paymentRef,
-            paymentProofUrl: r.paymentProofUrl,
-            remarks: r.remarks
-          });
-          totalRevenue += (Number(r.actualPrice) || 0);
-        });
-      }
-      if (qtRes) {
-        qtRes.forEach((t: any) => {
-          revenue.push({
-            id: t.id,
-            title: t.queueEvent?.title || '現場排隊服務',
-            source: 'Queue',
-            amount: Number(t.queueEvent?.price || 0) || 0,
-            timestamp: t.paymentUpdatedAt ? t.paymentUpdatedAt.toISOString().split('T')[0] : (t.createdAt instanceof Date ? t.createdAt.toISOString().split('T')[0] : String(t.createdAt)),
-            guestName: t.phone || '現場信眾',
-            paymentMethod: t.paymentMethod || '現金/臨櫃',
-            status: t.paymentStatus || t.status || 'Paid',
-            paymentRef: t.paymentRef,
-            paymentProofUrl: t.paymentProofUrl,
-            remarks: t.remarks
-          });
-          totalRevenue += (Number(t.queueEvent?.price || 0) || 0);
-        });
-      }
-      if (deepRes) {
-        deepRes.forEach((r: any) => {
-          let amt = 0;
-          let pMethod = '現金/臨櫃';
-          let payer = r.phone || '信眾';
-          const vals = typeof r.content === 'string' ? JSON.parse(r.content || '{}') : (r.content || {});
-            if (vals && vals['金額']) amt = Number(String(vals['金額']).replace(/[^0-9]/g, ''));
-            if (vals && vals['支付方式']) pMethod = vals['支付方式'];
-            if (vals && vals['付款人']) payer = vals['付款人'];
-          revenue.push({
-            id: r.id,
-            title: r.category,
-            source: 'Merit',
-            amount: amt,
-            timestamp: (r as any).paymentUpdatedAt || r.createdAt || (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date)),
-            guestName: payer,
-            paymentMethod: pMethod,
-            status: (r as any).paymentStatus || 'Paid',
-            paymentRef: r.paymentRef,
-            remarks: r.remarks
-          });
-          totalRevenue += amt;
-        });
-      }
-    } catch (e) {
-      console.error("Error fetching revenue from Prisma:", e);
+        totalRevenue += Number(a.amount) || 0;
+      });
     }
-
-    if (!usedPgForRevenue) {
-    [].filter(r => r.templeId === templeId && r.price > 0 && r.paymentStatus !== 'Pending').forEach(r => {
-      revenue.push({
-        id: r.id,
-        title: r.categoryName,
-        source: 'Lamp',
-        amount: r.price,
-        timestamp: r.paymentUpdatedAt || r.createdAt || r.date,
-        guestName: r.guestName || r.phone,
-        paymentMethod: '現金/臨櫃',
-        status: r.paymentStatus || 'Paid',
-        paymentRef: r.paymentRef,
-        remarks: r.remarks
+    if (lampRes) {
+      lampRes.forEach((r: any) => {
+        revenue.push({
+          id: r.id,
+          title: r.categoryName,
+          source: "Lamp",
+          amount: Number(r.actualPrice) || 0,
+          timestamp:
+            r.paymentUpdatedAt ||
+            (r.createdAt instanceof Date
+              ? r.createdAt.toISOString().split("T")[0]
+              : String(r.createdAt)),
+          guestName: r.guestName || r.phone,
+          paymentMethod: r.paymentMethod || "現金/臨櫃",
+          status: r.paymentStatus || "Paid",
+          paymentRef: r.paymentRef,
+          paymentProofUrl: r.paymentProofUrl,
+          remarks: r.remarks,
+        });
+        totalRevenue += Number(r.actualPrice) || 0;
       });
-      totalRevenue += r.price;
-    });
-
-    const myEvents = [].filter(e => e.templeId === templeId).map(e => e.id);
-    [].filter(r => myEvents?.includes(r.eventId) && r.paymentStatus !== 'Pending' && r.paymentStatus !== 'Unpaid').forEach(r => {
-      revenue.push({
-        id: r.id,
-        title: r.title,
-        source: 'Event',
-        amount: r.actualPrice || r.price,
-        timestamp: r.paymentUpdatedAt || r.timestamp || new Date().toISOString(),
-        guestName: r.guestName || r.phone,
-        paymentMethod: '現金/臨櫃',
-        status: r.paymentStatus,
-        paymentRef: r.paymentRef,
-        remarks: r.remarks
+    }
+    if (evRes) {
+      evRes.forEach((r: any) => {
+        revenue.push({
+          id: r.id,
+          title: r.event?.title || "法會活動",
+          source: "Event",
+          amount: Number(r.actualPrice) || 0,
+          timestamp:
+            r.paymentUpdatedAt ||
+            (r.createdAt instanceof Date
+              ? r.createdAt.toISOString()
+              : String(r.createdAt || new Date().toISOString())),
+          guestName: r.guestName || r.phone,
+          paymentMethod: r.paymentMethod || "現金/臨櫃",
+          status: r.paymentStatus || "Paid",
+          paymentRef: r.paymentRef,
+          paymentProofUrl: r.paymentProofUrl,
+          remarks: r.remarks,
+        });
+        totalRevenue += Number(r.actualPrice) || 0;
       });
-      totalRevenue += (r.actualPrice || r.price);
-    });
-
-    const myServices = [].filter(s => s.templeId === templeId).map(s => s.id);
-    [].filter(a => myServices?.includes(a.serviceId) && a.paymentStatus !== 'Pending' && a.paymentStatus !== 'Unpaid').forEach(a => {
-      revenue.push({
-        id: a.id,
-        title: a.service,
-        source: 'Appointment',
-        amount: a.amount || 0,
-        timestamp: a.paymentUpdatedAt || a.createdAt || a.date,
-        guestName: a.guestName || a.phone,
-        paymentMethod: a.paymentMethod || '現金/臨櫃',
-        status: a.paymentStatus || 'Paid',
-        paymentRef: a.paymentRef,
-        remarks: a.remarks
+    }
+    if (qtRes) {
+      qtRes.forEach((t: any) => {
+        revenue.push({
+          id: t.id,
+          title: t.queueEvent?.title || "現場排隊服務",
+          source: "Queue",
+          amount: Number(t.queueEvent?.price || 0) || 0,
+          timestamp: t.paymentUpdatedAt
+            ? t.paymentUpdatedAt.toISOString().split("T")[0]
+            : t.createdAt instanceof Date
+              ? t.createdAt.toISOString().split("T")[0]
+              : String(t.createdAt),
+          guestName: t.phone || "現場信眾",
+          paymentMethod: t.paymentMethod || "現金/臨櫃",
+          status: t.paymentStatus || t.status || "Paid",
+          paymentRef: t.paymentRef,
+          paymentProofUrl: t.paymentProofUrl,
+          remarks: t.remarks,
+        });
+        totalRevenue += Number(t.queueEvent?.price || 0) || 0;
       });
-      totalRevenue += (a.amount || 0);
-    });
-
-    [].filter(r => (!r.templeId || r.templeId === templeId) && (r.id.startsWith('MERIT-') || r.serviceType?.includes('功德'))).forEach(r => {
-      let amt = 0;
-      if (r.values && r.values['金額']) {
-        amt = Number(String(r.values['金額']).replace(/[^0-9]/g, ''));
-      }
-      revenue.push({
-        id: r.id,
-        title: r.serviceType,
-        source: 'Merit',
-        amount: amt,
-        timestamp: r.paymentUpdatedAt || r.createdAt || r.date,
-        guestName: r.guestName || (r.values && r.values['付款人']) || r.phone || '信眾',
-        paymentMethod: (r.values && r.values['支付方式']) || '現金/臨櫃',
-        status: r.paymentStatus || 'Paid',
-        paymentRef: r.paymentRef,
-        remarks: r.remarks
+    }
+    if (deepRes) {
+      deepRes.forEach((r: any) => {
+        let amt = 0;
+        let pMethod = "現金/臨櫃";
+        let payer = r.phone || "信眾";
+        const vals =
+          typeof r.content === "string"
+            ? JSON.parse(r.content || "{}")
+            : r.content || {};
+        if (vals && vals["金額"])
+          amt = Number(String(vals["金額"]).replace(/[^0-9]/g, ""));
+        if (vals && vals["支付方式"]) pMethod = vals["支付方式"];
+        if (vals && vals["付款人"]) payer = vals["付款人"];
+        revenue.push({
+          id: r.id,
+          title: r.category,
+          source: "Merit",
+          amount: amt,
+          timestamp:
+            (r as any).paymentUpdatedAt ||
+            r.createdAt ||
+            (r.date instanceof Date
+              ? r.date.toISOString().split("T")[0]
+              : String(r.date)),
+          guestName: payer,
+          paymentMethod: pMethod,
+          status: (r as any).paymentStatus || "Paid",
+          paymentRef: r.paymentRef,
+          remarks: r.remarks,
+        });
+        totalRevenue += amt;
       });
-      totalRevenue += amt;
-    });
-
-    [].filter(t => t.paymentStatus === 'Paid' && (!t.templeId || t.templeId === templeId)).forEach(t => {
-      revenue.push({
-        id: t.id,
-        title: (t as any).queueEvent?.title || '現場排隊服務',
-        source: 'Queue',
-        amount: t.price || 0,
-        timestamp: t.paymentUpdatedAt || t.scannedAt || t.date || new Date().toISOString().split('T')[0],
-        guestName: t.phone || '現場信眾',
-        paymentMethod: '現金/臨櫃',
-        status: t.paymentStatus || t.status || 'Paid',
-        paymentRef: t.paymentRef,
-        remarks: t.remarks
-      });
-      totalRevenue += (t.price || 0);
-    });
+    }
+  } catch (e) {
+    console.error("Error fetching revenue from Prisma:", e);
   }
 
-  revenue.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  if (!usedPgForRevenue) {
+    []
+      .filter(
+        (r) =>
+          r.templeId === templeId &&
+          r.price > 0 &&
+          r.paymentStatus !== "Pending",
+      )
+      .forEach((r) => {
+        revenue.push({
+          id: r.id,
+          title: r.categoryName,
+          source: "Lamp",
+          amount: r.price,
+          timestamp: r.paymentUpdatedAt || r.createdAt || r.date,
+          guestName: r.guestName || r.phone,
+          paymentMethod: "現金/臨櫃",
+          status: r.paymentStatus || "Paid",
+          paymentRef: r.paymentRef,
+          remarks: r.remarks,
+        });
+        totalRevenue += r.price;
+      });
+
+    const myEvents = [].filter((e) => e.templeId === templeId).map((e) => e.id);
+    []
+      .filter(
+        (r) =>
+          myEvents?.includes(r.eventId) &&
+          r.paymentStatus !== "Pending" &&
+          r.paymentStatus !== "Unpaid",
+      )
+      .forEach((r) => {
+        revenue.push({
+          id: r.id,
+          title: r.title,
+          source: "Event",
+          amount: r.actualPrice || r.price,
+          timestamp:
+            r.paymentUpdatedAt || r.timestamp || new Date().toISOString(),
+          guestName: r.guestName || r.phone,
+          paymentMethod: "現金/臨櫃",
+          status: r.paymentStatus,
+          paymentRef: r.paymentRef,
+          remarks: r.remarks,
+        });
+        totalRevenue += r.actualPrice || r.price;
+      });
+
+    const myServices = []
+      .filter((s) => s.templeId === templeId)
+      .map((s) => s.id);
+    []
+      .filter(
+        (a) =>
+          myServices?.includes(a.serviceId) &&
+          a.paymentStatus !== "Pending" &&
+          a.paymentStatus !== "Unpaid",
+      )
+      .forEach((a) => {
+        revenue.push({
+          id: a.id,
+          title: a.service,
+          source: "Appointment",
+          amount: a.amount || 0,
+          timestamp: a.paymentUpdatedAt || a.createdAt || a.date,
+          guestName: a.guestName || a.phone,
+          paymentMethod: a.paymentMethod || "現金/臨櫃",
+          status: a.paymentStatus || "Paid",
+          paymentRef: a.paymentRef,
+          remarks: a.remarks,
+        });
+        totalRevenue += a.amount || 0;
+      });
+
+    []
+      .filter(
+        (r) =>
+          (!r.templeId || r.templeId === templeId) &&
+          (r.id.startsWith("MERIT-") || r.serviceType?.includes("功德")),
+      )
+      .forEach((r) => {
+        let amt = 0;
+        if (r.values && r.values["金額"]) {
+          amt = Number(String(r.values["金額"]).replace(/[^0-9]/g, ""));
+        }
+        revenue.push({
+          id: r.id,
+          title: r.serviceType,
+          source: "Merit",
+          amount: amt,
+          timestamp: r.paymentUpdatedAt || r.createdAt || r.date,
+          guestName:
+            r.guestName ||
+            (r.values && r.values["付款人"]) ||
+            r.phone ||
+            "信眾",
+          paymentMethod: (r.values && r.values["支付方式"]) || "現金/臨櫃",
+          status: r.paymentStatus || "Paid",
+          paymentRef: r.paymentRef,
+          remarks: r.remarks,
+        });
+        totalRevenue += amt;
+      });
+
+    []
+      .filter(
+        (t) =>
+          t.paymentStatus === "Paid" &&
+          (!t.templeId || t.templeId === templeId),
+      )
+      .forEach((t) => {
+        revenue.push({
+          id: t.id,
+          title: (t as any).queueEvent?.title || "現場排隊服務",
+          source: "Queue",
+          amount: t.price || 0,
+          timestamp:
+            t.paymentUpdatedAt ||
+            t.scannedAt ||
+            t.date ||
+            new Date().toISOString().split("T")[0],
+          guestName: t.phone || "現場信眾",
+          paymentMethod: "現金/臨櫃",
+          status: t.paymentStatus || t.status || "Paid",
+          paymentRef: t.paymentRef,
+          remarks: t.remarks,
+        });
+        totalRevenue += t.price || 0;
+      });
+  }
+
+  revenue.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  );
 
   const _allTemplesForBills = await [];
   let expenses: ExpenseEntry[] = []
-    .filter(b => b.templeId === templeId)
-    .map(b => {
+    .filter((b) => b.templeId === templeId)
+    .map((b) => {
       const t = temple;
-      const isSuperAdminService = b.type === 'StorageUpgrade' || b.type === 'AgiService';
-      const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
-      const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
+      const isSuperAdminService =
+        b.type === "StorageUpgrade" || b.type === "AgiService";
+      const fallbackRole = isSuperAdminService
+        ? "SuperAdmin"
+        : t?.distributorId
+          ? "Distributor"
+          : "SuperAdmin";
+      const fallbackId = isSuperAdminService
+        ? "system-hq"
+        : t?.distributorId || "system-hq";
       return {
         id: b.id,
         type: b.type,
@@ -3702,98 +4621,124 @@ export async function fetchFinancialOverview() {
         status: b.status,
         billingDate: b.billingDate,
         payeeRole: b.payeeRole || fallbackRole,
-        payeeId: b.payeeId || fallbackId
+        payeeId: b.payeeId || fallbackId,
       };
     });
-    
+
   try {
     /* removed duplicate import */
-          let rows = await prisma.templeBill.findMany({ where: { templeId } });
-      if (temple && isPermanentFree && (!temple.distributorId || temple.distributorId.trim() === '')) {
-        rows = []; // Do not show any bills for free temples created by SuperAdmin
-      }
-      
-      if (rows && rows.length > 0) {
-        expenses = rows.map((r: any) => {
-          const t = temple;
-          const type = r.itemName || r.item_name || '';
-          const isSuperAdminService = type?.includes('空間') || type?.includes('AI') || type?.includes('Storage') || type?.includes('Agi');
-          const fallbackRole = isSuperAdminService ? 'SuperAdmin' : (t?.distributorId ? 'Distributor' : 'SuperAdmin');
-          const fallbackId = isSuperAdminService ? 'system-hq' : (t?.distributorId || 'system-hq');
-          
-          return {
-            id: r.id,
-            type: r.itemName || r.item_name,
-            amount: r.amount,
-            dueDate: r.dueDate || r.due_date,
-            status: r.status,
-            billingDate: r.billingDate || r.billing_date || (r.createdAt instanceof Date ? r.createdAt.toISOString().substring(0, 7) : String(r.createdAt || r.created_at || '').substring(0, 7)),
-            payeeRole: r.payeeRole || r.payee_role || fallbackRole,
-            payeeId: r.payeeId || r.payee_id || fallbackId
-          };
-        });
-      }
+    let rows = await prisma.templeBill.findMany({ where: { templeId } });
+    if (
+      temple &&
+      isPermanentFree &&
+      (!temple.distributorId || temple.distributorId.trim() === "")
+    ) {
+      rows = []; // Do not show any bills for free temples created by SuperAdmin
+    }
+
+    if (rows && rows.length > 0) {
+      expenses = rows.map((r: any) => {
+        const t = temple;
+        const type = r.itemName || r.item_name || "";
+        const isSuperAdminService =
+          type?.includes("空間") ||
+          type?.includes("AI") ||
+          type?.includes("Storage") ||
+          type?.includes("Agi");
+        const fallbackRole = isSuperAdminService
+          ? "SuperAdmin"
+          : t?.distributorId
+            ? "Distributor"
+            : "SuperAdmin";
+        const fallbackId = isSuperAdminService
+          ? "system-hq"
+          : t?.distributorId || "system-hq";
+
+        return {
+          id: r.id,
+          type: r.itemName || r.item_name,
+          amount: r.amount,
+          dueDate: r.dueDate || r.due_date,
+          status: r.status,
+          billingDate:
+            r.billingDate ||
+            r.billing_date ||
+            (r.createdAt instanceof Date
+              ? r.createdAt.toISOString().substring(0, 7)
+              : String(r.createdAt || r.created_at || "").substring(0, 7)),
+          payeeRole: r.payeeRole || r.payee_role || fallbackRole,
+          payeeId: r.payeeId || r.payee_id || fallbackId,
+        };
+      });
+    }
   } catch (e) {
-    console.error('Failed to fetch bills from DB in fetchFinancialOverview', e);
+    console.error("Failed to fetch bills from DB in fetchFinancialOverview", e);
   }
-  
-  const pendingExpense = expenses.filter(e => e.status === 'Unpaid' || e.status === 'PendingVerification').reduce((acc, e) => acc + e.amount, 0);
+
+  const pendingExpense = expenses
+    .filter((e) => e.status === "Unpaid" || e.status === "PendingVerification")
+    .reduce((acc, e) => acc + e.amount, 0);
 
   let payeeInfo = null;
   const payeeSettings: Record<string, any> = {};
-  
+
   try {
     /* removed duplicate import */
     for (const exp of expenses) {
-      if (exp.status !== 'Unpaid' && exp.status !== 'PendingVerification') continue;
-      
-      const pId = exp.payeeId || 'superadmin';
-      const pRole = exp.payeeRole || 'SuperAdmin';
-      
+      if (exp.status !== "Unpaid" && exp.status !== "PendingVerification")
+        continue;
+
+      const pId = exp.payeeId || "superadmin";
+      const pRole = exp.payeeRole || "SuperAdmin";
+
       if (!payeeSettings[pId]) {
-        if (pRole === 'Distributor' && pId && pId !== 'superadmin') {
+        if (pRole === "Distributor" && pId && pId !== "superadmin") {
           let dist = [].find((d: any) => d.id === pId);
           if (!dist) {
-             const dRes = await prisma.distributor.findUnique({ where: { id: pId } }) as any;
-             if (dRes) dist = dRes;
+            const dRes = (await prisma.distributor.findUnique({
+              where: { id: pId },
+            })) as any;
+            if (dRes) dist = dRes;
           }
           if (dist) {
             let b2b = dist.b2bPayment || dist.b2b_payment;
-            if (typeof b2b === 'string') {
+            if (typeof b2b === "string") {
               b2b = JSON.parse(b2b);
             }
             payeeSettings[pId] = b2b || null;
           }
         } else {
-           const sysConfig = await fetchSystemConfig();
-           payeeSettings[pId] = sysConfig?.b2bPayment || null;
+          const sysConfig = await fetchSystemConfig();
+          payeeSettings[pId] = sysConfig?.b2bPayment || null;
         }
       }
     }
   } catch (e) {
-    console.error('Failed to fetch payee b2b payment settings', e);
+    console.error("Failed to fetch payee b2b payment settings", e);
   }
 
   // Fallback for first expense (legacy support)
   const payeeId = expenses.length > 0 ? expenses[0].payeeId : null;
   const payeeRole = expenses.length > 0 ? expenses[0].payeeRole : null;
-  if (payeeRole === 'Distributor' && payeeId) {
+  if (payeeRole === "Distributor" && payeeId) {
     let dist = [].find((d: any) => d.id === payeeId);
     if (!dist) {
-        const dRes = await prisma.distributor.findUnique({ where: { id: payeeId } }) as any;
-        if (dRes) dist = dRes;
+      const dRes = (await prisma.distributor.findUnique({
+        where: { id: payeeId },
+      })) as any;
+      if (dRes) dist = dRes;
     }
     payeeInfo = {
-      bankName: dist?.bank_name || dist?.bankName || '未設定銀行',
-      account: dist?.bank_account || dist?.bankAccount || '未設定帳號',
-      name: dist ? dist.name : '神明管家經銷服務網',
-      bankCode: dist?.bank_code || dist?.bankCode || ''
+      bankName: dist?.bank_name || dist?.bankName || "未設定銀行",
+      account: dist?.bank_account || dist?.bankAccount || "未設定帳號",
+      name: dist ? dist.name : "神明管家經銷服務網",
+      bankCode: dist?.bank_code || dist?.bankCode || "",
     };
   } else {
     payeeInfo = {
-      bankName: '國泰世華銀行 (013)',
-      account: '9876 543 210987',
-      name: '神明管家總部'
+      bankName: "國泰世華銀行 (013)",
+      account: "9876 543 210987",
+      name: "神明管家總部",
     };
   }
 
@@ -3802,60 +4747,69 @@ export async function fetchFinancialOverview() {
     expenses,
     totalRevenue,
     pendingExpense,
-    lastMonthGrowth: '+12%',
+    lastMonthGrowth: "+12%",
     payeeInfo,
     payeeSettings,
     trialDaysRemaining,
-    isPermanentFree
+    isPermanentFree,
   };
 }
-export async function markAppointmentCompleted() { return { success: true }; }
+export async function markAppointmentCompleted() {
+  return { success: true };
+}
 
 // migrated (await jsonStore.find('bonuses')) to bonuses
 // migrated (await jsonStore.find('withdrawals')) to withdrawals
 // migrated (await jsonStore.find('notifications')) to (await jsonStore.find('notifications'))
 
-export async function applyBonusOverride(salesName: string, amount: number, reason: string) {
+export async function applyBonusOverride(
+  salesName: string,
+  amount: number,
+  reason: string,
+) {
   const newBonus = {
     id: `BONUS-${Date.now()}`,
     salesName,
     amount,
     reason,
-    date: new Date().toISOString().split('T')[0],
-    timestamp: new Date().toISOString()
+    date: new Date().toISOString().split("T")[0],
+    timestamp: new Date().toISOString(),
   };
   await null;
 
   await null;
 
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
+  revalidatePath("/super-admin");
+  revalidatePath("/super-sales");
   return { success: true };
 }
 
 export async function fetchSuperSalesBonuses(salesName: string) {
-
-      try {
-        const sales = await prisma.distributorSales.findFirst({ where: { name: salesName } });
-        if (!sales) return [];
-        return await prisma.bonus.findMany({ where: { salesId: sales.id } });
-      } catch(e) {
-        return [];
-      }
+  try {
+    const sales = await prisma.distributorSales.findFirst({
+      where: { name: salesName },
+    });
+    if (!sales) return [];
+    return await prisma.bonus.findMany({ where: { salesId: sales.id } });
+  } catch (e) {
+    return [];
+  }
 }
 
 export async function fetchAllWithdrawals() {
   try {
     const withdrawals = await prisma.withdrawal.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
-    
+
     // Get distinct sales names to find their wallet roles
-    const salesNames = [...new Set(withdrawals.map((w: any) => w.salesName).filter(Boolean))];
+    const salesNames = [
+      ...new Set(withdrawals.map((w: any) => w.salesName).filter(Boolean)),
+    ];
     const wallets = await prisma.wallet.findMany({
-      where: { name: { in: salesNames } }
+      where: { name: { in: salesNames } },
     });
-    const walletRoleMap = new Map(wallets.map(w => [w.name, w.role]));
+    const walletRoleMap = new Map(wallets.map((w) => [w.name, w.role]));
 
     const allWithdrawals = withdrawals.map((w: any) => ({
       id: w.id,
@@ -3863,56 +4817,58 @@ export async function fetchAllWithdrawals() {
       amount: w.amount,
       status: w.status,
       receiptUrl: w.receiptUrl,
-      date: w.date || w.createdAt.toISOString().split('T')[0],
-      role: walletRoleMap.get(w.salesName)
+      date: w.date || w.createdAt.toISOString().split("T")[0],
+      role: walletRoleMap.get(w.salesName),
     }));
-    
+
     // 過濾掉「經銷業務員」的提領申請，只留給對應的經銷商審核
-    return allWithdrawals.filter((w: any) => w.role !== 'DistSales' && w.role !== 'DistributorSales');
+    return allWithdrawals.filter(
+      (w: any) => w.role !== "DistSales" && w.role !== "DistributorSales",
+    );
   } catch (error) {
-    console.error('Failed to fetch all withdrawals', error);
+    console.error("Failed to fetch all withdrawals", error);
     return [];
   }
 }
 
-export async function approveWithdrawal(id: string, receiptUrl?: string) { 
+export async function approveWithdrawal(id: string, receiptUrl?: string) {
   try {
-    const data: any = { status: 'Approved' };
+    const data: any = { status: "Approved" };
     if (receiptUrl) {
       data.receiptUrl = receiptUrl;
     }
     await prisma.withdrawal.update({
       where: { id },
-      data
+      data,
     });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
-    return { success: true }; 
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    return { success: true };
   } catch (e) {
     console.error(e);
     return { success: false };
   }
 }
 
-export async function rejectWithdrawal(id: string) { 
+export async function rejectWithdrawal(id: string) {
   try {
     const w = await prisma.withdrawal.findUnique({ where: { id } });
     if (w) {
       await prisma.withdrawal.update({
         where: { id },
-        data: { status: 'Rejected' }
+        data: { status: "Rejected" },
       });
       // Refund wallet
       if (w.salesName && w.amount) {
         await prisma.wallet.updateMany({
           where: { name: w.salesName },
-          data: { balance: { increment: w.amount } }
+          data: { balance: { increment: w.amount } },
         });
       }
     }
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
-    return { success: true }; 
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    return { success: true };
   } catch (e) {
     console.error(e);
     return { success: false };
@@ -3920,75 +4876,86 @@ export async function rejectWithdrawal(id: string) {
 }
 
 export async function updateServiceSettings(settings: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return { success: false };
-        
-        const existing = await prisma.serviceSetting.findFirst({
-          where: { templeId }
-        });
-        
-        if (existing) {
-          await prisma.serviceSetting.update({
-            where: { id: existing.id },
-            data: { pushConfigs: settings }
-          });
-        } else {
-          await prisma.serviceSetting.create({
-            data: {
-              templeId,
-              pushConfigs: settings
-            }
-          });
-        }
-        
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+    const existing = await prisma.serviceSetting.findFirst({
+      where: { templeId },
+    });
+
+    if (existing) {
+      await prisma.serviceSetting.update({
+        where: { id: existing.id },
+        data: { pushConfigs: settings },
+      });
+    } else {
+      await prisma.serviceSetting.create({
+        data: {
+          templeId,
+          pushConfigs: settings,
+        },
+      });
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
-export async function fetchEarningsStats(salesId: string = '超級精英業務') { 
-  const history = await fetchCommissionHistory(salesId, '', '');
+export async function fetchEarningsStats(salesId: string = "超級精英業務") {
+  const history = await fetchCommissionHistory(salesId, "", "");
   return {
     balance: history.balance,
-    pending: history.pendingRequests.reduce((acc: any, curr: any) => acc + curr.amount, 0),
-    totalWithdrawn: history.totalWithdrawn
+    pending: history.pendingRequests.reduce(
+      (acc: any, curr: any) => acc + curr.amount,
+      0,
+    ),
+    totalWithdrawn: history.totalWithdrawn,
   };
 }
 
-export async function approveSuperSalesWithdrawal(withdrawalId: string, receiptUrl: string) {
-
-      try {
-        await prisma.withdrawal.update({
-          where: { id: withdrawalId },
-          data: { status: 'Approved', receiptUrl }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+export async function approveSuperSalesWithdrawal(
+  withdrawalId: string,
+  receiptUrl: string,
+) {
+  try {
+    await prisma.withdrawal.update({
+      where: { id: withdrawalId },
+      data: { status: "Approved", receiptUrl },
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
-export async function requestWithdrawal(salesName: string, amount: number) { 
+export async function requestWithdrawal(salesName: string, amount: number) {
   return withTempleSession(null, true, async (client) => {
-    const wRes = await client.query('SELECT balance FROM wallets WHERE name = $1', [salesName]);
-    if ((wRes.rowCount ?? 0) === 0) return { success: false, error: '找不到該錢包帳戶' };
+    const wRes = await client.query(
+      "SELECT balance FROM wallets WHERE name = $1",
+      [salesName],
+    );
+    if ((wRes.rowCount ?? 0) === 0)
+      return { success: false, error: "找不到該錢包帳戶" };
     const balance = Number(wRes.rows[0].balance);
-    if (amount > balance) return { success: false, error: '餘額不足' };
+    if (amount > balance) return { success: false, error: "餘額不足" };
 
-    await client.query('UPDATE wallets SET balance = balance - $1 WHERE name = $2', [amount, salesName]);
+    await client.query(
+      "UPDATE wallets SET balance = balance - $1 WHERE name = $2",
+      [amount, salesName],
+    );
 
     const wdId = `WD-${Date.now()}`;
     await client.query(
       'INSERT INTO "Withdrawal" (id, "salesName", amount, status, date) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
-      [wdId, salesName, amount, 'Pending']
+      [wdId, salesName, amount, "Pending"],
     );
-    
-    revalidatePath('/super-admin');
-    return { success: true }; 
+
+    revalidatePath("/super-admin");
+    return { success: true };
   });
 }
 
@@ -3998,87 +4965,116 @@ export async function requestPasswordReset(salesName: string) {
   const newReq = {
     id: `PR-${Date.now()}`,
     salesName,
-    status: 'Pending',
-    date: new Date().toISOString().split('T')[0]
+    status: "Pending",
+    date: new Date().toISOString().split("T")[0],
   };
   await null;
 
   await null;
-  revalidatePath('/super-admin');
+  revalidatePath("/super-admin");
   return { success: true };
 }
 
 export async function fetchPasswordResets() {
-
-      try {
-        return await prisma.passwordReset.findMany({
-          orderBy: { date: 'desc' }
-        });
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    return await prisma.passwordReset.findMany({
+      orderBy: { date: "desc" },
+    });
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
-export async function handlePasswordReset(id: string, action: 'Approve' | 'Reject') {
-
-      try {
-        const pr = await prisma.passwordReset.findUnique({ where: { id } });
-        if (!pr) return { success: false };
-        await prisma.passwordReset.update({ where: { id }, data: { status: action === 'Approve' ? 'Approved' : 'Rejected' } });
-        if (action === 'Approve') {
-          await updateAccountPassword(pr.userId, '000000', pr.userRole);
-        }
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+export async function handlePasswordReset(
+  id: string,
+  action: "Approve" | "Reject",
+) {
+  try {
+    const pr = await prisma.passwordReset.findUnique({ where: { id } });
+    if (!pr) return { success: false };
+    await prisma.passwordReset.update({
+      where: { id },
+      data: { status: action === "Approve" ? "Approved" : "Rejected" },
+    });
+    if (action === "Approve") {
+      await updateAccountPassword(pr.userId, "000000", pr.userRole);
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
 export async function fetchNotifications(userRole: string, userName?: string) {
+  try {
+    let whereClause: any = {};
+    if (userRole !== "SuperAdmin") {
+      whereClause = {
+        OR: [
+          { targetUser: userName },
+          {
+            title: {
+              notIn: [
+                "新宮廟核定申請",
+                "新經銷體系授權申請",
+                "密碼重設申請",
+                "手動獎金撥發通知",
+              ],
+            },
+          },
+          {
+            title: {
+              in: [
+                "新宮廟核定申請",
+                "新經銷體系授權申請",
+                "密碼重設申請",
+                "手動獎金撥發通知",
+              ],
+            },
+            content: { contains: userName || "" },
+          },
+        ],
+      };
+    }
 
-      try {
-        let whereClause: any = {};
-        if (userRole !== 'SuperAdmin') {
-          whereClause = {
-            OR: [
-              { targetUser: userName },
-              { title: { notIn: ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請', '手動獎金撥發通知'] } },
-              { 
-                title: { in: ['新宮廟核定申請', '新經銷體系授權申請', '密碼重設申請', '手動獎金撥發通知'] },
-                content: { contains: userName || '' }
-              }
-            ]
-          };
-        }
-        
-        return await prisma.notification.findMany({
-          where: whereClause,
-          orderBy: { date: 'desc' }
-        });
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
+    return await prisma.notification.findMany({
+      where: whereClause,
+      orderBy: { date: "desc" },
+    });
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export type StorageInfo = any;
-export async function upgradeStorage() { return { success: true }; }
-export async function uploadCustomerMedia(phone: string, url: string, type: 'photo' | 'video' | 'file', uploadedBy: string = 'Temple', customName?: string) {
+export async function upgradeStorage() {
+  return { success: true };
+}
+export async function uploadCustomerMedia(
+  phone: string,
+  url: string,
+  type: "photo" | "video" | "file",
+  uploadedBy: string = "Temple",
+  customName?: string,
+) {
   try {
     const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false, error: '未指定宮廟' };
+    if (!templeId) return { success: false, error: "未指定宮廟" };
 
-    const storage = await prisma.templeStorage.findUnique({ where: { templeId } });
+    const storage = await prisma.templeStorage.findUnique({
+      where: { templeId },
+    });
     if (storage) {
       if (Number(storage.usedBytes) >= Number(storage.allocatedBytes)) {
-        return { success: false, error: '宮廟雲端空間已滿，無法上傳檔案。' };
+        return { success: false, error: "宮廟雲端空間已滿，無法上傳檔案。" };
       }
     }
 
     const newId = `f-${Date.now()}`;
     const normPhone = normalizePhone(phone);
     const guest = await prisma.guest.findFirst({
-      where: { templeId, phone: normPhone }
+      where: { templeId, phone: normPhone },
     });
 
     const newFile = await prisma.guestFile.create({
@@ -4089,51 +5085,58 @@ export async function uploadCustomerMedia(phone: string, url: string, type: 'pho
         phone: guest ? guest.phone : normPhone,
         url,
         type,
-        name: customName || (type === 'photo' ? '現場祭祀/服務相片歸檔' : type === 'video' ? '消災祈福法會影像歸檔' : '信眾點燈與祈福案卡檔案'),
-        folder: new Date().toISOString().split('T')[0],
-        uploadedBy: uploadedBy
-      }
+        name:
+          customName ||
+          (type === "photo"
+            ? "現場祭祀/服務相片歸檔"
+            : type === "video"
+              ? "消災祈福法會影像歸檔"
+              : "信眾點燈與祈福案卡檔案"),
+        folder: new Date().toISOString().split("T")[0],
+        uploadedBy: uploadedBy,
+      },
     });
 
     await revalidateTemple();
     return { success: true };
   } catch (error) {
-    console.error('uploadCustomerMedia error:', error);
-    return { success: false, error: '檔案上傳與資料庫寫入失敗' };
+    console.error("uploadCustomerMedia error:", error);
+    return { success: false, error: "檔案上傳與資料庫寫入失敗" };
   }
 }
 export async function createPersonnel(formData: FormData) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, error: '缺少 templeId' };
+  if (!templeId) return { success: false, error: "缺少 templeId" };
 
   try {
-    const name = formData.get('name') as string;
-    const rawAccount = formData.get('account') as string;
-    const account = (rawAccount || '').trim();
-    
+    const name = formData.get("name") as string;
+    const rawAccount = formData.get("account") as string;
+    const account = (rawAccount || "").trim();
+
     if (account) {
       const existingUser = await prisma.user.findFirst({
         where: {
           templeId,
           account: {
             equals: account,
-            mode: 'insensitive'
-          }
-        }
+            mode: "insensitive",
+          },
+        },
       });
       if (existingUser) {
-        return { success: false, error: '該帳號在此宮廟已被註冊，請更換' };
+        return { success: false, error: "該帳號在此宮廟已被註冊，請更換" };
       }
     }
 
-    const phone = formData.get('phone') as string;
-    const password = formData.get('password') as string;
-    const role = formData.get('role') as string;
+    const phone = formData.get("phone") as string;
+    const password = formData.get("password") as string;
+    const role = formData.get("role") as string;
     const newId = `p-${Date.now()}`;
     const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4F46E5&color=fff`;
 
-    const defaultPerms = role === 'TempleAdmin' ? ['all'] : ['calendar', 'customers'];
-    
+    const defaultPerms =
+      role === "TempleAdmin" ? ["all"] : ["calendar", "customers"];
+
     await prisma.user.create({
       data: {
         id: newId,
@@ -4143,28 +5146,34 @@ export async function createPersonnel(formData: FormData) {
         account,
         phone,
         password,
-        status: 'Active',
+        status: "Active",
         avatar,
-        permissions: defaultPerms
-      }
+        permissions: defaultPerms,
+      },
     });
 
     await revalidateTemple(templeId);
-    await logSystemEvent('SUCCESS', '新增人員', `人員名稱：${name}`, '管理員', templeId);
+    await logSystemEvent(
+      "SUCCESS",
+      "新增人員",
+      `人員名稱：${name}`,
+      "管理員",
+      templeId,
+    );
     return { success: true };
   } catch (error) {
-    console.error('createPersonnel error:', error);
-    return { success: false, error: '建立人員失敗' };
+    console.error("createPersonnel error:", error);
+    return { success: false, error: "建立人員失敗" };
   }
 }
 
 export async function deletePersonnel(id: string) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, message: '缺少 templeId' };
+  if (!templeId) return { success: false, message: "缺少 templeId" };
 
   try {
     const personnel = await prisma.user.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (personnel && personnel.templeId === templeId) {
@@ -4172,118 +5181,148 @@ export async function deletePersonnel(id: string) {
         where: {
           templeId,
           staff: personnel.name,
-          status: { not: 'Completed' }
-        }
+          status: { not: "Completed" },
+        },
       });
 
       const hasSlots = await prisma.slot.findFirst({
         where: {
           templeId,
           staff: personnel.name,
-          status: { not: 'Completed' }
-        }
+          status: { not: "Completed" },
+        },
       });
 
       if (hasAppointments || hasSlots) {
-        return { success: false, message: '此人員目前尚有預約服務或已排班時段，請先清空後再進行刪除！' };
+        return {
+          success: false,
+          message: "此人員目前尚有預約服務或已排班時段，請先清空後再進行刪除！",
+        };
       }
     }
 
     await prisma.user.deleteMany({
       where: {
         id,
-        templeId
-      }
+        templeId,
+      },
     });
 
     await revalidateTemple(templeId);
-    await logSystemEvent('SUCCESS', '刪除人員', `帳號 ID：${id}`, '管理員', templeId);
+    await logSystemEvent(
+      "SUCCESS",
+      "刪除人員",
+      `帳號 ID：${id}`,
+      "管理員",
+      templeId,
+    );
     return { success: true };
   } catch (error) {
-    console.error('deletePersonnel error:', error);
-    return { success: false, message: '刪除人員失敗' };
+    console.error("deletePersonnel error:", error);
+    return { success: false, message: "刪除人員失敗" };
   }
 }
 
-export async function updateAccountPermissions(id: string, permissions: string[]) {
+export async function updateAccountPermissions(
+  id: string,
+  permissions: string[],
+) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, message: '缺少 templeId' };
-  
+  if (!templeId) return { success: false, message: "缺少 templeId" };
+
   try {
     await prisma.user.updateMany({
       where: { id, templeId },
-      data: { permissions }
+      data: { permissions },
     });
     await revalidateTemple(templeId);
     return { success: true };
   } catch (error) {
-    console.error('updateAccountPermissions error:', error);
+    console.error("updateAccountPermissions error:", error);
     return { success: false };
   }
 }
 
-export async function updateAccountPassword(id: string, newPass: string, role?: string) {
+export async function updateAccountPassword(
+  id: string,
+  newPass: string,
+  role?: string,
+) {
+  try {
+    if (role === "Temple" || id.startsWith("temple-")) {
+      await prisma.temple.update({
+        where: { id },
+        data: { password: newPass },
+      });
 
-      try {
-        if (role === 'Temple' || id.startsWith('temple-')) {
-          await prisma.temple.update({ where: { id }, data: { password: newPass } });
-          
-          const user = await prisma.user.findFirst({ where: { templeId: id } });
-          if (user) {
-            await prisma.user.update({ where: { id: user.id }, data: { password: newPass } });
-          } else {
-            const temple = await prisma.temple.findUnique({ where: { id } });
-            if (temple) {
-              await prisma.user.create({
-                data: {
-                  id: `p-${Date.now()}`,
-                  templeId: id,
-                  name: temple.templeName || '宮廟管理員',
-                  account: temple.account || `admin-${id.slice(-4)}`,
-                  password: newPass,
-                  role: 'TempleAdmin',
-                  status: 'Active'
-                }
-              });
-            }
-          }
-        } else if (role === 'Distributor') {
-          await prisma.distributor.update({ where: { id }, data: { password: newPass } });
-        } else if (role === 'SuperSales' || role === 'DistSales') {
-          await prisma.distributorSales.update({ where: { id }, data: { password: newPass } });
-        } else {
-          await prisma.user.update({ where: { id }, data: { password: newPass } });
+      const user = await prisma.user.findFirst({ where: { templeId: id } });
+      if (user) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { password: newPass },
+        });
+      } else {
+        const temple = await prisma.temple.findUnique({ where: { id } });
+        if (temple) {
+          await prisma.user.create({
+            data: {
+              id: `p-${Date.now()}`,
+              templeId: id,
+              name: temple.templeName || "宮廟管理員",
+              account: temple.account || `admin-${id.slice(-4)}`,
+              password: newPass,
+              role: "TempleAdmin",
+              status: "Active",
+            },
+          });
         }
-        await revalidateTemple();
-          return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
       }
+    } else if (role === "Distributor") {
+      await prisma.distributor.update({
+        where: { id },
+        data: { password: newPass },
+      });
+    } else if (role === "SuperSales" || role === "DistSales") {
+      await prisma.distributorSales.update({
+        where: { id },
+        data: { password: newPass },
+      });
+    } else {
+      await prisma.user.update({ where: { id }, data: { password: newPass } });
+    }
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // --- 經銷總部分階資料獲取 ---
 export async function fetchDistributorProfile(distId?: string) {
-
-      try {
-        if (!distId) return null;
-        const dist = await prisma.distributor.findUnique({ where: { id: distId } });
-        if (!dist) return null;
-        return {
-          ...dist,
-          bankInfo: {
-            bankCode: dist.bankCode || '',
-            bankName: dist.bankName || '',
-            accountNumber: dist.bankAccount || '',
-            accountName: dist.name
-          }
-        };
-      } catch(e) {
-        return null;
-      }
+  try {
+    if (!distId) return null;
+    const dist = await prisma.distributor.findUnique({ where: { id: distId } });
+    if (!dist) return null;
+    return {
+      ...dist,
+      bankInfo: {
+        bankCode: dist.bankCode || "",
+        bankName: dist.bankName || "",
+        accountNumber: dist.bankAccount || "",
+        accountName: dist.name,
+      },
+    };
+  } catch (e) {
+    return null;
+  }
 }
-export async function fetchDistributorCommissionSummary(distId: string, year: string, month: string) { 
-  const id = distId || 'dist-1';
+export async function fetchDistributorCommissionSummary(
+  distId: string,
+  year: string,
+  month: string,
+) {
+  const id = distId || "dist-1";
   const summary = await fetchDistributorFinanceSummary(id);
   const netProfit = summary.totalCommissionPayout || 0;
   return {
@@ -4292,10 +5331,10 @@ export async function fetchDistributorCommissionSummary(distId: string, year: st
     balance: netProfit * 0.8, // 模擬已請款與未請款
     totalWithdrawn: netProfit * 0.2,
     rules: {
-      baseRate: '20%',
-      bonusThreshold: '50 Nodes',
-      lastAudit: '2026-05-01'
-    }
+      baseRate: "20%",
+      bonusThreshold: "50 Nodes",
+      lastAudit: "2026-05-01",
+    },
   };
 }
 
@@ -4303,26 +5342,56 @@ export async function fetchDistributorCommissionSummary(distId: string, year: st
 export async function fetchGlobalTempleData() {
   const templeId = await getDynamicTempleId();
   if (!templeId) {
-    return { 
-      analyticsSettings: {}, 
-      analyticsData: { todayAppointments: 0, completedAppointments: 0, totalGuests: 0, lampStats: { totalLamps: 0, activeLamps: 0 }, serviceHeat: [] }, 
-      raw: { apps: [], agiStats: {}, guests: [], storageInfo: { used: 0, total: 100, isVip: false, planName: '未知方案' }, qActive: [] } 
+    return {
+      analyticsSettings: {},
+      analyticsData: {
+        todayAppointments: 0,
+        completedAppointments: 0,
+        totalGuests: 0,
+        lampStats: { totalLamps: 0, activeLamps: 0 },
+        serviceHeat: [],
+      },
+      raw: {
+        apps: [],
+        agiStats: {},
+        guests: [],
+        storageInfo: {
+          used: 0,
+          total: 100,
+          isVip: false,
+          planName: "未知方案",
+        },
+        qActive: [],
+      },
     };
   }
-  
+
   const now = new Date();
-  const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const todayStr =
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(now.getDate()).padStart(2, "0");
 
   try {
     const guests = await prisma.guest.findMany({
       where: { templeId },
-      select: { phone: true, name: true }
+      select: { phone: true, name: true },
     });
     const totalGuests = guests.length;
 
     const apps = await prisma.appointment.findMany({
       where: { templeId },
-      select: { id: true, guestId: true, service: true, date: true, time: true, status: true, paymentStatus: true }
+      select: {
+        id: true,
+        guestId: true,
+        service: true,
+        date: true,
+        time: true,
+        status: true,
+        paymentStatus: true,
+      },
     });
 
     let todayAppointments = 0;
@@ -4331,81 +5400,138 @@ export async function fetchGlobalTempleData() {
     const serviceCounts: Record<string, number> = {};
 
     apps.forEach((a: any) => {
-      if (a.service) { serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1; totalServices++; }
+      if (a.service) {
+        serviceCounts[a.service] = (serviceCounts[a.service] || 0) + 1;
+        totalServices++;
+      }
       if (a.date === todayStr) {
         todayAppointments++;
-        if (a.status === 'Completed' || a.status === 'Confirmed' || a.paymentStatus === 'Paid') completedAppointments++;
+        if (
+          a.status === "Completed" ||
+          a.status === "Confirmed" ||
+          a.paymentStatus === "Paid"
+        )
+          completedAppointments++;
       }
     });
 
-    const sortedServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label, count], index) => {
-      const colors = ['bg-indigo-500', 'bg-blue-400', 'bg-sky-300'];
-      return { label, val: totalServices === 0 ? 0 : Math.round((count / totalServices) * 100), color: colors[index % colors.length] };
-    });
+    const sortedServices = Object.entries(serviceCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([label, count], index) => {
+        const colors = ["bg-indigo-500", "bg-blue-400", "bg-sky-300"];
+        return {
+          label,
+          val:
+            totalServices === 0 ? 0 : Math.round((count / totalServices) * 100),
+          color: colors[index % colors.length],
+        };
+      });
 
-    if (sortedServices.length === 0) sortedServices.push({ label: '目前無預約', val: 0, color: 'bg-slate-200' });
+    if (sortedServices.length === 0)
+      sortedServices.push({
+        label: "目前無預約",
+        val: 0,
+        color: "bg-slate-200",
+      });
 
     const lampsRes = await prisma.lampRecord.findMany({
       where: { templeId },
-      select: { status: true, paymentStatus: true }
+      select: { status: true, paymentStatus: true },
     });
     const totalLamps = lampsRes.length;
-    const activeLamps = lampsRes.filter(l => l.status === 'Active' || l.paymentStatus === 'Paid').length;
+    const activeLamps = lampsRes.filter(
+      (l) => l.status === "Active" || l.paymentStatus === "Paid",
+    ).length;
 
     const qEvents = await prisma.queueEvent.findMany({
-      where: { status: 'Active', templeId }
+      where: { status: "Active", templeId },
     });
-    
-    const qActive = await Promise.all(qEvents.map(async (evt) => {
-      const tickets = await prisma.queueTicket.findMany({
-        where: { eventId: evt.id, templeId },
-        select: { status: true }
-      });
-      const waiting = tickets.filter(t => t.status === 'Queuing').length;
-      const completed = tickets.filter(t => t.status === 'Completed').length;
-      return { title: evt.title, waiting, completed };
-    }));
+
+    const qActive = await Promise.all(
+      qEvents.map(async (evt) => {
+        const tickets = await prisma.queueTicket.findMany({
+          where: { eventId: evt.id, templeId },
+          select: { status: true },
+        });
+        const waiting = tickets.filter((t) => t.status === "Queuing").length;
+        const completed = tickets.filter(
+          (t) => t.status === "Completed",
+        ).length;
+        return { title: evt.title, waiting, completed };
+      }),
+    );
 
     let isVip = true;
     let totalGB = 100;
     let used = 0;
-    let planName = '免費 5GB 空間';
+    let planName = "免費 5GB 空間";
 
     try {
       const storageRes = await prisma.templeStorage.findUnique({
-        where: { templeId }
+        where: { templeId },
       });
       if (storageRes) {
-        totalGB = Math.round(Number(storageRes.allocatedBytes) / (1024 * 1024 * 1024));
+        totalGB = Math.round(
+          Number(storageRes.allocatedBytes) / (1024 * 1024 * 1024),
+        );
         used = Number(storageRes.usedBytes) / (1024 * 1024 * 1024);
         planName = storageRes.planName || `${totalGB}GB`;
         isVip = false;
       } else {
         const temple = await prisma.temple.findUnique({
           where: { id: templeId },
-          select: { planId: true } 
+          select: { planId: true },
         });
-        
+
         if (temple) {
           isVip = false; // Just fallback for now
         }
       }
     } catch (e) {
-      console.error('fetchGlobalTempleData storage error:', e);
+      console.error("fetchGlobalTempleData storage error:", e);
     }
 
-    return { 
-      analyticsSettings: {}, 
-      analyticsData: { todayAppointments, completedAppointments, totalGuests, lampStats: { totalLamps, activeLamps }, serviceHeat: sortedServices }, 
-      raw: { apps, agiStats: {}, guests, storageInfo: { used, total: totalGB, isVip, planName }, qActive } 
+    return {
+      analyticsSettings: {},
+      analyticsData: {
+        todayAppointments,
+        completedAppointments,
+        totalGuests,
+        lampStats: { totalLamps, activeLamps },
+        serviceHeat: sortedServices,
+      },
+      raw: {
+        apps,
+        agiStats: {},
+        guests,
+        storageInfo: { used, total: totalGB, isVip, planName },
+        qActive,
+      },
     };
-
   } catch (err) {
     console.error("fetchGlobalTempleData Prisma Error:", err);
-    return { 
-      analyticsSettings: {}, 
-      analyticsData: { todayAppointments: 0, completedAppointments: 0, totalGuests: 0, lampStats: { totalLamps, activeLamps }, serviceHeat: [] }, 
-      raw: { apps: [], agiStats: {}, guests: [], storageInfo: { used: 0, total: 100, isVip: false, planName: '未知方案' }, qActive: [] } 
+    return {
+      analyticsSettings: {},
+      analyticsData: {
+        todayAppointments: 0,
+        completedAppointments: 0,
+        totalGuests: 0,
+        lampStats: { totalLamps, activeLamps },
+        serviceHeat: [],
+      },
+      raw: {
+        apps: [],
+        agiStats: {},
+        guests: [],
+        storageInfo: {
+          used: 0,
+          total: 100,
+          isVip: false,
+          planName: "未知方案",
+        },
+        qActive: [],
+      },
     };
   }
 }
@@ -4419,231 +5545,279 @@ export type GuestRecord = any;
 export type LampCategory = any;
 
 export async function fetchGuests() {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        
-        const guests = await prisma.guest.findMany({
-          where: { templeId },
-          orderBy: { createdAt: 'desc' }
-        });
-        
-        return guests.map(r => ({
-          id: r.id,
-          templeId: r.templeId,
-          phone: r.phone,
-          name: r.name,
-          email: r.email,
-          address: r.address,
-          birthday: r.birthday,
-          lunarBirthday: r.lunarBirthday,
-          birthHour: r.birthHour,
-          lineId: r.lineId,
-          status: r.status,
-          createdAt: r.createdAt.toISOString().split('T')[0]
-        }));
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+    const guests = await prisma.guest.findMany({
+      where: { templeId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return guests.map((r) => ({
+      id: r.id,
+      templeId: r.templeId,
+      phone: r.phone,
+      name: r.name,
+      email: r.email,
+      address: r.address,
+      birthday: r.birthday,
+      lunarBirthday: r.lunarBirthday,
+      birthHour: r.birthHour,
+      lineId: r.lineId,
+      status: r.status,
+      createdAt: r.createdAt.toISOString().split("T")[0],
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function searchGuestsByNameOrPhone(query: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        
-        const guests = await prisma.guest.findMany({
-          where: {
-            templeId,
-            OR: [
-              { name: { contains: query } },
-              { phone: { contains: query } }
-            ]
-          }
-        });
-        return guests;
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+    const guests = await prisma.guest.findMany({
+      where: {
+        templeId,
+        OR: [{ name: { contains: query } }, { phone: { contains: query } }],
+      },
+    });
+    return guests;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export async function checkGuestProfile(phone: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return null;
-        return await prisma.guest.findFirst({
-          where: { phone, templeId }
-        });
-      } catch(e) {
-        console.error(e);
-        return null;
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return null;
+    return await prisma.guest.findFirst({
+      where: { phone, templeId },
+    });
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }
 
 export async function createOrUpdateGuest(data: any, originalPhone?: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return { success: false };
-        
-        let d = data;
-        if (data instanceof FormData) {
-          d = {
-            phone: data.get('phone') as string,
-            name: data.get('name') as string,
-            email: data.get('email') as string,
-            password: data.get('password') as string,
-            address: data.get('address') as string,
-            birthday: data.get('birthday') as string,
-            lunarBirthday: data.get('lunarBirthday') as string,
-            birthHour: data.get('birthHour') as string,
-            lineId: data.get('lineId') as string,
-            status: data.get('status') as string || 'Active'
-          };
-        }
-        
-        const normPhone = normalizePhone(d.phone);
-        await prisma.guest.upsert({
-          where: { 
-            templeId_phone: {
-              templeId,
-              phone: normPhone
-            }
-          },
-          update: {
-            name: d.name,
-            email: d.email || null,
-            password: d.password || null,
-            address: d.address || null,
-            birthday: d.birthday || null,
-            lunarBirthday: d.lunarBirthday || null,
-            birthHour: d.birthHour || null,
-            lineId: d.lineId || null,
-            status: d.status || 'Active'
-          },
-          create: {
-            templeId,
-            phone: normPhone,
-            name: d.name,
-            email: d.email || null,
-            password: d.password || null,
-            address: d.address || null,
-            birthday: d.birthday || null,
-            lunarBirthday: d.lunarBirthday || null,
-            birthHour: d.birthHour || null,
-            lineId: d.lineId || null,
-            status: d.status || 'Active'
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    let d = data;
+    if (data instanceof FormData) {
+      d = {
+        phone: data.get("phone") as string,
+        name: data.get("name") as string,
+        email: data.get("email") as string,
+        password: data.get("password") as string,
+        address: data.get("address") as string,
+        birthday: data.get("birthday") as string,
+        lunarBirthday: data.get("lunarBirthday") as string,
+        birthHour: data.get("birthHour") as string,
+        lineId: data.get("lineId") as string,
+        status: (data.get("status") as string) || "Active",
+      };
+    }
+
+    const normPhone = normalizePhone(d.phone);
+    await prisma.guest.upsert({
+      where: {
+        templeId_phone: {
+          templeId,
+          phone: normPhone,
+        },
+      },
+      update: {
+        name: d.name,
+        email: d.email || null,
+        password: d.password || null,
+        address: d.address || null,
+        birthday: d.birthday || null,
+        lunarBirthday: d.lunarBirthday || null,
+        birthHour: d.birthHour || null,
+        lineId: d.lineId || null,
+        status: d.status || "Active",
+      },
+      create: {
+        templeId,
+        phone: normPhone,
+        name: d.name,
+        email: d.email || null,
+        password: d.password || null,
+        address: d.address || null,
+        birthday: d.birthday || null,
+        lunarBirthday: d.lunarBirthday || null,
+        birthHour: d.birthHour || null,
+        lineId: d.lineId || null,
+        status: d.status || "Active",
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 export async function fetchGuestHistory(p: string) {
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return { files: [], records: [], appointments: [], lampRecords: [], activities: [], queueTickets: [], eventRegistrations: [] };
-        const normPhone = p.replace(/-/g, '');
-        
-        const guest = await prisma.guest.findFirst({
-          where: { templeId, phone: normPhone }
-        });
-        
-        const files = guest ? await prisma.guestFile.findMany({ where: { guestId: guest.id }, orderBy: { createdAt: 'desc' } }) : [];
-        const appointments = await prisma.appointment.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        const lampRecords = await prisma.lampRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        const queueTickets = await prisma.queueTicket.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' }, include: { queueEvent: true } });
-        const eventRegistrations = await prisma.eventRegistration.findMany({ 
-          where: { templeId, phone: { contains: normPhone } }, 
-          include: { event: true },
-          orderBy: { createdAt: 'desc' } 
-        });
-        const guestNotes = guest ? await prisma.guestNote.findMany({ where: { guestId: guest.id }, orderBy: { createdAt: 'desc' } }) : [];
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId)
+      return {
+        files: [],
+        records: [],
+        appointments: [],
+        lampRecords: [],
+        activities: [],
+        queueTickets: [],
+        eventRegistrations: [],
+      };
+    const normPhone = p.replace(/-/g, "");
 
-        const rawDeepRecords = await prisma.deepRecord.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        const records = rawDeepRecords.map(r => ({
-          id: r.id,
-          date: r.date,
-          serviceType: r.content || '',
-          staffName: r.remarks || '',
-          values: r.paymentRef ? JSON.parse(r.paymentRef) : null
-        }));
+    const guest = await prisma.guest.findFirst({
+      where: { templeId, phone: normPhone },
+    });
 
-        const rawActivities = await prisma.activity.findMany({ where: { templeId, phone: { contains: normPhone } }, orderBy: { createdAt: 'desc' } });
-        const activities = rawActivities.map(a => ({
-          type: a.type,
-          content: a.content,
-          timestamp: a.createdAt.toISOString()
-        }));
+    const files = guest
+      ? await prisma.guestFile.findMany({
+          where: { guestId: guest.id },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
+    const appointments = await prisma.appointment.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      orderBy: { createdAt: "desc" },
+    });
+    const lampRecords = await prisma.lampRecord.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      orderBy: { createdAt: "desc" },
+    });
+    const queueTickets = await prisma.queueTicket.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      orderBy: { createdAt: "desc" },
+      include: { queueEvent: true },
+    });
+    const eventRegistrations = await prisma.eventRegistration.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      include: { event: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const guestNotes = guest
+      ? await prisma.guestNote.findMany({
+          where: { guestId: guest.id },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
 
-        return {
-          files,
-          records,
-          appointments,
-          lampRecords,
-          activities,
-          queueTickets,
-          eventRegistrations,
-          guestNotes
-        };
-      } catch (error) {
-        console.error('fetchGuestHistory error:', error);
-        return { files: [], records: [], appointments: [], lampRecords: [], activities: [], queueTickets: [], eventRegistrations: [], guestNotes: [] };
-      }
+    const rawDeepRecords = await prisma.deepRecord.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      orderBy: { createdAt: "desc" },
+    });
+    const records = rawDeepRecords.map((r) => ({
+      id: r.id,
+      date: r.date,
+      serviceType: r.content || "",
+      staffName: r.remarks || "",
+      values: r.paymentRef ? JSON.parse(r.paymentRef) : null,
+    }));
+
+    const rawActivities = await prisma.activity.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      orderBy: { createdAt: "desc" },
+    });
+    const activities = rawActivities.map((a) => ({
+      type: a.type,
+      content: a.content,
+      timestamp: a.createdAt.toISOString(),
+    }));
+
+    return {
+      files,
+      records,
+      appointments,
+      lampRecords,
+      activities,
+      queueTickets,
+      eventRegistrations,
+      guestNotes,
+    };
+  } catch (error) {
+    console.error("fetchGuestHistory error:", error);
+    return {
+      files: [],
+      records: [],
+      appointments: [],
+      lampRecords: [],
+      activities: [],
+      queueTickets: [],
+      eventRegistrations: [],
+      guestNotes: [],
+    };
+  }
 }
 
 export async function fetchGuestRecords(phone: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        const normPhone = phone.replace(/-/g, '');
-        return await prisma.appointment.findMany({
-          where: { templeId, phone: { contains: normPhone } },
-          orderBy: { createdAt: 'desc' }
-        });
-      } catch (error) {
-        console.error('fetchGuestRecords error:', error);
-        return [];
-      }
-}
-
-export async function updateDeepRecord(recordId: string, phone: string, staffName: string, values: any) {
-
-      try {
-        const record = await prisma.deepRecord.findUnique({ where: { id: recordId } });
-        if (record) {
-          await prisma.deepRecord.update({
-            where: { id: recordId },
-            data: {
-              remarks: staffName,
-              paymentRef: values ? JSON.stringify(values) : null
-            }
-          });
-          return { success: true, message: '紀錄已更新' };
-        }
-        return { success: false, message: '找不到指定的案卷紀錄' };
-      } catch (error) {
-        console.error('updateDeepRecord error:', error);
-        return { success: false, message: '更新失敗' };
-      }
-}
-export async function saveDeepRecord(phone: string, eventId: string, serviceType: string, staffName: string, values: any) {
   try {
     const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false, message: '未指定宮廟' };
+    if (!templeId) return [];
+    const normPhone = phone.replace(/-/g, "");
+    return await prisma.appointment.findMany({
+      where: { templeId, phone: { contains: normPhone } },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("fetchGuestRecords error:", error);
+    return [];
+  }
+}
+
+export async function updateDeepRecord(
+  recordId: string,
+  phone: string,
+  staffName: string,
+  values: any,
+) {
+  try {
+    const record = await prisma.deepRecord.findUnique({
+      where: { id: recordId },
+    });
+    if (record) {
+      await prisma.deepRecord.update({
+        where: { id: recordId },
+        data: {
+          remarks: staffName,
+          paymentRef: values ? JSON.stringify(values) : null,
+        },
+      });
+      return { success: true, message: "紀錄已更新" };
+    }
+    return { success: false, message: "找不到指定的案卷紀錄" };
+  } catch (error) {
+    console.error("updateDeepRecord error:", error);
+    return { success: false, message: "更新失敗" };
+  }
+}
+export async function saveDeepRecord(
+  phone: string,
+  eventId: string,
+  serviceType: string,
+  staffName: string,
+  values: any,
+) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false, message: "未指定宮廟" };
 
     const normPhone = normalizePhone(phone);
     const guest = await prisma.guest.findFirst({
-      where: { templeId, phone: normPhone }
+      where: { templeId, phone: normPhone },
     });
 
     const newRecord = await prisma.deepRecord.create({
@@ -4653,17 +5827,17 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
         phone: normPhone,
         category: eventId,
         content: serviceType,
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         remarks: staffName,
-        paymentRef: values ? JSON.stringify(values) : null
-      }
+        paymentRef: values ? JSON.stringify(values) : null,
+      },
     });
-    
+
     let activityContent = `完成【${serviceType}】紀錄歸檔`;
-    if (serviceType?.includes('功德')) {
-      const amount = values && values['金額'] ? values['金額'] : '';
-      const payer = values && values['付款人'] ? values['付款人'] : '';
-      const method = values && values['支付方式'] ? values['支付方式'] : '';
+    if (serviceType?.includes("功德")) {
+      const amount = values && values["金額"] ? values["金額"] : "";
+      const payer = values && values["付款人"] ? values["付款人"] : "";
+      const method = values && values["支付方式"] ? values["支付方式"] : "";
       activityContent = `完成【${serviceType}】錄入: ${amount} (由${payer}以${method}支付)`;
     }
 
@@ -4672,265 +5846,340 @@ export async function saveDeepRecord(phone: string, eventId: string, serviceType
         templeId,
         guestId: guest ? guest.id : null,
         phone: normPhone,
-        type: 'DeepRecord',
-        content: activityContent
-      }
+        type: "DeepRecord",
+        content: activityContent,
+      },
     });
 
     await revalidateTemple();
     return { success: true, record: newRecord };
   } catch (error) {
-    console.error('saveDeepRecord error:', error);
-    return { success: false, message: '儲存失敗' };
+    console.error("saveDeepRecord error:", error);
+    return { success: false, message: "儲存失敗" };
   }
 }
-export async function fetchAllFilesByDate() { return []; }
-export async function setFilePrivacy() { return { success: true }; }
+export async function fetchAllFilesByDate() {
+  return [];
+}
+export async function setFilePrivacy() {
+  return { success: true };
+}
 export async function updateGuestPassword(phone: string, newPassword: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        const normPhone = normalizePhone(phone);
-        await prisma.guest.updateMany({
-          where: { phone: normPhone, templeId: templeId! },
-          data: { password: newPassword }
-        });
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    const normPhone = normalizePhone(phone);
+    await prisma.guest.updateMany({
+      where: { phone: normPhone, templeId: templeId! },
+      data: { password: newPassword },
+    });
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 // --- 點燈管理 (Lamps) 相關 mock 函式與型別 ---
 export type LampRecord = any;
 
 export async function fetchGuestByPhone(p: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return null;
-        const normPhone = p.replace(/-/g, '');
-        return await prisma.guest.findFirst({
-          where: { templeId, phone: { contains: normPhone } }
-        });
-      } catch (error) {
-        console.error('fetchGuestByPhone error:', error);
-        return null;
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return null;
+    const normPhone = p.replace(/-/g, "");
+    return await prisma.guest.findFirst({
+      where: { templeId, phone: { contains: normPhone } },
+    });
+  } catch (error) {
+    console.error("fetchGuestByPhone error:", error);
+    return null;
+  }
 }
-export async function confirmPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
+export async function confirmPayment(
+  recordId: string,
+  recordType: "Lamp" | "Event" | "Queue" | "Appointment",
+) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
 
     let amount = 0;
-    let category = 'OTHER';
-    let source = '';
+    let category = "OTHER";
+    let source = "";
 
-    if (recordType === 'Appointment') {
-      const rec = await prisma.appointment.findFirst({ where: { id: recordId, templeId } });
+    if (recordType === "Appointment") {
+      const rec = await prisma.appointment.findFirst({
+        where: { id: recordId, templeId },
+      });
       if (rec) {
-         amount = rec.price || 0; category = 'SERVICE'; source = `預約服務付款 - ${rec.serviceName}`;
-         await prisma.appointment.updateMany({
-           where: { id: recordId, templeId },
-           data: { status: 'Confirmed', paymentStatus: 'Paid' }
-         });
+        amount = rec.price || 0;
+        category = "SERVICE";
+        source = `預約服務付款 - ${rec.serviceName}`;
+        await prisma.appointment.updateMany({
+          where: { id: recordId, templeId },
+          data: { status: "Confirmed", paymentStatus: "Paid" },
+        });
       }
     }
-    if (recordType === 'Lamp') {
-      const rec = await prisma.lampRecord.findFirst({ where: { id: recordId, templeId } });
+    if (recordType === "Lamp") {
+      const rec = await prisma.lampRecord.findFirst({
+        where: { id: recordId, templeId },
+      });
       if (rec) {
-         amount = rec.actualPrice || 0; category = 'LAMP'; source = `點燈付款 - ${rec.categoryName}`;
-         await prisma.lampRecord.updateMany({
-           where: { id: recordId, templeId },
-           data: { paymentStatus: 'Paid' }
-         });
+        amount = rec.actualPrice || 0;
+        category = "LAMP";
+        source = `點燈付款 - ${rec.categoryName}`;
+        await prisma.lampRecord.updateMany({
+          where: { id: recordId, templeId },
+          data: { paymentStatus: "Paid" },
+        });
       }
     }
-    if (recordType === 'Event') {
-      const rec = await prisma.eventRegistration.findFirst({ where: { id: recordId, templeId } });
+    if (recordType === "Event") {
+      const rec = await prisma.eventRegistration.findFirst({
+        where: { id: recordId, templeId },
+      });
       if (rec) {
-         amount = rec.actualPrice || 0; category = 'EVENT'; source = `法會付款 - ${rec.eventName}`;
-         await prisma.eventRegistration.updateMany({
-           where: { id: recordId, templeId },
-           data: { paymentStatus: 'Paid' }
-         });
+        amount = rec.actualPrice || 0;
+        category = "EVENT";
+        source = `法會付款 - ${rec.eventName}`;
+        await prisma.eventRegistration.updateMany({
+          where: { id: recordId, templeId },
+          data: { paymentStatus: "Paid" },
+        });
       }
     }
-    if (recordType === 'Queue') {
+    if (recordType === "Queue") {
       await prisma.queueTicket.updateMany({
         where: { id: recordId, templeId },
-        data: { paymentStatus: 'Paid' }
+        data: { paymentStatus: "Paid" },
       });
     }
 
     if (amount > 0) {
       await prisma.financeRecord.create({
-         data: { templeId, type: 'INCOME', category, amount, source, date: new Date() }
+        data: {
+          templeId,
+          type: "INCOME",
+          category,
+          amount,
+          source,
+          date: new Date(),
+        },
       });
     }
 
     await revalidateTemple();
     return { success: true };
   } catch (e) {
-    console.error('confirmPayment error:', e);
+    console.error("confirmPayment error:", e);
     return { success: false };
   }
 }
 export async function createLampRecord(data: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    let phone = "";
+    let categoryId = "";
+    let guestName = "";
+    let notice = "";
+    let paymentMethod = "";
+    let paymentRef = "";
+    let position = "";
+    let durationDays = 365;
+    let startDate = new Date();
 
-      try {
-        const templeId = await getDynamicTempleId();
-        let phone = ''; let categoryId = ''; let guestName = ''; let notice = ''; let paymentMethod = ''; let paymentRef = ''; let position = ''; let durationDays = 365; let startDate = new Date();
-        
-        if (data instanceof FormData) {
-          phone = data.get('phone') as string; categoryId = data.get('categoryId') as string; guestName = data.get('guestName') as string; notice = data.get('notice') as string; paymentMethod = data.get('paymentMethod') as string || 'Cash'; paymentRef = data.get('paymentRef') as string || '';
-          position = data.get('position') as string || '';
-          durationDays = data.get('durationDays') ? parseInt(data.get('durationDays') as string, 10) : 0;
-          startDate = data.get('startDate') ? new Date(data.get('startDate') as string) : new Date();
-        } else {
-          phone = data.phone; categoryId = data.categoryId; guestName = data.guestName; notice = data.notice; paymentMethod = data.paymentMethod || 'Cash'; paymentRef = data.paymentRef || '';
-          position = data.position || '';
-          durationDays = data.durationDays ? parseInt(data.durationDays, 10) : 0;
-          startDate = data.startDate ? new Date(data.startDate) : new Date();
-        }
+    if (data instanceof FormData) {
+      phone = data.get("phone") as string;
+      categoryId = data.get("categoryId") as string;
+      guestName = data.get("guestName") as string;
+      notice = data.get("notice") as string;
+      paymentMethod = (data.get("paymentMethod") as string) || "Cash";
+      paymentRef = (data.get("paymentRef") as string) || "";
+      position = (data.get("position") as string) || "";
+      durationDays = data.get("durationDays")
+        ? parseInt(data.get("durationDays") as string, 10)
+        : 0;
+      startDate = data.get("startDate")
+        ? new Date(data.get("startDate") as string)
+        : new Date();
+    } else {
+      phone = data.phone;
+      categoryId = data.categoryId;
+      guestName = data.guestName;
+      notice = data.notice;
+      paymentMethod = data.paymentMethod || "Cash";
+      paymentRef = data.paymentRef || "";
+      position = data.position || "";
+      durationDays = data.durationDays ? parseInt(data.durationDays, 10) : 0;
+      startDate = data.startDate ? new Date(data.startDate) : new Date();
+    }
 
-        const cat = await prisma.lampCategory.findFirst({
-          where: { id: categoryId, templeId: templeId! }
-        });
-        
-        if (!cat) return { success: false, error: '未找到燈種類別' };
+    const cat = await prisma.lampCategory.findFirst({
+      where: { id: categoryId, templeId: templeId! },
+    });
 
-        const currentCount = await prisma.lampRecord.count({
-          where: { templeId: templeId!, categoryId: cat.id, status: { in: ['Active', 'Pending'] } }
-        });
-        
-        if (currentCount >= cat.totalSlots) {
-          return { success: false, error: '該點燈服務名額已滿，請選擇其他燈種。' };
-        }
-        
-        if (position) {
-          const existing = await prisma.lampRecord.findFirst({
-            where: { templeId: templeId!, categoryId: cat.id, position, status: { in: ['Active', 'Pending'] } }
-          });
-          if (existing) return { success: false, error: '該燈位已被預訂或使用中，請重新選擇。' };
-        }
-        
-        const newId = `LMP-${Date.now()}`;
-        const paymentStatus = (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') ? 'Paid' : ((paymentMethod === 'transfer' || paymentMethod === 'customQR') ? 'Pending' : 'Unpaid');
-        
-        const normPhone = normalizePhone(phone);
-        const guest = await prisma.guest.upsert({
-          where: { templeId_phone: { templeId: templeId!, phone: normPhone } },
-          update: {},
-          create: { templeId: templeId!, phone: normPhone, name: guestName, status: 'Active' }
-        });
+    if (!cat) return { success: false, error: "未找到燈種類別" };
 
+    const currentCount = await prisma.lampRecord.count({
+      where: {
+        templeId: templeId!,
+        categoryId: cat.id,
+        status: { in: ["Active", "Pending"] },
+      },
+    });
 
-        if (!durationDays) {
-          durationDays = cat.durationDays || 365;
-        }
+    if (currentCount >= cat.totalSlots) {
+      return { success: false, error: "該點燈服務名額已滿，請選擇其他燈種。" };
+    }
 
-        const expiryDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    if (position) {
+      const existing = await prisma.lampRecord.findFirst({
+        where: {
+          templeId: templeId!,
+          categoryId: cat.id,
+          position,
+          status: { in: ["Active", "Pending"] },
+        },
+      });
+      if (existing)
+        return {
+          success: false,
+          error: "該燈位已被預訂或使用中，請重新選擇。",
+        };
+    }
 
-        await prisma.lampRecord.create({
-          data: {
-            id: newId,
-            templeId: templeId!,
-            categoryId: cat.id,
-            categoryName: cat.name,
-            guestId: guest.id,
-            guestName,
-            phone: normPhone,
-            actualPrice: cat.price,
-            status: 'Pending',
-            paymentMethod,
-            paymentRef: paymentRef,
-            paymentStatus,
-            remarks: notice,
-            position,
-            startDate,
-            durationDays,
-            expiryDate
-          }
-        });
+    const newId = `LMP-${Date.now()}`;
+    const paymentStatus =
+      paymentMethod === "LinePayApi" || paymentMethod === "ThirdPartyApi"
+        ? "Paid"
+        : paymentMethod === "transfer" || paymentMethod === "customQR"
+          ? "Pending"
+          : "Unpaid";
 
-          await prisma.adminNotification.create({
-            data: {
-              templeId: templeId!,
-              category: 'PENDING_REVIEW',
-              message: `信眾 ${guestName || phone} 點了 ${cat.name || '點燈服務'} (金額：NT$ ${cat.price || 0})`,
-              isRead: false,
-              linkPath: `/${templeId!}/admin/lamps`
-            }
-          });
-        
-        await revalidateTemple();
-        return { success: true, id: newId };
-      } catch(e: any) {
-        console.error('createLampRecord error:', e);
-        return { success: false, message: e.message || String(e) };
-      }
+    const normPhone = normalizePhone(phone);
+    const guest = await prisma.guest.upsert({
+      where: { templeId_phone: { templeId: templeId!, phone: normPhone } },
+      update: {},
+      create: {
+        templeId: templeId!,
+        phone: normPhone,
+        name: guestName,
+        status: "Active",
+      },
+    });
+
+    if (!durationDays) {
+      durationDays = cat.durationDays || 365;
+    }
+
+    const expiryDate = new Date(
+      startDate.getTime() + durationDays * 24 * 60 * 60 * 1000,
+    );
+
+    await prisma.lampRecord.create({
+      data: {
+        id: newId,
+        templeId: templeId!,
+        categoryId: cat.id,
+        categoryName: cat.name,
+        guestId: guest.id,
+        guestName,
+        phone: normPhone,
+        actualPrice: cat.price,
+        status: "Pending",
+        paymentMethod,
+        paymentRef: paymentRef,
+        paymentStatus,
+        remarks: notice,
+        position,
+        startDate,
+        durationDays,
+        expiryDate,
+      },
+    });
+
+    await prisma.adminNotification.create({
+      data: {
+        templeId: templeId!,
+        category: "PENDING_REVIEW",
+        message: `信眾 ${guestName || phone} 點了 ${cat.name || "點燈服務"} (金額：NT$ ${cat.price || 0})`,
+        isRead: false,
+        linkPath: `/${templeId!}/admin/lamps`,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true, id: newId };
+  } catch (e: any) {
+    console.error("createLampRecord error:", e);
+    return { success: false, message: e.message || String(e) };
+  }
 }
-export async function checkLampNotifications() { return { hasNotification: false }; }
+export async function checkLampNotifications() {
+  return { hasNotification: false };
+}
 export async function saveLampCategory(data: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (data.id) {
+      await prisma.lampCategory.update({
+        where: { id: data.id },
+        data: {
+          name: data.name,
+          description: data.description || "",
+          durationDays: data.durationDays || 365,
+          totalSlots: data.totalSlots || 500,
+          price: data.price || 0,
+          precautions: data.precautions || "",
+        },
+      });
+    } else {
+      await prisma.lampCategory.create({
+        data: {
+          id: `cat-${Date.now()}`,
+          templeId: templeId!,
+          name: data.name,
+          description: data.description || "",
+          durationDays: data.durationDays || 365,
+          totalSlots: data.totalSlots || 500,
+          price: data.price || 0,
+          precautions: data.precautions || "",
+        },
+      });
+    }
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (data.id) {
-          await prisma.lampCategory.update({
-            where: { id: data.id },
-            data: {
-              name: data.name,
-              description: data.description || '',
-              durationDays: data.durationDays || 365,
-              totalSlots: data.totalSlots || 500,
-              price: data.price || 0,
-              precautions: data.precautions || ''
-            }
-          });
-        } else {
-          await prisma.lampCategory.create({
-            data: {
-              id: `cat-${Date.now()}`,
-              templeId: templeId!,
-              name: data.name,
-              description: data.description || '',
-              durationDays: data.durationDays || 365,
-              totalSlots: data.totalSlots || 500,
-              price: data.price || 0,
-              precautions: data.precautions || ''
-            }
-          });
-        }
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function deleteLampCategory(id: string) {
+  try {
+    const hasRecords = await prisma.lampRecord.findFirst({
+      where: { categoryId: id },
+    });
 
-      try {
-        const hasRecords = await prisma.lampRecord.findFirst({
-          where: { categoryId: id }
-        });
-        
-        if (hasRecords) return { success: false, error: '該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。' };
-        
-        await prisma.lampCategory.delete({ where: { id } });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    if (hasRecords)
+      return {
+        success: false,
+        error: "該點燈類別已有信眾登記，請先移除相關信眾紀錄後再進行刪除。",
+      };
+
+    await prisma.lampCategory.delete({ where: { id } });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
-export async function renewLampRecord(id: string) { return { success: true }; }
+export async function renewLampRecord(id: string) {
+  return { success: true };
+}
 
 // --- 現場排隊 (Queue) 相關 mock 函式與型別 ---
 export type QueueEvent = any;
@@ -4940,339 +6189,363 @@ export type QueueEvent = any;
 // Removed redundant initialization block
 
 export async function fetchQueueEvents() {
+  try {
+    const templeId = await getDynamicTempleId();
+    const events = await prisma.queueEvent.findMany({
+      where: { templeId: templeId! },
+      orderBy: [{ date: "desc" }, { startTime: "desc" }],
+      include: { tickets: { where: { status: { notIn: ["Cancelled"] } } } },
+    });
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const events = await prisma.queueEvent.findMany({
-          where: { templeId: templeId! },
-          orderBy: [{ date: 'desc' }, { startTime: 'desc' }],
-          include: { tickets: { where: { status: { notIn: ['Cancelled'] } } } }
-        });
-        
-        return events.map(r => ({
-          id: r.id,
-          templeId: r.templeId,
-          title: r.title,
-          date: r.date,
-          startTime: r.startTime,
-          endTime: r.endTime,
-          location: r.location,
-          description: r.description,
-          serviceType: r.serviceType,
-          price: r.price,
-          maxCapacity: r.maxCapacity,
-          status: r.status,
-          participantCount: r.tickets.length
-        }));
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+    return events.map((r) => ({
+      id: r.id,
+      templeId: r.templeId,
+      title: r.title,
+      date: r.date,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      location: r.location,
+      description: r.description,
+      serviceType: r.serviceType,
+      price: r.price,
+      maxCapacity: r.maxCapacity,
+      status: r.status,
+      participantCount: r.tickets.length,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function fetchActiveQueues() {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        const events = await prisma.queueEvent.findMany({
-          where: { templeId: templeId!, status: 'Active' }
-        });
-        return events.map(r => ({
-          id: r.id, templeId: r.templeId, title: r.title, date: r.date, startTime: r.startTime, endTime: r.endTime,
-          location: r.location, description: r.description, serviceType: r.serviceType, price: r.price, maxCapacity: r.maxCapacity, status: r.status
-        }));
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    const events = await prisma.queueEvent.findMany({
+      where: { templeId: templeId!, status: "Active" },
+    });
+    return events.map((r) => ({
+      id: r.id,
+      templeId: r.templeId,
+      title: r.title,
+      date: r.date,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      location: r.location,
+      description: r.description,
+      serviceType: r.serviceType,
+      price: r.price,
+      maxCapacity: r.maxCapacity,
+      status: r.status,
+    }));
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 export async function fetchQueueDashboard(eventId?: string) {
+  try {
+    if (!eventId) return { tickets: [] };
+    const templeId = await getDynamicTempleId();
 
-      try {
-        if (!eventId) return { tickets: [] };
-        const templeId = await getDynamicTempleId();
-        
-        const tickets = await prisma.queueTicket.findMany({
-          where: { eventId, templeId: templeId! }
-        });
-        
-        return {
-          tickets: tickets.map(r => ({
-            id: r.id, eventId: r.eventId, templeId: r.templeId, eventTitle: (r as any).eventTitle, phone: r.phone, guestName: r.guestName,
-            status: r.status, assignedNumber: r.assignedNumber, createdAt: r.createdAt.toISOString(), scannedAt: (r as any).scannedAt, actualOrder: r.actualOrder
-          }))
-        };
-      } catch (e) {
-        console.error(e);
-        return { tickets: [] };
-      }
+    const tickets = await prisma.queueTicket.findMany({
+      where: { eventId, templeId: templeId! },
+    });
+
+    return {
+      tickets: tickets.map((r) => ({
+        id: r.id,
+        eventId: r.eventId,
+        templeId: r.templeId,
+        eventTitle: (r as any).eventTitle,
+        phone: r.phone,
+        guestName: r.guestName,
+        status: r.status,
+        assignedNumber: r.assignedNumber,
+        createdAt: r.createdAt.toISOString(),
+        scannedAt: (r as any).scannedAt,
+        actualOrder: r.actualOrder,
+      })),
+    };
+  } catch (e) {
+    console.error(e);
+    return { tickets: [] };
+  }
 }
 // 獲取當前活動以掃碼正在排隊的人數
 export async function fetchActiveQueueCount(): Promise<number> {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        const count = await prisma.queueTicket.count({
-          where: {
-            templeId: templeId!,
-            status: { in: ['Queuing', 'Calling'] },
-            queueEvent: { status: 'Active' }
-          }
-        });
-        return count;
-      } catch(e) {
-        console.error(e);
-        return 0;
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    const count = await prisma.queueTicket.count({
+      where: {
+        templeId: templeId!,
+        status: { in: ["Queuing", "Calling"] },
+        queueEvent: { status: "Active" },
+      },
+    });
+    return count;
+  } catch (e) {
+    console.error(e);
+    return 0;
+  }
 }
 
 export async function createQueueEvent(data: any) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (data.date < todayStr)
+      return { success: false, error: "不能部屬過去時間的活動。" };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (data.date < todayStr) return { success: false, error: '不能部屬過去時間的活動。' };
-        
-        await prisma.queueEvent.create({
-          data: {
-            id: `qe-${Date.now()}`,
-            templeId: templeId!,
-            title: data.title,
-            date: data.date,
-            startTime: data.startTime,
-            endTime: data.endTime,
-            location: data.location,
-            description: data.description,
-            serviceType: data.serviceType,
-            price: data.price,
-            maxCapacity: data.maxCapacity,
-            status: 'Active'
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e: any) {
-        console.error(e);
-        return { success: false, error: e.message };
-      }
+    await prisma.queueEvent.create({
+      data: {
+        id: `qe-${Date.now()}`,
+        templeId: templeId!,
+        title: data.title,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        description: data.description,
+        serviceType: data.serviceType,
+        price: data.price,
+        maxCapacity: data.maxCapacity,
+        status: "Active",
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e: any) {
+    console.error(e);
+    return { success: false, error: e.message };
+  }
 }
 
 export async function updateQueueEvent(id: string, data: any) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.queueEvent.update({
-          where: { id },
-          data: {
-            title: data.title,
-            date: data.date,
-            startTime: data.startTime,
-            endTime: data.endTime,
-            location: data.location,
-            description: data.description,
-            serviceType: data.serviceType,
-            price: data.price,
-            maxCapacity: data.maxCapacity
-          }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e: any) {
-        console.error(e);
-        return { success: false, error: e.message };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.queueEvent.update({
+      where: { id },
+      data: {
+        title: data.title,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        description: data.description,
+        serviceType: data.serviceType,
+        price: data.price,
+        maxCapacity: data.maxCapacity,
+      },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e: any) {
+    console.error(e);
+    return { success: false, error: e.message };
+  }
 }
 export async function activateQueueEvent(id: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        const qe = await prisma.queueEvent.findUnique({ where: { id } });
-        if (qe) {
-          await prisma.queueEvent.update({
-            where: { id },
-            data: { status: qe.status === 'Active' ? 'Draft' : 'Active' }
-          });
-        }
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    const qe = await prisma.queueEvent.findUnique({ where: { id } });
+    if (qe) {
+      await prisma.queueEvent.update({
+        where: { id },
+        data: { status: qe.status === "Active" ? "Draft" : "Active" },
+      });
+    }
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 export async function deleteQueueEvent(id: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        const tickets = await prisma.queueTicket.count({ where: { eventId: id } });
-        if (tickets > 0) {
-          await prisma.queueEvent.update({
-            where: { id },
-            data: { status: 'Cancelled' }
-          });
-          await prisma.queueTicket.updateMany({
-            where: { eventId: id, status: { not: 'Cancelled' } },
-            data: { status: 'Cancelled' }
-          });
-        } else {
-          await prisma.queueEvent.delete({ where: { id } });
-        }
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    const tickets = await prisma.queueTicket.count({ where: { eventId: id } });
+    if (tickets > 0) {
+      await prisma.queueEvent.update({
+        where: { id },
+        data: { status: "Cancelled" },
+      });
+      await prisma.queueTicket.updateMany({
+        where: { eventId: id, status: { not: "Cancelled" } },
+        data: { status: "Cancelled" },
+      });
+    } else {
+      await prisma.queueEvent.delete({ where: { id } });
+    }
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 export async function checkInWithQr(ticketId: string, eventId?: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const t = await prisma.queueTicket.findUnique({ where: { id: ticketId } });
+    if (!t) return { success: false, error: "找不到票券" };
+    if (t.status !== "Registered" && t.status !== "Pending")
+      return { success: false, error: "票券狀態不正確" };
+    if (eventId && t.eventId !== eventId)
+      return { success: false, error: "活動不符，請掃描正確的活動QR碼" };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const t = await prisma.queueTicket.findUnique({ where: { id: ticketId } });
-        if (!t) return { success: false, error: '找不到票券' };
-        if (t.status !== 'Registered' && t.status !== 'Pending') return { success: false, error: '票券狀態不正確' };
-        if (eventId && t.eventId !== eventId) return { success: false, error: '活動不符，請掃描正確的活動QR碼' };
-        
-        const count = await prisma.queueTicket.count({
-          where: {
-            eventId: t.eventId,
-            templeId: templeId!,
-            status: { notIn: ['Pending', 'Registered'] }
-          }
-        });
-        
-        await prisma.queueTicket.update({
-          where: { id: ticketId },
-          data: {
-            status: 'Queuing',
-            actualOrder: count + 1
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false, error: '系統錯誤' };
-      }
+    const count = await prisma.queueTicket.count({
+      where: {
+        eventId: t.eventId,
+        templeId: templeId!,
+        status: { notIn: ["Pending", "Registered"] },
+      },
+    });
+
+    await prisma.queueTicket.update({
+      where: { id: ticketId },
+      data: {
+        status: "Queuing",
+        actualOrder: count + 1,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: "系統錯誤" };
+  }
 }
 
 export async function callNextInQueue(eventId: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.queueTicket.updateMany({
+      where: { eventId, status: "Calling", templeId: templeId! },
+      data: { status: "Completed" },
+    });
 
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.queueTicket.updateMany({
-          where: { eventId, status: 'Calling', templeId: templeId! },
-          data: { status: 'Completed' }
-        });
-        
-        const nextT = await prisma.queueTicket.findFirst({
-          where: { eventId, status: 'Queuing', templeId: templeId! },
-          orderBy: { actualOrder: 'asc' }
-        });
-        
-        if (!nextT) return { error: 'NO_ONE_IN_QUEUE' };
-        
-        await prisma.queueTicket.update({
-          where: { id: nextT.id },
-          data: { status: 'Calling' }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { error: '系統錯誤' };
-      }
+    const nextT = await prisma.queueTicket.findFirst({
+      where: { eventId, status: "Queuing", templeId: templeId! },
+      orderBy: { actualOrder: "asc" },
+    });
+
+    if (!nextT) return { error: "NO_ONE_IN_QUEUE" };
+
+    await prisma.queueTicket.update({
+      where: { id: nextT.id },
+      data: { status: "Calling" },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { error: "系統錯誤" };
+  }
 }
 
 export async function completeQueueService(ticketId: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.queueTicket.update({
-          where: { id: ticketId },
-          data: { status: 'Completed' }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.queueTicket.update({
+      where: { id: ticketId },
+      data: { status: "Completed" },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function updateQueueStatus(ticketId: string, status: string) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.queueTicket.update({
-          where: { id: ticketId },
-          data: { status }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.queueTicket.update({
+      where: { id: ticketId },
+      data: { status },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
-export async function registerGuestForQueue(eventId: string, data: { guestName: string, phone: string, isOnline?: boolean }) {
+export async function registerGuestForQueue(
+  eventId: string,
+  data: { guestName: string; phone: string; isOnline?: boolean },
+) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const ev = await prisma.queueEvent.findUnique({
+      where: { id: eventId },
+      include: { tickets: true },
+    });
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const ev = await prisma.queueEvent.findUnique({
-          where: { id: eventId },
-          include: { tickets: true }
-        });
-        
-        if (!ev) return { error: 'EVENT_NOT_FOUND' };
-        
-        const activeTicketsCount = ev.tickets.filter(t => t.status !== 'Cancelled').length;
-        if (ev.maxCapacity > 0 && activeTicketsCount >= ev.maxCapacity) return { error: '活動預約已額滿！' };
-        
-        const nextNumber = `A${(ev.tickets.length + 1).toString().padStart(3, '0')}`;
-        
-        let actualOrder = 0;
-        if (!data.isOnline) {
-          const activeCount = await prisma.queueTicket.count({
-            where: { eventId, templeId: templeId!, status: { notIn: ['Pending', 'Registered'] } }
-          });
-          actualOrder = activeCount + 1;
-        }
-        
-        const newId = `t-${Date.now()}`;
-        
-        const normPhone = normalizePhone(data.phone);
-        const guest = await prisma.guest.upsert({
-          where: { templeId_phone: { templeId: templeId!, phone: normPhone } },
-          update: {},
-          create: { templeId: templeId!, phone: normPhone, name: data.guestName, status: 'Active' }
-        });
+    if (!ev) return { error: "EVENT_NOT_FOUND" };
 
-        await prisma.queueTicket.create({
-          data: {
-            id: newId,
-            eventId,
-            templeId: templeId!,
-            guestId: guest.id,
-            phone: normPhone,
-            guestName: data.guestName,
-            status: data.isOnline ? 'Registered' : 'Queuing',
-            displayNum: nextNumber,
-            assignedNumber: nextNumber,
-            eventTitle: ev.title,
-            actualOrder
-          }
-        });
-        
-        await revalidateTemple();
-        return { success: true, ticket: { id: newId, assignedNumber: nextNumber } };
-      } catch(e) {
-        console.error(e);
-        return { error: '系統錯誤' };
-      }
+    const activeTicketsCount = ev.tickets.filter(
+      (t) => t.status !== "Cancelled",
+    ).length;
+    if (ev.maxCapacity > 0 && activeTicketsCount >= ev.maxCapacity)
+      return { error: "活動預約已額滿！" };
+
+    const nextNumber = `A${(ev.tickets.length + 1).toString().padStart(3, "0")}`;
+
+    let actualOrder = 0;
+    if (!data.isOnline) {
+      const activeCount = await prisma.queueTicket.count({
+        where: {
+          eventId,
+          templeId: templeId!,
+          status: { notIn: ["Pending", "Registered"] },
+        },
+      });
+      actualOrder = activeCount + 1;
+    }
+
+    const newId = `t-${Date.now()}`;
+
+    const normPhone = normalizePhone(data.phone);
+    const guest = await prisma.guest.upsert({
+      where: { templeId_phone: { templeId: templeId!, phone: normPhone } },
+      update: {},
+      create: {
+        templeId: templeId!,
+        phone: normPhone,
+        name: data.guestName,
+        status: "Active",
+      },
+    });
+
+    await prisma.queueTicket.create({
+      data: {
+        id: newId,
+        eventId,
+        templeId: templeId!,
+        guestId: guest.id,
+        phone: normPhone,
+        guestName: data.guestName,
+        status: data.isOnline ? "Registered" : "Queuing",
+        displayNum: nextNumber,
+        assignedNumber: nextNumber,
+        eventTitle: ev.title,
+        actualOrder,
+      },
+    });
+
+    await revalidateTemple();
+    return { success: true, ticket: { id: newId, assignedNumber: nextNumber } };
+  } catch (e) {
+    console.error(e);
+    return { error: "系統錯誤" };
+  }
 }
 
 // --- 財務與結算 (Billing) 相關 mock 函式與型別 ---
@@ -5280,23 +6553,41 @@ export type RevenueEntry = any;
 export type ExpenseEntry = any;
 export type FreeAccountApplication = any;
 
-export async function initiatePayment(amount: number, desc: string) { return { success: true }; }
-export async function approveFreeAccount(id: string) { return { success: true }; }
-export async function rejectFreeAccount(id: string) { return { success: true }; }
+export async function initiatePayment(amount: number, desc: string) {
+  return { success: true };
+}
+export async function approveFreeAccount(id: string) {
+  return { success: true };
+}
+export async function rejectFreeAccount(id: string) {
+  return { success: true };
+}
 
-export async function completeMeritPayment(phone: string, recordId: string, amount: number, service: string) {
+export async function completeMeritPayment(
+  phone: string,
+  recordId: string,
+  amount: number,
+  service: string,
+) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
-    
+
     await prisma.financeRecord.create({
-      data: { templeId, type: 'INCOME', category: 'DONATION', amount: Number(amount), source: `香油錢/緣金 - ${service}`, date: new Date() }
+      data: {
+        templeId,
+        type: "INCOME",
+        category: "DONATION",
+        amount: Number(amount),
+        source: `香油錢/緣金 - ${service}`,
+        date: new Date(),
+      },
     });
-    
+
     await revalidateTemple();
     return { success: true };
   } catch (e) {
-    console.error('completeMeritPayment error:', e);
+    console.error("completeMeritPayment error:", e);
     return { success: false };
   }
 }
@@ -5323,13 +6614,29 @@ export interface TempleApplication {
   planId: string;
   setupFee: number;
   monthlyFee: number;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: "Pending" | "Approved" | "Rejected";
   salesId: string;
 }
 
 const db_price_plans: PricePlan[] = [
-  { id: 'plan-1', distributorId: 'dist-1', name: '基礎推廣方案', setupFee: 12000, monthlyFee: 3600, isFree: false, freeMonths: 0 },
-  { id: 'plan-2', distributorId: 'dist-1', name: '免費推廣試用方案', setupFee: 0, monthlyFee: 3600, isFree: true, freeMonths: 3 }
+  {
+    id: "plan-1",
+    distributorId: "dist-1",
+    name: "基礎推廣方案",
+    setupFee: 12000,
+    monthlyFee: 3600,
+    isFree: false,
+    freeMonths: 0,
+  },
+  {
+    id: "plan-2",
+    distributorId: "dist-1",
+    name: "免費推廣試用方案",
+    setupFee: 0,
+    monthlyFee: 3600,
+    isFree: true,
+    freeMonths: 3,
+  },
 ];
 
 // migrated (await jsonStore.find('temple_applications')) to (await jsonStore.find('temple_applications'))
@@ -5338,20 +6645,27 @@ const db_price_plans: PricePlan[] = [
 export async function fetchDistributorStats() {
   const templeId = await getDynamicTempleId();
   return withTempleSession(templeId, false, async (client) => {
-    const activeRes = await client.query('SELECT COUNT(*) as active_count FROM "Temple" WHERE status = $1', ['Active']);
-      const totalRes = await client.query('SELECT COUNT(*) as total_count FROM "Temple"');
-      const salesRes = await client.query('SELECT COUNT(*) as sales_count FROM dist_sales');
-      const activeCount = Number(activeRes.rows[0]?.active_count || 0);
-      const totalTemples = Number(totalRes.rows[0]?.total_count || 0);
-      const totalSales = Number(salesRes.rows[0]?.sales_count || 0);
-      return {
-              totalNodes: 100,
-              usedNodes: totalTemples,
-              activeTemples: activeCount,
-              totalRevenue: 1250000,
-              totalCommission: 187500,
-              activeSales: totalSales
-            };
+    const activeRes = await client.query(
+      'SELECT COUNT(*) as active_count FROM "Temple" WHERE status = $1',
+      ["Active"],
+    );
+    const totalRes = await client.query(
+      'SELECT COUNT(*) as total_count FROM "Temple"',
+    );
+    const salesRes = await client.query(
+      "SELECT COUNT(*) as sales_count FROM dist_sales",
+    );
+    const activeCount = Number(activeRes.rows[0]?.active_count || 0);
+    const totalTemples = Number(totalRes.rows[0]?.total_count || 0);
+    const totalSales = Number(salesRes.rows[0]?.sales_count || 0);
+    return {
+      totalNodes: 100,
+      usedNodes: totalTemples,
+      activeTemples: activeCount,
+      totalRevenue: 1250000,
+      totalCommission: 187500,
+      activeSales: totalSales,
+    };
   });
 }
 
@@ -5360,15 +6674,31 @@ export async function fetchPricePlans() {
     const plans = await prisma.pricePlan.findMany();
     if (plans.length === 0) {
       const defaultPlans = [
-        { id: 'plan-1', distributorId: 'dist-1', name: '基礎推廣方案', setupFee: 12000, monthlyFee: 3600, isFree: false, freeMonths: 0 },
-        { id: 'plan-2', distributorId: 'dist-1', name: '免費推廣試用方案', setupFee: 0, monthlyFee: 3600, isFree: true, freeMonths: 3 }
+        {
+          id: "plan-1",
+          distributorId: "dist-1",
+          name: "基礎推廣方案",
+          setupFee: 12000,
+          monthlyFee: 3600,
+          isFree: false,
+          freeMonths: 0,
+        },
+        {
+          id: "plan-2",
+          distributorId: "dist-1",
+          name: "免費推廣試用方案",
+          setupFee: 0,
+          monthlyFee: 3600,
+          isFree: true,
+          freeMonths: 3,
+        },
       ];
       await prisma.pricePlan.createMany({ data: defaultPlans });
       return defaultPlans;
     }
     return plans;
   } catch (error) {
-    console.error('Failed to fetch price plans:', error);
+    console.error("Failed to fetch price plans:", error);
     return [];
   }
 }
@@ -5379,20 +6709,20 @@ export async function createPricePlan(plan: any) {
     await prisma.pricePlan.create({
       data: {
         id: newId,
-        distributorId: 'dist-1',
+        distributorId: "dist-1",
         name: plan.name,
         setupFee: Number(plan.setupFee || 0),
         monthlyFee: Number(plan.monthlyFee || 0),
         isFree: Boolean(plan.isFree),
-        freeMonths: Number(plan.freeMonths || 0)
-      }
+        freeMonths: Number(plan.freeMonths || 0),
+      },
     });
-    
+
     await revalidateTemple();
     return { success: true };
   } catch (error) {
-    console.error('Failed to create price plan:', error);
-    return { success: false, message: '建立方案失敗' };
+    console.error("Failed to create price plan:", error);
+    return { success: false, message: "建立方案失敗" };
   }
 }
 
@@ -5408,10 +6738,10 @@ export async function fetchTempleApplications() {
       setupFee: r.setupFee,
       monthlyFee: r.monthlyFee,
       status: r.status,
-      salesId: r.salesId
+      salesId: r.salesId,
     }));
   } catch (error) {
-    console.error('Failed to fetch temple applications:', error);
+    console.error("Failed to fetch temple applications:", error);
     return [];
   }
 }
@@ -5421,95 +6751,95 @@ export async function submitTempleApplication(data: any) {
     const newId = `app-${Date.now()}`;
     let setupFee = 12000;
     let monthlyFee = 3600;
-    
+
     const plan = await prisma.pricePlan.findUnique({
-      where: { id: data.planId }
+      where: { id: data.planId },
     });
-    
+
     if (plan) {
       setupFee = plan.setupFee;
       monthlyFee = plan.monthlyFee;
     }
-    
+
     await prisma.templeApplication.create({
       data: {
         id: newId,
         templeName: data.templeName,
-        contactPerson: data.contactPerson || '聯絡人',
-        contactPhone: data.contactPhone || '',
+        contactPerson: data.contactPerson || "聯絡人",
+        contactPhone: data.contactPhone || "",
         planId: data.planId,
         setupFee,
         monthlyFee,
-        status: 'Pending',
-        salesId: 'sales-1'
-      }
+        status: "Pending",
+        salesId: "sales-1",
+      },
     });
-    
+
     await revalidateTemple();
     return { success: true };
   } catch (error) {
-    console.error('Failed to submit temple application:', error);
-    return { success: false, message: '提交申請失敗' };
+    console.error("Failed to submit temple application:", error);
+    return { success: false, message: "提交申請失敗" };
   }
 }
 
 export async function approveTempleApplication(appId: string) {
   try {
     const app = await prisma.templeApplication.findUnique({
-      where: { id: appId }
+      where: { id: appId },
     });
-    
-    if (!app) return { success: false, error: '找不到該筆開案申請' };
-    
+
+    if (!app) return { success: false, error: "找不到該筆開案申請" };
+
     await prisma.templeApplication.update({
       where: { id: appId },
-      data: { status: 'Approved' }
+      data: { status: "Approved" },
     });
-    
+
     const newTempleId = `temple-${Date.now()}`;
-    
+
     await prisma.temple.create({
       data: {
         id: newTempleId,
         name: app.templeName,
-        city: '台北市',
-        status: 'Active',
+        city: "台北市",
+        status: "Active",
         salesId: app.salesId,
         setupFee: app.setupFee,
         monthlyRent: app.monthlyFee,
-        paymentCycle: 'Monthly'
-      }
+        paymentCycle: "Monthly",
+      },
     });
-    
+
     await prisma.templeStorage.create({
       data: {
         templeId: newTempleId,
         usedBytes: 0,
         allocatedBytes: BigInt(21474836480),
-        planName: '免費 20GB 空間',
-          planId: 'FREE',
-        city: '台北市'
-      }
+        planName: "免費 20GB 空間",
+        planId: "FREE",
+        city: "台北市",
+      },
     });
-    
+
     await prisma.user.create({
       data: {
         id: `p-${Date.now()}`,
         templeId: newTempleId,
-        name: app.contactPerson || '管理員',
-        role: 'TempleAdmin',
-        account: app.contactPhone || 'admin',
-        phone: app.contactPhone || '0000',
-        password: app.contactPhone || 'admin',
-        status: 'Active'
-      }
+        name: app.contactPerson || "管理員",
+        role: "TempleAdmin",
+        account: app.contactPhone || "admin",
+        phone: app.contactPhone || "0000",
+        password: app.contactPhone || "admin",
+        status: "Active",
+      },
     });
-    
+
     await revalidateTemple();
     return { success: true };
   } catch (error) {
-    console.error('Failed to approve temple application:', error);
-    return { success: false, error: '核准失敗' };
+    console.error("Failed to approve temple application:", error);
+    return { success: false, error: "核准失敗" };
   }
 }
 
@@ -5530,23 +6860,31 @@ export interface TempleNotification {
 // (await jsonStore.find('temple_notifications')) synced
 
 // 1. 創立通知資料表與發佈公告
-export async function createNotification(title: string, content: string, sendTime: string, guestId?: string, expiresAt?: string | null, isCarousel: boolean = true, carouselSeconds: number = 5) {
-    try {
-      const templeId = await getDynamicTempleId();
-      if (!templeId) return { success: false };
-  
-      await prisma.templeNotification.create({
-        data: {
-          templeId,
-          title,
-          content,
-          sendTime: new Date(sendTime),
-          guestId: guestId || null,
-          expiresAt: expiresAt ? new Date(expiresAt) : null,
-          isCarousel,
-          carouselSeconds
-        }
-      });
+export async function createNotification(
+  title: string,
+  content: string,
+  sendTime: string,
+  guestId?: string,
+  expiresAt?: string | null,
+  isCarousel: boolean = true,
+  carouselSeconds: number = 5,
+) {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return { success: false };
+
+    await prisma.templeNotification.create({
+      data: {
+        templeId,
+        title,
+        content,
+        sendTime: new Date(sendTime),
+        guestId: guestId || null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isCarousel,
+        carouselSeconds,
+      },
+    });
 
     await revalidateTemple();
     return { success: true };
@@ -5557,26 +6895,28 @@ export async function createNotification(title: string, content: string, sendTim
 }
 
 // 2. 獲取所有通知紀錄（管理端：含定時預排通知）
-export async function fetchTempleNotifications(): Promise<TempleNotification[]> {
-    try {
-      const templeId = await getDynamicTempleId();
-      if (!templeId) return [];
-  
-      const notifs = await prisma.templeNotification.findMany({
-        where: { templeId },
-        orderBy: { sendTime: 'desc' }
-      });
-  
-      return notifs.map(n => ({
-        id: n.id,
-        title: n.title,
-        content: n.content,
-        sendTime: n.sendTime.toISOString(),
-        createdAt: n.createdAt.toISOString(),
-        expiresAt: n.expiresAt ? n.expiresAt.toISOString() : null,
+export async function fetchTempleNotifications(): Promise<
+  TempleNotification[]
+> {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+
+    const notifs = await prisma.templeNotification.findMany({
+      where: { templeId },
+      orderBy: { sendTime: "desc" },
+    });
+
+    return notifs.map((n) => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      sendTime: n.sendTime.toISOString(),
+      createdAt: n.createdAt.toISOString(),
+      expiresAt: n.expiresAt ? n.expiresAt.toISOString() : null,
       guestId: n.guestId,
       isCarousel: n.isCarousel,
-      carouselSeconds: n.carouselSeconds
+      carouselSeconds: n.carouselSeconds,
     }));
   } catch (e) {
     console.error(e);
@@ -5591,26 +6931,25 @@ export async function fetchLatestNotificationForGuest(): Promise<TempleNotificat
 }
 
 // 4. 獲取所有已發送公告（信眾端歷史對話框）
-export async function fetchActiveNotificationsForGuest(): Promise<TempleNotification[]> {
-    try {
-      const templeId = await getDynamicTempleId();
-      if (!templeId) return [];
-  
-      const now = new Date();
-      const notifs = await prisma.templeNotification.findMany({
-        where: { 
-          templeId,
-          sendTime: { lte: now },
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: now } }
-          ],
-          guestId: null // Global broadcasts only for now
-        },
-        orderBy: { sendTime: 'desc' }
-      });
-  
-      return notifs.map(n => ({
+export async function fetchActiveNotificationsForGuest(): Promise<
+  TempleNotification[]
+> {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+
+    const now = new Date();
+    const notifs = await prisma.templeNotification.findMany({
+      where: {
+        templeId,
+        sendTime: { lte: now },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        guestId: null, // Global broadcasts only for now
+      },
+      orderBy: { sendTime: "desc" },
+    });
+
+    return notifs.map((n) => ({
       id: n.id,
       title: n.title,
       content: n.content,
@@ -5618,7 +6957,7 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
       createdAt: n.createdAt.toISOString(),
       guestId: n.guestId,
       isCarousel: n.isCarousel,
-      carouselSeconds: n.carouselSeconds
+      carouselSeconds: n.carouselSeconds,
     }));
   } catch (e) {
     console.error(e);
@@ -5626,126 +6965,133 @@ export async function fetchActiveNotificationsForGuest(): Promise<TempleNotifica
   }
 }
 
-
 function normalizePhone(phone: string | undefined): string {
-  return phone ? phone.replace(/\D/g, '') : '';
+  return phone ? phone.replace(/\D/g, "") : "";
 }
-
 
 // ==========================================
 // 上帝視角 (Impersonation)
 // ==========================================
 export async function impersonateTemple(templeId: string, originRole?: string) {
-  const { cookies } = require('next/headers');
+  const { cookies } = require("next/headers");
   const cookieStore = await cookies();
-  
+
   // Track where the impersonation started from
-  const currentRole = originRole || cookieStore.get('admin_role')?.value;
-  if (currentRole && currentRole !== 'SuperAdmin') {
-    cookieStore.set('impersonator_origin', currentRole);
+  const currentRole = originRole || cookieStore.get("admin_role")?.value;
+  if (currentRole && currentRole !== "SuperAdmin") {
+    cookieStore.set("impersonator_origin", currentRole);
   }
 
   // Bypass strict role check for prototype since SuperAdmin UI is the only entry point
-  cookieStore.set('templeId', templeId);
-  cookieStore.set('admin_role', 'SuperAdmin');
-  
+  cookieStore.set("templeId", templeId);
+  cookieStore.set("admin_role", "SuperAdmin");
+
   return { success: true, redirectPath: `/${templeId}/admin/services` };
 }
-
 
 // -------------------------------------------------------------------------
 // 🚀 權限轉移 (Hierarchical Transfer)
 // -------------------------------------------------------------------------
 
-export async function transferTempleOwnership(templeId: string, newDistributorId: string | null, newSalesId: string | null) {
-  const temple = [].find(t => t.id === templeId);
-  if (!temple) return { success: false, error: 'Temple not found' };
+export async function transferTempleOwnership(
+  templeId: string,
+  newDistributorId: string | null,
+  newSalesId: string | null,
+) {
+  const temple = [].find((t) => t.id === templeId);
+  if (!temple) return { success: false, error: "Temple not found" };
 
   if (newDistributorId !== undefined) {
-     temple.distributorId = newDistributorId;
+    temple.distributorId = newDistributorId;
   }
   if (newSalesId !== undefined) {
-     temple.salesId = newSalesId;
+    temple.salesId = newSalesId;
   }
-  
+
   // Create an audit log
   await null;
 
-  const { revalidatePath } = require('next/cache');
-  revalidatePath('/super-admin');
+  const { revalidatePath } = require("next/cache");
+  revalidatePath("/super-admin");
   return { success: true };
 }
 
-export async function transferDistributorOwnership(distributorId: string, newSalesId: string | null) {
-  const dist = [].find(d => d.id === distributorId);
-  if (!dist) return { success: false, error: 'Distributor not found' };
+export async function transferDistributorOwnership(
+  distributorId: string,
+  newSalesId: string | null,
+) {
+  const dist = [].find((d) => d.id === distributorId);
+  if (!dist) return { success: false, error: "Distributor not found" };
 
   dist.salesId = newSalesId;
 
   // Transfer all underlying temples if they belong to this distributor
   // And update their salesId to the new salesId if applicable
-  [].forEach(t => {
-     if (t.distributorId === distributorId) {
-        if (newSalesId !== undefined) {
-           t.salesId = newSalesId;
-        }
-     }
+  [].forEach((t) => {
+    if (t.distributorId === distributorId) {
+      if (newSalesId !== undefined) {
+        t.salesId = newSalesId;
+      }
+    }
   });
 
   await null;
 
-  const { revalidatePath } = require('next/cache');
-  revalidatePath('/super-admin');
+  const { revalidatePath } = require("next/cache");
+  revalidatePath("/super-admin");
   return { success: true };
 }
 
 export async function returnToSuperAdmin() {
-  const { cookies } = require('next/headers');
+  const { cookies } = require("next/headers");
   const cookieStore = await cookies();
-  
-  const origin = cookieStore.get('impersonator_origin')?.value;
-  cookieStore.delete('templeId');
-  cookieStore.delete('impersonator_origin');
 
-  let redirectPath = '/super-admin';
-  
-  if (origin === 'Distributor') {
-     cookieStore.set('admin_role', 'Distributor');
-     redirectPath = '/dist-admin';
-  } else if (origin === 'SuperSales') {
-     cookieStore.set('admin_role', 'SuperSales');
-     redirectPath = '/super-sales';
+  const origin = cookieStore.get("impersonator_origin")?.value;
+  cookieStore.delete("templeId");
+  cookieStore.delete("impersonator_origin");
+
+  let redirectPath = "/super-admin";
+
+  if (origin === "Distributor") {
+    cookieStore.set("admin_role", "Distributor");
+    redirectPath = "/dist-admin";
+  } else if (origin === "SuperSales") {
+    cookieStore.set("admin_role", "SuperSales");
+    redirectPath = "/super-sales";
   } else {
-     // Default back to SuperAdmin
-     cookieStore.set('admin_role', 'SuperAdmin');
+    // Default back to SuperAdmin
+    cookieStore.set("admin_role", "SuperAdmin");
   }
 
   return { success: true, redirectPath };
 }
 
-export async function updateAppointmentPayment(appId: number, paymentMethod: string, paymentRef?: string) {
+export async function updateAppointmentPayment(
+  appId: number,
+  paymentMethod: string,
+  paymentRef?: string,
+) {
+  try {
+    const id = String(appId);
+    const app = await prisma.appointment.findUnique({ where: { id } });
+    if (!app) return { success: false, message: "找不到該預約" };
 
-      try {
-        const id = String(appId);
-        const app = await prisma.appointment.findUnique({ where: { id } });
-        if (!app) return { success: false, message: '找不到該預約' };
-        
-        let paymentStatus = 'Pending';
-        let status = 'Pending';
-        if (paymentMethod === 'LinePayApi' || paymentMethod === 'ThirdPartyApi') {
-          paymentStatus = 'Paid';
-          status = 'Confirmed';
-        }
-        
-        await prisma.appointment.update({
-          where: { id },
-          data: { paymentMethod, paymentRef, paymentStatus, status }
-        });
-        return { success: true };
-      } catch (error) {
-        console.error('updateAppointmentPayment error:', error);
-        return { success: false, message: '更新失敗' };
-      }
+    let paymentStatus = "Pending";
+    let status = "Pending";
+    if (paymentMethod === "LinePayApi" || paymentMethod === "ThirdPartyApi") {
+      paymentStatus = "Paid";
+      status = "Confirmed";
+    }
+
+    await prisma.appointment.update({
+      where: { id },
+      data: { paymentMethod, paymentRef, paymentStatus, status },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("updateAppointmentPayment error:", error);
+    return { success: false, message: "更新失敗" };
+  }
 }
 
 export async function fetchAiPlans() {
@@ -5759,31 +7105,31 @@ export async function fetchAiPlans() {
 
 export async function saveAiPlan(plan: any) {
   try {
-    if (plan.id && !plan.id.startsWith('AI-')) {
+    if (plan.id && !plan.id.startsWith("AI-")) {
       await prisma.aiPlan.upsert({
         where: { id: plan.id },
         update: {
           name: plan.name,
           price: Number(plan.price) || 0,
-          features: plan.features
+          features: plan.features,
         },
         create: {
           name: plan.name,
           price: Number(plan.price) || 0,
-          features: plan.features
-        }
+          features: plan.features,
+        },
       });
     } else {
       await prisma.aiPlan.create({
         data: {
           name: plan.name,
           price: Number(plan.price) || 0,
-          features: plan.features
-        }
+          features: plan.features,
+        },
       });
     }
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
     return { success: true };
   } catch (e) {
     console.error(e);
@@ -5794,8 +7140,8 @@ export async function saveAiPlan(plan: any) {
 export async function deleteAiPlan(id: string) {
   try {
     await prisma.aiPlan.delete({ where: { id } });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
     return { success: true };
   } catch (e) {
     console.error(e);
@@ -5803,16 +7149,14 @@ export async function deleteAiPlan(id: string) {
   }
 }
 
-
 // --- AI Plan & Usage Management ---
 export async function fetchAiApiModels() {
-
-      try {
-        return await prisma.aiApiModel.findMany();
-      } catch(e) {
-        console.error(e);
-        return [];
-      }
+  try {
+    return await prisma.aiApiModel.findMany();
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
 export async function saveAiApiModels(models: any[]) {
@@ -5821,15 +7165,15 @@ export async function saveAiApiModels(models: any[]) {
     for (const m of models) {
       await prisma.aiApiModel.create({
         data: {
-          name: m.name || '',
-          provider: m.provider || '',
-          version: m.version || '',
-          isDefault: Boolean(m.isDefault)
-        }
+          name: m.name || "",
+          provider: m.provider || "",
+          version: m.version || "",
+          isDefault: Boolean(m.isDefault),
+        },
       });
     }
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
     return { success: true };
   } catch (e) {
     console.error(e);
@@ -5837,230 +7181,243 @@ export async function saveAiApiModels(models: any[]) {
   }
 }
 
-
 export async function fetchAllTempleAiUsage() {
-
-      try {
-        return await prisma.templeAiUsage.findMany({ include: { temple: true } });
-      } catch(e) {
-        return [];
-      }
+  try {
+    return await prisma.templeAiUsage.findMany({ include: { temple: true } });
+  } catch (e) {
+    return [];
+  }
 }
 
-
-export async function grantTempleAiVip(templeId: string, isVip: boolean = true) {
+export async function grantTempleAiVip(
+  templeId: string,
+  isVip: boolean = true,
+) {
   try {
-    const existing = await prisma.templeAiUsage.findFirst({ where: { templeId } });
+    const existing = await prisma.templeAiUsage.findFirst({
+      where: { templeId },
+    });
     if (existing) {
       await prisma.templeAiUsage.update({
         where: { id: existing.id },
-        data: { planId: isVip ? 'VIP-AI' : 'FREE' }
+        data: { planId: isVip ? "VIP-AI" : "FREE" },
       });
     } else {
       await prisma.templeAiUsage.create({
-        data: { templeId, planId: isVip ? 'VIP-AI' : 'FREE', usedCount: 0 }
+        data: { templeId, planId: isVip ? "VIP-AI" : "FREE", usedCount: 0 },
       });
     }
     return { success: true };
-  } catch(e) {
-    console.error('grantTempleAiVip error:', e);
+  } catch (e) {
+    console.error("grantTempleAiVip error:", e);
     return { success: false };
   }
 }
 
 export async function fetchTempleAiUsage() {
-      try {
-        const templeId = await getDynamicTempleId();
-        const temple = await prisma.temple.findUnique({ where: { id: templeId! }, select: { aiTokens: true } });
-        return { enabled: true, aiTokens: temple?.aiTokens || 0 };
-      } catch(e) {
-        return null;
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    const temple = await prisma.temple.findUnique({
+      where: { id: templeId! },
+      select: { aiTokens: true },
+    });
+    return { enabled: true, aiTokens: temple?.aiTokens || 0 };
+  } catch (e) {
+    return null;
+  }
 }
 
 export async function toggleTempleAiStatus(enabled: boolean) {
-
-      try {
-        const templeId = await getDynamicTempleId();
-        await prisma.templeAiUsage.update({
-          where: { templeId: templeId! },
-          data: { enabled }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    await prisma.templeAiUsage.update({
+      where: { templeId: templeId! },
+      data: { enabled },
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
 export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
+  try {
+    const templeId = await getDynamicTempleId();
+    const sys = await prisma.systemConfig.findFirst();
+    const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
+    if (!plan) return { success: false };
 
-      try {
-        const templeId = await getDynamicTempleId();
-        const sys = await prisma.systemConfig.findFirst();
-        const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
-        if (!plan) return { success: false };
-        
-        await prisma.templeBill.create({
-          data: {
-            id: `bill-${Date.now()}`,
-            templeId: templeId!,
-            amount: plan.price,
-            type: 'AiUpgrade',
-            status: 'PendingPayment',
-            date: new Date()
-          }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+    await prisma.templeBill.create({
+      data: {
+        id: `bill-${Date.now()}`,
+        templeId: templeId!,
+        amount: plan.price,
+        type: "AiUpgrade",
+        status: "PendingPayment",
+        date: new Date(),
+      },
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
-export async function logSystemEvent(level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS', action: string, target: string, operator: string, templeIdOverride?: string) {
+export async function logSystemEvent(
+  level: "INFO" | "WARN" | "ERROR" | "SUCCESS",
+  action: string,
+  target: string,
+  operator: string,
+  templeIdOverride?: string,
+) {
+  try {
+    const templeId = templeIdOverride || (await getDynamicTempleId());
+    if (!templeId) return { success: false };
+    const timestamp = new Date().toLocaleString("zh-TW");
 
-      try {
-        const templeId = templeIdOverride || await getDynamicTempleId();
-        if (!templeId) return { success: false };
-        const timestamp = new Date().toLocaleString('zh-TW');
-        
-        await prisma.auditLog.create({
-          data: {
-            id: `log-${Date.now()}`,
-            templeId,
-            action: `[${level}] ${action}`,
-            details: `Target: ${target}`,
-            operator,
-            timestamp,
-            performedBy: operator
-          }
-        });
-        
-        return { success: true };
-      } catch (e) {
-        console.error('Error logging system event', e);
-        return { success: false };
-      }
+    await prisma.auditLog.create({
+      data: {
+        id: `log-${Date.now()}`,
+        templeId,
+        action: `[${level}] ${action}`,
+        details: `Target: ${target}`,
+        operator,
+        timestamp,
+        performedBy: operator,
+      },
+    });
+
+    return { success: true };
+  } catch (e) {
+    console.error("Error logging system event", e);
+    return { success: false };
+  }
 }
 
 export async function fetchAuditLogs() {
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
 
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        
-        const logs = await prisma.auditLog.findMany({
-          where: { templeId },
-          orderBy: { createdAt: 'desc' }
-        });
-        return logs;
-      } catch (e) {
-        console.error('fetchAuditLogs error', e);
-        return [];
-      }
+    const logs = await prisma.auditLog.findMany({
+      where: { templeId },
+      orderBy: { createdAt: "desc" },
+    });
+    return logs;
+  } catch (e) {
+    console.error("fetchAuditLogs error", e);
+    return [];
+  }
 }
 
 export async function getTempleBasicInfo(templeId?: string) {
-
-      try {
-        const tId = templeId || await getDynamicTempleId();
-        if (!tId) return null;
-        const t = await prisma.temple.findUnique({ where: { id: tId } });
-        if (!t) return null;
-        return { ...t, templeName: t.templeName || t.name };
-      } catch(e) {
-        console.error(e);
-        return null;
-      }
+  try {
+    const tId = templeId || (await getDynamicTempleId());
+    if (!tId) return null;
+    const t = await prisma.temple.findUnique({ where: { id: tId } });
+    if (!t) return null;
+    return { ...t, templeName: t.templeName || t.name };
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }
 
 export async function updateTempleBasicInfo(data: any, templeId?: string) {
+  try {
+    const tId = templeId || (await getDynamicTempleId());
+    if (!tId) return { success: false };
 
-      try {
-        const tId = templeId || await getDynamicTempleId();
-        if (!tId) return { success: false };
-        
-        const updateData: any = {};
-        if (data.templeName || data.name) updateData.templeName = data.templeName || data.name;
-        if (data.city) updateData.city = data.city;
-        if (data.address) updateData.address = data.address;
-        if (data.phone) updateData.phone = data.phone;
-        if (data.themeColor) updateData.themeColor = data.themeColor;
-        if (data.logoUrl) updateData.logoUrl = data.logoUrl;
-        if (data.bannerUrl) updateData.bannerUrl = data.bannerUrl;
-        
-        if (Object.keys(updateData).length > 0) {
-          await prisma.temple.update({
-            where: { id: tId },
-            data: updateData
-          });
-        }
-        
-        const { revalidatePath } = require('next/cache');
-        revalidatePath('/[templeId]/admin/settings', 'page');
-        revalidatePath('/[templeId]/admin/appearance', 'page');
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+    const updateData: any = {};
+    if (data.templeName || data.name)
+      updateData.templeName = data.templeName || data.name;
+    if (data.city) updateData.city = data.city;
+    if (data.address) updateData.address = data.address;
+    if (data.phone) updateData.phone = data.phone;
+    if (data.themeColor) updateData.themeColor = data.themeColor;
+    if (data.logoUrl) updateData.logoUrl = data.logoUrl;
+    if (data.bannerUrl) updateData.bannerUrl = data.bannerUrl;
+
+    if (Object.keys(updateData).length > 0) {
+      await prisma.temple.update({
+        where: { id: tId },
+        data: updateData,
+      });
+    }
+
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/[templeId]/admin/settings", "page");
+    revalidatePath("/[templeId]/admin/appearance", "page");
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
-
 function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
-  let paymentStatusLabel = '未付款';
-  let contractEndDate = '';
+  let paymentStatusLabel = "未付款";
+  let contractEndDate = "";
   let trialDaysRemaining = 0;
   const now = new Date();
-  const createdDate = new Date(temple.timestamp || temple.createdAt || Date.now());
+  const createdDate = new Date(
+    temple.timestamp || temple.createdAt || Date.now(),
+  );
   const trialMonths = temple.trialMonths || temple.freeMonths || 0;
-  
-  if (temple.freeType === 'Permanent') {
-    paymentStatusLabel = '永久免費';
+
+  if (temple.freeType === "Permanent") {
+    paymentStatusLabel = "永久免費";
   } else if (trialMonths > 0) {
     const endFreeDate = new Date(createdDate);
-    endFreeDate.setDate(endFreeDate.getDate() + (trialMonths * 30));
+    endFreeDate.setDate(endFreeDate.getDate() + trialMonths * 30);
     if (now < endFreeDate) {
-      trialDaysRemaining = Math.ceil((endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      trialDaysRemaining = Math.ceil(
+        (endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      );
       paymentStatusLabel = `免費試用中 (剩 ${trialDaysRemaining} 天)`;
-      contractEndDate = `${endFreeDate.getFullYear()}/${(endFreeDate.getMonth()+1).toString().padStart(2,'0')}/${endFreeDate.getDate().toString().padStart(2,'0')} (試用結束)`;
-    } else if (lastBill && lastBill.status === 'Paid') {
-      const bDate = new Date(lastBill.created_at || lastBill.timestamp || Date.now());
-      if (temple.paymentCycle === 'Yearly' || temple.rentType === 'Yearly') {
+      contractEndDate = `${endFreeDate.getFullYear()}/${(endFreeDate.getMonth() + 1).toString().padStart(2, "0")}/${endFreeDate.getDate().toString().padStart(2, "0")} (試用結束)`;
+    } else if (lastBill && lastBill.status === "Paid") {
+      const bDate = new Date(
+        lastBill.created_at || lastBill.timestamp || Date.now(),
+      );
+      if (temple.paymentCycle === "Yearly" || temple.rentType === "Yearly") {
         const startYear = bDate.getFullYear();
         const startMonth = bDate.getMonth() + 1;
         const nextYear = new Date(bDate);
         nextYear.setFullYear(startYear + 1);
         const endYear = nextYear.getFullYear();
         const endMonth = nextYear.getMonth() + 1;
-        contractEndDate = `${endYear}/${endMonth.toString().padStart(2,'0')}/${nextYear.getDate().toString().padStart(2,'0')}`;
+        contractEndDate = `${endYear}/${endMonth.toString().padStart(2, "0")}/${nextYear.getDate().toString().padStart(2, "0")}`;
         paymentStatusLabel = `${startYear}/${startMonth}-${endYear}/${endMonth} 已付款`;
       } else {
         const nextMonth = new Date(bDate);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
-        contractEndDate = `${nextMonth.getFullYear()}/${(nextMonth.getMonth()+1).toString().padStart(2,'0')}/${nextMonth.getDate().toString().padStart(2,'0')}`;
+        contractEndDate = `${nextMonth.getFullYear()}/${(nextMonth.getMonth() + 1).toString().padStart(2, "0")}/${nextMonth.getDate().toString().padStart(2, "0")}`;
         paymentStatusLabel = `${bDate.getMonth() + 1}月已付`;
       }
     }
   } else {
-    if (lastBill && lastBill.status === 'Paid') {
-      const bDate = new Date(lastBill.created_at || lastBill.timestamp || Date.now());
-      if (temple.paymentCycle === 'Yearly' || temple.rentType === 'Yearly') {
+    if (lastBill && lastBill.status === "Paid") {
+      const bDate = new Date(
+        lastBill.created_at || lastBill.timestamp || Date.now(),
+      );
+      if (temple.paymentCycle === "Yearly" || temple.rentType === "Yearly") {
         const startYear = bDate.getFullYear();
         const startMonth = bDate.getMonth() + 1;
         const nextYear = new Date(bDate);
         nextYear.setFullYear(startYear + 1);
         const endYear = nextYear.getFullYear();
         const endMonth = nextYear.getMonth() + 1;
-        contractEndDate = `${endYear}/${endMonth.toString().padStart(2,'0')}/${nextYear.getDate().toString().padStart(2,'0')}`;
+        contractEndDate = `${endYear}/${endMonth.toString().padStart(2, "0")}/${nextYear.getDate().toString().padStart(2, "0")}`;
         paymentStatusLabel = `${startYear}/${startMonth}-${endYear}/${endMonth} 已付款`;
       } else {
         const nextMonth = new Date(bDate);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
-        contractEndDate = `${nextMonth.getFullYear()}/${(nextMonth.getMonth()+1).toString().padStart(2,'0')}/${nextMonth.getDate().toString().padStart(2,'0')}`;
+        contractEndDate = `${nextMonth.getFullYear()}/${(nextMonth.getMonth() + 1).toString().padStart(2, "0")}/${nextMonth.getDate().toString().padStart(2, "0")}`;
         paymentStatusLabel = `${bDate.getMonth() + 1}月已付`;
       }
     } else {
-      paymentStatusLabel = '未付款';
+      paymentStatusLabel = "未付款";
     }
   }
 
@@ -6068,155 +7425,226 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
 }
 export async function fetchDistributorFinancials(distId: string) {
   try {
-    const distSalesIdsForFinance = (await prisma.distributorSales.findMany({
-      where: { distributorId: distId, role: { not: 'SuperSales' } },
-      select: { id: true }
-    })).map((s: any) => s.id);
+    const distSalesIdsForFinance = (
+      await prisma.distributorSales.findMany({
+        where: { distributorId: distId, role: { not: "SuperSales" } },
+        select: { id: true },
+      })
+    ).map((s: any) => s.id);
 
     const temples = await prisma.temple.findMany({
-      where: { OR: [ { distributorId: distId }, { salesId: { in: distSalesIdsForFinance } } ] }
+      where: {
+        OR: [
+          { distributorId: distId },
+          { salesId: { in: distSalesIdsForFinance } },
+        ],
+      },
     });
     const templeIds = temples.map((t: any) => t.id);
 
     let bills: any[] = [];
     if (templeIds.length > 0) {
-      bills = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds } }, orderBy: { createdAt: 'desc' } });
+      bills = await prisma.templeBill.findMany({
+        where: { templeId: { in: templeIds } },
+        orderBy: { createdAt: "desc" },
+      });
     }
-    
+
     const paymentRecords = temples.map((t: any) => {
       const tBills = bills.filter((b: any) => b.templeId === t.id);
       const lastBill = tBills[0];
       const history = tBills.map((b: any) => {
-          let m = '';
-          if (b.billingDate) {
-              m = b.billingDate.substring(0, 7);
-          } else if (b.createdAt) {
-              const d = new Date(b.createdAt);
-              m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-          }
-          return {
-              id: b.id,
-              month: m,
-              type: b.itemName || b.type || 'MonthlyFee',
-              amount: b.amount,
-              status: b.status,
-              receiptUrl: b.receiptUrl
-          };
+        let m = "";
+        if (b.billingDate) {
+          m = b.billingDate.substring(0, 7);
+        } else if (b.createdAt) {
+          const d = new Date(b.createdAt);
+          m = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+        }
+        return {
+          id: b.id,
+          month: m,
+          type: b.itemName || b.type || "MonthlyFee",
+          amount: b.amount,
+          status: b.status,
+          receiptUrl: b.receiptUrl,
+        };
       });
       return {
         id: t.id,
-        temple: t.templeName || t.name || '未命名宮廟',
-        region: t.city || '未設定',
-        amount: lastBill ? lastBill.amount : (t.monthlyRent || 0),
-        date: lastBill ? (lastBill.createdAt instanceof Date ? lastBill.createdAt.toISOString().split('T')[0] : lastBill.createdAt) : (t.createdAt ? new Date(t.createdAt).toISOString().split('T')[0] : '未設定'),
-        status: lastBill ? lastBill.status : 'Paid',
-        type: lastBill ? (lastBill.itemName || lastBill.type || 'MonthlyFee') : 'MonthlyFee',
+        temple: t.templeName || t.name || "未命名宮廟",
+        region: t.city || "未設定",
+        amount: lastBill ? lastBill.amount : t.monthlyRent || 0,
+        date: lastBill
+          ? lastBill.createdAt instanceof Date
+            ? lastBill.createdAt.toISOString().split("T")[0]
+            : lastBill.createdAt
+          : t.createdAt
+            ? new Date(t.createdAt).toISOString().split("T")[0]
+            : "未設定",
+        status: lastBill ? lastBill.status : "Paid",
+        type: lastBill
+          ? lastBill.itemName || lastBill.type || "MonthlyFee"
+          : "MonthlyFee",
         templeStatus: t.status,
         trialMonths: t.trialMonths || 0,
-        history: history || []
+        history: history || [],
       };
     });
 
-    const salesRes = await prisma.distributorSales.findMany({ where: { distributorId: distId }, select: { id: true, name: true } });
+    const salesRes = await prisma.distributorSales.findMany({
+      where: { distributorId: distId },
+      select: { id: true, name: true },
+    });
     const salesIds = salesRes.map((s: any) => s.id);
-    
+
     let myBonusRequests: any[] = [];
     if (salesIds.length > 0) {
       const bonusRes = await prisma.bonusRequest.findMany({
         where: { salesId: { in: salesIds } },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: "desc" },
       });
       bonusRes.forEach((r: any) => {
         myBonusRequests.push({
-          id: r.id, amount: r.amount, date: r.date || r.createdAt.toISOString().split('T')[0], status: r.status, method: r.method, salesName: r.salesName
+          id: r.id,
+          amount: r.amount,
+          date: r.date || r.createdAt.toISOString().split("T")[0],
+          status: r.status,
+          method: r.method,
+          salesName: r.salesName,
         });
       });
     }
 
     return { paymentRecords, bonusRequests: myBonusRequests };
   } catch (e) {
-    console.error('fetchDistributorFinancials err:', e);
+    console.error("fetchDistributorFinancials err:", e);
     return { paymentRecords: [], bonusRequests: [] };
   }
 }
-export async function fetchDistributorSalesPerformance(distId: string, yearMonth?: string) {
+export async function fetchDistributorSalesPerformance(
+  distId: string,
+  yearMonth?: string,
+) {
   try {
-    const sales = await prisma.distributorSales.findMany({ where: { distributorId: distId } });
+    const sales = await prisma.distributorSales.findMany({
+      where: { distributorId: distId },
+    });
 
-    return await Promise.all(sales.map(async (s: any) => {
-      const temples = await prisma.temple.findMany({ where: { salesId: s.id } });
-      const templeIds = temples.map((t: any) => t.id);
-      
-      let totalSales = 0;
-      let commission = 0;
-      let availableBonus = 0;
-      let totalWithdrawn = 0;
+    return await Promise.all(
+      sales.map(async (s: any) => {
+        const temples = await prisma.temple.findMany({
+          where: { salesId: s.id },
+        });
+        const templeIds = temples.map((t: any) => t.id);
 
-      if (templeIds.length > 0) {
-        const allBills = await prisma.templeBill.findMany({ where: { templeId: { in: templeIds }, status: 'Paid' } });
-        
-        // Calculate lifetime commission for available balance
-        const lifetimeCommission = allBills.reduce((sum: number, b: any) => {
-          const isSetup = b.itemName === 'SetupFee' || b.itemName === 'Setup' || b.type === 'SetupFee' || b.type === 'Setup';
-          let sRules: any = {};
-          if (typeof s.commissionRules === 'string') {
-             try { sRules = JSON.parse(s.commissionRules); } catch(e){}
-          } else if (s.commissionRules) {
-             sRules = s.commissionRules;
-          }
-          const rate = isSetup ? (sRules.setupFeePercent || sRules.setupRate || 20) : (sRules.rentYear1Percent || sRules.rentYear1Rate || 15);
-          return sum + (b.amount * rate / 100);
-        }, 0);
+        let totalSales = 0;
+        let commission = 0;
+        let availableBonus = 0;
+        let totalWithdrawn = 0;
 
-        let monthBills = allBills;
-        if (yearMonth) {
-          monthBills = allBills.filter((b: any) => {
-            const dateStr = b.createdAt instanceof Date ? b.createdAt.toISOString().substring(0, 7) : 
-                         (b.createdAt ? String(b.createdAt).substring(0,7) : (b.billingDate ? String(b.billingDate).substring(0,7) : (b.timestamp ? new Date(b.timestamp).toISOString().substring(0,7) : '')));
-            return dateStr === yearMonth;
+        if (templeIds.length > 0) {
+          const allBills = await prisma.templeBill.findMany({
+            where: { templeId: { in: templeIds }, status: "Paid" },
           });
+
+          // Calculate lifetime commission for available balance
+          const lifetimeCommission = allBills.reduce((sum: number, b: any) => {
+            const isSetup =
+              b.itemName === "SetupFee" ||
+              b.itemName === "Setup" ||
+              b.type === "SetupFee" ||
+              b.type === "Setup";
+            let sRules: any = {};
+            if (typeof s.commissionRules === "string") {
+              try {
+                sRules = JSON.parse(s.commissionRules);
+              } catch (e) {}
+            } else if (s.commissionRules) {
+              sRules = s.commissionRules;
+            }
+            const rate = isSetup
+              ? sRules.setupFeePercent || sRules.setupRate || 20
+              : sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+            return sum + (b.amount * rate) / 100;
+          }, 0);
+
+          let monthBills = allBills;
+          if (yearMonth) {
+            monthBills = allBills.filter((b: any) => {
+              const dateStr =
+                b.createdAt instanceof Date
+                  ? b.createdAt.toISOString().substring(0, 7)
+                  : b.createdAt
+                    ? String(b.createdAt).substring(0, 7)
+                    : b.billingDate
+                      ? String(b.billingDate).substring(0, 7)
+                      : b.timestamp
+                        ? new Date(b.timestamp).toISOString().substring(0, 7)
+                        : "";
+              return dateStr === yearMonth;
+            });
+          }
+
+          totalSales = monthBills.reduce(
+            (sum: number, b: any) => sum + b.amount,
+            0,
+          );
+          commission = monthBills.reduce((sum: number, b: any) => {
+            const isSetup =
+              b.itemName === "SetupFee" ||
+              b.itemName === "Setup" ||
+              b.type === "SetupFee" ||
+              b.type === "Setup";
+            let sRules: any = {};
+            if (typeof s.commissionRules === "string") {
+              try {
+                sRules = JSON.parse(s.commissionRules);
+              } catch (e) {}
+            } else if (s.commissionRules) {
+              sRules = s.commissionRules;
+            }
+            const rate = isSetup
+              ? sRules.setupFeePercent || sRules.setupRate || 20
+              : sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+            return sum + (b.amount * rate) / 100;
+          }, 0);
+
+          const myWithdrawals = await prisma.bonusRequest.findMany({
+            where: {
+              salesId: s.id,
+              status: { in: ["Approved", "Verified", "Paid"] },
+            },
+          });
+          totalWithdrawn = myWithdrawals.reduce(
+            (sum: number, w: any) => sum + (w.amount || 0),
+            0,
+          );
+          availableBonus = lifetimeCommission - totalWithdrawn;
         }
 
-        totalSales = monthBills.reduce((sum: number, b: any) => sum + b.amount, 0);
-        commission = monthBills.reduce((sum: number, b: any) => {
-          const isSetup = b.itemName === 'SetupFee' || b.itemName === 'Setup' || b.type === 'SetupFee' || b.type === 'Setup';
-          let sRules: any = {};
-          if (typeof s.commissionRules === 'string') {
-             try { sRules = JSON.parse(s.commissionRules); } catch(e){}
-          } else if (s.commissionRules) {
-             sRules = s.commissionRules;
-          }
-          const rate = isSetup ? (sRules.setupFeePercent || sRules.setupRate || 20) : (sRules.rentYear1Percent || sRules.rentYear1Rate || 15);
-          return sum + (b.amount * rate / 100);
-        }, 0);
-        
-        const myWithdrawals = await prisma.bonusRequest.findMany({
-          where: {
-            salesId: s.id,
-            status: { in: ['Approved', 'Verified', 'Paid'] }
-          }
+        const salesVisits = await prisma.salesVisit.findMany({
+          where: { salesName: s.name },
         });
-        totalWithdrawn = myWithdrawals.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
-        availableBonus = lifetimeCommission - totalWithdrawn;
-      }
+        const convertedTempleNames = temples.map(
+          (t: any) => t.templeName || t.name,
+        );
 
-      const salesVisits = await prisma.salesVisit.findMany({
-        where: { salesName: s.name }
-      });
-      const convertedTempleNames = temples.map((t: any) => t.templeName || t.name);
-
-      return {
-        ...s,
-        totalSales,
-        commission,
-        totalWithdrawn,
-        availableBonus: availableBonus > 0 ? availableBonus : 0,
-        totalTemplesCount: temples.length,
-        unconvertedVisitsCount: salesVisits.filter((v: any) => !convertedTempleNames.includes(v.templeName)).length
-      };
-    }));
+        return {
+          ...s,
+          totalSales,
+          commission,
+          totalWithdrawn,
+          availableBonus: availableBonus > 0 ? availableBonus : 0,
+          totalTemplesCount: temples.length,
+          unconvertedVisitsCount: salesVisits.filter(
+            (v: any) => !convertedTempleNames.includes(v.templeName),
+          ).length,
+        };
+      }),
+    );
   } catch (e) {
-    console.error('fetchDistributorSalesPerformance error:', e);
+    console.error("fetchDistributorSalesPerformance error:", e);
     return [];
   }
 }
@@ -6233,183 +7661,251 @@ export async function fetchSuperAdminFinancials() {
   try {
     const res = { rows: await prisma.templeBill.findMany() };
     if (res && res.rows) templeBills = res.rows;
-  } catch(e) {}
+  } catch (e) {}
 
   const records: any[] = [];
-  templeBills.filter(b => b.status === 'Paid').forEach(b => {
+  templeBills
+    .filter((b) => b.status === "Paid")
+    .forEach((b) => {
       const bDate = b.created_at || b.timestamp;
-      const t = allTemples.find((temple: any) => temple.id === (b.temple_id || b.templeId));
+      const t = allTemples.find(
+        (temple: any) => temple.id === (b.temple_id || b.templeId),
+      );
       records.push({
-         id: b.id,
-         date: bDate instanceof Date ? bDate.toISOString().split('T')[0] : (bDate ? String(bDate).split('T')[0] : new Date().toISOString().split('T')[0]),
-         type: 'INCOME',
-         amount: Number(b.amount || 0),
-         category: (b.item_name === 'SetupFee' || b.type === 'Setup') ? 'AUTH_FEE' : 'SYSTEM_FEE',
-         description: `${t?.templeName || t?.name || '未知宮廟'} - ${b.item_name === 'SetupFee' || b.type === 'Setup' ? '開辦費' : '系統費用'}`
+        id: b.id,
+        date:
+          bDate instanceof Date
+            ? bDate.toISOString().split("T")[0]
+            : bDate
+              ? String(bDate).split("T")[0]
+              : new Date().toISOString().split("T")[0],
+        type: "INCOME",
+        amount: Number(b.amount || 0),
+        category:
+          b.item_name === "SetupFee" || b.type === "Setup"
+            ? "AUTH_FEE"
+            : "SYSTEM_FEE",
+        description: `${t?.templeName || t?.name || "未知宮廟"} - ${b.item_name === "SetupFee" || b.type === "Setup" ? "開辦費" : "系統費用"}`,
       });
-  });
+    });
 
   const allWithdrawals = await fetchAllWithdrawals();
 
-  allWithdrawals.filter((w: any) => w.status === 'Approved' || w.status === 'Verified').forEach((w: any) => {
+  allWithdrawals
+    .filter((w: any) => w.status === "Approved" || w.status === "Verified")
+    .forEach((w: any) => {
       const wDate = w.timestamp || w.created_at || w.date;
       records.push({
-         id: w.id,
-         date: wDate instanceof Date ? wDate.toISOString().split('T')[0] : (wDate ? String(wDate).split('T')[0] : new Date().toISOString().split('T')[0]),
-         type: 'EXPENSE',
-         amount: Number(w.amount || 0),
-         category: 'COMMISSION',
-         description: `業務提領 - ${w.salesName}`
+        id: w.id,
+        date:
+          wDate instanceof Date
+            ? wDate.toISOString().split("T")[0]
+            : wDate
+              ? String(wDate).split("T")[0]
+              : new Date().toISOString().split("T")[0],
+        type: "EXPENSE",
+        amount: Number(w.amount || 0),
+        category: "COMMISSION",
+        description: `業務提領 - ${w.salesName}`,
       });
-  });
+    });
 
-  const totalRevenue = records.filter(r => r.type === 'INCOME').reduce((s, r) => s + r.amount, 0);
-  const totalCommission = records.filter(r => r.type === 'EXPENSE').reduce((s, r) => s + r.amount, 0);
+  const totalRevenue = records
+    .filter((r) => r.type === "INCOME")
+    .reduce((s, r) => s + r.amount, 0);
+  const totalCommission = records
+    .filter((r) => r.type === "EXPENSE")
+    .reduce((s, r) => s + r.amount, 0);
   const netProfit = totalRevenue - totalCommission;
 
   const config = await fetchSystemConfig();
-  const templePayments = allTemples.filter((t: any) => !t.distributorId && t.status !== 'Inactive').map((t: any) => {
-    const bills = templeBills.filter(b => b.temple_id === t.id || b.templeId === t.id);
-    const unpaidBills = bills.filter(b => b.status === '未繳費' || b.status === '未結帳' || b.status === 'Unpaid' || b.status === 'Pending' || b.status === 'PendingVerification');
-    const hasUnpaid = unpaidBills.length > 0;
-    const isPending = unpaidBills.some(b => b.status === 'PendingVerification' || b.status === 'Pending');
+  const templePayments = allTemples
+    .filter((t: any) => !t.distributorId && t.status !== "Inactive")
+    .map((t: any) => {
+      const bills = templeBills.filter(
+        (b) => b.temple_id === t.id || b.templeId === t.id,
+      );
+      const unpaidBills = bills.filter(
+        (b) =>
+          b.status === "未繳費" ||
+          b.status === "未結帳" ||
+          b.status === "Unpaid" ||
+          b.status === "Pending" ||
+          b.status === "PendingVerification",
+      );
+      const hasUnpaid = unpaidBills.length > 0;
+      const isPending = unpaidBills.some(
+        (b) => b.status === "PendingVerification" || b.status === "Pending",
+      );
 
-    const isYearly = t.paymentCycle === 'Yearly';
-    const discountRate = config.yearlyDiscountRate || 20;
-    const discountMultiplier = 1 - discountRate / 100;
-    const calcPrice = isYearly ? ((t.monthlyRent || 3600) * 12 * discountMultiplier) : (t.monthlyRent || 3600);
-    const rentAmount = t.freeType === 'Permanent' ? 0 : calcPrice;
-    const isPaid = bills.length > 0 && unpaidBills.length === 0;
+      const isYearly = t.paymentCycle === "Yearly";
+      const discountRate = config.yearlyDiscountRate || 20;
+      const discountMultiplier = 1 - discountRate / 100;
+      const calcPrice = isYearly
+        ? (t.monthlyRent || 3600) * 12 * discountMultiplier
+        : t.monthlyRent || 3600;
+      const rentAmount = t.freeType === "Permanent" ? 0 : calcPrice;
+      const isPaid = bills.length > 0 && unpaidBills.length === 0;
 
-    return {
-      id: t.id,
-      name: t.templeName || t.name,
-      monthlyRent: t.monthlyRent || 3600,
-      rentAmount: rentAmount,
-      paymentCycle: t.paymentCycle || 'Monthly',
-      status: t.freeType === 'Permanent' ? 'VIP' : (isPending ? 'PendingVerification' : (isPaid ? 'Paid' : 'Unpaid')),
-      unpaidAmount: unpaidBills.reduce((s, b) => s + Number(b.amount), 0),
-      bills: bills,
-      billingStartDate: t.billingStartDate,
-      freeType: t.freeType,
-      joinedAt: t.timestamp || t.created_at || new Date().toISOString()
-    };
-  });
-  const superSalesWithdrawals = allWithdrawals.filter((w: any) => w.role === 'SuperSales' || w.role === 'SuperSalesRole');
+      return {
+        id: t.id,
+        name: t.templeName || t.name,
+        monthlyRent: t.monthlyRent || 3600,
+        rentAmount: rentAmount,
+        paymentCycle: t.paymentCycle || "Monthly",
+        status:
+          t.freeType === "Permanent"
+            ? "VIP"
+            : isPending
+              ? "PendingVerification"
+              : isPaid
+                ? "Paid"
+                : "Unpaid",
+        unpaidAmount: unpaidBills.reduce((s, b) => s + Number(b.amount), 0),
+        bills: bills,
+        billingStartDate: t.billingStartDate,
+        freeType: t.freeType,
+        joinedAt: t.timestamp || t.created_at || new Date().toISOString(),
+      };
+    });
+  const superSalesWithdrawals = allWithdrawals.filter(
+    (w: any) => w.role === "SuperSales" || w.role === "SuperSalesRole",
+  );
   return {
     records: records.slice().reverse(),
     summary: {
       totalRevenue,
       totalCommission,
-      netProfit
+      netProfit,
     },
     wallets: [],
     templePayments,
-    superSalesWithdrawals
+    superSalesWithdrawals,
   };
 }
 
 export async function updateDistributorBankInfo(distId: string, bankInfo: any) {
-
-      try {
-        await prisma.distributor.update({
-          where: { id: distId },
-          data: {
-            bankCode: bankInfo.bankCode || '',
-            bankAccount: bankInfo.accountNumber || '',
-            bankName: bankInfo.bankName || ''
-          }
-        });
-        return true;
-      } catch (error) {
-        console.error('updateDistributorBankInfo error:', error);
-        return false;
-      }
+  try {
+    await prisma.distributor.update({
+      where: { id: distId },
+      data: {
+        bankCode: bankInfo.bankCode || "",
+        bankAccount: bankInfo.accountNumber || "",
+        bankName: bankInfo.bankName || "",
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("updateDistributorBankInfo error:", error);
+    return false;
+  }
 }
 
 export async function getTempleCreatorInfo(templeId: string) {
-      try {
-        const temple = await prisma.temple.findUnique({
-           where: { id: templeId },
-           select: { salesId: true, distributorId: true, superSalesId: true }
-        });
-        if (!temple) return null;
+  try {
+    const temple = await prisma.temple.findUnique({
+      where: { id: templeId },
+      select: { salesId: true, distributorId: true, superSalesId: true },
+    });
+    if (!temple) return null;
 
-        let salesName = '';
-        let distName = '';
+    let salesName = "";
+    let distName = "";
 
-        if (temple.salesId) {
-           const salesRes = await prisma.distributorSales.findUnique({ where: { id: temple.salesId }, select: { name: true } });
-           salesName = salesRes?.name || temple.salesId;
-        } else if (temple.superSalesId) {
-           const salesRes = await prisma.distributorSales.findUnique({ where: { id: temple.superSalesId }, select: { name: true } });
-           salesName = salesRes?.name || temple.superSalesId;
-        }
+    if (temple.salesId) {
+      const salesRes = await prisma.distributorSales.findUnique({
+        where: { id: temple.salesId },
+        select: { name: true },
+      });
+      salesName = salesRes?.name || temple.salesId;
+    } else if (temple.superSalesId) {
+      const salesRes = await prisma.distributorSales.findUnique({
+        where: { id: temple.superSalesId },
+        select: { name: true },
+      });
+      salesName = salesRes?.name || temple.superSalesId;
+    }
 
-        if (temple.distributorId) {
-           const distRes = await prisma.distributor.findUnique({ where: { id: temple.distributorId }, select: { name: true } });
-           distName = distRes?.name || temple.distributorId;
-        }
+    if (temple.distributorId) {
+      const distRes = await prisma.distributor.findUnique({
+        where: { id: temple.distributorId },
+        select: { name: true },
+      });
+      distName = distRes?.name || temple.distributorId;
+    }
 
-        return {
-           type: temple.salesId ? 'Sales' : (temple.distributorId ? 'Distributor' : 'super_admin'),
-           salesName: salesName,
-           distName: distName
-        };
-      } catch(e) {
-        return null;
-      }
+    return {
+      type: temple.salesId
+        ? "Sales"
+        : temple.distributorId
+          ? "Distributor"
+          : "super_admin",
+      salesName: salesName,
+      distName: distName,
+    };
+  } catch (e) {
+    return null;
+  }
 }
 
-export async function updateAccountStatus(id: string, role: string, status: 'Active' | 'Inactive') {
-
-      try {
-        if (role === 'TempleAdmin' || role === 'Temple') {
-          await prisma.temple.update({ where: { id }, data: { status } });
-          await prisma.user.updateMany({ where: { templeId: id }, data: { status } });
-        } else if (role === 'Distributor') {
-          await prisma.distributor.update({ where: { id }, data: { status } });
-        } else if (role === 'SuperSales' || role === 'DistSales') {
-          await prisma.distributorSales.update({ where: { id }, data: { status } });
-        }
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+export async function updateAccountStatus(
+  id: string,
+  role: string,
+  status: "Active" | "Inactive",
+) {
+  try {
+    if (role === "TempleAdmin" || role === "Temple") {
+      await prisma.temple.update({ where: { id }, data: { status } });
+      await prisma.user.updateMany({
+        where: { templeId: id },
+        data: { status },
+      });
+    } else if (role === "Distributor") {
+      await prisma.distributor.update({ where: { id }, data: { status } });
+    } else if (role === "SuperSales" || role === "DistSales") {
+      await prisma.distributorSales.update({ where: { id }, data: { status } });
+    }
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
-export async function transferTemples(templeIds: string[], targetId: string | null, targetRole: 'Distributor' | 'SuperSales' | 'HQ') {
-
-      try {
-        if (targetRole === 'HQ') {
-          await prisma.temple.updateMany({
-            where: { id: { in: templeIds } },
-            data: { distributorId: null, salesId: null }
-          });
-        } else if (targetRole === 'Distributor') {
-          await prisma.temple.updateMany({
-            where: { id: { in: templeIds } },
-            data: { distributorId: targetId, salesId: null }
-          });
-        } else if (targetRole === 'SuperSales') {
-          await prisma.temple.updateMany({
-            where: { id: { in: templeIds } },
-            data: { distributorId: null, salesId: targetId }
-          });
-        }
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+export async function transferTemples(
+  templeIds: string[],
+  targetId: string | null,
+  targetRole: "Distributor" | "SuperSales" | "HQ",
+) {
+  try {
+    if (targetRole === "HQ") {
+      await prisma.temple.updateMany({
+        where: { id: { in: templeIds } },
+        data: { distributorId: null, salesId: null },
+      });
+    } else if (targetRole === "Distributor") {
+      await prisma.temple.updateMany({
+        where: { id: { in: templeIds } },
+        data: { distributorId: targetId, salesId: null },
+      });
+    } else if (targetRole === "SuperSales") {
+      await prisma.temple.updateMany({
+        where: { id: { in: templeIds } },
+        data: { distributorId: null, salesId: targetId },
+      });
+    }
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 export async function confirmPaymentSuccess(orderId: string, method: string) {
-    if (orderId.startsWith('TEMPLE_BILL_')) {
-      const billId = orderId.replace('TEMPLE_BILL_', '');
-      const res = await approveTempleBill(billId);
-      return res.success;
-    }
+  if (orderId.startsWith("TEMPLE_BILL_")) {
+    const billId = orderId.replace("TEMPLE_BILL_", "");
+    const res = await approveTempleBill(billId);
+    return res.success;
+  }
 
   const templeId = await getDynamicTempleId();
   if (!templeId) return false;
@@ -6418,156 +7914,165 @@ export async function confirmPaymentSuccess(orderId: string, method: string) {
     // Check appointments
     let updateRes = await prisma.appointment.updateMany({
       where: { id: orderId, templeId },
-      data: { paymentStatus: 'Paid', paymentMethod: method }
+      data: { paymentStatus: "Paid", paymentMethod: method },
     });
     if (updateRes.count > 0) return true;
-    
+
     // Check event registrations
     updateRes = await prisma.eventRegistration.updateMany({
       where: { id: orderId, templeId },
-      data: { paymentStatus: 'Paid' }
+      data: { paymentStatus: "Paid" },
     });
     if (updateRes.count > 0) return true;
-    
+
     // Check queue tickets
     updateRes = await prisma.queueTicket.updateMany({
       where: { id: orderId, templeId },
-      data: { paymentStatus: 'Paid' }
+      data: { paymentStatus: "Paid" },
     });
     if (updateRes.count > 0) return true;
-    
+
     return false;
   } catch (error) {
-    console.error('handlePaymentCallback error:', error);
+    console.error("handlePaymentCallback error:", error);
     return false;
   }
 }
 
-export async function revertPayment(recordId: string, recordType: 'Lamp' | 'Event' | 'Queue' | 'Appointment') {
+export async function revertPayment(
+  recordId: string,
+  recordType: "Lamp" | "Event" | "Queue" | "Appointment",
+) {
   try {
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false };
 
-    if (recordType === 'Appointment') {
+    if (recordType === "Appointment") {
       await prisma.appointment.updateMany({
         where: { id: recordId, templeId },
-        data: { paymentStatus: 'Unpaid' }
+        data: { paymentStatus: "Unpaid" },
       });
     }
-    if (recordType === 'Lamp') {
+    if (recordType === "Lamp") {
       await prisma.lampRecord.updateMany({
         where: { id: recordId, templeId },
-        data: { paymentStatus: 'Unpaid' }
+        data: { paymentStatus: "Unpaid" },
       });
     }
-    if (recordType === 'Event') {
+    if (recordType === "Event") {
       await prisma.eventRegistration.updateMany({
         where: { id: recordId, templeId },
-        data: { paymentStatus: 'Unpaid' }
+        data: { paymentStatus: "Unpaid" },
       });
     }
-    if (recordType === 'Queue') {
+    if (recordType === "Queue") {
       await prisma.queueTicket.updateMany({
         where: { id: recordId, templeId },
-        data: { paymentStatus: 'Unpaid' }
+        data: { paymentStatus: "Unpaid" },
       });
     }
     await revalidateTemple();
     return { success: true };
   } catch (e) {
-    console.error('revertPayment error:', e);
+    console.error("revertPayment error:", e);
     return { success: false };
   }
 }
 
-
 export async function deleteGuestFile(fileId: string) {
   const templeId = await getDynamicTempleId();
-  if (!templeId) return { success: false, error: '未指定宮廟' };
+  if (!templeId) return { success: false, error: "未指定宮廟" };
 
   try {
     await prisma.guestFile.deleteMany({
       where: {
         id: fileId,
-        templeId
-      }
+        templeId,
+      },
     });
 
     await revalidateTemple(templeId);
     return { success: true };
   } catch (error) {
-    console.error('deleteGuestFile error:', error);
-    return { success: false, error: '刪除檔案失敗' };
+    console.error("deleteGuestFile error:", error);
+    return { success: false, error: "刪除檔案失敗" };
   }
 }
 export async function activateLampRecord(recordId: string) {
+  try {
+    const record = await prisma.lampRecord.findUnique({
+      where: { id: recordId },
+      include: { category: true },
+    });
+    if (!record) return { success: false };
 
-      try {
-        const record = await prisma.lampRecord.findUnique({
-          where: { id: recordId },
-          include: { category: true }
-        });
-        if (!record) return { success: false };
-        
-        const startDate = new Date();
-        const durationDays = record.durationDays || record.category?.durationDays || 365;
-        const expiryDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const startDate = new Date();
+    const durationDays =
+      record.durationDays || record.category?.durationDays || 365;
+    const expiryDate = new Date(
+      startDate.getTime() + durationDays * 24 * 60 * 60 * 1000,
+    );
 
-        await prisma.lampRecord.update({
-          where: { id: recordId },
-          data: { status: 'Active', startDate, expiryDate, durationDays }
-        });
-        
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+    await prisma.lampRecord.update({
+      where: { id: recordId },
+      data: { status: "Active", startDate, expiryDate, durationDays },
+    });
+
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function deactivateLampRecord(recordId: string) {
-
-      try {
-        await prisma.lampRecord.update({
-          where: { id: recordId },
-          data: { status: 'Pending' }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch(e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    await prisma.lampRecord.update({
+      where: { id: recordId },
+      data: { status: "Pending" },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function fetchDistributorLogs(distributorId: string) {
-
-      try {
-        const logs = await prisma.adminLog.findMany({
-          where: { target: { contains: distributorId } },
-          orderBy: { createdAt: 'desc' }
-        });
-        return logs;
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
-}
-export async function requestBonus(salesId: string, distributorId: string, amount: number, method: string = 'Bank Transfer', salesName: string = '') {
   try {
-    const newId = 'bonus-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const logs = await prisma.adminLog.findMany({
+      where: { target: { contains: distributorId } },
+      orderBy: { createdAt: "desc" },
+    });
+    return logs;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+}
+export async function requestBonus(
+  salesId: string,
+  distributorId: string,
+  amount: number,
+  method: string = "Bank Transfer",
+  salesName: string = "",
+) {
+  try {
+    const newId =
+      "bonus-" + Math.random().toString(36).substring(2, 10).toUpperCase();
     await prisma.bonusRequest.create({
       data: {
         id: newId,
         salesId: salesId,
-        distributorId: distributorId || '',
+        distributorId: distributorId || "",
         amount: amount,
-        date: new Date().toISOString().split('T')[0],
-        status: 'Pending',
+        date: new Date().toISOString().split("T")[0],
+        status: "Pending",
         method: method,
-        salesName: salesName || ''
-      }
+        salesName: salesName || "",
+      },
     });
     return { success: true };
   } catch (e) {
@@ -6578,25 +8083,32 @@ export async function fetchSalesBonusRequests(salesId: string) {
   try {
     const requests = await prisma.bonusRequest.findMany({
       where: { salesId: salesId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
     return requests.map((r: any) => ({
-      id: r.id, amount: r.amount, date: r.date || r.createdAt.toISOString().split('T')[0], status: r.status, method: r.method
+      id: r.id,
+      amount: r.amount,
+      date: r.date || r.createdAt.toISOString().split("T")[0],
+      status: r.status,
+      method: r.method,
     }));
   } catch (error) {
-    console.error('Failed to fetch bonus history', error);
+    console.error("Failed to fetch bonus history", error);
     return [];
   }
 }
-export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: string) {
+export async function uploadReceiptAndApproveBonus(
+  requestId: string,
+  imageUrl: string,
+) {
   try {
     await prisma.bonusRequest.update({
       where: { id: requestId },
-      data: { status: 'Paid', receiptUrl: imageUrl }
+      data: { status: "Paid", receiptUrl: imageUrl },
     });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/distributor');
-    revalidatePath('/super-admin');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/distributor");
+    revalidatePath("/super-admin");
     return { success: true };
   } catch (e) {
     return { success: false };
@@ -6605,7 +8117,7 @@ export async function uploadReceiptAndApproveBonus(requestId: string, imageUrl: 
 export async function fetchSaasOrders() {
   try {
     return await prisma.saasOrder.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
   } catch (e) {
     return [];
@@ -6613,13 +8125,13 @@ export async function fetchSaasOrders() {
 }
 
 export async function createSaasOrder(data: {
-  templeId: string,
-  type: string,
-  planId: string,
-  amount: number,
-  cycle: string,
-  paymentMethod: string,
-  receiptImage: string
+  templeId: string;
+  type: string;
+  planId: string;
+  amount: number;
+  cycle: string;
+  paymentMethod: string;
+  receiptImage: string;
 }) {
   try {
     const order = await prisma.saasOrder.create({
@@ -6631,13 +8143,13 @@ export async function createSaasOrder(data: {
         cycle: data.cycle,
         paymentMethod: data.paymentMethod,
         receiptImage: data.receiptImage,
-        status: 'pending'
-      }
+        status: "pending",
+      },
     });
     return { success: true, orderId: order.id };
   } catch (e) {
     console.error("createSaasOrder error:", e);
-    return { success: false, message: '新增訂單失敗' };
+    return { success: false, message: "新增訂單失敗" };
   }
 }
 
@@ -6647,33 +8159,30 @@ export async function fetchDistributorTempleBills(distributorId: string) {
       where: {
         OR: [
           { distributorId: distributorId },
-          { sales: { distributorId: distributorId } }
-        ]
+          { sales: { distributorId: distributorId } },
+        ],
       },
       include: {
-        sales: true
-      }
+        sales: true,
+      },
     });
 
-    const templeIds = temples.map(t => t.id);
+    const templeIds = temples.map((t) => t.id);
 
     if (templeIds.length === 0) return [];
 
     const bills = await prisma.templeBill.findMany({
-      where: { 
-        OR: [
-          { templeId: { in: templeIds } },
-          { payeeId: distributorId }
-        ]
+      where: {
+        OR: [{ templeId: { in: templeIds } }, { payeeId: distributorId }],
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
 
     return bills.map((b: any) => {
       const t = temples.find((temple: any) => temple.id === b.templeId);
       return {
         ...b,
-        templeName: t ? (t.templeName || t.name) : '未知宮廟'
+        templeName: t ? t.templeName || t.name : "未知宮廟",
       };
     });
   } catch (e) {
@@ -6682,71 +8191,95 @@ export async function fetchDistributorTempleBills(distributorId: string) {
   }
 }
 export async function logDistributorAction(...args: any[]) {
-
-      try {
-        // Fire and forget
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+  try {
+    // Fire and forget
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
-export async function grantTempleStorageVip(templeId: string, isVip: boolean = true) {
+export async function grantTempleStorageVip(
+  templeId: string,
+  isVip: boolean = true,
+) {
   try {
     await prisma.templeStorage.upsert({
       where: { templeId },
       update: {
-        planId: isVip ? 'VIP-STORAGE' : 'FREE',
+        planId: isVip ? "VIP-STORAGE" : "FREE",
         allocatedBytes: isVip ? 1099511627776n : 21474836480n,
-        planName: isVip ? '進階免費空間' : '免費 20GB 空間'
+        planName: isVip ? "進階免費空間" : "免費 20GB 空間",
       },
       create: {
         templeId,
-        planId: isVip ? 'VIP-STORAGE' : 'FREE',
+        planId: isVip ? "VIP-STORAGE" : "FREE",
         allocatedBytes: isVip ? 1099511627776n : 21474836480n,
-        planName: isVip ? '進階免費空間' : '免費 20GB 空間',
-        usedBytes: 0n
-      }
+        planName: isVip ? "進階免費空間" : "免費 20GB 空間",
+        usedBytes: 0n,
+      },
     });
     return { success: true };
-  } catch(e) {
-    console.error('grantTempleStorageVip error:', e);
+  } catch (e) {
+    console.error("grantTempleStorageVip error:", e);
     return { success: false };
   }
 }
 
 export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
+  try {
+    const sys = await prisma.systemConfig.findFirst();
+    const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
+    if (!plan) return { success: false };
 
-      try {
-        const sys = await prisma.systemConfig.findFirst();
-        const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
-        if (!plan) return { success: false };
-        
-        await prisma.templeAiUsage.upsert({
-          where: { templeId },
-          update: { planId, enabled: true },
-          create: { templeId, planId, enabled: true, usedCount: 0 }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+    await prisma.templeAiUsage.upsert({
+      where: { templeId },
+      update: { planId, enabled: true },
+      create: { templeId, planId, enabled: true, usedCount: 0 },
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
-
 
 export async function fetchDataBridgeTree() {
   try {
     const rootNodes: any[] = [];
-    
-    const hqTempleNode: any = { id: 'HQ-Temple', name: '總部直營宮廟', type: 'super-admin', children: [] };
-    const hqSuperSalesNode: any = { id: 'HQ-SuperSales', name: '超級管理員(總部)', type: 'super-admin', children: [] };
-    const hqDistributorNode: any = { id: 'HQ-Distributor', name: '總部直屬經銷商', type: 'super-admin', children: [] };
-    const hqDistSalesNode: any = { id: 'HQ-DistSales', name: '總部直屬經銷業務', type: 'super-admin', children: [] };
+
+    const hqTempleNode: any = {
+      id: "HQ-Temple",
+      name: "總部直營宮廟",
+      type: "super-admin",
+      children: [],
+    };
+    const hqSuperSalesNode: any = {
+      id: "HQ-SuperSales",
+      name: "超級管理員(總部)",
+      type: "super-admin",
+      children: [],
+    };
+    const hqDistributorNode: any = {
+      id: "HQ-Distributor",
+      name: "總部直屬經銷商",
+      type: "super-admin",
+      children: [],
+    };
+    const hqDistSalesNode: any = {
+      id: "HQ-DistSales",
+      name: "總部直屬經銷業務",
+      type: "super-admin",
+      children: [],
+    };
 
     // Fetch all entities
-    const superSales = await prisma.distributorSales.findMany({ where: { role: 'SuperSales' } });
+    const superSales = await prisma.distributorSales.findMany({
+      where: { role: "SuperSales" },
+    });
     const distributors = await prisma.distributor.findMany();
-    const distSales = await prisma.distributorSales.findMany({ where: { role: 'DistSales' } });
+    const distSales = await prisma.distributorSales.findMany({
+      where: { role: "DistSales" },
+    });
     const temples = await prisma.temple.findMany();
     const distApps = await prisma.distributorApplication.findMany(); // For mapping dist to superSales
     const config = await prisma.systemConfig.findFirst();
@@ -6755,67 +8288,97 @@ export async function fetchDataBridgeTree() {
     const superSalesNodes = superSales.map((s: any) => ({
       id: s.id,
       name: s.name,
-      type: 'super-sales',
+      type: "super-sales",
       joinedAt: s.createdAt.toISOString(),
       status: s.status,
-      children: []
+      children: [],
     }));
 
     const distNodes = distributors.map((d: any) => ({
       id: d.id,
       name: d.name,
       account: d.account,
-      type: 'distributor',
+      type: "distributor",
       joinedAt: d.createdAt.toISOString(),
       status: d.status,
-      planName: d.name ? '標準經銷方案' : '標準經銷方案',
+      planName: d.name ? "標準經銷方案" : "標準經銷方案",
       price: d.setupFee || 1600000,
       nodes: d.quota,
-      expirationDate: new Date(new Date(d.createdAt).setFullYear(new Date(d.createdAt).getFullYear() + 2)).toISOString(),
-      children: []
+      expirationDate: new Date(
+        new Date(d.createdAt).setFullYear(
+          new Date(d.createdAt).getFullYear() + 2,
+        ),
+      ).toISOString(),
+      children: [],
     }));
 
     const distSalesNodes = distSales.map((d: any) => ({
       id: d.id,
       name: d.name,
-      type: 'dist-sales',
+      type: "dist-sales",
       joinedAt: d.createdAt.toISOString(),
       status: d.status,
-      children: []
+      children: [],
     }));
 
     const templeNodes = temples.map((t: any) => ({
       id: t.id,
-      name: t.name || t.templeName || '未知宮廟',
-      type: 'temple',
+      name: t.name || t.templeName || "未知宮廟",
+      type: "temple",
       joinedAt: t.createdAt.toISOString(),
       status: t.status,
-      planName: t.freeType === 'Trial' ? '免費體驗方案' : 
-                t.freeType === 'Permanent' ? '永久免費' :
-                t.paymentCycle === 'Yearly' ? '年付優惠方案' : '月付標準方案',
-      price: t.paymentCycle === 'Yearly' ? Math.round((t.monthlyRent || 0) * 12 * (1 - yearlyDiscountRate / 100)) : (t.monthlyRent || 0),
+      planName:
+        t.freeType === "Trial"
+          ? "免費體驗方案"
+          : t.freeType === "Permanent"
+            ? "永久免費"
+            : t.paymentCycle === "Yearly"
+              ? "年付優惠方案"
+              : "月付標準方案",
+      price:
+        t.paymentCycle === "Yearly"
+          ? Math.round(
+              (t.monthlyRent || 0) * 12 * (1 - yearlyDiscountRate / 100),
+            )
+          : t.monthlyRent || 0,
       freeType: t.freeType,
       plan: t.plan,
       paymentCycle: t.paymentCycle,
       billingStartDate: t.billingStartDate,
-      paymentStatus: t.paymentStatus
+      paymentStatus: t.paymentStatus,
     }));
 
     // Build hierarchy
     templeNodes.forEach((tNode: any) => {
       const temple = temples.find((t: any) => t.id === tNode.id);
-      const possibleIds = [temple?.salesId, temple?.superSalesId, temple?.distributorId].filter(Boolean);
-      
+      const possibleIds = [
+        temple?.salesId,
+        temple?.superSalesId,
+        temple?.distributorId,
+      ].filter(Boolean);
+
       let foundParent = false;
       for (const pId of possibleIds) {
-        let parent = distSalesNodes.find(ds => ds.id === pId);
-        if (parent) { parent.children.push(tNode); foundParent = true; break; }
-        
-        parent = distNodes.find(d => d.id === pId);
-        if (parent) { parent.children.push(tNode); foundParent = true; break; }
+        let parent = distSalesNodes.find((ds) => ds.id === pId);
+        if (parent) {
+          parent.children.push(tNode);
+          foundParent = true;
+          break;
+        }
 
-        parent = superSalesNodes.find(ss => ss.id === pId);
-        if (parent) { parent.children.push(tNode); foundParent = true; break; }
+        parent = distNodes.find((d) => d.id === pId);
+        if (parent) {
+          parent.children.push(tNode);
+          foundParent = true;
+          break;
+        }
+
+        parent = superSalesNodes.find((ss) => ss.id === pId);
+        if (parent) {
+          parent.children.push(tNode);
+          foundParent = true;
+          break;
+        }
       }
 
       if (!foundParent) {
@@ -6826,7 +8389,7 @@ export async function fetchDataBridgeTree() {
     distSalesNodes.forEach((dsNode: any) => {
       const ds = distSales.find((d: any) => d.id === dsNode.id);
       if (ds?.distributorId) {
-        const parent = distNodes.find(d => d.id === ds.distributorId);
+        const parent = distNodes.find((d) => d.id === ds.distributorId);
         if (parent) parent.children.push(dsNode);
         else hqDistSalesNode.children.push(dsNode);
       } else {
@@ -6837,15 +8400,23 @@ export async function fetchDataBridgeTree() {
     distNodes.forEach((dNode: any) => {
       const dist = distributors.find((d: any) => d.id === dNode.id);
       if (dist?.superSalesId) {
-        const parentSS = superSalesNodes.find(ss => ss.id === dist.superSalesId);
+        const parentSS = superSalesNodes.find(
+          (ss) => ss.id === dist.superSalesId,
+        );
         if (parentSS) {
           parentSS.children.push(dNode);
           return;
         }
       }
-      const app = distApps.find((a: any) => (a.account && a.account === dNode.account) || (a.name && a.name === dNode.name));
+      const app = distApps.find(
+        (a: any) =>
+          (a.account && a.account === dNode.account) ||
+          (a.name && a.name === dNode.name),
+      );
       if (app && app.submittedBy) {
-        const parentSS = superSalesNodes.find(ss => ss.id === app.submittedBy);
+        const parentSS = superSalesNodes.find(
+          (ss) => ss.id === app.submittedBy,
+        );
         if (parentSS) {
           parentSS.children.push(dNode);
           return;
@@ -6860,7 +8431,8 @@ export async function fetchDataBridgeTree() {
 
     if (hqTempleNode.children.length > 0) rootNodes.push(hqTempleNode);
     if (hqSuperSalesNode.children.length > 0) rootNodes.push(hqSuperSalesNode);
-    if (hqDistributorNode.children.length > 0) rootNodes.push(hqDistributorNode);
+    if (hqDistributorNode.children.length > 0)
+      rootNodes.push(hqDistributorNode);
     if (hqDistSalesNode.children.length > 0) rootNodes.push(hqDistSalesNode);
 
     return rootNodes;
@@ -6870,65 +8442,68 @@ export async function fetchDataBridgeTree() {
   }
 }
 
-
 export async function updateDistributorProfile(distId: string, data: any) {
+  try {
+    const updateData: any = {};
+    if (data.name) updateData.name = data.name;
+    if (data.account) updateData.account = data.account;
+    if (data.password) updateData.password = data.password;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.bankInfo) {
+      updateData.bankCode = data.bankInfo.bankCode || "";
+      updateData.bankAccount = data.bankInfo.accountNumber || "";
+      updateData.bankName = data.bankInfo.bankName || "";
+    }
 
-      try {
-        const updateData: any = {};
-        if (data.name) updateData.name = data.name;
-        if (data.account) updateData.account = data.account;
-        if (data.password) updateData.password = data.password;
-        if (data.email !== undefined) updateData.email = data.email;
-        if (data.address !== undefined) updateData.address = data.address;
-        if (data.bankInfo) {
-          updateData.bankCode = data.bankInfo.bankCode || '';
-          updateData.bankAccount = data.bankInfo.accountNumber || '';
-          updateData.bankName = data.bankInfo.bankName || '';
-        }
-        
-        await prisma.distributor.update({
-          where: { id: distId },
-          data: updateData
-        });
-        
-        const { revalidatePath } = require('next/cache');
-        revalidatePath('/super-admin');
-        revalidatePath('/distributor');
-        return { success: true };
-      } catch (error) {
-        console.error('updateDistributorProfile error:', error);
-        return { success: false, error: String(error) };
-      }
+    await prisma.distributor.update({
+      where: { id: distId },
+      data: updateData,
+    });
+
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    revalidatePath("/distributor");
+    return { success: true };
+  } catch (error) {
+    console.error("updateDistributorProfile error:", error);
+    return { success: false, error: String(error) };
+  }
 }
 
-export async function updateDistributorPaymentConfig(distId: string, paymentConfig: any) {
-
-      try {
-        await prisma.distributor.update({
-          where: { id: distId },
-          data: { b2bPayment: paymentConfig }
-        });
-        return { success: true };
-      } catch (error) {
-        console.error('updateDistributorPaymentConfig error:', error);
-        return { success: false, error: String(error) };
-      }
+export async function updateDistributorPaymentConfig(
+  distId: string,
+  paymentConfig: any,
+) {
+  try {
+    await prisma.distributor.update({
+      where: { id: distId },
+      data: { b2bPayment: paymentConfig },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("updateDistributorPaymentConfig error:", error);
+    return { success: false, error: String(error) };
+  }
 }
 
-export async function verifySaasOrder(orderId: string, status: 'paid' | 'rejected') {
+export async function verifySaasOrder(
+  orderId: string,
+  status: "paid" | "rejected",
+) {
   try {
     const order = await prisma.saasOrder.findUnique({ where: { id: orderId } });
     if (order) {
       await prisma.saasOrder.update({
         where: { id: orderId },
-        data: { status: status === 'paid' ? 'Paid' : 'Rejected' }
+        data: { status: status === "paid" ? "Paid" : "Rejected" },
       });
       return { success: true };
     }
   } catch (e) {
     console.error(e);
   }
-  return { success: false, error: 'Order not found' };
+  return { success: false, error: "Order not found" };
 }
 
 export async function fetchSuperSalesWithdrawals(salesId: string) {
@@ -6937,58 +8512,70 @@ export async function fetchSuperSalesWithdrawals(salesId: string) {
 }
 
 export async function fetchSalesProfileById(salesId: string) {
-
-      try {
-        const sales = await prisma.distributorSales.findUnique({
-          where: { id: salesId },
-          include: { distributor: true }
-        });
-        if (sales) {
-          return {
-            name: sales.name,
-            parentDistributor: sales.distributor?.name || '未指派',
-            account: sales.account
-          };
-        }
-        return { name: '未知', parentDistributor: '未指派', account: '' };
-      } catch (error) {
-        console.error('fetchSalesProfileById error:', error);
-        return { name: '未知', parentDistributor: '未指派', account: '' };
-      }
+  try {
+    const sales = await prisma.distributorSales.findUnique({
+      where: { id: salesId },
+      include: { distributor: true },
+    });
+    if (sales) {
+      return {
+        name: sales.name,
+        parentDistributor: sales.distributor?.name || "未指派",
+        account: sales.account,
+      };
+    }
+    return { name: "未知", parentDistributor: "未指派", account: "" };
+  } catch (error) {
+    console.error("fetchSalesProfileById error:", error);
+    return { name: "未知", parentDistributor: "未指派", account: "" };
+  }
 }
 
 export async function fetchTempleBills(templeId: string) {
-      try {
-        await autoGenerateStorageBills(templeId);
-        return await prisma.templeBill.findMany({ where: { templeId }, orderBy: { createdAt: 'desc' } });
-      } catch(e) {
-        return [];
-      }
+  try {
+    await autoGenerateStorageBills(templeId);
+    return await prisma.templeBill.findMany({
+      where: { templeId },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (e) {
+    return [];
+  }
 }
 
 async function autoGenerateStorageBills(templeId: string) {
   try {
-    const storage = await prisma.templeStorage.findUnique({ where: { templeId } });
-    if (!storage || !storage.planId || !storage.paymentCycle || !storage.billingStartDate) return;
+    const storage = await prisma.templeStorage.findUnique({
+      where: { templeId },
+    });
+    if (
+      !storage ||
+      !storage.planId ||
+      !storage.paymentCycle ||
+      !storage.billingStartDate
+    )
+      return;
 
-    const plan = await prisma.storagePlan.findUnique({ where: { id: storage.planId } });
+    const plan = await prisma.storagePlan.findUnique({
+      where: { id: storage.planId },
+    });
     if (!plan || plan.priceMonthly <= 0) return;
 
-    const isYearly = storage.paymentCycle === 'Yearly';
+    const isYearly = storage.paymentCycle === "Yearly";
     const config = (await prisma.systemConfig.findFirst()) as any;
     const yearlyDiscount = config?.yearlyDiscountRate || 20;
-    
-    const priceFactor = isYearly ? (12 * (1 - yearlyDiscount / 100)) : 1;
+
+    const priceFactor = isYearly ? 12 * (1 - yearlyDiscount / 100) : 1;
     const amount = Math.round(plan.priceMonthly * priceFactor);
-    const itemName = '雲端空間擴充方案 - ' + plan.name;
+    const itemName = "雲端空間擴充方案 - " + plan.name;
 
     const existingBills = await prisma.templeBill.findMany({
-      where: { templeId, itemName: { contains: plan.name } }
+      where: { templeId, itemName: { contains: plan.name } },
     });
 
     const now = new Date();
     let cycleDate = new Date(storage.billingStartDate);
-    
+
     // Jump to next cycle since first cycle is paid upon upgrade
     if (isYearly) {
       cycleDate.setFullYear(cycleDate.getFullYear() + 1);
@@ -6999,10 +8586,17 @@ async function autoGenerateStorageBills(templeId: string) {
     const generateBills = [];
     while (cycleDate <= now) {
       const billingStr = cycleDate.toISOString().substring(0, 7);
-      
+
       const hasBill = existingBills.some((b: any) => {
-         const bStr = (b.billingDate || (b.createdAt instanceof Date ? b.createdAt.toISOString() : '')).substring(0, 7);
-         return bStr === billingStr || b.id.includes(billingStr) || (b.dueDate && b.dueDate.startsWith(billingStr));
+        const bStr = (
+          b.billingDate ||
+          (b.createdAt instanceof Date ? b.createdAt.toISOString() : "")
+        ).substring(0, 7);
+        return (
+          bStr === billingStr ||
+          b.id.includes(billingStr) ||
+          (b.dueDate && b.dueDate.startsWith(billingStr))
+        );
       });
 
       if (!hasBill) {
@@ -7011,11 +8605,11 @@ async function autoGenerateStorageBills(templeId: string) {
           templeId,
           itemName: `雲端空間擴充方案 - ${plan.name} (${plan.id})`,
           amount,
-          dueDate: cycleDate.toISOString().split('T')[0],
+          dueDate: cycleDate.toISOString().split("T")[0],
           billingDate: billingStr,
-          status: 'Unpaid',
-          payeeRole: 'SuperAdmin',
-          payeeId: 'system-hq'
+          status: "Unpaid",
+          payeeRole: "SuperAdmin",
+          payeeId: "system-hq",
         });
       }
 
@@ -7027,207 +8621,245 @@ async function autoGenerateStorageBills(templeId: string) {
     }
 
     for (const newBill of generateBills) {
-      await prisma.templeBill.create({ data: newBill }).catch(e => console.error('Failed to gen storage bill', e));
+      await prisma.templeBill
+        .create({ data: newBill })
+        .catch((e) => console.error("Failed to gen storage bill", e));
     }
   } catch (error) {
-    console.error('autoGenerateStorageBills error:', error);
+    console.error("autoGenerateStorageBills error:", error);
   }
 }
 
-export async function uploadTempleBillReceipt(billId: string, imageUrl: string, bankLast5?: string) {
-
-      try {
-        await prisma.templeBill.update({
-          where: { id: billId },
-          data: { receiptUrl: imageUrl, status: 'PendingVerification', bankLast5: bankLast5 || null }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+export async function uploadTempleBillReceipt(
+  billId: string,
+  imageUrl: string,
+  bankLast5?: string,
+) {
+  try {
+    await prisma.templeBill.update({
+      where: { id: billId },
+      data: {
+        receiptUrl: imageUrl,
+        status: "PendingVerification",
+        bankLast5: bankLast5 || null,
+      },
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
 export async function approveTempleBill(billId: string) {
+  try {
+    const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
+    if (!bill) return { success: false };
 
-      try {
-        const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
-        if (!bill) return { success: false };
-        
-        await prisma.templeBill.update({
-          where: { id: billId },
-          data: { status: 'Paid' }
+    await prisma.templeBill.update({
+      where: { id: billId },
+      data: { status: "Paid" },
+    });
+
+    const templeId = bill.templeId;
+    if (templeId) {
+      await prisma.temple.update({
+        where: { id: templeId },
+        data: { status: "Active" },
+      });
+    }
+
+    const temple = await prisma.temple.findUnique({ where: { id: templeId! } });
+
+    // --- LOGIC FOR UPGRADES ---
+    if (bill.type === "StorageUpgrade" || bill.type === "AiUpgrade") {
+      const match = bill.itemName?.match(/\(([^)]+)\)$/);
+      const planId = match ? match[1] : null;
+
+      const adminWallet = await prisma.wallet.findFirst({
+        where: { role: "SuperAdmin" },
+      });
+      if (adminWallet) {
+        await prisma.wallet.update({
+          where: { id: adminWallet.id },
+          data: { balance: { increment: bill.amount } },
         });
+      }
 
-        const templeId = bill.templeId;
-        if (templeId) {
-          await prisma.temple.update({
-            where: { id: templeId },
-            data: { status: 'Active' }
+      await prisma.financeRecord.create({
+        data: {
+          type: "INCOME",
+          category:
+            bill.type === "StorageUpgrade" ? "SPACE_UPGRADE" : "AI_UPGRADE",
+          amount: bill.amount,
+          source: `${temple?.templeName || "宮廟"}-${bill.type === "StorageUpgrade" ? "雲端空間升級" : "AI方案升級"} (後台審核)`,
+          date: new Date(),
+        },
+      });
+
+      if (bill.type === "StorageUpgrade" && planId) {
+        await upgradeTempleStorage(bill.templeId!, planId, "Monthly", true);
+      } else if (bill.type === "AiUpgrade" && planId) {
+        let usage = await prisma.templeAiUsage.findUnique({
+          where: { templeId: bill.templeId! },
+        });
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+        if (usage) {
+          await prisma.templeAiUsage.update({
+            where: { templeId: bill.templeId! },
+            data: {
+              planId,
+              expiryDate: thirtyDaysLater,
+              usedCount: 0,
+              enabled: true,
+            },
+          });
+        } else {
+          await prisma.templeAiUsage.create({
+            data: {
+              templeId: bill.templeId!,
+              enabled: true,
+              planId,
+              usedCount: 0,
+              expiryDate: thirtyDaysLater,
+              isVip: false,
+            },
           });
         }
-
-        const temple = await prisma.temple.findUnique({ where: { id: templeId! } });
-
-        // --- LOGIC FOR UPGRADES ---
-        if (bill.type === 'StorageUpgrade' || bill.type === 'AiUpgrade') {
-           const match = bill.itemName?.match(/\(([^)]+)\)$/);
-           const planId = match ? match[1] : null;
-
-           const adminWallet = await prisma.wallet.findFirst({ where: { role: 'SuperAdmin' } });
-           if (adminWallet) {
-              await prisma.wallet.update({
-                where: { id: adminWallet.id },
-                data: { balance: { increment: bill.amount } }
-              });
-           }
-
-           await prisma.financeRecord.create({
-             data: {
-               type: 'INCOME',
-               category: bill.type === 'StorageUpgrade' ? 'SPACE_UPGRADE' : 'AI_UPGRADE',
-               amount: bill.amount,
-               source: `${temple?.templeName || '宮廟'}-${bill.type === 'StorageUpgrade' ? '雲端空間升級' : 'AI方案升級'} (後台審核)`,
-               date: new Date()
-             }
-           });
-
-           if (bill.type === 'StorageUpgrade' && planId) {
-              await upgradeTempleStorage(bill.templeId!, planId, 'Monthly', true);
-           } else if (bill.type === 'AiUpgrade' && planId) {
-              let usage = await prisma.templeAiUsage.findUnique({ where: { templeId: bill.templeId! } });
-              const thirtyDaysLater = new Date();
-              thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-              if (usage) {
-                 await prisma.templeAiUsage.update({
-                   where: { templeId: bill.templeId! },
-                   data: { planId, expiryDate: thirtyDaysLater, usedCount: 0, enabled: true }
-                 });
-              } else {
-                 await prisma.templeAiUsage.create({
-                   data: { templeId: bill.templeId!, enabled: true, planId, usedCount: 0, expiryDate: thirtyDaysLater, isVip: false }
-                 });
-              }
-           }
-        }
-        // --- END LOGIC ---
-
-        if (temple && temple.salesId) {
-          const salesPerson = await prisma.distributorSales.findUnique({ where: { id: temple.salesId } });
-          if (salesPerson) {
-             try {
-               const sysConfig = await fetchSystemConfig();
-               const rates = (salesPerson.commissionRules as any) || sysConfig?.defaultSuperSalesRates || {};
-               const rate = Number(rates.templeSetupRate) || 20; 
-               const commissionAmt = Math.floor(bill.amount * (rate / 100));
-               
-               if (commissionAmt > 0) {
-                 await prisma.commission.create({
-                   data: {
-                     salesId: salesPerson.id,
-                     templeId: temple.id,
-                     billId: bill.id,
-                     amount: commissionAmt,
-                     date: new Date()
-                   }
-                 });
-                 
-                 const wallet = await prisma.wallet.findFirst({ where: { name: salesPerson.name } });
-                 if (wallet) {
-                   await prisma.wallet.update({
-                     where: { id: wallet.id },
-                     data: { balance: { increment: commissionAmt } }
-                   });
-                 } else {
-                   await prisma.wallet.create({
-                     data: {
-                       ownerId: salesPerson.id,
-                       name: salesPerson.name,
-                       role: salesPerson.role,
-                       balance: commissionAmt
-                     }
-                   });
-                 }
-               }
-             } catch (comErr) {
-               console.error("Error generating commission for bill:", bill.id, comErr);
-             }
-          }
-        }
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
       }
+    }
+    // --- END LOGIC ---
+
+    if (temple && temple.salesId) {
+      const salesPerson = await prisma.distributorSales.findUnique({
+        where: { id: temple.salesId },
+      });
+      if (salesPerson) {
+        try {
+          const sysConfig = await fetchSystemConfig();
+          const rates =
+            (salesPerson.commissionRules as any) ||
+            sysConfig?.defaultSuperSalesRates ||
+            {};
+          const rate = Number(rates.templeSetupRate) || 20;
+          const commissionAmt = Math.floor(bill.amount * (rate / 100));
+
+          if (commissionAmt > 0) {
+            await prisma.commission.create({
+              data: {
+                salesId: salesPerson.id,
+                templeId: temple.id,
+                billId: bill.id,
+                amount: commissionAmt,
+                date: new Date(),
+              },
+            });
+
+            const wallet = await prisma.wallet.findFirst({
+              where: { name: salesPerson.name },
+            });
+            if (wallet) {
+              await prisma.wallet.update({
+                where: { id: wallet.id },
+                data: { balance: { increment: commissionAmt } },
+              });
+            } else {
+              await prisma.wallet.create({
+                data: {
+                  ownerId: salesPerson.id,
+                  name: salesPerson.name,
+                  role: salesPerson.role,
+                  balance: commissionAmt,
+                },
+              });
+            }
+          }
+        } catch (comErr) {
+          console.error(
+            "Error generating commission for bill:",
+            bill.id,
+            comErr,
+          );
+        }
+      }
+    }
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function toggleBillStatusSimple(billId: string, status: string) {
-
-      try {
-        await prisma.templeBill.update({
-          where: { id: billId },
-          data: { status }
-        });
-        await revalidateTemple();
-        return { success: true };
-      } catch (error) {
-        console.error('toggleBillStatusSimple error:', error);
-        return { success: false };
-      }
+  try {
+    await prisma.templeBill.update({
+      where: { id: billId },
+      data: { status },
+    });
+    await revalidateTemple();
+    return { success: true };
+  } catch (error) {
+    console.error("toggleBillStatusSimple error:", error);
+    return { success: false };
+  }
 }
 
 export async function rejectTempleBill(billId: string) {
+  try {
+    const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
+    if (!bill) return { success: false };
 
-      try {
-        const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
-        if (!bill) return { success: false };
-        
-        await prisma.templeBill.update({
-          where: { id: billId },
-          data: { status: 'PendingPayment', receiptUrl: null }
-        });
+    await prisma.templeBill.update({
+      where: { id: billId },
+      data: { status: "PendingPayment", receiptUrl: null },
+    });
 
-        if (bill.templeId) {
-          await prisma.temple.update({
-            where: { id: bill.templeId },
-            data: { paymentStatus: 'PendingPayment' }
-          });
-        }
+    if (bill.templeId) {
+      await prisma.temple.update({
+        where: { id: bill.templeId },
+        data: { paymentStatus: "PendingPayment" },
+      });
+    }
 
-        await revalidateTemple();
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+    await revalidateTemple();
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function fetchAllSalesBonusRequests() {
   try {
     const requests = await prisma.bonusRequest.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
     return requests.map((r: any) => ({
-      id: r.id, amount: r.amount, date: r.date || r.createdAt.toISOString().split('T')[0], status: r.status, method: r.method,
-      salesName: r.salesName, distributorId: r.distributorId, receiptUrl: r.receiptUrl
+      id: r.id,
+      amount: r.amount,
+      date: r.date || r.createdAt.toISOString().split("T")[0],
+      status: r.status,
+      method: r.method,
+      salesName: r.salesName,
+      distributorId: r.distributorId,
+      receiptUrl: r.receiptUrl,
     }));
   } catch (error) {
-    console.error('Failed to fetch all bonus requests', error);
+    console.error("Failed to fetch all bonus requests", error);
     return [];
   }
 }
 
-
 export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
-
-      try {
-        await prisma.distributorSales.update({
-          where: { id: salesId },
-          data: { bankAccount: bankInfo }
-        });
-        return { success: true };
-      } catch(e) {
-        return { success: false };
-      }
+  try {
+    await prisma.distributorSales.update({
+      where: { id: salesId },
+      data: { bankAccount: bankInfo },
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 }
 
 export async function getLineConfig(templeId: string) {
@@ -7239,18 +8871,29 @@ export async function getLineConfig(templeId: string) {
         lineChannelSecret: true,
         lineLoginClientId: true,
         linePushEnabled: true,
-      }
+      },
     });
-    if (!temple) return { lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false };
+    if (!temple)
+      return {
+        lineChannelToken: "",
+        lineChannelSecret: "",
+        lineLoginClientId: "",
+        linePushEnabled: false,
+      };
     return {
-      lineChannelToken: temple.lineChannelToken || '',
-      lineChannelSecret: temple.lineChannelSecret || '',
-      lineLoginClientId: temple.lineLoginClientId || '',
-      linePushEnabled: temple.linePushEnabled || false
+      lineChannelToken: temple.lineChannelToken || "",
+      lineChannelSecret: temple.lineChannelSecret || "",
+      lineLoginClientId: temple.lineLoginClientId || "",
+      linePushEnabled: temple.linePushEnabled || false,
     };
   } catch (error) {
-    console.error('getLineConfig error:', error);
-    return { lineChannelToken: '', lineChannelSecret: '', lineLoginClientId: '', linePushEnabled: false };
+    console.error("getLineConfig error:", error);
+    return {
+      lineChannelToken: "",
+      lineChannelSecret: "",
+      lineLoginClientId: "",
+      linePushEnabled: false,
+    };
   }
 }
 
@@ -7263,168 +8906,193 @@ export async function updateLineConfig(templeId: string, config: any) {
         lineChannelSecret: config.lineChannelSecret,
         lineLoginClientId: config.lineLoginClientId,
         linePushEnabled: config.linePushEnabled,
-      }
+      },
     });
     return { success: true };
   } catch (error) {
-    console.error('updateLineConfig error:', error);
-    return { success: false, error: 'Database update failed' };
+    console.error("updateLineConfig error:", error);
+    return { success: false, error: "Database update failed" };
   }
 }
-
 
 export async function getGuestLineId(templeId: string, phone: string) {
-
-      try {
-        const guest = await prisma.guest.findFirst({
-          where: { templeId, phone }
-        });
-        return guest?.lineId || null;
-      } catch (error) {
-        console.error('getGuestLineId error:', error);
-        return null;
-      }
+  try {
+    const guest = await prisma.guest.findFirst({
+      where: { templeId, phone },
+    });
+    return guest?.lineId || null;
+  } catch (error) {
+    console.error("getGuestLineId error:", error);
+    return null;
+  }
 }
 
-export async function sendLineMessage(templeId: string, lineUserId: string, messageText: string) {
+export async function sendLineMessage(
+  templeId: string,
+  lineUserId: string,
+  messageText: string,
+) {
   const config = await getLineConfig(templeId);
   if (!config.linePushEnabled) {
-     console.log(`[LINE Push] 攔截：宮廟 ${templeId} 的推播總開關未開啟。`);
-     return { success: false, reason: 'Disabled' };
+    console.log(`[LINE Push] 攔截：宮廟 ${templeId} 的推播總開關未開啟。`);
+    return { success: false, reason: "Disabled" };
   }
   if (!config.lineChannelToken) {
-     console.log(`[LINE Push] 攔截：宮廟 ${templeId} 未設定 Channel Token。`);
-     return { success: false, reason: 'NoToken' };
+    console.log(`[LINE Push] 攔截：宮廟 ${templeId} 未設定 Channel Token。`);
+    return { success: false, reason: "NoToken" };
   }
-  if (!lineUserId) return { success: false, reason: 'NoUserId' };
+  if (!lineUserId) return { success: false, reason: "NoUserId" };
 
   try {
-     const resp = await fetch('https://api.line.me/v2/bot/message/push', {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-         'Authorization': `Bearer ${config.lineChannelToken}`
-       },
-       body: JSON.stringify({
-         to: lineUserId,
-         messages: [ { type: 'text', text: messageText } ]
-       })
-     });
-     const data = await resp.json();
-     console.log(`[LINE Push] 宮廟 ${templeId} 成功推播給 ${lineUserId}`, data);
-     return { success: true, data };
+    const resp = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.lineChannelToken}`,
+      },
+      body: JSON.stringify({
+        to: lineUserId,
+        messages: [{ type: "text", text: messageText }],
+      }),
+    });
+    const data = await resp.json();
+    console.log(`[LINE Push] 宮廟 ${templeId} 成功推播給 ${lineUserId}`, data);
+    return { success: true, data };
   } catch (err) {
-     console.error(`[LINE Push] 宮廟 ${templeId} 推播失敗:`, err);
-     return { success: false, reason: 'NetworkError' };
+    console.error(`[LINE Push] 宮廟 ${templeId} 推播失敗:`, err);
+    return { success: false, reason: "NetworkError" };
   }
 }
 
-export async function bindCustomerLine(templeId: string, phone: string, lineUserId: string) {
-  if (!templeId) return { success: false, reason: 'NoTemple' };
+export async function bindCustomerLine(
+  templeId: string,
+  phone: string,
+  lineUserId: string,
+) {
+  if (!templeId) return { success: false, reason: "NoTemple" };
   try {
-    let normPhone = phone.replace(/\D/g, '');
-    
+    let normPhone = phone.replace(/\D/g, "");
+
     // Find if the guest exists
     const guest = await prisma.guest.findFirst({
       where: {
         templeId,
-        phone: normPhone
-      }
+        phone: normPhone,
+      },
     });
 
     if (guest) {
       await prisma.guest.update({
         where: { id: guest.id },
-        data: { lineId: lineUserId }
+        data: { lineId: lineUserId },
       });
       return { success: true };
     } else {
-      return { success: false, reason: 'GuestNotFound' };
+      return { success: false, reason: "GuestNotFound" };
     }
   } catch (error) {
-    console.error('bindCustomerLine error:', error);
-    return { success: false, reason: 'DatabaseError' };
+    console.error("bindCustomerLine error:", error);
+    return { success: false, reason: "DatabaseError" };
   }
 }
 
 export async function fetchTemplePaymentTarget(templeId: string) {
   const t = await getTempleBasicInfo(templeId);
   if (!t) return null;
-  
+
   const config = await fetchSystemConfig();
   let targetBank = {
-     bankCode: config.b2bPayment?.customTransfer?.bankCode || '808',
-     bankName: config.b2bPayment?.customTransfer?.bankName || '玉山銀行',
-     accountNo: config.b2bPayment?.customTransfer?.accountNo || '808-1234-5678-901',
-     accountName: config.b2bPayment?.customTransfer?.accountName || '天宇科技服務有限公司'
+    bankCode: config.b2bPayment?.customTransfer?.bankCode || "808",
+    bankName: config.b2bPayment?.customTransfer?.bankName || "玉山銀行",
+    accountNo:
+      config.b2bPayment?.customTransfer?.accountNo || "808-1234-5678-901",
+    accountName:
+      config.b2bPayment?.customTransfer?.accountName || "天宇科技服務有限公司",
   };
-  
+
   const distId = t.distributorId;
   if (distId) {
-     const dist = await fetchDistributorProfile(distId);
-     if (dist) {
-        if (dist.b2bPayment?.customTransfer?.enabled) {
-           targetBank = {
-              bankCode: dist.b2bPayment.customTransfer.bankCode || '',
-              bankName: dist.b2bPayment.customTransfer.bankName || '',
-              accountNo: dist.b2bPayment.customTransfer.accountNo || '',
-              accountName: dist.b2bPayment.customTransfer.accountName || ''
-           };
-        } else if (dist.bankInfo?.bankCode || dist.bankInfo?.accountNumber) {
-           targetBank = {
-              bankCode: dist.bankInfo.bankCode || '',
-              bankName: dist.bankInfo.bankName || '',
-              accountNo: dist.bankInfo.accountNumber || '',
-              accountName: dist.bankInfo.accountName || dist.name
-           };
-        }
-     }
+    const dist = await fetchDistributorProfile(distId);
+    if (dist) {
+      if (dist.b2bPayment?.customTransfer?.enabled) {
+        targetBank = {
+          bankCode: dist.b2bPayment.customTransfer.bankCode || "",
+          bankName: dist.b2bPayment.customTransfer.bankName || "",
+          accountNo: dist.b2bPayment.customTransfer.accountNo || "",
+          accountName: dist.b2bPayment.customTransfer.accountName || "",
+        };
+      } else if (dist.bankInfo?.bankCode || dist.bankInfo?.accountNumber) {
+        targetBank = {
+          bankCode: dist.bankInfo.bankCode || "",
+          bankName: dist.bankInfo.bankName || "",
+          accountNo: dist.bankInfo.accountNumber || "",
+          accountName: dist.bankInfo.accountName || dist.name,
+        };
+      }
+    }
   }
   return targetBank;
 }
 
-export async function updateRevenueRemark(id: string, source: string, remark: string) {
+export async function updateRevenueRemark(
+  id: string,
+  source: string,
+  remark: string,
+) {
   try {
     switch (source) {
-      case 'Appointment':
-        await prisma.appointment.update({ where: { id }, data: { remarks: remark } });
+      case "Appointment":
+        await prisma.appointment.update({
+          where: { id },
+          data: { remarks: remark },
+        });
         break;
-      case 'Lamp':
-        await prisma.lampRecord.update({ where: { id }, data: { remarks: remark } });
+      case "Lamp":
+        await prisma.lampRecord.update({
+          where: { id },
+          data: { remarks: remark },
+        });
         break;
-      case 'Event':
-        await prisma.eventRegistration.update({ where: { id }, data: { remarks: remark } });
+      case "Event":
+        await prisma.eventRegistration.update({
+          where: { id },
+          data: { remarks: remark },
+        });
         break;
-      case 'QueueTicket':
-        await prisma.queueTicket.update({ where: { id }, data: { remarks: remark } });
+      case "QueueTicket":
+        await prisma.queueTicket.update({
+          where: { id },
+          data: { remarks: remark },
+        });
         break;
-      case 'DeepRecord':
-        await prisma.deepRecord.update({ where: { id }, data: { remarks: remark } });
+      case "DeepRecord":
+        await prisma.deepRecord.update({
+          where: { id },
+          data: { remarks: remark },
+        });
         break;
       default:
-        console.warn('Unknown revenue source for remark update:', source);
+        console.warn("Unknown revenue source for remark update:", source);
     }
     return { success: true };
-  } catch(e) {
-    console.error('Update remark error', e);
+  } catch (e) {
+    console.error("Update remark error", e);
     return { success: false };
   }
 }
 
-
-
 export async function fetchSuperSalesApplications(salesName: string) {
   try {
     const apps = await prisma.distributorApplication.findMany({
-      where: { submittedBy: salesName }
+      where: { submittedBy: salesName },
     });
     return apps.map((r: any) => ({
       ...r,
-      rejectReason: r.rejectReason || '',
-      rejectedAt: r.rejectedAt || ''
+      rejectReason: r.rejectReason || "",
+      rejectedAt: r.rejectedAt || "",
     }));
   } catch (error) {
-    console.error('fetchSuperSalesApplications error:', error);
+    console.error("fetchSuperSalesApplications error:", error);
     return [];
   }
 }
@@ -7433,7 +9101,7 @@ export async function getTempleFormTemplates(templeId: string) {
   try {
     const temple = await prisma.temple.findUnique({
       where: { id: templeId },
-      select: { formTemplates: true }
+      select: { formTemplates: true },
     });
     if (!temple || !temple.formTemplates) return [];
     return Array.isArray(temple.formTemplates) ? temple.formTemplates : [];
@@ -7442,11 +9110,14 @@ export async function getTempleFormTemplates(templeId: string) {
   }
 }
 
-export async function updateTempleFormTemplates(templeId: string, templates: any) {
+export async function updateTempleFormTemplates(
+  templeId: string,
+  templates: any,
+) {
   try {
     await prisma.temple.update({
       where: { id: templeId },
-      data: { formTemplates: templates }
+      data: { formTemplates: templates },
     });
     return { success: true };
   } catch (e) {
@@ -7454,23 +9125,25 @@ export async function updateTempleFormTemplates(templeId: string, templates: any
   }
 }
 
-
 // --- RECOVERED LEGACY DBQUERY ---
-
 
 // --- RECOVERED FUNCTIONS ---
 export async function generateInitialBills(newTemple: any) {
-  const payeeRole = newTemple.distributorId ? 'Distributor' : 'SuperAdmin';
-  const payeeId = newTemple.distributorId || 'system-hq';
+  const payeeRole = newTemple.distributorId ? "Distributor" : "SuperAdmin";
+  const payeeId = newTemple.distributorId || "system-hq";
 
-  const billDueDate = new Date(newTemple.billingStartDate || Date.now()).toISOString().split('T')[0];
+  const billDueDate = new Date(newTemple.billingStartDate || Date.now())
+    .toISOString()
+    .split("T")[0];
   const monthlyRent = newTemple.monthlyRent || 0;
 
-  if (newTemple.freeType !== 'Permanent') {
-    const isYearly = newTemple.paymentCycle === 'Yearly';
+  if (newTemple.freeType !== "Permanent") {
+    const isYearly = newTemple.paymentCycle === "Yearly";
     const config = await fetchSystemConfig();
-    const rentAmount = isYearly ? (monthlyRent * 12 * (1 - (config.yearlyDiscountRate || 20) / 100)) : monthlyRent;
-    const rentType = isYearly ? 'YearlyFee' : 'MonthlyFee';
+    const rentAmount = isYearly
+      ? monthlyRent * 12 * (1 - (config.yearlyDiscountRate || 20) / 100)
+      : monthlyRent;
+    const rentType = isYearly ? "YearlyFee" : "MonthlyFee";
     const setupFee = newTemple.setupFee ?? 12000;
 
     const billsToInsert = [];
@@ -7482,54 +9155,63 @@ export async function generateInitialBills(newTemple: any) {
         amount: rentAmount,
         billingDate: new Date().toISOString().substring(0, 7),
         dueDate: billDueDate,
-        status: 'Unpaid',
+        status: "Unpaid",
         payeeRole,
         payeeId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
     if (setupFee > 0) {
       billsToInsert.push({
         id: `BILL-SETUP-${Date.now()}`,
         templeId: newTemple.id,
-        type: 'SetupFee',
+        type: "SetupFee",
         amount: setupFee,
         billingDate: new Date().toISOString().substring(0, 7),
-        dueDate: new Date().toISOString().split('T')[0],
-        status: 'Unpaid',
+        dueDate: new Date().toISOString().split("T")[0],
+        status: "Unpaid",
         payeeRole,
         payeeId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
     const storagePlanId = newTemple.cloudStorage;
     let plan = null;
-    if (storagePlanId && storagePlanId.startsWith('SP-')) {
-       plan = await prisma.storagePlan.findUnique({ where: { id: storagePlanId } }) as any;
+    if (storagePlanId && storagePlanId.startsWith("SP-")) {
+      plan = (await prisma.storagePlan.findUnique({
+        where: { id: storagePlanId },
+      })) as any;
     }
     if (!plan) {
-       // Fetch cheapest storage plan
-       const plans = await prisma.storagePlan.findMany({ orderBy: { priceMonthly: 'asc' } }) as any[];
-       if (plans && plans.length > 0) {
-         plan = plans[0];
-       }
+      // Fetch cheapest storage plan
+      const plans = (await prisma.storagePlan.findMany({
+        orderBy: { priceMonthly: "asc" },
+      })) as any[];
+      if (plans && plans.length > 0) {
+        plan = plans[0];
+      }
     }
     if (plan) {
-      const storageFee = isYearly ? (plan.priceYearly || (plan.priceMonthly * 12 * (1 - (config?.yearlyDiscountRate || 20) / 100))) : plan.priceMonthly;
+      const storageFee = isYearly
+        ? plan.priceYearly ||
+          plan.priceMonthly *
+            12 *
+            (1 - (config?.yearlyDiscountRate || 20) / 100)
+        : plan.priceMonthly;
       if (storageFee > 0) {
         billsToInsert.push({
           id: `BILL-STORAGE-${Date.now()}`,
           templeId: newTemple.id,
-          type: 'StorageUpgrade',
-          item_name: '雲端空間專案 - ' + plan.name,
+          type: "StorageUpgrade",
+          item_name: "雲端空間專案 - " + plan.name,
           amount: storageFee,
           billingDate: new Date().toISOString().substring(0, 7),
           dueDate: billDueDate,
-          status: 'Unpaid',
-          payeeRole: 'SuperAdmin',
-          payeeId: 'system-hq',
-          timestamp: new Date().toISOString()
+          status: "Unpaid",
+          payeeRole: "SuperAdmin",
+          payeeId: "system-hq",
+          timestamp: new Date().toISOString(),
         });
       }
     }
@@ -7537,30 +9219,36 @@ export async function generateInitialBills(newTemple: any) {
     let aiPlanId = newTemple.aiPlan;
     let aiPlanInfo = null;
     if (aiPlanId) {
-       aiPlanInfo = await prisma.aiPlan.findUnique({ where: { id: aiPlanId } }) as any;
+      aiPlanInfo = (await prisma.aiPlan.findUnique({
+        where: { id: aiPlanId },
+      })) as any;
     }
     if (!aiPlanInfo) {
-       // Fetch cheapest AI plan
-       const aiPlans = await prisma.aiPlan.findMany({ orderBy: { price: 'asc' } }) as any[];
-       if (aiPlans && aiPlans.length > 0) {
-         aiPlanInfo = aiPlans[0];
-       }
+      // Fetch cheapest AI plan
+      const aiPlans = (await prisma.aiPlan.findMany({
+        orderBy: { price: "asc" },
+      })) as any[];
+      if (aiPlans && aiPlans.length > 0) {
+        aiPlanInfo = aiPlans[0];
+      }
     }
     if (aiPlanInfo) {
-      const aiFee = isYearly ? (aiPlanInfo.price * 12 * (1 - (config?.yearlyDiscountRate || 20) / 100)) : aiPlanInfo.price;
+      const aiFee = isYearly
+        ? aiPlanInfo.price * 12 * (1 - (config?.yearlyDiscountRate || 20) / 100)
+        : aiPlanInfo.price;
       if (aiFee > 0) {
         billsToInsert.push({
           id: `BILL-AI-${Date.now()}`,
           templeId: newTemple.id,
-          type: 'AiUpgrade',
-          item_name: 'AI引擎方案 - ' + aiPlanInfo.name,
+          type: "AiUpgrade",
+          item_name: "AI引擎方案 - " + aiPlanInfo.name,
           amount: aiFee,
           billingDate: new Date().toISOString().substring(0, 7),
           dueDate: billDueDate,
-          status: 'Unpaid',
-          payeeRole: 'SuperAdmin',
-          payeeId: 'system-hq',
-          timestamp: new Date().toISOString()
+          status: "Unpaid",
+          payeeRole: "SuperAdmin",
+          payeeId: "system-hq",
+          timestamp: new Date().toISOString(),
         });
       }
     }
@@ -7568,460 +9256,564 @@ export async function generateInitialBills(newTemple: any) {
     try {
       /* removed duplicate import */
       for (const newBill of billsToInsert) {
-        const exists = [].find(b => b.templeId === newTemple.id && (b.type === newBill.type || b.item_name === newBill.type));
+        const exists = [].find(
+          (b) =>
+            b.templeId === newTemple.id &&
+            (b.type === newBill.type || b.item_name === newBill.type),
+        );
         if (!exists) {
           await null;
-          await prisma.templeBill.create({
-            data: {
-              id: newBill.id,
-              templeId: newTemple.id,
-              itemName: newBill.type,
-              amount: newBill.amount,
-              dueDate: newBill.dueDate,
-              status: 'Unpaid',
-              payeeRole: newBill.payeeRole,
-              payeeId: newBill.payeeId,
-              billingDate: newBill.billingDate
-            }
-          }).catch(err => {
-             console.error('Failed Prisma create in generateInitialBills', err);
-          });
+          await prisma.templeBill
+            .create({
+              data: {
+                id: newBill.id,
+                templeId: newTemple.id,
+                itemName: newBill.type,
+                amount: newBill.amount,
+                dueDate: newBill.dueDate,
+                status: "Unpaid",
+                payeeRole: newBill.payeeRole,
+                payeeId: newBill.payeeId,
+                billingDate: newBill.billingDate,
+              },
+            })
+            .catch((err) => {
+              console.error(
+                "Failed Prisma create in generateInitialBills",
+                err,
+              );
+            });
         }
       }
       // (await jsonStore.find('temple_bills')) synced
-    } catch(e) { console.error('Failed to insert bill', e); }
+    } catch (e) {
+      console.error("Failed to insert bill", e);
+    }
   }
 }
 
-export async function submitFreeAccountApplication(data: any) { 
+export async function submitFreeAccountApplication(data: any) {
   const account = data.account || data.adminAccount;
   const password = data.password || data.adminPassword;
 
-  if (account && await checkAccountExists(account)) {
-    return { success: false, error: '帳號已被註冊' };
+  if (account && (await checkAccountExists(account))) {
+    return { success: false, error: "帳號已被註冊" };
   }
   const { role, paymentCycle, ...formData } = data;
-  
-  const status = (role === 'distributor' || role === 'super-admin') ? 'Active' : 'Pending';
+
+  const status =
+    role === "distributor" || role === "super-admin" ? "Active" : "Pending";
 
   let sales: any = null;
   try {
     sales = await prisma.distributorSales.findFirst({
       where: {
-        OR: [
-          { name: data.submittedBy },
-          { account: data.submittedBy }
-        ]
+        OR: [{ name: data.submittedBy }, { account: data.submittedBy }],
       },
-      select: { id: true, distributorId: true }
+      select: { id: true, distributorId: true },
     });
   } catch (e) {
-    console.error('Failed to fetch sales info', e);
+    console.error("Failed to fetch sales info", e);
   }
 
-  const reqRole = await getCurrentRole() || 'System';
+  const reqRole = (await getCurrentRole()) || "System";
   const currentUser = await getCurrentUser();
   const templeNo = 1;
 
-  const targetDistId = role === 'super-admin' ? null : (sales?.distributorId || (role === 'distributor' ? data.distributorId : null));
+  const targetDistId =
+    role === "super-admin"
+      ? null
+      : sales?.distributorId ||
+        (role === "distributor" ? data.distributorId : null);
   if (targetDistId) {
     const capacity = await fetchDistributorCapacity(targetDistId);
     if (!capacity.isUnlimited && capacity.used >= capacity.total) {
-      return { success: false, error: '該經銷商的系統配額已經用盡，無法部屬新節點' };
+      return {
+        success: false,
+        error: "該經銷商的系統配額已經用盡，無法部屬新節點",
+      };
     }
   }
 
-      const newTemple = {
-      id: `temple-${Math.random().toString(36).substring(2, 10)}`,
-      templeNo,
-      ...formData,
-      account,
-      password,
-      paymentCycle: paymentCycle || 'Monthly',
-      monthlyRent: data.freeType === 'Permanent' ? 0 : ((await fetchSystemConfig()).fixedMonthlyRent || 3600),
-      trialMonths: data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0,
-      freeType: data.freeType || 'Normal',
-      role: 'Temple',
-      status,
-      creatorRole: role,
-      creatorId: currentUser.name,
-      salesId: data.salesId || sales?.id || null,
-      distributorId: role === 'super-admin' ? null : (data.distributorId || sales?.distributorId || null),
-      timestamp: new Date().toISOString(),
-      billingStartDate: data.freeType === 'Trial' ? 
-        new Date(Date.now() + (parseInt(data.trialMonths || '0') * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
-        new Date().toISOString(),
-      paymentStatus: 'PendingPayment'
-    };
-    await null;
-    // synced
+  const newTemple = {
+    id: `temple-${Math.random().toString(36).substring(2, 10)}`,
+    templeNo,
+    ...formData,
+    account,
+    password,
+    paymentCycle: paymentCycle || "Monthly",
+    monthlyRent:
+      data.freeType === "Permanent"
+        ? 0
+        : (await fetchSystemConfig()).fixedMonthlyRent || 3600,
+    trialMonths:
+      data.freeType === "Trial" ? parseInt(data.trialMonths || "0") : 0,
+    freeType: data.freeType || "Normal",
+    role: "Temple",
+    status,
+    creatorRole: role,
+    creatorId: currentUser.name,
+    salesId: data.salesId || sales?.id || null,
+    distributorId:
+      role === "super-admin"
+        ? null
+        : data.distributorId || sales?.distributorId || null,
+    timestamp: new Date().toISOString(),
+    billingStartDate:
+      data.freeType === "Trial"
+        ? new Date(
+            Date.now() +
+              parseInt(data.trialMonths || "0") * 30 * 24 * 60 * 60 * 1000,
+          ).toISOString()
+        : new Date().toISOString(),
+    paymentStatus: "PendingPayment",
+  };
+  await null;
+  // synced
 
-    try {
-      await prisma.temple.create({
-        data: {
-          id: newTemple.id,
-          name: newTemple.templeName || newTemple.name,
-          city: newTemple.city || '未設定',
-          address: newTemple.address || '',
-          status: newTemple.status,
-          salesId: newTemple.salesId,
-          distributorId: newTemple.distributorId,
-          setupFee: newTemple.setupFee || 0,
-          monthlyRent: newTemple.monthlyRent || 0,
-          paymentCycle: newTemple.paymentCycle,
-          account: newTemple.account,
-          password: newTemple.password,
-          phone: newTemple.templePhone || newTemple.contactPhone || '',
-          creatorRole: newTemple.creatorRole,
-          creatorId: newTemple.creatorId
-        }
-      });
-      let allocatedBytes = 21474836480n;
-      let storagePlanName = '免費 20GB 空間';
+  try {
+    await prisma.temple.create({
+      data: {
+        id: newTemple.id,
+        name: newTemple.templeName || newTemple.name,
+        city: newTemple.city || "未設定",
+        address: newTemple.address || "",
+        status: newTemple.status,
+        salesId: newTemple.salesId,
+        distributorId: newTemple.distributorId,
+        setupFee: newTemple.setupFee || 0,
+        monthlyRent: newTemple.monthlyRent || 0,
+        paymentCycle: newTemple.paymentCycle,
+        account: newTemple.account,
+        password: newTemple.password,
+        phone: newTemple.templePhone || newTemple.contactPhone || "",
+        creatorRole: newTemple.creatorRole,
+        creatorId: newTemple.creatorId,
+      },
+    });
+    let allocatedBytes = 21474836480n;
+    let storagePlanName = "免費 20GB 空間";
 
-      if (data.cloudStorage === 'Free' || data.freeType === 'Permanent') {
-         allocatedBytes = 21990232555520n; // 20TB
-         storagePlanName = '無限使用';
-      } else if (data.cloudStorage) {
-         let p = await prisma.storagePlan.findUnique({ where: { id: data.cloudStorage } }) as any;
-         if (p) {
-             allocatedBytes = BigInt(20 + p.sizeGb) * 1073741824n; // (20 + sizeGb) * 1024^3
-             storagePlanName = `${20 + p.sizeGb}GB 雲端空間`;
-         }
+    if (data.cloudStorage === "Free" || data.freeType === "Permanent") {
+      allocatedBytes = 21990232555520n; // 20TB
+      storagePlanName = "無限使用";
+    } else if (data.cloudStorage) {
+      let p = (await prisma.storagePlan.findUnique({
+        where: { id: data.cloudStorage },
+      })) as any;
+      if (p) {
+        allocatedBytes = BigInt(20 + p.sizeGb) * 1073741824n; // (20 + sizeGb) * 1024^3
+        storagePlanName = `${20 + p.sizeGb}GB 雲端空間`;
       }
-
-      await prisma.templeStorage.create({
-        data: {
-          id: `ts-${Date.now()}`,
-          templeId: newTemple.id,
-          usedBytes: 0n,
-          allocatedBytes,
-          planName: storagePlanName,
-          planId: (data.cloudStorage && data.cloudStorage !== 'Free') ? data.cloudStorage : 'FREE'
-        }
-      });
-
-      let isAiVip = data.aiLife === 'Free' || data.freeType === 'Permanent';
-      let aiPlanId = isAiVip ? 'VIP-AI' : (data.aiLife ? data.aiLife : 'FREE');
-      await prisma.templeAiUsage.create({
-        data: {
-          templeId: newTemple.id,
-          planId: aiPlanId,
-          enabled: data.enableAi ?? true,
-          usedCount: 0,
-          isVip: isAiVip
-        }
-      });
-
-    } catch (e) {
-      console.error("Failed to insert new temple into postgres", e);
     }
 
-    if (data.freeType === 'Permanent') {
-      // Already handled in creation above
-    }
+    await prisma.templeStorage.create({
+      data: {
+        id: `ts-${Date.now()}`,
+        templeId: newTemple.id,
+        usedBytes: 0n,
+        allocatedBytes,
+        planName: storagePlanName,
+        planId:
+          data.cloudStorage && data.cloudStorage !== "Free"
+            ? data.cloudStorage
+            : "FREE",
+      },
+    });
 
+    let isAiVip = data.aiLife === "Free" || data.freeType === "Permanent";
+    let aiPlanId = isAiVip ? "VIP-AI" : data.aiLife ? data.aiLife : "FREE";
+    await prisma.templeAiUsage.create({
+      data: {
+        templeId: newTemple.id,
+        planId: aiPlanId,
+        enabled: data.enableAi ?? true,
+        usedCount: 0,
+        isVip: isAiVip,
+      },
+    });
+  } catch (e) {
+    console.error("Failed to insert new temple into postgres", e);
+  }
+
+  if (data.freeType === "Permanent") {
+    // Already handled in creation above
+  }
 
   // If status is Active (e.g. created by super-admin or distributor), create personnel login immediately
-  if (status === 'Active' && account && password) {
+  if (status === "Active" && account && password) {
     const pData = await [];
     const pId = `p-${Date.now()}`;
     pData.push({
       id: pId,
       templeId: newTemple.id,
-      name: data.templeName || '宮廟管理員',
+      name: data.templeName || "宮廟管理員",
       account: account,
       password: password, // In real app, hash this
-      role: 'TempleAdmin',
-      status: 'Active'
+      role: "TempleAdmin",
+      status: "Active",
     });
     await null;
-    
+
     try {
       await prisma.user.create({
         data: {
           id: pId,
           templeId: newTemple.id,
-          name: data.templeName || '宮廟管理員',
+          name: data.templeName || "宮廟管理員",
           account: account,
           password: password,
-          role: 'TempleAdmin',
-          status: 'Active'
-        }
+          role: "TempleAdmin",
+          status: "Active",
+        },
       });
     } catch (e) {
-      console.error("Failed to insert \"User\"", e);
+      console.error('Failed to insert "User"', e);
     }
   }
-  
-  if (status === 'Active') {
+
+  if (status === "Active") {
     await generateInitialBills(newTemple);
   }
-  
+
   // Create Notification for Super Admin
   await null;
 
-  revalidatePath('/dist-sales');
-  revalidatePath('/distributor');
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
-  
-  return { success: true, templeId: newTemple.id }; 
+  revalidatePath("/dist-sales");
+  revalidatePath("/distributor");
+  revalidatePath("/super-admin");
+  revalidatePath("/super-sales");
+
+  return { success: true, templeId: newTemple.id };
 }
 
 export async function approveTempleBySuperAdmin(id: string) {
+  try {
+    const temple = await prisma.temple.findUnique({ where: { id } });
+    if (temple) {
+      await prisma.temple.update({
+        where: { id },
+        data: { status: "Active" },
+      });
+      await generateInitialBills(temple);
 
-      try {
-        const temple = await prisma.temple.findUnique({ where: { id } });
-        if (temple) {
-          await prisma.temple.update({
-            where: { id },
-            data: { status: 'Active' }
-          });
-          await generateInitialBills(temple);
-          
-          if (temple.account && temple.password) {
-             await prisma.user.upsert({
-               where: { account: temple.account },
-               update: {},
-               create: {
-                 id: `p-${Date.now()}`,
-                 templeId: id,
-                 name: temple.templeName || '宮廟管理員',
-                 account: temple.account,
-                 password: temple.password,
-                 role: 'TempleAdmin',
-                 status: 'Active'
-               }
-             });
-          }
-        }
-        const { revalidatePath } = require('next/cache');
-        revalidatePath('/super-admin');
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
+      if (temple.account && temple.password) {
+        await prisma.user.upsert({
+          where: { account: temple.account },
+          update: {},
+          create: {
+            id: `p-${Date.now()}`,
+            templeId: id,
+            name: temple.templeName || "宮廟管理員",
+            account: temple.account,
+            password: temple.password,
+            role: "TempleAdmin",
+            status: "Active",
+          },
+        });
       }
+    }
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function rejectTempleBySuperAdmin(id: string) {
-
-      try {
-        await prisma.temple.delete({ where: { id } });
-        const { revalidatePath } = require('next/cache');
-        revalidatePath('/super-admin');
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+  try {
+    await prisma.temple.delete({ where: { id } });
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
 export async function fetchPendingDistributors() {
   try {
     const apps = await prisma.distributorApplication.findMany({
-      where: { status: 'Pending' }
+      where: { status: "Pending" },
     });
     const allApps = new Map();
     // Removed mock array fallback
-    apps.forEach(a => allApps.set(a.id, {
-      id: a.id, name: a.name, contactName: a.contactName, phone: a.phone, email: a.email,
-      taxId: a.taxId, address: a.address, planId: a.planId, price: a.price, nodes: a.nodes,
-      submittedBy: a.submittedBy, status: a.status, date: a.createdAt, account: a.account,
-      password: a.password, expirationDate: a.expirationDate
-    }));
+    apps.forEach((a) =>
+      allApps.set(a.id, {
+        id: a.id,
+        name: a.name,
+        contactName: a.contactName,
+        phone: a.phone,
+        email: a.email,
+        taxId: a.taxId,
+        address: a.address,
+        planId: a.planId,
+        price: a.price,
+        nodes: a.nodes,
+        submittedBy: a.submittedBy,
+        status: a.status,
+        date: a.createdAt,
+        account: a.account,
+        password: a.password,
+        expirationDate: a.expirationDate,
+      }),
+    );
     return Array.from(allApps.values());
   } catch (error) {
-    console.error('fetchPendingDistributors error:', error);
+    console.error("fetchPendingDistributors error:", error);
     return [];
   }
 }
 
-export async function approveDistributorBySuperAdmin(id: string, overrideQuota?: number) {
-      try {
-        const app = await prisma.distributorApplication.findUnique({
-          where: { id }
-        });
-        if (!app) return { success: false };
+export async function approveDistributorBySuperAdmin(
+  id: string,
+  overrideQuota?: number,
+) {
+  try {
+    const app = await prisma.distributorApplication.findUnique({
+      where: { id },
+    });
+    if (!app) return { success: false };
 
-        await prisma.distributorApplication.update({
-          where: { id },
-          data: { status: 'Active' }
-        });
+    await prisma.distributorApplication.update({
+      where: { id },
+      data: { status: "Active" },
+    });
 
-        const distId = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-        
-        const newQuota = overrideQuota !== undefined ? overrideQuota : Number(app.nodes || 100);
+    const distId =
+      "dist-" + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-        await prisma.distributor.create({
-          data: {
-            id: distId,
-            name: app.name || '',
-            account: app.account || app.name,
-            password: app.password || 'pivot2026',
-            status: 'Active',
-            quota: newQuota,
-            nodes: newQuota,
-            customNodes: newQuota,
-            contactName: app.contact_name || '',
-            contactPhone: app.phone || '',
-            email: app.email || '',
-            address: app.address || '',
-            superSalesId: app.submittedBy !== 'System Admin' ? app.submittedBy : null
-          }
-        });
+    const newQuota =
+      overrideQuota !== undefined ? overrideQuota : Number(app.nodes || 100);
 
-        const { revalidatePath } = require('next/cache');
-        revalidatePath('/super-admin');
-        return { success: true };
-      } catch (e) {
-        console.error(e);
-        return { success: false };
-      }
+    await prisma.distributor.create({
+      data: {
+        id: distId,
+        name: app.name || "",
+        account: app.account || app.name,
+        password: app.password || "pivot2026",
+        status: "Active",
+        quota: newQuota,
+        nodes: newQuota,
+        customNodes: newQuota,
+        contactName: app.contact_name || "",
+        contactPhone: app.phone || "",
+        email: app.email || "",
+        address: app.address || "",
+        superSalesId:
+          app.submittedBy !== "System Admin" ? app.submittedBy : null,
+      },
+    });
+
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false };
+  }
 }
 
-export async function rejectDistributorBySuperAdmin(id: string, rejectReason?: string) {
+export async function rejectDistributorBySuperAdmin(
+  id: string,
+  rejectReason?: string,
+) {
   try {
     await prisma.distributorApplication.update({
       where: { id },
-      data: { status: 'Rejected', rejectReason: rejectReason || '', rejectedAt: new Date().toISOString() }
+      data: {
+        status: "Rejected",
+        rejectReason: rejectReason || "",
+        rejectedAt: new Date().toISOString(),
+      },
     });
   } catch (e) {}
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
+  revalidatePath("/super-admin");
+  revalidatePath("/super-sales");
   return { success: true };
 }
 
-export async function updateSuperSalesCommission(salesName: string, rates: any) {
+export async function updateSuperSalesCommission(
+  salesName: string,
+  rates: any,
+) {
   console.log(`Updating rates for ${salesName}:`, rates);
   [][salesName] = rates;
-  
+
   await null;
 
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
+  revalidatePath("/super-admin");
+  revalidatePath("/super-sales");
   return { success: true };
 }
 
 export async function fetchSalesPerformance(salesId: string) {
-
-      try {
-        const temples = await prisma.temple.findMany({
-           where: {
-             OR: [{ salesId: salesId }, { superSalesId: salesId }]
-           }
-        });
-        return {
-          total: temples.length,
-          approved: temples.filter(t => t.status === 'Active').length
-        };
-      } catch (error) {
-        console.error('fetchSalesPerformance error:', error);
-        return { total: 0, approved: 0 };
-      }
+  try {
+    const temples = await prisma.temple.findMany({
+      where: {
+        OR: [{ salesId: salesId }, { superSalesId: salesId }],
+      },
+    });
+    return {
+      total: temples.length,
+      approved: temples.filter((t) => t.status === "Active").length,
+    };
+  } catch (error) {
+    console.error("fetchSalesPerformance error:", error);
+    return { total: 0, approved: 0 };
+  }
 }
 
 export async function fetchVisitationRecords(salesId: string) {
-
-      try {
-        const records = await prisma.salesVisit.findMany({
-          where: { salesId }
-        });
-        return records;
-      } catch (error) {
-        console.error('fetchVisitationRecords error:', error);
-        return [];
-      }
+  try {
+    const records = await prisma.salesVisit.findMany({
+      where: { salesId },
+    });
+    return records;
+  } catch (error) {
+    console.error("fetchVisitationRecords error:", error);
+    return [];
+  }
 }
 
 export async function fetchAllAccountsForAdmin() {
   const accounts: any[] = [];
-  
-  accounts.push({ id: 'ADMIN', name: '系統總部 HQ', role: 'SuperAdmin', account: 'PIVOTADMIN01', status: 'Active' });
-  
+
+  accounts.push({
+    id: "ADMIN",
+    name: "系統總部 HQ",
+    role: "SuperAdmin",
+    account: "PIVOTADMIN01",
+    status: "Active",
+  });
+
   let pgAdmins = await prisma.user.findMany({
-    where: { role: 'Admin' }
+    where: { role: "Admin" },
   });
 
   const allAdminsMap = new Map();
-  pgAdmins.forEach(p => {
-    allAdminsMap.set(p.account, { ...p, name: p.name, account: p.account, status: p.status || 'Active' });
+  pgAdmins.forEach((p) => {
+    allAdminsMap.set(p.account, {
+      ...p,
+      name: p.name,
+      account: p.account,
+      status: p.status || "Active",
+    });
   });
-  Array.from(allAdminsMap.values()).forEach(p => {
-    accounts.push({ ...p, id: p.id, name: p.name, role: 'Admin', account: p.account, status: p.status || 'Active' });
+  Array.from(allAdminsMap.values()).forEach((p) => {
+    accounts.push({
+      ...p,
+      id: p.id,
+      name: p.name,
+      role: "Admin",
+      account: p.account,
+      status: p.status || "Active",
+    });
   });
 
   // SuperSales (Legacy from User)
   let pgSuperSales = await prisma.user.findMany({
-    where: { role: 'SuperSales' }
+    where: { role: "SuperSales" },
   });
-  pgSuperSales.forEach(s => {
-    accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active' });
+  pgSuperSales.forEach((s) => {
+    accounts.push({
+      ...s,
+      id: s.id,
+      name: s.name,
+      role: "SuperSales",
+      account: s.account,
+      status: s.status || "Active",
+    });
   });
 
   // SuperSales (New from DistributorSales)
   let pgSuperSalesNew = await prisma.distributorSales.findMany({
-    where: { role: 'SuperSales' }
+    where: { role: "SuperSales" },
   });
-  pgSuperSalesNew.forEach(s => {
-    accounts.push({ ...s, id: s.id, name: s.name, role: 'SuperSales', account: s.account, status: s.status || 'Active' });
+  pgSuperSalesNew.forEach((s) => {
+    accounts.push({
+      ...s,
+      id: s.id,
+      name: s.name,
+      role: "SuperSales",
+      account: s.account,
+      status: s.status || "Active",
+    });
   });
 
   let pgDistributors = await prisma.distributor.findMany();
 
   const allDistributorsMap = new Map();
-  pgDistributors.forEach(d => {
-    allDistributorsMap.set(d.account, { 
-      ...d, 
-      planId: d.planId || 'DEFAULT', 
-      planName: d.planName || '標準方案', 
-      joinedAt: d.joinedAt || (d.createdAt ? d.createdAt.toISOString().split('T')[0] : '未知'), 
-      creatorSalesId: d.creatorSalesId || 'SuperAdmin', 
-      phone: d.contactPhone || d.phone || '', 
-      email: d.email || '', 
-      address: d.address || '', 
-      contactName: d.contactName || '', 
-      taxId: d.taxId || '' 
+  pgDistributors.forEach((d) => {
+    allDistributorsMap.set(d.account, {
+      ...d,
+      planId: d.planId || "DEFAULT",
+      planName: d.planName || "標準方案",
+      joinedAt:
+        d.joinedAt ||
+        (d.createdAt ? d.createdAt.toISOString().split("T")[0] : "未知"),
+      creatorSalesId: d.creatorSalesId || "SuperAdmin",
+      phone: d.contactPhone || d.phone || "",
+      email: d.email || "",
+      address: d.address || "",
+      contactName: d.contactName || "",
+      taxId: d.taxId || "",
     });
   });
-  
-  Array.from(allDistributorsMap.values()).forEach(d => {
-    accounts.push({ ...d, id: d.id, name: d.name, role: 'Distributor', account: d.account, status: d.status || 'Active' });
+
+  Array.from(allDistributorsMap.values()).forEach((d) => {
+    accounts.push({
+      ...d,
+      id: d.id,
+      name: d.name,
+      role: "Distributor",
+      account: d.account,
+      status: d.status || "Active",
+    });
   });
 
   // DistSales
   let pgSales = await prisma.distributorSales.findMany();
-  pgSales.forEach(s => {
-    accounts.push({ ...s, id: s.id, name: s.name, role: 'DistSales', account: s.account, status: s.status || 'Active' });
+  pgSales.forEach((s) => {
+    accounts.push({
+      ...s,
+      id: s.id,
+      name: s.name,
+      role: "DistSales",
+      account: s.account,
+      status: s.status || "Active",
+    });
   });
-  
+
   // Temples
   let pgTemples = await prisma.temple.findMany();
-  
-  const templePromises = pgTemples.map(async t => {
+
+  const templePromises = pgTemples.map(async (t) => {
     let personnel = await prisma.user.findFirst({
       select: { account: true },
-      where: { templeId: t.id }
+      where: { templeId: t.id },
     });
     const creatorInfo = await getTempleCreatorInfo(t.id);
-    return { 
+    return {
       ...t,
-      id: t.id, 
-      name: t.templeName || t.name || '未知宮廟', 
-      role: 'Temple', 
-      account: personnel ? personnel.account : (t.account || `USR-${t.id}`), 
+      id: t.id,
+      name: t.templeName || t.name || "未知宮廟",
+      role: "Temple",
+      account: personnel ? personnel.account : t.account || `USR-${t.id}`,
       templePhone: t.phone,
-      status: t.status || 'Active',
+      status: t.status || "Active",
       creatorInfo: creatorInfo,
       setupFee: t.setupFee,
       monthlyRent: t.monthlyRent,
       paymentCycle: t.paymentCycle,
       address: t.address,
-      timestamp: t.createdAt
+      timestamp: t.createdAt,
     };
   });
-  
+
   const resolvedTemples = await Promise.all(templePromises);
   accounts.push(...resolvedTemples);
 
@@ -8029,29 +9821,29 @@ export async function fetchAllAccountsForAdmin() {
 }
 
 export async function fetchSuperSalesAccounts() {
+  try {
+    const sales = await prisma.distributorSales.findMany({
+      where: { role: "SuperSales" },
+    });
 
-      try {
-        const sales = await prisma.distributorSales.findMany({
-          where: { role: 'SuperSales' }
-        });
-        
-        // We should parse commissionRules back to rates if needed
-        return sales.map(s => {
-          const parsedRates = s.commissionRules && typeof s.commissionRules === 'object' 
-            ? s.commissionRules 
-            : { templeSetupRate: 20 };
-          return {
-            ...s,
-            rates: parsedRates
-          };
-        });
-      } catch (e) {
-        console.error(e);
-        return [];
-      }
+    // We should parse commissionRules back to rates if needed
+    return sales.map((s) => {
+      const parsedRates =
+        s.commissionRules && typeof s.commissionRules === "object"
+          ? s.commissionRules
+          : { templeSetupRate: 20 };
+      return {
+        ...s,
+        rates: parsedRates,
+      };
+    });
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
 }
 
-export async function addVisitationRecord(data: any) { 
+export async function addVisitationRecord(data: any) {
   try {
     await prisma.salesVisit.create({
       data: {
@@ -8063,17 +9855,17 @@ export async function addVisitationRecord(data: any) {
         notes: data.notes,
         status: data.status,
         importance: data.importance,
-        content: data.notes
-      }
+        content: data.notes,
+      },
     });
     const { revalidatePath } = require("next/cache");
-    revalidatePath('/dist-sales');
-    revalidatePath('/dist-admin');
-    revalidatePath('/distributor');
+    revalidatePath("/dist-sales");
+    revalidatePath("/dist-admin");
+    revalidatePath("/distributor");
     return { success: true };
   } catch (error) {
-    console.error('addVisitationRecord error:', error);
-    return { success: false, error: 'Failed to add visit record' };
+    console.error("addVisitationRecord error:", error);
+    return { success: false, error: "Failed to add visit record" };
   }
 }
 
@@ -8082,20 +9874,29 @@ export async function fetchSalesTools() {
     let tools = await prisma.tool.findMany();
     if (tools.length === 0) {
       const defaultTools = [
-        { name: '管理工具', description: '', isEnabled: true },
-        { name: '行銷工具', description: '', isEnabled: true },
-        { name: '系統工具', description: '', isEnabled: true },
-        { name: '其他工具', description: '', isEnabled: true }
+        { name: "管理工具", description: "", isEnabled: true },
+        { name: "行銷工具", description: "", isEnabled: true },
+        { name: "系統工具", description: "", isEnabled: true },
+        { name: "其他工具", description: "", isEnabled: true },
       ];
       for (const t of defaultTools) {
         await prisma.tool.create({ data: t });
       }
       tools = await prisma.tool.findMany();
     }
-    const colorMap = ["bg-indigo-50 text-indigo-600", "bg-purple-50 text-purple-600", "bg-emerald-50 text-emerald-600", "bg-slate-100 text-slate-900"];
-    return tools.map((t, i) => ({ n: t.name, icon: t.description, c: colorMap[i % 4] }));
+    const colorMap = [
+      "bg-indigo-50 text-indigo-600",
+      "bg-purple-50 text-purple-600",
+      "bg-emerald-50 text-emerald-600",
+      "bg-slate-100 text-slate-900",
+    ];
+    return tools.map((t, i) => ({
+      n: t.name,
+      icon: t.description,
+      c: colorMap[i % 4],
+    }));
   } catch (error) {
-    console.error('fetchSalesTools error:', error);
+    console.error("fetchSalesTools error:", error);
     return [];
   }
 }
@@ -8104,160 +9905,181 @@ export async function fetchSuperSalesLogs(salesName: string) {
   try {
     const logs = await prisma.adminLog.findMany({
       where: { adminName: salesName },
-      orderBy: { createdAt: 'desc' },
-      take: 50
+      orderBy: { createdAt: "desc" },
+      take: 50,
     });
-    return logs.map((l: any) => ({ id: l.id, action: l.action, target: l.target, time: l.timestamp }));
+    return logs.map((l: any) => ({
+      id: l.id,
+      action: l.action,
+      target: l.target,
+      time: l.timestamp,
+    }));
   } catch (error) {
-    console.error('fetchSuperSalesLogs error:', error);
+    console.error("fetchSuperSalesLogs error:", error);
     return [];
   }
 }
 
-export async function addSuperSalesLog(salesName: string, action: string, target: string) {
+export async function addSuperSalesLog(
+  salesName: string,
+  action: string,
+  target: string,
+) {
   try {
-    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const time = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     await prisma.adminLog.create({
       data: {
         adminName: salesName,
         action,
         target,
-        timestamp: time
-      }
+        timestamp: time,
+      },
     });
   } catch (error) {
-    console.error('addSuperSalesLog error:', error);
+    console.error("addSuperSalesLog error:", error);
   }
 }
 
 export async function uploadTool(formData: FormData) {
-  const type = formData.get('type') as string;
-  const title = formData.get('title') as string;
-  const category = formData.get('category') as string;
-  let thumbnail = formData.get('thumbnail') as string;
-  const file = formData.get('file') as File | null;
+  const type = formData.get("type") as string;
+  const title = formData.get("title") as string;
+  const category = formData.get("category") as string;
+  let thumbnail = formData.get("thumbnail") as string;
+  const file = formData.get("file") as File | null;
   let url = thumbnail;
 
   if (file && file.size > 0) {
-    const fs = require('fs');
-    const path = require('path');
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const fs = require("fs");
+    const path = require("path");
+    const uploadsDir = path.join(process.cwd(), "public", "uploads");
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
-    const ext = path.extname(file.name) || '';
-    const safeName = 'tool-' + Date.now() + ext;
+    const ext = path.extname(file.name) || "";
+    const safeName = "tool-" + Date.now() + ext;
     const filePath = path.join(uploadsDir, safeName);
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filePath, buffer);
-    url = '/api/uploads/' + safeName;
-    if (type === 'photo') {
+    url = "/api/uploads/" + safeName;
+    if (type === "photo") {
       thumbnail = url;
     }
   }
 
-  const uploadedAt = new Date().toISOString().split('T')[0];
+  const uploadedAt = new Date().toISOString().split("T")[0];
   try {
     await prisma.tool.create({
       data: {
-        id: 'tool-' + Date.now(),
+        id: "tool-" + Date.now(),
         type: type,
         title: title,
         category: category,
         url: url,
         thumbnail: thumbnail,
         uploadedAt: uploadedAt,
-        uploadedBy: 'System'
-      }
+        uploadedBy: "System",
+      },
     });
-  } catch(e) {
-    console.error('Failed to upload tool to db', e);
+  } catch (e) {
+    console.error("Failed to upload tool to db", e);
   }
-  const { revalidatePath } = require('next/cache');
-  revalidatePath('/super-admin');
-  revalidatePath('/distributor');
-  revalidatePath('/dist-sales');
-  revalidatePath('/super-sales/[salesId]', 'page');
+  const { revalidatePath } = require("next/cache");
+  revalidatePath("/super-admin");
+  revalidatePath("/distributor");
+  revalidatePath("/dist-sales");
+  revalidatePath("/super-sales/[salesId]", "page");
   return { success: true, toolUrl: url, thumbnail };
 }
 
 export async function deleteTool(toolId: string) {
   try {
     await prisma.tool.delete({
-      where: { id: toolId }
+      where: { id: toolId },
     });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-admin');
-    revalidatePath('/distributor');
-    revalidatePath('/dist-sales');
-    revalidatePath('/super-sales/[salesId]', 'page');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    revalidatePath("/distributor");
+    revalidatePath("/dist-sales");
+    revalidatePath("/super-sales/[salesId]", "page");
     return { success: true };
   } catch (e) {
-    console.error('Failed to delete tool', e);
-    return { success: false, error: 'Tool not found or delete failed' };
+    console.error("Failed to delete tool", e);
+    return { success: false, error: "Tool not found or delete failed" };
   }
 }
 
-export async function fetchEContracts() { return []; }
+export async function fetchEContracts() {
+  return [];
+}
 
-export async function submitEContract(fd: any) { return { success: true }; }
+export async function submitEContract(fd: any) {
+  return { success: true };
+}
 
 export async function fetchDistributorCapacity(distId?: string) {
+  try {
+    let whereClause: any = {};
+    if (distId) {
+      whereClause = { distributorId: distId };
+    }
 
-      try {
-        let whereClause: any = {};
-        if (distId) {
-          whereClause = { distributorId: distId };
-        }
-        
-        const temples = await prisma.temple.findMany({
-          where: whereClause
-        }) as any;
-        
-        const salesIdsForCapacity = temples.map((t: any) => t.salesId).filter(Boolean);
-        const salesData = await prisma.distributorSales.findMany({
-          where: { id: { in: salesIdsForCapacity as string[] } }
-        });
-        
-        const used = temples.filter((t: any) => {
-           const s = salesData.find((sd: any) => sd.id === t.salesId);
-           return !s || s.role !== 'SuperSales';
-        }).length;
-        
-        let total = 0;
-        if (distId) {
-          const dist = await prisma.distributor.findUnique({ where: { id: distId } });
-          total = dist?.nodes || 100;
-        } else {
-          const dists = await prisma.distributor.findMany();
-          total = dists.reduce((acc, d) => acc + (d.nodes || 100), 0);
-        }
-        
-        return { used, total, isUnlimited: total >= 1000 };
-      } catch (error) {
-        console.error('fetchDistributorCapacity error:', error);
-        return { used: 0, total: 100, isUnlimited: false };
-      }
+    const temples = (await prisma.temple.findMany({
+      where: whereClause,
+    })) as any;
+
+    const salesIdsForCapacity = temples
+      .map((t: any) => t.salesId)
+      .filter(Boolean);
+    const salesData = await prisma.distributorSales.findMany({
+      where: { id: { in: salesIdsForCapacity as string[] } },
+    });
+
+    const used = temples.filter((t: any) => {
+      const s = salesData.find((sd: any) => sd.id === t.salesId);
+      return !s || s.role !== "SuperSales";
+    }).length;
+
+    let total = 0;
+    if (distId) {
+      const dist = await prisma.distributor.findUnique({
+        where: { id: distId },
+      });
+      total = dist?.nodes || 100;
+    } else {
+      const dists = await prisma.distributor.findMany();
+      total = dists.reduce((acc, d) => acc + (d.nodes || 100), 0);
+    }
+
+    return { used, total, isUnlimited: total >= 1000 };
+  } catch (error) {
+    console.error("fetchDistributorCapacity error:", error);
+    return { used: 0, total: 100, isUnlimited: false };
+  }
 }
 
 export async function submitDistributorApplication(data: any) {
-  if (data.account && await checkAccountExists((data.account || '').trim())) {
-    return { success: false, error: '帳號已被使用' };
+  if (data.account && (await checkAccountExists((data.account || "").trim()))) {
+    return { success: false, error: "帳號已被使用" };
   }
   const expirationDate = new Date();
-  expirationDate.setFullYear(expirationDate.getFullYear() + (Number(data.years) || 2));
+  expirationDate.setFullYear(
+    expirationDate.getFullYear() + (Number(data.years) || 2),
+  );
 
-  const safeAccount = (data.account || '').trim();
-  const safePassword = (data.password || '').trim();
+  const safeAccount = (data.account || "").trim();
+  const safePassword = (data.password || "").trim();
 
   const newApp = {
-    id: 'DAPP-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+    id: "DAPP-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
     ...data,
     account: safeAccount,
     password: safePassword,
-    status: 'Pending',
-    date: new Date().toISOString().split('T')[0],
-    expirationDate: expirationDate.toISOString().split('T')[0]
+    status: "Pending",
+    date: new Date().toISOString().split("T")[0],
+    expirationDate: expirationDate.toISOString().split("T")[0],
   };
   // Removed mock array push, strictly using SQL
 
@@ -8265,90 +10087,97 @@ export async function submitDistributorApplication(data: any) {
     await prisma.distributorApplication.create({
       data: {
         id: newApp.id,
-        name: data.name || '',
-        contactName: data.contactName || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        taxId: data.taxId || '',
-        address: data.address || '',
-        planId: data.planId || '',
+        name: data.name || "",
+        contactName: data.contactName || "",
+        phone: data.phone || "",
+        email: data.email || "",
+        taxId: data.taxId || "",
+        address: data.address || "",
+        planId: data.planId || "",
         price: Number(data.customPrice) || 0,
         nodes: Number(data.customNodes) || 0,
-        submittedBy: data.submittedBy || '',
-        status: 'Pending',
+        submittedBy: data.submittedBy || "",
+        status: "Pending",
         account: safeAccount,
         password: safePassword,
-        expirationDate: newApp.expirationDate
-      }
+        expirationDate: newApp.expirationDate,
+      },
     });
-  } catch(e) {
+  } catch (e) {
     console.error("Failed to insert distributor_application:", e);
   }
 
   await null;
 
-  revalidatePath('/super-admin');
-  revalidatePath('/super-sales');
+  revalidatePath("/super-admin");
+  revalidatePath("/super-sales");
   return { success: true, id: newApp.id };
 }
 
 export async function fetchSuperSalesProfile(salesId: string) {
-
-      try {
-        const sales = await prisma.distributorSales.findUnique({
-          where: { id: salesId }
-        });
-        if (sales) {
-          if (typeof sales.bankAccount === 'string') {
-            try { sales.bankAccount = JSON.parse(sales.bankAccount); } catch(e) {}
-          }
-          (sales as any).bankInfo = sales.bankAccount || {
-            bankCode: '',
-            bankName: '',
-            accountNumber: '',
-            accountName: sales.name
-          };
-        }
-        return sales;
-      } catch (e) {
-        console.error(e);
-        return null;
+  try {
+    const sales = await prisma.distributorSales.findUnique({
+      where: { id: salesId },
+    });
+    if (sales) {
+      if (typeof sales.bankAccount === "string") {
+        try {
+          sales.bankAccount = JSON.parse(sales.bankAccount);
+        } catch (e) {}
       }
+      (sales as any).bankInfo = sales.bankAccount || {
+        bankCode: "",
+        bankName: "",
+        accountNumber: "",
+        accountName: sales.name,
+      };
+    }
+    return sales;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }
 
-export async function updateSuperSalesBankInfo(salesId: string, bankInfo: { bankName: string, accountName: string, accountNumber: string }) {
+export async function updateSuperSalesBankInfo(
+  salesId: string,
+  bankInfo: { bankName: string; accountName: string; accountNumber: string },
+) {
   try {
     await prisma.distributorSales.update({
       where: { id: salesId },
       data: {
         bankName: bankInfo.bankName,
         bankAccountName: bankInfo.accountName,
-        bankAccountNumber: bankInfo.accountNumber
-      }
+        bankAccountNumber: bankInfo.accountNumber,
+      },
     });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-sales');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-sales");
     return { success: true };
   } catch (e) {
-    console.error('updateSuperSalesBankInfo error:', e);
+    console.error("updateSuperSalesBankInfo error:", e);
     return { success: false, error: String(e) };
   }
 }
 
-export async function updateSuperSalesBasicInfo(salesId: string, data: { phone: string, email: string }) {
+export async function updateSuperSalesBasicInfo(
+  salesId: string,
+  data: { phone: string; email: string },
+) {
   try {
     await prisma.distributorSales.update({
       where: { id: salesId },
       data: {
         phone: data.phone,
-        email: data.email
-      }
+        email: data.email,
+      },
     });
-    const { revalidatePath } = require('next/cache');
-    revalidatePath('/super-sales');
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-sales");
     return { success: true };
   } catch (e) {
-    console.error('updateSuperSalesBasicInfo error:', e);
+    console.error("updateSuperSalesBasicInfo error:", e);
     return { success: false, error: String(e) };
   }
 }
@@ -8359,118 +10188,172 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   let listSales = [...[]];
 
   /* removed duplicate import */
-    const resTemples = { rows: await prisma.temple.findMany() };
-    if (resTemples && resTemples.rows) {
-          listTemples = resTemples.rows.map((r: any) => ({
-            ...r,
-            status: r.status,
-            templeName: r.templeName || r.temple_name,
-            salesId: r.salesId || r.sales_id,
-            distributorId: r.distributorId || r.distributor_id,
-            monthlyRent: r.monthlyRent || r.monthly_rent,
-            setupFee: r.setupFee || r.setup_fee,
-            paymentCycle: r.paymentCycle || r.payment_cycle,
-            paymentStatus: r.paymentStatus || r.payment_status,
-            timestamp: r.createdAt || r.created_at
-          }));
-        }
-    const resDist = { rows: await prisma.distributor.findMany() };
-    if (resDist && resDist.rows) {
-          listDistributors = resDist.rows.map((r: any) => ({
-            ...r,
-            creatorSalesId: r.creatorSalesId || r.creator_sales_id,
-            salesId: r.creatorSalesId || r.creator_sales_id,
-            planId: r.planId || r.plan_id
-          }));
-        }
-    const resSales = { rows: await prisma.distributorSales.findMany() };
-    if (resSales && resSales.rows) {
-          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributorId || r.distributor_id }));
-        }
+  const resTemples = { rows: await prisma.temple.findMany() };
+  if (resTemples && resTemples.rows) {
+    listTemples = resTemples.rows.map((r: any) => ({
+      ...r,
+      status: r.status,
+      templeName: r.templeName || r.temple_name,
+      salesId: r.salesId || r.sales_id,
+      distributorId: r.distributorId || r.distributor_id,
+      monthlyRent: r.monthlyRent || r.monthly_rent,
+      setupFee: r.setupFee || r.setup_fee,
+      paymentCycle: r.paymentCycle || r.payment_cycle,
+      paymentStatus: r.paymentStatus || r.payment_status,
+      timestamp: r.createdAt || r.created_at,
+    }));
+  }
+  const resDist = { rows: await prisma.distributor.findMany() };
+  if (resDist && resDist.rows) {
+    listDistributors = resDist.rows.map((r: any) => ({
+      ...r,
+      creatorSalesId: r.creatorSalesId || r.creator_sales_id,
+      salesId: r.creatorSalesId || r.creator_sales_id,
+      planId: r.planId || r.plan_id,
+    }));
+  }
+  const resSales = { rows: await prisma.distributorSales.findMany() };
+  if (resSales && resSales.rows) {
+    listSales = resSales.rows.map((r: any) => ({
+      ...r,
+      role: r.role,
+      distributorId: r.distributorId || r.distributor_id,
+    }));
+  }
 
-  const sales = listSales.find(s => s.id === salesId);
+  const sales = listSales.find((s) => s.id === salesId);
   const name = sales?.name;
-  
+
   const temples = [];
   for (const t of listTemples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
-    if ((creatorInfo && creatorInfo.salesName === name) || t.salesId === salesId) {
-       let yearlyRent = 0;
-       let setupFee = 0;
-       if (t.freeType !== 'Permanent') {
-          const config = await fetchSystemConfig();
-          const rent = Number(t.monthlyRent) || (config.fixedMonthlyRent || 3600);
-          const cycle = t.paymentCycle || 'Monthly';
-          const discount = config.yearlyDiscountRate || 20;
-          yearlyRent = cycle === 'Yearly' ? (rent * 12 * (1 - discount / 100)) : (rent * 12);
-          setupFee = t.setupFee ?? 12000;
-       }
-       const annualContribution = yearlyRent + setupFee;
-       
-       const bills = await prisma.templeBill.findMany({ where: { templeId: t.id } });
-       const now = new Date();
-       let lastBillDate = now;
-       if (bills && bills.length > 0) {
-           const lastBill = bills[bills.length - 1];
-           if (lastBill.createdAt || lastBill.created_at || lastBill.timestamp) {
-               lastBillDate = new Date(lastBill.createdAt || lastBill.created_at || lastBill.timestamp);
-           }
-       }
-       const startYear = lastBillDate.getFullYear();
-       const startMonth = lastBillDate.getMonth() + 1;
-       const cycle = t.paymentCycle || 'Monthly';
-       let hasUnpaid = false;
-       let hasPending = false;
-       bills.forEach((b: any) => {
-         if (b.status === 'Unpaid' || b.status === 'Overdue' || b.status === '未繳費' || b.status === '未結帳') hasUnpaid = true;
-         if (b.status === 'PendingVerification') hasPending = true;
-       });
+    if (
+      (creatorInfo && creatorInfo.salesName === name) ||
+      t.salesId === salesId
+    ) {
+      let yearlyRent = 0;
+      let setupFee = 0;
+      if (t.freeType !== "Permanent") {
+        const config = await fetchSystemConfig();
+        const rent = Number(t.monthlyRent) || config.fixedMonthlyRent || 3600;
+        const cycle = t.paymentCycle || "Monthly";
+        const discount = config.yearlyDiscountRate || 20;
+        yearlyRent =
+          cycle === "Yearly" ? rent * 12 * (1 - discount / 100) : rent * 12;
+        setupFee = t.setupFee ?? 12000;
+      }
+      const annualContribution = yearlyRent + setupFee;
 
-       if (t.paymentStatus === 'PendingPayment' || (bills.length === 0 && t.freeType !== 'Permanent' && t.status !== 'Pending')) {
-          if (cycle === 'Yearly') {
-             paymentStatus = `${startYear}/${startMonth}-${startYear+1}/${startMonth} 未繳費`;
-          } else {
-             paymentStatus = `${startMonth}月未繳費`;
-          }
-       } else {
-          if (cycle === 'Yearly') {
-             paymentStatus = hasUnpaid ? `${startYear}/${startMonth}-${startYear+1}/${startMonth} 未繳費` : hasPending ? `${startYear}/${startMonth}-${startYear+1}/${startMonth} 審核中` : `${startYear}/${startMonth}-${startYear+1}/${startMonth} 已付款`;
-          } else {
-             paymentStatus = hasUnpaid ? `${startMonth}月未繳費` : hasPending ? `${startMonth}月審核中` : `${startMonth}月已付款`;
-          }
-       }
-       
-       temples.push({ ...t, id: t.id, name: t.templeName || t.name, status: t.status, plan: '進階雲端方案', date: t.timestamp ? new Date(t.timestamp).toISOString().split('T')[0] : (t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '未知'), revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
+      const bills = await prisma.templeBill.findMany({
+        where: { templeId: t.id },
+      });
+      const now = new Date();
+      let lastBillDate = now;
+      if (bills && bills.length > 0) {
+        const lastBill = bills[bills.length - 1];
+        if (lastBill.createdAt || lastBill.created_at || lastBill.timestamp) {
+          lastBillDate = new Date(
+            lastBill.createdAt || lastBill.created_at || lastBill.timestamp,
+          );
+        }
+      }
+      const startYear = lastBillDate.getFullYear();
+      const startMonth = lastBillDate.getMonth() + 1;
+      const cycle = t.paymentCycle || "Monthly";
+      let hasUnpaid = false;
+      let hasPending = false;
+      bills.forEach((b: any) => {
+        if (
+          b.status === "Unpaid" ||
+          b.status === "Overdue" ||
+          b.status === "未繳費" ||
+          b.status === "未結帳"
+        )
+          hasUnpaid = true;
+        if (b.status === "PendingVerification") hasPending = true;
+      });
+
+      if (
+        t.paymentStatus === "PendingPayment" ||
+        (bills.length === 0 &&
+          t.freeType !== "Permanent" &&
+          t.status !== "Pending")
+      ) {
+        if (cycle === "Yearly") {
+          paymentStatus = `${startYear}/${startMonth}-${startYear + 1}/${startMonth} 未繳費`;
+        } else {
+          paymentStatus = `${startMonth}月未繳費`;
+        }
+      } else {
+        if (cycle === "Yearly") {
+          paymentStatus = hasUnpaid
+            ? `${startYear}/${startMonth}-${startYear + 1}/${startMonth} 未繳費`
+            : hasPending
+              ? `${startYear}/${startMonth}-${startYear + 1}/${startMonth} 審核中`
+              : `${startYear}/${startMonth}-${startYear + 1}/${startMonth} 已付款`;
+        } else {
+          paymentStatus = hasUnpaid
+            ? `${startMonth}月未繳費`
+            : hasPending
+              ? `${startMonth}月審核中`
+              : `${startMonth}月已付款`;
+        }
+      }
+
+      temples.push({
+        ...t,
+        id: t.id,
+        name: t.templeName || t.name,
+        status: t.status,
+        plan: "進階雲端方案",
+        date: t.timestamp
+          ? new Date(t.timestamp).toISOString().split("T")[0]
+          : t.created_at
+            ? new Date(t.created_at).toISOString().split("T")[0]
+            : "未知",
+        revenue: t.monthlyRent || 0,
+        annualContribution,
+        paymentStatus,
+        bills,
+      });
     }
   }
 
-  const distributors = listDistributors.filter(d => d.creatorSalesId === salesId || d.salesId === salesId).map(d => {
-    const distTemples = listTemples.filter(t => t.distributorId === d.id);
-    const distSales = listSales.filter(s => s.distributorId === d.id);
-    const totalIncome = distTemples.reduce((acc, t) => acc + (Number(t.monthlyRent) || 0) * 12, 0);
-    const commissionExpense = Math.floor(totalIncome * 0.2); // 預設費用20%
-    const netRevenue = totalIncome - commissionExpense;
+  const distributors = listDistributors
+    .filter((d) => d.creatorSalesId === salesId || d.salesId === salesId)
+    .map((d) => {
+      const distTemples = listTemples.filter((t) => t.distributorId === d.id);
+      const distSales = listSales.filter((s) => s.distributorId === d.id);
+      const totalIncome = distTemples.reduce(
+        (acc, t) => acc + (Number(t.monthlyRent) || 0) * 12,
+        0,
+      );
+      const commissionExpense = Math.floor(totalIncome * 0.2); // 預設費用20%
+      const netRevenue = totalIncome - commissionExpense;
 
-    return {
-      id: d.id,
-      name: d.name,
-      status: d.contractStatus || d.status || 'Active',
-      plan: d.planName || '標準方案',
-      date: d.joinedAt || '未知',
-      nodesUsed: distTemples.length,
-      templeCount: distTemples.length,
-      salesCount: distSales.length,
-      revenue: totalIncome,
-      expenses: commissionExpense,
-      netRevenue: netRevenue
-    };
-  });
+      return {
+        id: d.id,
+        name: d.name,
+        status: d.contractStatus || d.status || "Active",
+        plan: d.planName || "標準方案",
+        date: d.joinedAt || "未知",
+        nodesUsed: distTemples.length,
+        templeCount: distTemples.length,
+        salesCount: distSales.length,
+        revenue: totalIncome,
+        expenses: commissionExpense,
+        netRevenue: netRevenue,
+      };
+    });
 
   let pendingTempleCount = 0;
   for (const t of listTemples) {
-    if (t.status === 'Pending') {
+    if (t.status === "Pending") {
       const creatorInfo = await getTempleCreatorInfo(t.id);
-      if ((creatorInfo && creatorInfo.salesName === name) || t.salesId === salesId) {
+      if (
+        (creatorInfo && creatorInfo.salesName === name) ||
+        t.salesId === salesId
+      ) {
         pendingTempleCount++;
       }
     }
@@ -8478,7 +10361,9 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 
   let pgPendingDistCount = 0;
   try {
-    const count = await prisma.templeApplication.count({ where: { salesId: name, status: 'Pending' } });
+    const count = await prisma.templeApplication.count({
+      where: { salesId: name, status: "Pending" },
+    });
     const res = { rows: [{ count: count }] };
     if (res && (res as any).rows && (res as any).rows.length > 0) {
       pgPendingDistCount = parseInt((res as any).rows[0].count);
@@ -8493,86 +10378,91 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 }
 
 export async function createSuperSalesAccount(data: any) {
+  try {
+    const existing = await prisma.distributorSales.findFirst({
+      where: { account: data.account },
+    });
+    if (existing) {
+      return { success: false, error: "帳號已被使用" };
+    }
+    const id = `ss-${Date.now()}`;
 
-      try {
-        const existing = await prisma.distributorSales.findFirst({ where: { account: data.account } });
-        if (existing) {
-          return { success: false, error: '帳號已被使用' };
-        }
-        const id = `ss-${Date.now()}`;
-        
-        const commissionRules = {
-          distributorAuthRate: Number(data.distributorAuthRate) || 15,
-          templeSetupRate: Number(data.templeSetupRate) || 10,
-          templeSetupType: data.templeSetupType || 'percent',
-          templeRentRates: [
-            Number(data.rentY1) || 15,
-            Number(data.rentY2) || 12,
-            Number(data.rentY3) || 10
-          ]
-        };
+    const commissionRules = {
+      distributorAuthRate: Number(data.distributorAuthRate) || 15,
+      templeSetupRate: Number(data.templeSetupRate) || 10,
+      templeSetupType: data.templeSetupType || "percent",
+      templeRentRates: [
+        Number(data.rentY1) || 15,
+        Number(data.rentY2) || 12,
+        Number(data.rentY3) || 10,
+      ],
+    };
 
-        await prisma.distributorSales.create({
-          data: {
-            id,
-            name: data.name,
-            account: data.account,
-            phone: data.phone || null,
-            email: data.email || null,
-            password: data.password || '',
-            role: 'SuperSales',
-            status: 'Active',
-            commissionRules,
-            bankAccount: data.bankInfo || data.bankAccount || null,
-            joinedAt: new Date().toISOString().split('T')[0]
-          }
-        });
+    await prisma.distributorSales.create({
+      data: {
+        id,
+        name: data.name,
+        account: data.account,
+        phone: data.phone || null,
+        email: data.email || null,
+        password: data.password || "",
+        role: "SuperSales",
+        status: "Active",
+        commissionRules,
+        bankAccount: data.bankInfo || data.bankAccount || null,
+        joinedAt: new Date().toISOString().split("T")[0],
+      },
+    });
 
-        const { revalidatePath } = require('next/cache');
-        revalidatePath('/super-admin');
-        return { success: true, id };
-      } catch (e) {
-        console.error(e);
-        return { success: false, error: String(e) };
-      }
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/super-admin");
+    return { success: true, id };
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: String(e) };
+  }
 }
 
 export async function updateDistributorQuota(distId: string, newQuota: number) {
-
-      try {
-        const dist = await prisma.distributor.findFirst({
-          where: { OR: [{ id: distId }, { account: distId }] }
-        });
-        if (dist) {
-          await prisma.distributor.update({
-            where: { id: dist.id },
-            data: { quota: newQuota, nodes: newQuota, customNodes: newQuota }
-          });
-          const { revalidatePath } = require('next/cache');
-          revalidatePath('/super-admin');
-          return { success: true };
-        }
-        return { success: false, error: 'Distributor not found' };
-      } catch (error) {
-        console.error('updateDistributorQuota error:', error);
-        return { success: false, error: String(error) };
-      }
+  try {
+    const dist = await prisma.distributor.findFirst({
+      where: { OR: [{ id: distId }, { account: distId }] },
+    });
+    if (dist) {
+      await prisma.distributor.update({
+        where: { id: dist.id },
+        data: { quota: newQuota, nodes: newQuota, customNodes: newQuota },
+      });
+      const { revalidatePath } = require("next/cache");
+      revalidatePath("/super-admin");
+      return { success: true };
+    }
+    return { success: false, error: "Distributor not found" };
+  } catch (error) {
+    console.error("updateDistributorQuota error:", error);
+    return { success: false, error: String(error) };
+  }
 }
 
 export async function createDistributorAccount(data: any) {
-  if (data.account && await checkAccountExists(data.account.trim())) {
-    return { success: false, error: '帳號已被使用' };
+  if (data.account && (await checkAccountExists(data.account.trim()))) {
+    return { success: false, error: "帳號已被使用" };
   }
-  const safeAccount = (data.account || '').trim();
-  const safePassword = (data.password || '').trim();
-  const id = 'dist-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+  const safeAccount = (data.account || "").trim();
+  const safePassword = (data.password || "").trim();
+  const id =
+    "dist-" + Math.random().toString(36).substring(2, 10).toUpperCase();
   const config = await fetchSystemConfig();
-  const plan = config.distributorPlans.find((p: any) => p.id === data.planId) || config.distributorPlans[0];
+  const plan =
+    config.distributorPlans.find((p: any) => p.id === data.planId) ||
+    config.distributorPlans[0];
   const finalPrice = Number(data.customPrice) || plan.price;
-  
+
   const expirationDate = new Date();
-  expirationDate.setFullYear(expirationDate.getFullYear() + (Number(data.years) || 2));
-  
+  expirationDate.setFullYear(
+    expirationDate.getFullYear() + (Number(data.years) || 2),
+  );
+
   const newDist = {
     id,
     ...data,
@@ -8581,26 +10471,26 @@ export async function createDistributorAccount(data: any) {
     planId: plan.id,
     planName: plan.name,
     price: finalPrice,
-    status: 'Active',
+    status: "Active",
     quota: Number(data.customNodes) || plan.nodes || 100,
-    joinedAt: new Date().toISOString().split('T')[0],
-    expirationDate: expirationDate.toISOString().split('T')[0],
-    phone: data.phone || '',
-    email: data.email || '',
-    address: data.address || '',
-    contactName: data.contactName || '',
-    taxId: data.taxId || '',
+    joinedAt: new Date().toISOString().split("T")[0],
+    expirationDate: expirationDate.toISOString().split("T")[0],
+    phone: data.phone || "",
+    email: data.email || "",
+    address: data.address || "",
+    contactName: data.contactName || "",
+    taxId: data.taxId || "",
     bankInfo: data.bankInfo || {
-      bankCode: data.bankCode || '',
-      bankName: data.bankName || '',
-      accountName: data.accountName || '',
-      accountNumber: data.accountNumber || ''
+      bankCode: data.bankCode || "",
+      bankName: data.bankName || "",
+      accountName: data.accountName || "",
+      accountNumber: data.accountNumber || "",
     },
-    creatorSalesId: 'SuperAdmin'
+    creatorSalesId: "SuperAdmin",
   };
-  
+
   await null;
-  
+
   try {
     await prisma.distributorApplication.create({
       data: {
@@ -8608,16 +10498,16 @@ export async function createDistributorAccount(data: any) {
         name: data.name,
         planId: plan.id,
         price: finalPrice,
-        submittedBy: 'System Admin',
-        status: 'Active',
+        submittedBy: "System Admin",
+        status: "Active",
         account: safeAccount,
-        password: safePassword
-      }
+        password: safePassword,
+      },
     });
   } catch (err) {
-    console.error('Failed to insert into distributor_applications', err);
+    console.error("Failed to insert into distributor_applications", err);
   }
-  
+
   try {
     await prisma.distributor.create({
       data: {
@@ -8633,44 +10523,57 @@ export async function createDistributorAccount(data: any) {
         contactPhone: newDist.phone,
         email: newDist.email,
         address: newDist.address,
-        bankCode: newDist.bankInfo?.bankCode || '',
-        bankAccount: newDist.bankInfo?.accountNumber || '',
-        bankName: newDist.bankInfo?.bankName || ''
-      }
+        bankCode: newDist.bankInfo?.bankCode || "",
+        bankAccount: newDist.bankInfo?.accountNumber || "",
+        bankName: newDist.bankInfo?.bankName || "",
+      },
     });
   } catch (e) {
     console.error("DB Insert Error for distributor:", e);
     return { success: false, error: String(e) };
   }
 
-  revalidatePath('/super-admin');
+  revalidatePath("/super-admin");
   return { success: true, id };
 }
 
 export async function createTempleAccount(data: any) {
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被註冊' };
+  if (data.account && (await checkAccountExists(data.account))) {
+    return { success: false, error: "帳號已被註冊" };
   }
-  const reqRole = await getCurrentRole() || 'System';
+  const reqRole = (await getCurrentRole()) || "System";
   const currentUser = await getCurrentUser();
   const creatorRole = reqRole;
-  const creatorId = currentUser?.name || 'System';
+  const creatorId = currentUser?.name || "System";
 
-  if (reqRole !== 'SuperAdmin' && reqRole !== 'super-admin' && reqRole !== 'System' && (data.freeType === 'Permanent' || data.freeType === 'Trial')) {
-    return { success: false, error: '只有超級管理員可以開設免費宮廟帳戶' };
+  if (
+    reqRole !== "SuperAdmin" &&
+    reqRole !== "super-admin" &&
+    reqRole !== "System" &&
+    (data.freeType === "Permanent" || data.freeType === "Trial")
+  ) {
+    return { success: false, error: "只有超級管理員可以開設免費宮廟帳戶" };
   }
 
   const id = `temple-${Math.random().toString(36).substring(2, 10)}`;
   const templeNo = [].length + 1;
   const { paymentCycle, ...rest } = data;
-  
+
   const config = await fetchSystemConfig();
-  const monthlyRent = data.freeType === 'Permanent' ? 0 : (Number(data.monthlyRent) || config.fixedMonthlyRent || 3600);
-  const trialMonths = data.freeType === 'Trial' ? parseInt(data.trialMonths || '0') : 0;
-  
-  let status = 'Active';
-  if (reqRole === 'SuperSales' || reqRole === 'DistributorSales' || reqRole === 'DistSales') {
-    status = 'Pending';
+  const monthlyRent =
+    data.freeType === "Permanent"
+      ? 0
+      : Number(data.monthlyRent) || config.fixedMonthlyRent || 3600;
+  const trialMonths =
+    data.freeType === "Trial" ? parseInt(data.trialMonths || "0") : 0;
+
+  let status = "Active";
+  if (
+    reqRole === "SuperSales" ||
+    reqRole === "DistributorSales" ||
+    reqRole === "DistSales"
+  ) {
+    status = "Pending";
   }
 
   const newTemple = {
@@ -8682,248 +10585,341 @@ export async function createTempleAccount(data: any) {
     salesId: data.salesId || null,
     creatorRole,
     creatorId,
-    paymentCycle: paymentCycle || 'Monthly',
+    paymentCycle: paymentCycle || "Monthly",
     monthlyRent,
     trialMonths,
-    freeType: data.freeType || 'Normal',
+    freeType: data.freeType || "Normal",
     status,
     timestamp: new Date().toISOString(),
-    billingStartDate: data.freeType === 'Trial' && trialMonths > 0 ? 
-      new Date(Date.now() + (trialMonths * 30 * 24 * 60 * 60 * 1000)).toISOString() : 
-      new Date(Date.now() + (5 * 24 * 60 * 60 * 1000)).toISOString()
+    billingStartDate:
+      data.freeType === "Trial" && trialMonths > 0
+        ? new Date(
+            Date.now() + trialMonths * 30 * 24 * 60 * 60 * 1000,
+          ).toISOString()
+        : new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
   };
-  
+
   await null;
   // synced
-  
+
   // Initialize temple storage immediately to prevent overriding
   // Initialize temple storage immediately to prevent overriding
-  const isVip = newTemple.plan === 'Unlimited Node' || newTemple.plan === 'Free' || newTemple.plan === '無限使用' || newTemple.cloudStorage?.includes('無限') || newTemple.cloudStorage === 'Free' || !newTemple.cloudStorage;
+  const isVip =
+    newTemple.plan === "Unlimited Node" ||
+    newTemple.plan === "Free" ||
+    newTemple.plan === "無限使用" ||
+    newTemple.cloudStorage?.includes("無限") ||
+    newTemple.cloudStorage === "Free" ||
+    !newTemple.cloudStorage;
   let qGB = 5;
-  let pName = '免費 5GB 空間';
+  let pName = "免費 5GB 空間";
   if (isVip) {
-      qGB = 20480; // 20TB
-      pName = '無限使用';
+    qGB = 20480; // 20TB
+    pName = "無限使用";
   } else if (newTemple.cloudStorage) {
-      let p = await prisma.storagePlan.findUnique({ where: { id: newTemple.cloudStorage } }) as any;
-      if (p) { 
-          qGB = p.sizeGb; 
-          pName = `${p.sizeGb}GB 雲端空間`; 
-      }
+    let p = (await prisma.storagePlan.findUnique({
+      where: { id: newTemple.cloudStorage },
+    })) as any;
+    if (p) {
+      qGB = p.sizeGb;
+      pName = `${p.sizeGb}GB 雲端空間`;
+    }
   }
   const newStorage = {
     id: `TS-${Date.now()}-${newTemple.id}`,
     templeId: newTemple.id,
     templeName: newTemple.templeName,
-    city: newTemple.city || '未設定',
+    city: newTemple.city || "未設定",
     usedBytes: 0,
     quotaGb: qGB,
     planName: pName,
-      planId: newTemple.cloudStorage || 'FREE'
+    planId: newTemple.cloudStorage || "FREE",
   };
-  
+
   await null;
-  
+
   // Create personnel account for login
   if (data.account && data.password) {
     const pData = await [];
     pData.push({
       id: `p-${Date.now()}`,
       templeId: id,
-      name: data.name || '宮廟管理員',
+      name: data.name || "宮廟管理員",
       account: data.account,
       password: data.password, // In real app, hash this
-      role: 'TempleAdmin',
-      status: 'Active'
+      role: "TempleAdmin",
+      status: "Active",
     });
     await null;
   }
   /* removed duplicate import */
-    await prisma.temple.create({
-      data: {
-        id,
-        name: newTemple.templeName || '未知宮廟',
-        templeName: newTemple.templeName || '未知宮廟',
-        account: data.account || null,
-        region: data.region || null,
-        city: newTemple.city || '未設定',
-        address: data.address || null,
-        phone: data.phone || null,
-        status: newTemple.status,
-        salesId: newTemple.salesId || null,
-        distributorId: newTemple.distributorId || null,
-        superSalesId: data.superSalesId || null,
-        creatorRole: newTemple.creatorRole,
-        creatorId: newTemple.creatorId,
-        setupFee: newTemple.setupFee || 0,
-        monthlyRent: newTemple.monthlyRent || 0,
-        paymentCycle: newTemple.paymentCycle || 'Monthly',
-        billingStartDate: newTemple.billingStartDate ? new Date(newTemple.billingStartDate) : undefined,
-        freeType: newTemple.freeType || 'Normal',
-        trialMonths: newTemple.trialMonths || 0,
-      }
-    });
+  await prisma.temple.create({
+    data: {
+      id,
+      name: newTemple.templeName || "未知宮廟",
+      templeName: newTemple.templeName || "未知宮廟",
+      account: data.account || null,
+      region: data.region || null,
+      city: newTemple.city || "未設定",
+      address: data.address || null,
+      phone: data.phone || null,
+      status: newTemple.status,
+      salesId: newTemple.salesId || null,
+      distributorId: newTemple.distributorId || null,
+      superSalesId: data.superSalesId || null,
+      creatorRole: newTemple.creatorRole,
+      creatorId: newTemple.creatorId,
+      setupFee: newTemple.setupFee || 0,
+      monthlyRent: newTemple.monthlyRent || 0,
+      paymentCycle: newTemple.paymentCycle || "Monthly",
+      billingStartDate: newTemple.billingStartDate
+        ? new Date(newTemple.billingStartDate)
+        : undefined,
+      freeType: newTemple.freeType || "Normal",
+      trialMonths: newTemple.trialMonths || 0,
+    },
+  });
 
-    await prisma.templeStorage.create({
+  await prisma.templeStorage.create({
+    data: {
+      templeId: id,
+      usedBytes: BigInt(0),
+      allocatedBytes: BigInt(newStorage.quotaGb) * BigInt(1024 * 1024 * 1024),
+      planName: newStorage.planName,
+      planId: newStorage.planId || "FREE",
+      city: "未設定",
+    },
+  });
+
+  let aiPlanId = isVip ? "VIP-AI" : data.aiLife || "FREE";
+  await prisma.templeAiUsage.create({
+    data: {
+      templeId: id,
+      planId: aiPlanId,
+      enabled: data.enableAi ?? true,
+      usedCount: 0,
+      isVip: isVip,
+    },
+  });
+
+  if (data.account && data.password) {
+    await prisma.user.create({
       data: {
+        id: `p-${Date.now()}`,
         templeId: id,
-        usedBytes: BigInt(0),
-        allocatedBytes: BigInt(newStorage.quotaGb) * BigInt(1024 * 1024 * 1024),
-        planName: newStorage.planName,
-          planId: newStorage.planId || 'FREE',
-        city: '未設定'
-      }
+        name: data.name || "宮廟管理員",
+        role: "TempleAdmin",
+        account: data.account,
+        phone: data.account,
+        password: data.password,
+        status: "Active",
+      },
     });
+  }
 
-    let aiPlanId = isVip ? 'VIP-AI' : (data.aiLife || 'FREE');
-    await prisma.templeAiUsage.create({
-      data: {
-        templeId: id,
-        planId: aiPlanId,
-        enabled: data.enableAi ?? true,
-        usedCount: 0,
-        isVip: isVip
-      }
-    });
+  // Deduct quota if Distributor/Sales
+  const { cookies } = require("next/headers");
+  const cookieStore = await cookies();
+  const currentRole = cookieStore.get("admin_role")?.value || "SuperAdmin";
+  const accountStr = cookieStore.get("admin_account")?.value || "system";
 
-    if (data.account && data.password) {
-      await prisma.user.create({
-        data: {
-          id: `p-${Date.now()}`,
-          templeId: id,
-          name: data.name || '宮廟管理員',
-          role: 'TempleAdmin',
-          account: data.account,
-          phone: data.account,
-          password: data.password,
-          status: 'Active'
-        }
+  if (currentRole === "Distributor" || currentRole === "DistSales") {
+    if (currentRole === "Distributor") {
+      const dist = await prisma.distributor.findFirst({
+        where: { account: accountStr },
       });
-    }
-
-    // Deduct quota if Distributor/Sales
-    const { cookies } = require("next/headers");
-    const cookieStore = await cookies();
-    const currentRole = cookieStore.get("admin_role")?.value || "SuperAdmin";
-    const accountStr = cookieStore.get("admin_account")?.value || "system";
-  
-    if (currentRole === 'Distributor' || currentRole === 'DistSales') {
-      if (currentRole === 'Distributor') {
-        const dist = await prisma.distributor.findFirst({ where: { account: accountStr } });
-        if (dist) {
-           if (dist.quota <= 0) return { success: false, message: '??撌脰嚗瘜?閮剜摰桀?' };
-           await prisma.distributor.update({
-             where: { id: dist.id },
-             data: { quota: dist.quota - 1 }
-           });
-        }
+      if (dist) {
+        if (dist.quota <= 0)
+          return { success: false, message: "??撌脰嚗瘜?閮剜摰桀?" };
+        await prisma.distributor.update({
+          where: { id: dist.id },
+          data: { quota: dist.quota - 1 },
+        });
       }
     }
+  }
 
-    if (data.freeType === 'Permanent') {
-      await grantTempleAiVip(id, true);
-      await grantTempleStorageVip(id, true);
-    }
-
+  if (data.freeType === "Permanent") {
+    await grantTempleAiVip(id, true);
+    await grantTempleStorageVip(id, true);
+  }
 
   await generateInitialBills(newTemple);
 
-  revalidatePath('/super-admin');
+  revalidatePath("/super-admin");
   await revalidateTemple(id);
   return { success: true, id };
 }
 
 export async function fetchAggregatedAnalytics(targetYear?: string) {
+  try {
+    const currentYear = targetYear || new Date().getFullYear().toString();
+    const totalTemples = await prisma.temple.count();
+    const activeTemples = await prisma.temple.count({
+      where: { status: "Active" },
+    });
+    const totalDistributors = await prisma.distributor.count();
+    const totalSuperSales = await prisma.distributorSales.count({
+      where: { role: "SuperSales" },
+    });
 
-      try {
-        const currentYear = targetYear || new Date().getFullYear().toString();
-        const totalTemples = await prisma.temple.count();
-        const activeTemples = await prisma.temple.count({ where: { status: 'Active' } });
-        const totalDistributors = await prisma.distributor.count();
-        const totalSuperSales = await prisma.distributorSales.count({ where: { role: 'SuperSales' } });
-        
-        const bills = await prisma.templeBill.findMany({ where: { status: 'Paid' } });
-        const monthlyRevenue = bills.reduce((sum, b) => sum + Number(b.amount || 0), 0);
-        
-        const temples = await prisma.temple.findMany({ where: { status: 'Active' }, select: { city: true, address: true, region: true } });
-        const regionCounts: Record<string, number> = {};
-        const majorRegions = ['台北', '新北', '基隆', '桃園', '新竹', '苗栗', '台中', '彰化', '南投', '雲林', '嘉義', '台南', '高雄', '屏東', '宜蘭', '花蓮', '台東', '澎湖', '金門', '連江'];
-        
-        temples.forEach((t: any) => {
-          let region = t.city || (t.address ? t.address.substring(0, 2) : '') || t.region || '';
-          const shortRegion = region.substring(0, 2);
-          const matchedRegion = majorRegions.find(r => shortRegion?.includes(r));
-          if (matchedRegion) {
-             regionCounts[matchedRegion] = (regionCounts[matchedRegion] || 0) + 1;
-          }
-        });
+    const bills = await prisma.templeBill.findMany({
+      where: { status: "Paid" },
+    });
+    const monthlyRevenue = bills.reduce(
+      (sum, b) => sum + Number(b.amount || 0),
+      0,
+    );
 
-        const regionalDistribution = Object.entries(regionCounts).map(([region, count]) => ({ region, count }));
-        
-        const allTemples = await prisma.temple.findMany({ select: { createdAt: true } });
-        const growthTrend = Array.from({ length: 12 }).map((_, i) => {
-          const month = String(i + 1).padStart(2, '0');
-          const prefix = `${currentYear}-${month}`;
-          const count = allTemples.filter(t => t.createdAt && new Date(t.createdAt).toISOString().startsWith(prefix)).length;
-          return { date: prefix, count };
-        });
-        
-        return {
-          overview: { totalTemples, activeTemples, totalDistributors, totalSuperSales, monthlyRevenue, systemHealth: 98 },
-          regionalDistribution,
-          growthTrend
-        };
-      } catch(e) {
-        console.error(e);
-        return { overview: { totalTemples: 0, activeTemples: 0, totalDistributors: 0, totalSuperSales: 0, monthlyRevenue: 0, systemHealth: 98 }, regionalDistribution: [], growthTrend: [] };
+    const temples = await prisma.temple.findMany({
+      where: { status: "Active" },
+      select: { city: true, address: true, region: true },
+    });
+    const regionCounts: Record<string, number> = {};
+    const majorRegions = [
+      "台北",
+      "新北",
+      "基隆",
+      "桃園",
+      "新竹",
+      "苗栗",
+      "台中",
+      "彰化",
+      "南投",
+      "雲林",
+      "嘉義",
+      "台南",
+      "高雄",
+      "屏東",
+      "宜蘭",
+      "花蓮",
+      "台東",
+      "澎湖",
+      "金門",
+      "連江",
+    ];
+
+    temples.forEach((t: any) => {
+      let region =
+        t.city ||
+        (t.address ? t.address.substring(0, 2) : "") ||
+        t.region ||
+        "";
+      const shortRegion = region.substring(0, 2);
+      const matchedRegion = majorRegions.find((r) => shortRegion?.includes(r));
+      if (matchedRegion) {
+        regionCounts[matchedRegion] = (regionCounts[matchedRegion] || 0) + 1;
       }
+    });
+
+    const regionalDistribution = Object.entries(regionCounts).map(
+      ([region, count]) => ({ region, count }),
+    );
+
+    const allTemples = await prisma.temple.findMany({
+      select: { createdAt: true },
+    });
+    const growthTrend = Array.from({ length: 12 }).map((_, i) => {
+      const month = String(i + 1).padStart(2, "0");
+      const prefix = `${currentYear}-${month}`;
+      const count = allTemples.filter(
+        (t) =>
+          t.createdAt && new Date(t.createdAt).toISOString().startsWith(prefix),
+      ).length;
+      return { date: prefix, count };
+    });
+
+    return {
+      overview: {
+        totalTemples,
+        activeTemples,
+        totalDistributors,
+        totalSuperSales,
+        monthlyRevenue,
+        systemHealth: 98,
+      },
+      regionalDistribution,
+      growthTrend,
+    };
+  } catch (e) {
+    console.error(e);
+    return {
+      overview: {
+        totalTemples: 0,
+        activeTemples: 0,
+        totalDistributors: 0,
+        totalSuperSales: 0,
+        monthlyRevenue: 0,
+        systemHealth: 98,
+      },
+      regionalDistribution: [],
+      growthTrend: [],
+    };
+  }
 }
 
-export async function fetchCommissionHistory(salesId: string, year: string, month: string) { 
+export async function fetchCommissionHistory(
+  salesId: string,
+  year: string,
+  month: string,
+) {
   let listTemples = [...[]];
   let listSales = [...[]];
   let listBills = [...[]];
   let listWithdrawals = [...([] || [])];
 
   /* removed duplicate import */
-    const resTemples = { rows: await prisma.temple.findMany() };
-    if (resTemples && resTemples.rows) {
-          listTemples = resTemples.rows.map((r: any) => ({
-            ...r,
-            status: r.status,
-            templeName: r.templeName || r.temple_name,
-            salesId: r.salesId || r.sales_id,
-            distributorId: r.distributorId || r.distributor_id,
-            monthlyRent: r.monthlyRent || r.monthly_rent,
-            setupFee: r.setupFee || r.setup_fee,
-            paymentCycle: r.paymentCycle || r.payment_cycle,
-            timestamp: r.createdAt || r.created_at
-          }));
-        }
-    const resSales = { rows: await prisma.distributorSales.findMany() };
-    if (resSales && resSales.rows) {
-          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
-        }
-    const resBills = { rows: await prisma.templeBill.findMany() };
-    if (resBills && resBills.rows) {
-          listBills = resBills.rows.map((r: any) => ({ ...r, templeId: r.templeId || r.temple_id, status: r.status, amount: r.amount }));
-        }
-    const resWD = await prisma.withdrawal.findMany();
-    listWithdrawals = resWD.map((r: any) => ({ ...r, salesName: r.salesName, status: r.status, amount: r.amount }));
+  const resTemples = { rows: await prisma.temple.findMany() };
+  if (resTemples && resTemples.rows) {
+    listTemples = resTemples.rows.map((r: any) => ({
+      ...r,
+      status: r.status,
+      templeName: r.templeName || r.temple_name,
+      salesId: r.salesId || r.sales_id,
+      distributorId: r.distributorId || r.distributor_id,
+      monthlyRent: r.monthlyRent || r.monthly_rent,
+      setupFee: r.setupFee || r.setup_fee,
+      paymentCycle: r.paymentCycle || r.payment_cycle,
+      timestamp: r.createdAt || r.created_at,
+    }));
+  }
+  const resSales = { rows: await prisma.distributorSales.findMany() };
+  if (resSales && resSales.rows) {
+    listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role }));
+  }
+  const resBills = { rows: await prisma.templeBill.findMany() };
+  if (resBills && resBills.rows) {
+    listBills = resBills.rows.map((r: any) => ({
+      ...r,
+      templeId: r.templeId || r.temple_id,
+      status: r.status,
+      amount: r.amount,
+    }));
+  }
+  const resWD = await prisma.withdrawal.findMany();
+  listWithdrawals = resWD.map((r: any) => ({
+    ...r,
+    salesName: r.salesName,
+    status: r.status,
+    amount: r.amount,
+  }));
 
-  const sales = listSales.find(s => s.id === salesId);
+  const sales = listSales.find((s) => s.id === salesId);
   const salesName = sales?.name;
-  
+
   const myTemples: any[] = [];
   for (const t of listTemples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
-    if ((creatorInfo && creatorInfo.salesName === salesName) || t.salesId === salesId) {
-      if (t.status === 'Active') {
+    if (
+      (creatorInfo && creatorInfo.salesName === salesName) ||
+      t.salesId === salesId
+    ) {
+      if (t.status === "Active") {
         myTemples.push(t);
       }
     }
   }
-  
+
   let lifetimeTotalEarned = 0;
   let lifetimeTotalPending = 0;
   let monthEarned = 0;
@@ -8931,88 +10927,135 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
   let monthRevenue = 0;
   const records: any[] = [];
   const revenueRecords: any[] = [];
-  
+
+  console.log(
+    `[DEBUG] fetchCommissionHistory salesId: ${salesId}, salesName: ${salesName}, year: ${year}, month: ${month}`,
+  );
+  console.log(
+    `[DEBUG] fetchCommissionHistory found temples: ${myTemples.length}`,
+  );
+  console.log(
+    `[DEBUG] fetchCommissionHistory total bills before filter: ${listBills.length}`,
+  );
+
   const overrides = salesName ? [][salesName] : null;
   const config = await fetchSystemConfig();
-  const rawRules = sales?.commissionRules || overrides || config.defaultSuperSalesRates;
+  const rawRules =
+    sales?.commissionRules || overrides || config.defaultSuperSalesRates;
   let parsedRules: any = {};
-  if (typeof rawRules === 'string') {
-     try { parsedRules = JSON.parse(rawRules); } catch(e){}
+  if (typeof rawRules === "string") {
+    try {
+      parsedRules = JSON.parse(rawRules);
+    } catch (e) {}
   } else if (rawRules) {
-     parsedRules = rawRules;
+    parsedRules = rawRules;
   }
-  const setupRate = parsedRules.templeSetupRate ?? parsedRules.setupFeePercent ?? parsedRules.setupRate ?? 20;
-  const rentY1 = parsedRules.templeRentRates?.[0] ?? parsedRules.rentYear1Percent ?? parsedRules.rentYear1Rate ?? 15;
-  const rentY2 = parsedRules.templeRentRates?.[1] ?? parsedRules.rentYear2Percent ?? parsedRules.rentYear2Rate ?? 12;
-  const rentY3 = parsedRules.templeRentRates?.[2] ?? parsedRules.rentYear3PlusPercent ?? parsedRules.rentYear3PlusRate ?? 10;
+  const setupRate =
+    parsedRules.templeSetupRate ??
+    parsedRules.setupFeePercent ??
+    parsedRules.setupRate ??
+    20;
+  const rentY1 =
+    parsedRules.templeRentRates?.[0] ??
+    parsedRules.rentYear1Percent ??
+    parsedRules.rentYear1Rate ??
+    15;
+  const rentY2 =
+    parsedRules.templeRentRates?.[1] ??
+    parsedRules.rentYear2Percent ??
+    parsedRules.rentYear2Rate ??
+    12;
+  const rentY3 =
+    parsedRules.templeRentRates?.[2] ??
+    parsedRules.rentYear3PlusPercent ??
+    parsedRules.rentYear3PlusRate ??
+    10;
 
-  myTemples.forEach(t => {
-    const bills = listBills.filter(b => b.templeId === t.id && b.status !== 'Rejected');
-    
-    bills.forEach(bill => {
-      // Ignore bills that don't generate commission
-      if (!['SetupFee', 'Setup', 'MonthlyFee', 'YearlyFee'].includes(bill.type)) return;
-      
-      const isPaid = bill.status === 'Paid';
+  myTemples.forEach((t) => {
+    const bills = listBills.filter(
+      (b) => b.templeId === t.id && b.status !== "Rejected",
+    );
+
+    bills.forEach((bill) => {
+      // Any bill not explicitly setup is treated as rent to match Distributor Portal
+      const isPaid = bill.status === "Paid";
       let commission = 0;
-      let label = '';
+      let label = "";
       let percent = 0;
+      const isSetup =
+        bill.type === "SetupFee" ||
+        bill.type === "Setup" ||
+        bill.itemName === "SetupFee" ||
+        bill.itemName === "Setup";
 
-      if (bill.type === 'SetupFee' || bill.type === 'Setup') {
+      if (isSetup) {
         percent = setupRate;
         commission = bill.amount * (percent / 100);
-        label = '系統設定費';
+        label = "系統設定費";
       } else {
         // Calculate years difference from temple creation to bill date
         const activeDate = new Date(t.timestamp || bill.timestamp);
-        const billDate = new Date(bill.billingDate || bill.dueDate || bill.timestamp);
-        let monthsDiff = (billDate.getFullYear() - activeDate.getFullYear()) * 12 + (billDate.getMonth() - activeDate.getMonth());
+        const billDate = new Date(
+          bill.billingDate || bill.dueDate || bill.timestamp,
+        );
+        let monthsDiff =
+          (billDate.getFullYear() - activeDate.getFullYear()) * 12 +
+          (billDate.getMonth() - activeDate.getMonth());
         if (monthsDiff < 0) monthsDiff = 0;
 
         if (monthsDiff < 12) {
           percent = rentY1;
-          label = `${bill.type === 'YearlyFee' ? '年租費' : '月租費'}抽成 (第一年)`;
+          label = `${bill.type === "YearlyFee" ? "年租費" : "月租費"}抽成 (第一年)`;
         } else if (monthsDiff < 24) {
           percent = rentY2;
-          label = `${bill.type === 'YearlyFee' ? '年租費' : '月租費'}抽成 (第一年)`;
+          label = `${bill.type === "YearlyFee" ? "年租費" : "月租費"}抽成 (第一年)`;
         } else {
           percent = rentY3;
-          label = `${bill.type === 'YearlyFee' ? '年租費' : '月租費'}抽成 (第三年以上)`;
+          label = `${bill.type === "YearlyFee" ? "年租費" : "月租費"}抽成 (第三年以上)`;
         }
         commission = bill.amount * (percent / 100);
       }
-      
-      const bDateStr = bill.createdAt instanceof Date ? bill.createdAt.toISOString().substring(0, 10) : 
-                       (bill.createdAt ? String(bill.createdAt).substring(0, 10) : (bill.billingDate ? String(bill.billingDate).substring(0, 10) : (bill.timestamp ? new Date(bill.timestamp).toISOString().substring(0, 10) : '未知')));
-      const bYearMonth = bDateStr !== '未知' ? bDateStr.substring(0, 7) : '';
-      const isCurrentMonth = (year && month) ? bYearMonth === `${year}-${month}` : true;
+
+      const bDateStr =
+        bill.createdAt instanceof Date
+          ? bill.createdAt.toISOString().substring(0, 10)
+          : bill.createdAt
+            ? String(bill.createdAt).substring(0, 10)
+            : bill.billingDate
+              ? String(bill.billingDate).substring(0, 10)
+              : bill.timestamp
+                ? new Date(bill.timestamp).toISOString().substring(0, 10)
+                : "未知";
+      const bYearMonth = bDateStr !== "未知" ? bDateStr.substring(0, 7) : "";
+      const isCurrentMonth =
+        year && month ? bYearMonth === `${year}-${month}` : true;
 
       if (isPaid) {
         lifetimeTotalEarned += commission;
         if (isCurrentMonth) {
-           monthEarned += commission;
-           monthRevenue += bill.amount;
-           records.push({
-             id: bill.id,
-             templeId: t.id,
-             templeName: t.templeName || t.name,
-             date: bDateStr,
-             type: label,
-             amount: commission,
-             percent,
-             phase: bill.type?.includes('Setup') ? 'Setup' : 'Rent',
-             calculation: `${bill.type?.includes('Setup') ? '系統設定費' : (bill.type === 'YearlyFee' ? '年租費' : '月租費')} $${bill.amount.toLocaleString()} * ${percent}%`
-           });
-           revenueRecords.push({
-             id: bill.id,
-             templeId: t.id,
-             templeName: t.templeName || t.name,
-             date: bDateStr,
-             type: bill.type === 'Setup' || bill.type === 'SetupFee' ? '系統設定費' : '租用費',
-             amount: bill.amount,
-             status: bill.status,
-             receiptUrl: bill.receiptUrl
-           });
+          monthEarned += commission;
+          monthRevenue += bill.amount;
+          records.push({
+            id: bill.id,
+            templeId: t.id,
+            templeName: t.templeName || t.name,
+            date: bDateStr,
+            type: label,
+            amount: commission,
+            percent,
+            phase: bill.type?.includes("Setup") ? "Setup" : "Rent",
+            calculation: `${bill.type?.includes("Setup") ? "系統設定費" : bill.type === "YearlyFee" ? "年租費" : "月租費"} $${bill.amount.toLocaleString()} * ${percent}%`,
+          });
+          revenueRecords.push({
+            id: bill.id,
+            templeId: t.id,
+            templeName: t.templeName || t.name,
+            date: bDateStr,
+            type: isSetup ? "系統設定費" : "租用費",
+            amount: bill.amount,
+            status: bill.status,
+            receiptUrl: bill.receiptUrl,
+          });
         }
       } else {
         lifetimeTotalPending += commission;
@@ -9020,56 +11063,74 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
       }
     });
   });
-  
+
   // 3. 獎金抽成比例 (Bonus Overrides)
   let myBonuses = [];
   try {
-    const rows = await prisma.bonusRequest.findMany({ where: { salesId, status: 'Approved' } });
+    const rows = await prisma.bonusRequest.findMany({
+      where: { salesId, status: "Approved" },
+    });
     if (rows) {
       myBonuses = rows.map((r: any) => ({
         id: r.id,
         salesName: r.salesName,
-        date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
+        date:
+          r.date instanceof Date ? r.date.toISOString().split("T")[0] : r.date,
         amount: r.amount,
-        reason: (r as any).reason || '額外獎勵'
+        reason: (r as any).reason || "額外獎勵",
       }));
     }
   } catch (e) {}
 
   myBonuses.forEach((b: any) => {
     lifetimeTotalEarned += b.amount;
-    const isCurrentMonth = (year && month) ? String(b.date).substring(0, 7) === `${year}-${month}` : true;
+    const isCurrentMonth =
+      year && month
+        ? String(b.date).substring(0, 7) === `${year}-${month}`
+        : true;
     if (isCurrentMonth) {
-       monthEarned += b.amount;
-       records.push({
-         id: b.id,
-         templeName: '專案獎金',
-         date: b.date,
-         type: '額外獎金',
-         amount: b.amount,
-         phase: 'Bonus',
-         calculation: `備註: ${b.reason}`
-       });
+      monthEarned += b.amount;
+      records.push({
+        id: b.id,
+        templeName: "專案獎金",
+        date: b.date,
+        type: "額外獎金",
+        amount: b.amount,
+        phase: "Bonus",
+        calculation: `備註: ${b.reason}`,
+      });
     }
   });
-  
+
   let myWithdrawals: any[] = [];
   /* removed duplicate import */
-    const rows = await prisma.bonusRequest.findMany({ where: { salesId }, orderBy: { createdAt: 'desc' } });
-    const myBonusRequests = (rows || []).map((r: any) => ({
-          id: r.id,
-          salesName: r.salesName,
-          amount: r.amount,
-          date: r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date,
-          status: r.status,
-          receiptUrl: r.receiptUrl,
-          method: r.method
-        }));
-    myWithdrawals = [...myWithdrawals, ...myBonusRequests];
-  
-  const pendingRequests = myWithdrawals.filter(w => w.status === 'Pending' || w.status === '審核中');
-  const calculatedTotalWithdrawn = myWithdrawals.filter(w => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').reduce((acc, curr) => acc + curr.amount, 0);
-  
+  const rows = await prisma.bonusRequest.findMany({
+    where: { salesId },
+    orderBy: { createdAt: "desc" },
+  });
+  const myBonusRequests = (rows || []).map((r: any) => ({
+    id: r.id,
+    salesName: r.salesName,
+    amount: r.amount,
+    date: r.date instanceof Date ? r.date.toISOString().split("T")[0] : r.date,
+    status: r.status,
+    receiptUrl: r.receiptUrl,
+    method: r.method,
+  }));
+  myWithdrawals = [...myWithdrawals, ...myBonusRequests];
+
+  const pendingRequests = myWithdrawals.filter(
+    (w) => w.status === "Pending" || w.status === "審核中",
+  );
+  const calculatedTotalWithdrawn = myWithdrawals
+    .filter(
+      (w) =>
+        w.status === "Verified" ||
+        w.status === "Approved" ||
+        w.status === "Paid",
+    )
+    .reduce((acc, curr) => acc + curr.amount, 0);
+
   return {
     totalEarned: monthEarned,
     totalPending: monthPending,
@@ -9080,89 +11141,110 @@ export async function fetchCommissionHistory(salesId: string, year: string, mont
     records,
     revenueRecords,
     rules: {
-       setupFeePercent: setupRate,
-       rentYear1Percent: rentY1,
-       rentYear2Percent: rentY2,
-       rentYear3PlusPercent: rentY3
+      setupFeePercent: setupRate,
+      rentYear1Percent: rentY1,
+      rentYear2Percent: rentY2,
+      rentYear3PlusPercent: rentY3,
     },
     pendingRequests,
-    withdrawals: myWithdrawals
-  }; 
+    withdrawals: myWithdrawals,
+  };
 }
 
-export async function fetchSalesProfile(salesName: string) { 
+export async function fetchSalesProfile(salesName: string) {
   return withTempleSession(null, true, async (client) => {
-    const sRes = await client.query('SELECT * FROM dist_sales WHERE name = $1', [salesName]);
+    const sRes = await client.query(
+      "SELECT * FROM dist_sales WHERE name = $1",
+      [salesName],
+    );
     if ((sRes.rowCount ?? 0) > 0) {
       const sales = sRes.rows[0];
-      const dRes = await client.query('SELECT name FROM distributors WHERE id = $1', [sales.distributor_id]);
-      const distName = (dRes.rowCount ?? 0) > 0 ? dRes.rows[0].name : '無資料';
-      return { name: salesName, parentDistributor: distName, account: sales.account };
+      const dRes = await client.query(
+        "SELECT name FROM distributors WHERE id = $1",
+        [sales.distributor_id],
+      );
+      const distName = (dRes.rowCount ?? 0) > 0 ? dRes.rows[0].name : "無資料";
+      return {
+        name: salesName,
+        parentDistributor: distName,
+        account: sales.account,
+      };
     }
-    return { name: salesName, parentDistributor: '無資料', account: '' };
+    return { name: salesName, parentDistributor: "無資料", account: "" };
   });
 }
 
-export async function fetchRentPlans() { 
+export async function fetchRentPlans() {
   return [
-    { id: 'plan-1', name: '基本雲端方案', fee: 3600 },
-    { id: 'plan-2', name: '進階雲端方案', fee: 6800 },
-    { id: 'plan-3', name: '尊爵不朽方案', fee: 12000 }
-  ]; 
+    { id: "plan-1", name: "基本雲端方案", fee: 3600 },
+    { id: "plan-2", name: "進階雲端方案", fee: 6800 },
+    { id: "plan-3", name: "尊爵不朽方案", fee: 12000 },
+  ];
 }
 
-export async function addSalesMember(data: any) { 
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被使用' };
+export async function addSalesMember(data: any) {
+  if (data.account && (await checkAccountExists(data.account))) {
+    return { success: false, error: "帳號已被使用" };
   }
-  const id = 'sales-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+  const id =
+    "sales-" + Math.random().toString(36).substring(2, 10).toUpperCase();
   try {
     await prisma.distributorSales.create({
       data: {
         id: id,
-        distributorId: data.distributorId || 'dist-1',
-        name: data.name || '未命名業務員',
+        distributorId: data.distributorId || "dist-1",
+        name: data.name || "未命名業務員",
         account: data.account || `sales_${id}`,
-        password: data.password || '12345678',
+        password: data.password || "12345678",
         phone: data.phone || null,
-        role: 'DistSales',
-        status: 'Active',
-        joinedAt: new Date().toISOString().split('T')[0],
+        role: "DistSales",
+        status: "Active",
+        joinedAt: new Date().toISOString().split("T")[0],
         commissionRules: {
           setupRate: data.setupFeePercent || 20,
           rentYear1Rate: data.rentYear1Percent || 15,
           rentYear2Rate: data.rentYear2Percent || 10,
-          rentYear3PlusRate: data.rentYear3PlusPercent || 5
-        }
-      }
+          rentYear3PlusRate: data.rentYear3PlusPercent || 5,
+        },
+      },
     });
   } catch (e) {
     console.error("DB Insert Error for sales:", e);
-    return { success: false, error: '建立業務菁英失敗' };
+    return { success: false, error: "建立業務菁英失敗" };
   }
-  revalidatePath('/distributor');
-  return { success: true, id }; 
+  revalidatePath("/distributor");
+  return { success: true, id };
 }
 
-
 export async function createDistributorSales(distId: string, data: any) {
-  if (data.account && await checkAccountExists(data.account)) {
-    return { success: false, error: '帳號已被使用' };
+  if (data.account && (await checkAccountExists(data.account))) {
+    return { success: false, error: "帳號已被使用" };
   }
-  const { name, phone, account, password, setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate } = data;
-  const newSalesId = 'dist-sales-' + Date.now();
-  const joinedAt = new Date().toISOString().split('T')[0];
+  const {
+    name,
+    phone,
+    account,
+    password,
+    setupRate,
+    rentYear1Rate,
+    rentYear2Rate,
+    rentYear3PlusRate,
+  } = data;
+  const newSalesId = "dist-sales-" + Date.now();
+  const joinedAt = new Date().toISOString().split("T")[0];
 
   try {
-    const existing = await prisma.distributorSales.findFirst({ where: { account } });
+    const existing = await prisma.distributorSales.findFirst({
+      where: { account },
+    });
     if (existing) {
       await prisma.distributorSales.update({
         where: { id: existing.id },
         data: {
           password,
-          status: 'Active',
-          phone
-        }
+          status: "Active",
+          phone,
+        },
       });
     } else {
       await prisma.distributorSales.create({
@@ -9173,11 +11255,16 @@ export async function createDistributorSales(distId: string, data: any) {
           account,
           password,
           phone,
-          role: 'DistSales',
-          status: 'Active',
+          role: "DistSales",
+          status: "Active",
           joinedAt,
-          commissionRules: { setupRate, rentYear1Rate, rentYear2Rate, rentYear3PlusRate }
-        }
+          commissionRules: {
+            setupRate,
+            rentYear1Rate,
+            rentYear2Rate,
+            rentYear3PlusRate,
+          },
+        },
       });
     }
   } catch (e) {
@@ -9191,7 +11278,7 @@ export async function createDistributorSales(distId: string, data: any) {
 export async function deleteTempleAllData(templeId: string) {
   try {
     if (!templeId) throw new Error("templeId is required");
-    
+
     // First verify if the temple exists
     const temple = await prisma.temple.findUnique({ where: { id: templeId } });
     if (!temple) return { success: false, error: "Temple not found" };
@@ -9209,7 +11296,7 @@ export async function deleteTempleAllData(templeId: string) {
       prisma.activity.deleteMany({ where: { templeId } }),
       prisma.leaveRecord.deleteMany({ where: { templeId } }),
       prisma.slot.deleteMany({ where: { templeId } }),
-      
+
       // 2. Secondary leaf tables that only depend on Temple
       prisma.templeBill.deleteMany({ where: { templeId } }),
       prisma.templeStorage.deleteMany({ where: { templeId } }),
@@ -9225,7 +11312,7 @@ export async function deleteTempleAllData(templeId: string) {
       prisma.templeNotification.deleteMany({ where: { templeId } }),
       prisma.aiChatLog.deleteMany({ where: { templeId } }),
       prisma.saasOrder.deleteMany({ where: { templeId } }),
-      
+
       // 3. Parent tables (referenced by Leaf tables)
       prisma.service.deleteMany({ where: { templeId } }),
       prisma.event.deleteMany({ where: { templeId } }),
@@ -9233,11 +11320,11 @@ export async function deleteTempleAllData(templeId: string) {
       prisma.lampCategory.deleteMany({ where: { templeId } }),
       prisma.guest.deleteMany({ where: { templeId } }),
       prisma.user.deleteMany({ where: { templeId } }),
-      
+
       // 4. Finally, delete the root temple
-      prisma.temple.delete({ where: { id: templeId } })
+      prisma.temple.delete({ where: { id: templeId } }),
     ]);
-    
+
     return { success: true };
   } catch (e: any) {
     console.error("Failed to delete temple:", e);
@@ -9248,17 +11335,19 @@ export async function deleteTempleAllData(templeId: string) {
 export async function deleteDistributorAllData(distributorId: string) {
   try {
     if (!distributorId) throw new Error("distributorId is required");
-    
+
     // First verify if the distributor exists
-    const distributor = await prisma.distributor.findUnique({ where: { id: distributorId } });
+    const distributor = await prisma.distributor.findUnique({
+      where: { id: distributorId },
+    });
     if (!distributor) return { success: false, error: "Distributor not found" };
 
     // Get all sales ids for this distributor
     const sales = await prisma.distributorSales.findMany({
       where: { distributorId },
-      select: { id: true }
+      select: { id: true },
     });
-    const salesIds = sales.map(s => s.id);
+    const salesIds = sales.map((s) => s.id);
 
     await prisma.$transaction([
       // 1. Transfer Temples assigned directly to the distributor
@@ -9267,32 +11356,40 @@ export async function deleteDistributorAllData(distributorId: string) {
         data: {
           distributorId: null,
           salesId: null,
-          superSalesId: 'system-hq'
-        }
+          superSalesId: "system-hq",
+        },
       }),
       // Transfer Temples assigned to the distributor's sales reps
-      ...(salesIds.length > 0 ? [
-        prisma.temple.updateMany({
-          where: { salesId: { in: salesIds } },
-          data: {
-            distributorId: null,
-            salesId: null,
-            superSalesId: 'system-hq'
-          }
-        }),
-        // 2. Delete Sales Reps' child records
-        prisma.commission.deleteMany({ where: { salesId: { in: salesIds } } }),
-        prisma.salesVisit.deleteMany({ where: { salesId: { in: salesIds } } }),
-        prisma.templeApplication.deleteMany({ where: { salesId: { in: salesIds } } })
-      ] : []),
-      
+      ...(salesIds.length > 0
+        ? [
+            prisma.temple.updateMany({
+              where: { salesId: { in: salesIds } },
+              data: {
+                distributorId: null,
+                salesId: null,
+                superSalesId: "system-hq",
+              },
+            }),
+            // 2. Delete Sales Reps' child records
+            prisma.commission.deleteMany({
+              where: { salesId: { in: salesIds } },
+            }),
+            prisma.salesVisit.deleteMany({
+              where: { salesId: { in: salesIds } },
+            }),
+            prisma.templeApplication.deleteMany({
+              where: { salesId: { in: salesIds } },
+            }),
+          ]
+        : []),
+
       // 3. Delete the Sales Reps
       prisma.distributorSales.deleteMany({ where: { distributorId } }),
-      
+
       // 4. Delete the Distributor main record
-      prisma.distributor.delete({ where: { id: distributorId } })
+      prisma.distributor.delete({ where: { id: distributorId } }),
     ]);
-    
+
     return { success: true };
   } catch (e: any) {
     console.error("Failed to delete distributor:", e);
@@ -9303,35 +11400,35 @@ export async function deleteDistributorAllData(distributorId: string) {
 export async function deleteSuperSalesAllData(superSalesId: string) {
   try {
     if (!superSalesId) throw new Error("superSalesId is required");
-    
+
     await prisma.$transaction([
       // 1. Transfer Temples created by this SuperSales to system-hq
       prisma.temple.updateMany({
         where: { superSalesId },
-        data: { superSalesId: 'system-hq' }
+        data: { superSalesId: "system-hq" },
       }),
-      
+
       // 2. Transfer Distributors by removing SuperSalesOverride links
       prisma.superSalesOverride.deleteMany({
-        where: { superSalesId }
+        where: { superSalesId },
       }),
-      
+
       // 3. Delete personal records of the SuperSales (commissions, visits, applications)
       prisma.commission.deleteMany({ where: { salesId: superSalesId } }),
       prisma.salesVisit.deleteMany({ where: { salesId: superSalesId } }),
       prisma.templeApplication.deleteMany({ where: { salesId: superSalesId } }),
-      
+
       // 4. Delete the SuperSales account from DistributorSales table (if it exists)
       prisma.distributorSales.deleteMany({
-        where: { id: superSalesId, role: 'SuperSales' }
+        where: { id: superSalesId, role: "SuperSales" },
       }),
-      
+
       // 5. Delete from User table just in case it exists there
       prisma.user.deleteMany({
-        where: { id: superSalesId, role: 'SuperSales' }
-      })
+        where: { id: superSalesId, role: "SuperSales" },
+      }),
     ]);
-    
+
     return { success: true };
   } catch (e: any) {
     console.error("Failed to delete SuperSales:", e);
@@ -9340,53 +11437,60 @@ export async function deleteSuperSalesAllData(superSalesId: string) {
 }
 
 export async function fetchGuestDeepRecords(phone: string) {
-      try {
-        const templeId = await getDynamicTempleId();
-        if (!templeId) return [];
-        const normPhone = phone.replace(/-/g, '');
-        return await prisma.deepRecord.findMany({
-          where: { 
-            templeId, 
-            phone: { contains: normPhone },
-            OR: [
-              { category: { startsWith: 'MERIT-' } },
-              { content: { contains: '功德' } }
-            ]
-          },
-          orderBy: { createdAt: 'desc' }
-        });
-      } catch (error) {
-        console.error('fetchGuestDeepRecords error:', error);
-        return [];
-      }
+  try {
+    const templeId = await getDynamicTempleId();
+    if (!templeId) return [];
+    const normPhone = phone.replace(/-/g, "");
+    return await prisma.deepRecord.findMany({
+      where: {
+        templeId,
+        phone: { contains: normPhone },
+        OR: [
+          { category: { startsWith: "MERIT-" } },
+          { content: { contains: "功德" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("fetchGuestDeepRecords error:", error);
+    return [];
+  }
 }
 
 export async function deleteNotification(id: string) {
   try {
     const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false, message: '未設定宮廟' };
+    if (!templeId) return { success: false, message: "未設定宮廟" };
 
     await prisma.templeNotification.delete({
-      where: { id, templeId }
+      where: { id, templeId },
     });
 
     await revalidateTemple();
     return { success: true };
   } catch (e: any) {
-    console.error('deleteNotification error:', e);
+    console.error("deleteNotification error:", e);
     return { success: false, message: e.message || String(e) };
   }
 }
 
-export async function saveGuestNote(guestId: string, phone: string, title: string, content: string, date: string, noteId?: string) {
+export async function saveGuestNote(
+  guestId: string,
+  phone: string,
+  title: string,
+  content: string,
+  date: string,
+  noteId?: string,
+) {
   try {
     const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false, error: '未授權' };
+    if (!templeId) return { success: false, error: "未授權" };
 
     if (noteId) {
       await prisma.guestNote.update({
         where: { id: noteId },
-        data: { title, content, date, phone }
+        data: { title, content, date, phone },
       });
     } else {
       await prisma.guestNote.create({
@@ -9396,13 +11500,13 @@ export async function saveGuestNote(guestId: string, phone: string, title: strin
           phone,
           title,
           content,
-          date
-        }
+          date,
+        },
       });
     }
     return { success: true };
   } catch (error) {
-    console.error('saveGuestNote error:', error);
+    console.error("saveGuestNote error:", error);
     return { success: false, error: String(error) };
   }
 }
@@ -9410,14 +11514,14 @@ export async function saveGuestNote(guestId: string, phone: string, title: strin
 export async function deleteGuestNote(noteId: string) {
   try {
     const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false, error: '未授權' };
+    if (!templeId) return { success: false, error: "未授權" };
 
     await prisma.guestNote.delete({
-      where: { id: noteId }
+      where: { id: noteId },
     });
     return { success: true };
   } catch (error) {
-    console.error('deleteGuestNote error:', error);
+    console.error("deleteGuestNote error:", error);
     return { success: false, error: String(error) };
   }
 }
