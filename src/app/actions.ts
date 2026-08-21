@@ -8361,7 +8361,6 @@ export async function fetchSuperSalesRegistry(salesId: string) {
        const annualContribution = yearlyRent + setupFee;
        
        const bills = await prisma.templeBill.findMany({ where: { templeId: t.id } });
-       const hasUnpaid = bills.some((b: any) => b.status === 'Unpaid' || b.status === 'Overdue' || b.status === '未繳費' || b.status === '未結帳');
        const now = new Date();
        let lastBillDate = now;
        if (bills && bills.length > 0) {
