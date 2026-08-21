@@ -843,21 +843,49 @@ export default function DistributorClient({
                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">本日拜訪計畫 Schedule ({selectedDay}日)</h3>
                   </div>
                   <div className="space-y-3">
-                     {mockVisits.filter(v => v.date === `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${selectedDay?.toString().padStart(2, '0')}`).map(visit => (
-                        <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500">
-                           <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-2xl text-white flex items-center justify-center text-xl shadow-lg transition-all group-hover:scale-105 ${
-                                visit.importance === 'High' ? 'bg-rose-500' :
-                                visit.importance === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
-                              }`}>{visit.sales.substring(0,1)}</div>
-                              <div>
-                                 <h4 className="text-sm font-black text-slate-900 tracking-tight">{visit.sales} 〈{visit.temple}〉</h4>
-                                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">{visit.purpose}</p>
-                              </div>
-                           </div>
-                           <div className={`text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter shadow-sm ${visit.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}>{visit.status === 'Completed' ? '已完成' : '進行中'}</div>
-                        </div>
-                     ))}
+                     {(() => {
+                        const selectedDayVisits = mockVisits.filter(v => v.date === `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${selectedDay?.toString().padStart(2, '0')}`);
+                        const totalSchedulePages = Math.ceil(selectedDayVisits.length / 7) || 1;
+                        const paginatedVisits = selectedDayVisits.slice((schedulePage - 1) * 7, schedulePage * 7);
+
+                        return (
+                           <>
+                              {paginatedVisits.map(visit => (
+                                 <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500">
+                                    <div className="flex items-center gap-4">
+                                       <div className={`w-12 h-12 rounded-2xl text-white flex items-center justify-center text-xl shadow-lg transition-all group-hover:scale-105 ${
+                                         visit.importance === 'High' ? 'bg-rose-500' :
+                                         visit.importance === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
+                                       }`}>{visit.sales.substring(0,1)}</div>
+                                       <div>
+                                          <h4 className="text-sm font-black text-slate-900 tracking-tight">{visit.sales} 〈{visit.temple}〉</h4>
+                                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">{visit.purpose}</p>
+                                       </div>
+                                    </div>
+                                    <div className={`text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter shadow-sm ${visit.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}>{visit.status === 'Completed' ? '已完成' : '進行中'}</div>
+                                 </div>
+                              ))}
+                              
+                              {totalSchedulePages > 1 && (
+                                 <div className="flex justify-center items-center gap-4 mt-8 pb-4">
+                                    <button 
+                                       onClick={() => setSchedulePage(p => Math.max(1, p - 1))}
+                                       disabled={schedulePage === 1}
+                                       className="w-10 h-10 rounded-full bg-white text-blue-600 shadow-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-all font-black text-xl"
+                                    >〈</button>
+                                    <span className="text-xs font-black text-slate-400 bg-white/50 px-4 py-2 rounded-full shadow-inner">
+                                       {schedulePage} / {totalSchedulePages}
+                                    </span>
+                                    <button 
+                                       onClick={() => setSchedulePage(p => Math.min(totalSchedulePages, p + 1))}
+                                       disabled={schedulePage === totalSchedulePages}
+                                       className="w-10 h-10 rounded-full bg-white text-blue-600 shadow-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-50 transition-all font-black text-xl"
+                                    >〉</button>
+                                 </div>
+                              )}
+                           </>
+                        );
+                     })()}
                   </div>
                </section>
             </div>
