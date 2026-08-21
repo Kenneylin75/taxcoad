@@ -6020,10 +6020,14 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
     } else if (lastBill && lastBill.status === 'Paid') {
       const bDate = new Date(lastBill.created_at || lastBill.timestamp || Date.now());
       if (temple.paymentCycle === 'Yearly' || temple.rentType === 'Yearly') {
+        const startYear = bDate.getFullYear();
+        const startMonth = bDate.getMonth() + 1;
         const nextYear = new Date(bDate);
-        nextYear.setFullYear(nextYear.getFullYear() + 1);
-        contractEndDate = `${nextYear.getFullYear()}/${(nextYear.getMonth()+1).toString().padStart(2,'0')}/${nextYear.getDate().toString().padStart(2,'0')}`;
-        paymentStatusLabel = `${bDate.getFullYear()}年已付 (合約至${contractEndDate})`;
+        nextYear.setFullYear(startYear + 1);
+        const endYear = nextYear.getFullYear();
+        const endMonth = nextYear.getMonth() + 1;
+        contractEndDate = `${endYear}/${endMonth.toString().padStart(2,'0')}/${nextYear.getDate().toString().padStart(2,'0')}`;
+        paymentStatusLabel = `${startYear}/${startMonth}-${endYear}/${endMonth} 已付款`;
       } else {
         const nextMonth = new Date(bDate);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -6035,10 +6039,14 @@ function enrichTempleWithFinancialStatus(temple: any, lastBill: any = null) {
     if (lastBill && lastBill.status === 'Paid') {
       const bDate = new Date(lastBill.created_at || lastBill.timestamp || Date.now());
       if (temple.paymentCycle === 'Yearly' || temple.rentType === 'Yearly') {
+        const startYear = bDate.getFullYear();
+        const startMonth = bDate.getMonth() + 1;
         const nextYear = new Date(bDate);
-        nextYear.setFullYear(nextYear.getFullYear() + 1);
-        contractEndDate = `${nextYear.getFullYear()}/${(nextYear.getMonth()+1).toString().padStart(2,'0')}/${nextYear.getDate().toString().padStart(2,'0')}`;
-        paymentStatusLabel = `${bDate.getFullYear()}年已付 (合約至${contractEndDate})`;
+        nextYear.setFullYear(startYear + 1);
+        const endYear = nextYear.getFullYear();
+        const endMonth = nextYear.getMonth() + 1;
+        contractEndDate = `${endYear}/${endMonth.toString().padStart(2,'0')}/${nextYear.getDate().toString().padStart(2,'0')}`;
+        paymentStatusLabel = `${startYear}/${startMonth}-${endYear}/${endMonth} 已付款`;
       } else {
         const nextMonth = new Date(bDate);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -7028,7 +7036,7 @@ export async function approveTempleBill(billId: string) {
         if (templeId) {
           await prisma.temple.update({
             where: { id: templeId },
-            data: { paymentStatus: 'Paid', status: 'Active' }
+            data: { status: 'Active' }
           });
         }
 
@@ -8306,28 +8314,28 @@ export async function fetchSuperSalesRegistry(salesId: string) {
           listTemples = resTemples.rows.map((r: any) => ({
             ...r,
             status: r.status,
-            templeName: r.temple_name,
-            salesId: r.sales_id,
-            distributorId: r.distributor_id,
-            monthlyRent: r.monthly_rent,
-            setupFee: r.setup_fee,
-            paymentCycle: r.payment_cycle,
-            paymentStatus: r.payment_status,
-            timestamp: r.created_at
+            templeName: r.templeName || r.temple_name,
+            salesId: r.salesId || r.sales_id,
+            distributorId: r.distributorId || r.distributor_id,
+            monthlyRent: r.monthlyRent || r.monthly_rent,
+            setupFee: r.setupFee || r.setup_fee,
+            paymentCycle: r.paymentCycle || r.payment_cycle,
+            paymentStatus: r.paymentStatus || r.payment_status,
+            timestamp: r.createdAt || r.created_at
           }));
         }
     const resDist = { rows: await prisma.distributor.findMany() };
     if (resDist && resDist.rows) {
           listDistributors = resDist.rows.map((r: any) => ({
             ...r,
-            creatorSalesId: r.creator_sales_id,
-            salesId: r.creator_sales_id,
-            planId: r.plan_id
+            creatorSalesId: r.creatorSalesId || r.creator_sales_id,
+            salesId: r.creatorSalesId || r.creator_sales_id,
+            planId: r.planId || r.plan_id
           }));
         }
     const resSales = { rows: await prisma.distributorSales.findMany() };
     if (resSales && resSales.rows) {
-          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributor_id }));
+          listSales = resSales.rows.map((r: any) => ({ ...r, role: r.role, distributorId: r.distributorId || r.distributor_id }));
         }
 
   const sales = listSales.find(s => s.id === salesId);
@@ -8352,16 +8360,30 @@ export async function fetchSuperSalesRegistry(salesId: string) {
        const bills = await prisma.templeBill.findMany({ where: { templeId: t.id } });
        const hasUnpaid = bills.some((b: any) => b.status === 'Unpaid' || b.status === 'Overdue' || b.status === '未繳費' || b.status === '未結帳');
        const now = new Date();
-       const m = now.getMonth() + 1;
-       const y = now.getFullYear();
+       let lastBillDate = now;
+       if (bills && bills.length > 0) {
+           const lastBill = bills[bills.length - 1];
+           if (lastBill.createdAt || lastBill.created_at || lastBill.timestamp) {
+               lastBillDate = new Date(lastBill.createdAt || lastBill.created_at || lastBill.timestamp);
+           }
+       }
+       const startYear = lastBillDate.getFullYear();
+       const startMonth = lastBillDate.getMonth() + 1;
        const cycle = t.paymentCycle || 'Monthly';
        let paymentStatus = '';
+
        if (t.paymentStatus === 'PendingPayment' || (bills.length === 0 && t.freeType !== 'Permanent' && t.status !== 'Pending')) {
-          paymentStatus = cycle === 'Yearly' ? `${y}年未繳費` : `${m}月未繳費`;
+          if (cycle === 'Yearly') {
+             paymentStatus = `${startYear}/${startMonth}-${startYear+1}/${startMonth} 未繳費`;
+          } else {
+             paymentStatus = `${startMonth}月未繳費`;
+          }
        } else {
-          paymentStatus = hasUnpaid 
-             ? (cycle === 'Yearly' ? `${y}年未繳費` : `${m}月未繳費`)
-             : (cycle === 'Yearly' ? `${y}年已繳費` : `${m}月已繳費`);
+          if (cycle === 'Yearly') {
+             paymentStatus = hasUnpaid ? `${startYear}/${startMonth}-${startYear+1}/${startMonth} 未繳費` : `${startYear}/${startMonth}-${startYear+1}/${startMonth} 已付款`;
+          } else {
+             paymentStatus = hasUnpaid ? `${startMonth}月未繳費` : `${startMonth}月已付款`;
+          }
        }
        
        temples.push({ id: t.id, name: t.templeName, status: t.status, plan: '進階雲端方案', date: t.timestamp ? new Date(t.timestamp).toISOString().split('T')[0] : (t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : '未知'), revenue: t.monthlyRent || 0, annualContribution, paymentStatus, bills });
