@@ -54,6 +54,11 @@ export default function DistributorClient({
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+  const [schedulePage, setSchedulePage] = useState(1);
+
+  useEffect(() => {
+    setSchedulePage(1);
+  }, [currentYear, currentMonth, selectedDay]);
 
   // --- Global Modals State ---
   const [isAddSalesModalOpen, setIsAddSalesModalOpen] = useState(false);
