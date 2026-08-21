@@ -307,7 +307,6 @@ export default function SuperAdminClient({
                     </span>
                   )}
                <span className="tracking-wide uppercase italic">{item.label}</span>
-               {item.count && item.count > 0 && <span className="absolute right-6 top-1/2 -translate-y-1/2 bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{item.count}</span>}
              </button>
            ))}
         </nav>

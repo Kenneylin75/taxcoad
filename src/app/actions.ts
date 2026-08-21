@@ -6751,7 +6751,9 @@ export async function fetchDataBridgeTree() {
       type: 'temple',
       joinedAt: t.createdAt.toISOString(),
       status: t.status,
-      planName: t.monthlyRent > 0 ? '月付標準方案' : '永久免費',
+      planName: t.freeType === 'Trial' ? '免費體驗方案' : 
+                t.freeType === 'Permanent' ? '永久免費' :
+                t.paymentCycle === 'Yearly' ? '年付優惠方案' : '月付標準方案',
       price: t.monthlyRent || 0,
       freeType: t.freeType,
       plan: t.plan,
