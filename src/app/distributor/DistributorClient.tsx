@@ -505,7 +505,7 @@ export default function DistributorClient({
        </section>
 
        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white/60 backdrop-blur-xl p-7 rounded-[35px] border border-white shadow-xl flex flex-col justify-between h-44 group hover:border-blue-500 hover:bg-white/80 transition-all duration-500">
+          <div onClick={() => setActiveTab('team')} className="bg-white/60 backdrop-blur-xl p-7 rounded-[35px] border border-white shadow-xl flex flex-col justify-between h-44 group hover:border-blue-500 hover:bg-white/80 transition-all duration-500 cursor-pointer active:scale-95">
              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">👥</div>
              <div>
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">轄下業務菁英</p>
