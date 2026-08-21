@@ -51,9 +51,9 @@ export default function DistributorClient({
 
   // --- Calendar & Period State ---
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(5);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
-  const [selectedDay, setSelectedDay] = useState(12);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
 
   // --- Global Modals State ---
   const [isAddSalesModalOpen, setIsAddSalesModalOpen] = useState(false);
@@ -774,14 +774,28 @@ export default function DistributorClient({
             <div className="space-y-8 animate-in slide-in-from-right-10 duration-700 pb-20">
                <section className="bg-white/60 backdrop-blur-xl p-8 rounded-[50px] shadow-2xl border border-white">
                   <div className="flex justify-between items-center mb-10 px-4">
-                     <button onClick={() => setCurrentMonth(m => m === 1 ? 12 : m - 1)} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〈</button>
+                     <button onClick={() => {
+                        if (currentMonth === 1) {
+                           setCurrentMonth(12);
+                           setCurrentYear(y => y - 1);
+                        } else {
+                           setCurrentMonth(m => m - 1);
+                        }
+                     }} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〈</button>
                      <div className="text-center">
                         <h3 className="text-lg font-black text-slate-900 tracking-tighter italic underline decoration-blue-500 decoration-4 underline-offset-8">{currentYear}年 {currentMonth}月 監控</h3>
                         <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">
                            本月共有 <span className="text-blue-600 font-black">{mockVisits.filter(v => v.date.startsWith(`${currentYear}-${currentMonth.toString().padStart(2, '0')}`)).length}</span> 筆計畫
                         </p>
                      </div>
-                     <button onClick={() => setCurrentMonth(m => m === 12 ? 1 : m + 1)} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〉</button>
+                     <button onClick={() => {
+                        if (currentMonth === 12) {
+                           setCurrentMonth(1);
+                           setCurrentYear(y => y + 1);
+                        } else {
+                           setCurrentMonth(m => m + 1);
+                        }
+                     }} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〉</button>
                   </div>
                   <div className="grid grid-cols-7 gap-3">
                      {Array.from({length: daysInMonth(currentYear, currentMonth)}).map((_, i) => {
