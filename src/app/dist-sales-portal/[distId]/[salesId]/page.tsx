@@ -195,6 +195,10 @@ export default function DistSalesPage() {
 
 
   const handleRequestWithdrawal = async () => {
+    if (!profile?.bankAccount?.accountNo) {
+      alert("請先於下方設定您的提領銀行帳戶，才能申請提領！");
+      return;
+    }
     if (!commission || !commission.balance || commission.balance <= 0) {
       alert("目前無可用餘額提領！");
       return;

@@ -132,7 +132,9 @@ export default function DistributorClient({
 
   const [rejectReason, setRejectReason] = useState("");
   const [newSalesForm, setNewSalesForm] = useState({ 
-    name: "", phone: "", account: "", password: "", setupRate: 20, rentYear1Rate: 15, rentYear2Rate: 10, rentYear3PlusRate: 5 
+    name: '', phone: '', account: '', password: '', 
+    setupRate: 20, rentYear1Rate: 15, rentYear2Rate: 12, rentYear3PlusRate: 10,
+    bankCode: '', bankName: '', accountName: '', accountNo: ''
   });
   
   const [editingRates, setEditingRates] = useState({
@@ -326,7 +328,13 @@ export default function DistributorClient({
           setupFeePercent: newSalesForm.setupRate,
           rentYear1Percent: newSalesForm.rentYear1Rate,
           rentYear2Percent: newSalesForm.rentYear2Rate,
-          rentYear3PlusPercent: newSalesForm.rentYear3PlusRate
+          rentYear3PlusPercent: newSalesForm.rentYear3PlusRate,
+          bankInfo: {
+            bankCode: newSalesForm.bankCode,
+            bankName: newSalesForm.bankName,
+            accountName: newSalesForm.accountName,
+            accountNo: newSalesForm.accountNo
+          }
         });
         if (res && res.success === false) {
            alert(res.error || '帳號已被使用，請更換其他帳號');
@@ -1586,6 +1594,34 @@ export default function DistributorClient({
                               </div>
                            </div>
                         ))}
+                     </div>
+                  </div>
+
+                  {/* Bank Account Section */}
+                  <div className="space-y-6">
+                     <div className="flex items-center gap-3 px-2">
+                        <div className="w-1.5 h-5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                        <h4 className="text-lg font-black text-slate-900 tracking-tight">提領帳戶設定 Bank Account</h4>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行代碼 Bank Code</p>
+                           <input type="text" placeholder="例: 808" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.bankCode} onChange={e=>setNewSalesForm({...newSalesForm, bankCode:e.target.value})} required />
+                        </div>
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行名稱 Bank Name</p>
+                           <input type="text" placeholder="例: 玉山銀行" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.bankName} onChange={e=>setNewSalesForm({...newSalesForm, bankName:e.target.value})} required />
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">戶名 Account Name</p>
+                           <input type="text" placeholder="例: 王大明" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.accountName} onChange={e=>setNewSalesForm({...newSalesForm, accountName:e.target.value})} required />
+                        </div>
+                        <div className="space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行帳號 Account No.</p>
+                           <input type="text" placeholder="輸入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.accountNo} onChange={e=>setNewSalesForm({...newSalesForm, accountNo:e.target.value})} required />
+                        </div>
                      </div>
                   </div>
 
