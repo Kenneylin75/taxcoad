@@ -103,7 +103,8 @@ export default function DistributorClient({
     sales: v.salesName || '未知',
     temple: v.templeName || '未知',
     purpose: v.notes || '例行拜訪',
-    status: v.status || 'Pending'
+    status: v.status || 'Pending',
+    importance: v.importance || 'Medium'
   })) || [], [initialVisits]);
 
   const officialTools = useMemo(() => initialTools?.map((t: any, idx: number) => ({
@@ -781,16 +782,41 @@ export default function DistributorClient({
                      {Array.from({length: daysInMonth(currentYear, currentMonth)}).map((_, i) => {
                         const day = i + 1;
                         const dateStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-                        const hasVisits = mockVisits.some(v => v.date === dateStr);
+                        const dayVisits = mockVisits.filter(v => v.date === dateStr);
                         const isSelected = selectedDay === day;
                         return (
                           <div key={i} onClick={() => setSelectedDay(day)} className={`h-14 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${isSelected ? 'bg-slate-950 text-white shadow-2xl scale-110 z-10 ring-4 ring-blue-500/20' : 'bg-white/50 text-slate-400 hover:bg-blue-50 hover:text-blue-600 hover:scale-105'}`}>
                              <span className="text-[10px] font-black">{day}</span>
-                             {hasVisits && !isSelected && <div className="mt-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>}
-                             {hasVisits && isSelected && <div className="mt-1 w-1.5 h-1.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(96,165,250,0.8)]"></div>}
+                             {dayVisits.length > 0 && (
+                                <div className="flex gap-0.5 mt-1">
+                                   {dayVisits.slice(0,3).map((dv, idx) => (
+                                      <div key={idx} className={`w-1.5 h-1.5 rounded-full shadow-sm ${
+                                        dv.importance === 'High' ? 'bg-rose-500' :
+                                        dv.importance === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
+                                      }`}></div>
+                                   ))}
+                                   {dayVisits.length > 3 && <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>}
+                                </div>
+                             )}
                           </div>
                         );
                      })}
+                  </div>
+                  
+                  {/* Legend */}
+                  <div className="mt-8 flex gap-4 px-2 justify-center">
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                        <span className="text-[10px] font-black text-slate-400">高度重要</span>
+                     </div>
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                        <span className="text-[10px] font-black text-slate-400">中度重要</span>
+                     </div>
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span className="text-[10px] font-black text-slate-400">一般計畫</span>
+                     </div>
                   </div>
                </section>
                <section className="space-y-4">
@@ -801,7 +827,10 @@ export default function DistributorClient({
                      {mockVisits.filter(v => v.date === `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${selectedDay?.toString().padStart(2, '0')}`).map(visit => (
                         <div key={visit.id} className="bg-white/60 backdrop-blur-xl p-6 rounded-[35px] border border-white shadow-xl flex items-center justify-between group hover:border-blue-500 hover:bg-white transition-all duration-500">
                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xl shadow-2xl group-hover:bg-blue-600 transition-all">{visit.sales.substring(0,1)}</div>
+                              <div className={`w-12 h-12 rounded-2xl text-white flex items-center justify-center text-xl shadow-lg transition-all group-hover:scale-105 ${
+                                visit.importance === 'High' ? 'bg-rose-500' :
+                                visit.importance === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}>{visit.sales.substring(0,1)}</div>
                               <div>
                                  <h4 className="text-sm font-black text-slate-900 tracking-tight">{visit.sales} 〈{visit.temple}〉</h4>
                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">{visit.purpose}</p>
