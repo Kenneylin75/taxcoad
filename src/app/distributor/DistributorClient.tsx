@@ -784,8 +784,8 @@ export default function DistributorClient({
                      }} className="text-slate-300 text-2xl font-black hover:text-blue-600 transition-colors">〈</button>
                      <div className="text-center">
                         <h3 className="text-lg font-black text-slate-900 tracking-tighter italic underline decoration-blue-500 decoration-4 underline-offset-8">{currentYear}年 {currentMonth}月 監控</h3>
-                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">
-                           本月共有 <span className="text-blue-600 font-black">{mockVisits.filter(v => v.date.startsWith(`${currentYear}-${currentMonth.toString().padStart(2, '0')}`)).length}</span> 筆計畫
+                        <p className="text-xs text-slate-400 font-bold mt-2 tracking-widest">
+                           本月共有 <span className="text-blue-600 font-black text-lg mx-1">{mockVisits.filter(v => v.date.startsWith(`${currentYear}-${currentMonth.toString().padStart(2, '0')}`)).length}</span> 筆計畫
                         </p>
                      </div>
                      <button onClick={() => {
