@@ -517,7 +517,6 @@ export default function SuperAdminClient({
                                     className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
                                         <i className="fas fa-trash-alt"></i> 刪除
                                     </button>
-                                  </div>
                                </td>
                             </tr>
                           ))}
@@ -592,7 +591,6 @@ export default function SuperAdminClient({
                                     className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
                                         <i className="fas fa-trash-alt"></i> 刪除
                                     </button>
-                                  </div>
                                </td>
                             </tr>
                           ))}
