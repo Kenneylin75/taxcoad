@@ -514,7 +514,10 @@ export default function SuperAdminClient({
                                         }
                                       }
                                     }} 
-                                    className="text-[11px] font-black text-rose-300 uppercase hover:text-rose-600 transition-all border-b-2 border-transparent hover:border-rose-600 italic mt-2">刪除 (DELETE 🗑️)</button>
+                                    className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                        <i className="fas fa-trash-alt"></i> 刪除
+                                    </button>
+                                  </div>
                                </td>
                             </tr>
                           ))}
@@ -586,7 +589,10 @@ export default function SuperAdminClient({
                                         }
                                       }
                                     }} 
-                                    className="text-[11px] font-black text-rose-300 uppercase hover:text-rose-600 transition-all border-b-2 border-transparent hover:border-rose-600 italic mt-2">刪除 (DELETE 🗑️)</button>
+                                    className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                        <i className="fas fa-trash-alt"></i> 刪除
+                                    </button>
+                                  </div>
                                </td>
                             </tr>
                           ))}
@@ -621,23 +627,39 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8 text-lg font-black text-slate-400 tracking-tight italic">No.{String(idx+1).padStart(4, '0')}</td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-12 py-8 text-[12px] font-bold text-slate-600">{(() => {
-                                  if (acc.superSalesId && acc.superSalesId !== 'system-hq') {
-                                     const superSales = initialAccounts.find((a: any) => a.id === acc.superSalesId);
-                                     return `系統總部 HQ => 超級業務員${superSales?.name || acc.creatorInfo?.salesName || acc.superSalesId}`;
-                                  }
-                                  if (acc.distributorId && acc.distributorId !== 'system-hq') {
-                                     const dist = initialAccounts.find((a: any) => a.id === acc.distributorId);
-                                     const distName = dist?.name || acc.creatorInfo?.distName || acc.distributorId;
-                                     if (acc.salesId && acc.salesId !== 'system-hq') {
-                                        const sales = initialAccounts.find((a: any) => a.id === acc.salesId);
-                                        const salesName = sales?.name || acc.creatorInfo?.salesName || acc.salesId;
-                                        return `${distName}經銷商 => ${salesName}經銷業務`;
-                                     }
-                                     return `${distName}經銷商`;
-                                  }
-                                  return '系統總部 HQ';
-                               })()}</td>
+                               <td className="px-12 py-8">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                     {(() => {
+                                        if (acc.superSalesId && acc.superSalesId !== 'system-hq') {
+                                           const superSales = initialAccounts.find((a: any) => a.id === acc.superSalesId);
+                                           return (
+                                              <>
+                                                 <span className="px-3 py-1.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold tracking-wide border border-slate-200 shadow-sm flex items-center gap-1.5"><i className="fas fa-building text-slate-400"></i>系統總部 HQ</span>
+                                                 <span className="text-slate-300"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg></span>
+                                                 <span className="px-3 py-1.5 rounded-md bg-amber-50 text-amber-600 text-[11px] font-bold tracking-wide border border-amber-200 shadow-sm flex items-center gap-1.5"><i className="fas fa-user-tie text-amber-400"></i>超級業務 ${superSales?.name || acc.creatorInfo?.salesName || acc.superSalesId}</span>
+                                              </>
+                                           );
+                                        }
+                                        if (acc.distributorId && acc.distributorId !== 'system-hq') {
+                                           const dist = initialAccounts.find((a: any) => a.id === acc.distributorId);
+                                           const distName = dist?.name || acc.creatorInfo?.distName || acc.distributorId;
+                                           if (acc.salesId && acc.salesId !== 'system-hq') {
+                                              const sales = initialAccounts.find((a: any) => a.id === acc.salesId);
+                                              const salesName = sales?.name || acc.creatorInfo?.salesName || acc.salesId;
+                                              return (
+                                                 <>
+                                                    <span className="px-3 py-1.5 rounded-md bg-indigo-50 text-indigo-600 text-[11px] font-bold tracking-wide border border-indigo-200 shadow-sm flex items-center gap-1.5"><i className="fas fa-store text-indigo-400"></i>${distName} 經銷商</span>
+                                                    <span className="text-slate-300"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg></span>
+                                                    <span className="px-3 py-1.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-bold tracking-wide border border-emerald-200 shadow-sm flex items-center gap-1.5"><i className="fas fa-id-badge text-emerald-400"></i>${salesName} 經銷業務</span>
+                                                 </>
+                                              );
+                                           }
+                                           return <span className="px-3 py-1.5 rounded-md bg-indigo-50 text-indigo-600 text-[11px] font-bold tracking-wide border border-indigo-200 shadow-sm flex items-center gap-1.5"><i className="fas fa-store text-indigo-400"></i>${distName} 經銷商</span>;
+                                        }
+                                        return <span className="px-3 py-1.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold tracking-wide border border-slate-200 shadow-sm flex items-center gap-1.5"><i className="fas fa-building text-slate-400"></i>系統總部 HQ</span>;
+                                     })()}
+                                  </div>
+                               </td>
                                <td className="px-12 py-8">
                                   <button 
                                      onClick={async () => {
@@ -652,13 +674,18 @@ export default function SuperAdminClient({
                                      {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
                                   </button>
                                </td>
-                               <td className="px-12 py-8 text-right flex justify-end gap-4">
-                                  <button onClick={() => {
-                                     import('@/app/actions').then(async m => { const res = await m.impersonateTemple((acc.templeId || acc.id) as string, 'SuperAdmin'); if(res.success && res.redirectPath) window.location.href = res.redirectPath; })
-                                  }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
-                                  <button onClick={() => setViewingAccountDetail(acc)} className="text-[11px] font-black text-slate-300 uppercase hover:text-slate-900 transition-all border-b-2 border-transparent hover:border-slate-900 italic mt-2">VIEW DETAIL 🔑</button>
-                                  <button 
-                                    onClick={async () => {
+                               <td className="px-12 py-8 text-right">
+                                  <div className="flex items-center justify-end gap-3">
+                                     <button onClick={() => {
+                                        import('@/app/actions').then(async m => { const res = await m.impersonateTemple((acc.templeId || acc.id) as string, 'SuperAdmin'); if(res.success && res.redirectPath) window.location.href = res.redirectPath; })
+                                     }} className="px-5 py-2 bg-gradient-to-r from-amber-200 to-amber-300 text-amber-800 rounded-full text-[10px] font-black uppercase tracking-widest hover:from-amber-400 hover:to-amber-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                        <i className="fas fa-sign-in-alt"></i> 進入後台
+                                     </button>
+                                     <button onClick={() => setViewingAccountDetail(acc)} className="px-4 py-2 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                        <i className="fas fa-eye"></i> 詳情
+                                     </button>
+                                     <button 
+                                       onClick={async () => {
                                       if (confirm('確定要永久刪除此宮廟的所有資料嗎？此動作無法復原！')) {
                                         const { deleteTempleAllData } = await import('@/app/actions');
                                         const res = await deleteTempleAllData(acc.id);
@@ -670,7 +697,10 @@ export default function SuperAdminClient({
                                         }
                                       }
                                     }} 
-                                    className="text-[11px] font-black text-rose-300 uppercase hover:text-rose-600 transition-all border-b-2 border-transparent hover:border-rose-600 italic mt-2">刪除 (DELETE 🗑️)</button>
+                                    className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                        <i className="fas fa-trash-alt"></i> 刪除
+                                    </button>
+                                  </div>
                                </td>
                             </tr>
                           ))}
