@@ -138,6 +138,8 @@ export default function SuperAdminClient({
    const [selectedPlanDistributor, setSelectedPlanDistributor] = useState<any>(null);
    const [distributorContracts, setDistributorContracts] = useState<any[]>([]);
    const [newContractForm, setNewContractForm] = useState({ amount: 0, duration: '', quotaAdded: 0, type: 'ADD_QUOTA', note: '' });
+   const [editingContractId, setEditingContractId] = useState<string | null>(null);
+   const [editContractForm, setEditContractForm] = useState({ amount: 0, duration: '' });
   
   // --- Data Fetching ---
   useEffect(() => {
@@ -3068,21 +3070,53 @@ export default function SuperAdminClient({
                            }
 
                            return (
-                           <div key={contract.id} className="p-6 rounded-3xl bg-slate-50 flex justify-between items-center group hover:bg-indigo-50 transition-all border border-slate-100 hover:border-indigo-100">
-                              <div>
+                           <div key={contract.id} className="p-6 rounded-3xl bg-slate-50 flex justify-between items-start group hover:bg-indigo-50 transition-all border border-slate-100 hover:border-indigo-100 relative">
+                              <div className="flex-1 pr-4">
                                  <p className="text-[13px] font-black text-slate-900 mb-1">{contract.note || `${contract.type === 'NEW' ? '新增合約' : contract.type === 'RENEW' ? '合約續約' : '增加額度'} ${contract.amount/10000}萬 ${contract.duration} ${contract.quotaAdded}宮廟帳戶數量`}</p>
                                  <p className="text-[11px] font-bold text-slate-400 font-mono">{startDate.toLocaleDateString()} {startDate.toLocaleTimeString()}</p>
-                                 <div className="flex gap-2 mt-3 flex-wrap">
-                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-100">
-                                      💰 NT$ {(contract.amount || 0).toLocaleString()}
-                                    </span>
-                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500 flex items-center gap-1 border border-slate-200">
-                                      📅 {startDate.toLocaleDateString()} ~ {endDateStr || '無期限'}
-                                    </span>
-                                 </div>
+                                 
+                                 {editingContractId === contract.id ? (
+                                    <div className="mt-4 p-4 bg-white rounded-2xl border border-indigo-100 flex gap-4 items-end flex-wrap">
+                                      <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">編輯金額</label>
+                                        <input type="number" value={editContractForm.amount} onChange={e => setEditContractForm({...editContractForm, amount: parseInt(e.target.value)||0})} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs w-32 focus:outline-none focus:border-indigo-500" />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">編輯期限 (如: 2年)</label>
+                                        <input type="text" value={editContractForm.duration} onChange={e => setEditContractForm({...editContractForm, duration: e.target.value})} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs w-32 focus:outline-none focus:border-indigo-500" />
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button onClick={async () => {
+                                          const { updateDistributorContract } = await import('../actions');
+                                          const res = await updateDistributorContract(contract.id, editContractForm);
+                                          if (res.success) {
+                                            setDistributorContracts(distributorContracts.map(c => c.id === contract.id ? {...c, amount: editContractForm.amount, duration: editContractForm.duration} : c));
+                                            setEditingContractId(null);
+                                          } else {
+                                            alert('更新失敗');
+                                          }
+                                        }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-md">儲存</button>
+                                        <button onClick={() => setEditingContractId(null)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-300">取消</button>
+                                      </div>
+                                    </div>
+                                 ) : (
+                                    <div className="flex gap-2 mt-3 flex-wrap">
+                                       <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-100">
+                                         💰 NT$ {(contract.amount || 0).toLocaleString()}
+                                       </span>
+                                       <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500 flex items-center gap-1 border border-slate-200">
+                                         📅 {startDate.toLocaleDateString()} ~ {endDateStr || '無期限'}
+                                       </span>
+                                    </div>
+                                 )}
                               </div>
-                              <div className="text-right">
+                              <div className="text-right flex flex-col items-end gap-2">
                                  <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic bg-indigo-100 text-indigo-600">+{contract.quotaAdded} Quota</span>
+                                 {!editingContractId && (
+                                   <button onClick={() => { setEditingContractId(contract.id); setEditContractForm({amount: contract.amount || 0, duration: contract.duration || ''}); }} className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                     <i className="fas fa-edit"></i> 編輯金額與期限
+                                   </button>
+                                 )}
                               </div>
                            </div>
                          )})
