@@ -8541,6 +8541,7 @@ export async function fetchSalesProfileById(salesId: string) {
         name: sales.name,
         parentDistributor: sales.distributor?.name || "未指派",
         account: sales.account,
+        bankAccount: sales.bankAccount,
       };
     }
     return { name: "未知", parentDistributor: "未指派", account: "" };
