@@ -3054,17 +3054,38 @@ export default function SuperAdminClient({
                       {distributorContracts.length === 0 ? (
                          <div className="text-center py-10 text-slate-400 font-bold text-sm bg-slate-50 rounded-3xl">尚無合約紀錄</div>
                       ) : (
-                         distributorContracts.map((contract: any) => (
+                         distributorContracts.map((contract: any) => {
+                           const startDate = new Date(contract.date);
+                           let endDateStr = contract.duration;
+                           if (contract.duration && contract.duration.includes('年')) {
+                             const match = contract.duration.match(/(\d+)年/);
+                             if (match) {
+                               const years = parseInt(match[1]);
+                               const endDate = new Date(startDate);
+                               endDate.setFullYear(endDate.getFullYear() + years);
+                               endDateStr = endDate.toLocaleDateString();
+                             }
+                           }
+
+                           return (
                            <div key={contract.id} className="p-6 rounded-3xl bg-slate-50 flex justify-between items-center group hover:bg-indigo-50 transition-all border border-slate-100 hover:border-indigo-100">
                               <div>
                                  <p className="text-[13px] font-black text-slate-900 mb-1">{contract.note || `${contract.type === 'NEW' ? '新增合約' : contract.type === 'RENEW' ? '合約續約' : '增加額度'} ${contract.amount/10000}萬 ${contract.duration} ${contract.quotaAdded}宮廟帳戶數量`}</p>
-                                 <p className="text-[11px] font-bold text-slate-400 font-mono">{new Date(contract.date).toLocaleDateString()} {new Date(contract.date).toLocaleTimeString()}</p>
+                                 <p className="text-[11px] font-bold text-slate-400 font-mono">{startDate.toLocaleDateString()} {startDate.toLocaleTimeString()}</p>
+                                 <div className="flex gap-2 mt-3 flex-wrap">
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-100">
+                                      💰 NT$ {(contract.amount || 0).toLocaleString()}
+                                    </span>
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500 flex items-center gap-1 border border-slate-200">
+                                      📅 {startDate.toLocaleDateString()} ~ {endDateStr || '無期限'}
+                                    </span>
+                                 </div>
                               </div>
                               <div className="text-right">
                                  <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic bg-indigo-100 text-indigo-600">+{contract.quotaAdded} Quota</span>
                               </div>
                            </div>
-                         ))
+                         )})
                       )}
                    </div>
                 </div>
