@@ -505,15 +505,15 @@ export default function DistSalesPage() {
                        </>
                      )}
                   </div>
-                  <div className="flex-1 space-y-1">
-                     <div className="flex justify-between items-start">
-                        <h4 className={`font-black tracking-tighter transition-colors ${v.eventType === 'activation' ? 'text-amber-600 group-hover:text-amber-700' : 'text-slate-900 group-hover:text-emerald-600'}`}>{v.templeName}</h4>
-                        <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase ${
+                  <div className="flex-1 min-w-0 space-y-1">
+                     <div className="flex justify-between items-start gap-2">
+                        <h4 className={`font-black tracking-tighter transition-colors truncate break-all ${v.eventType === 'activation' ? 'text-amber-600 group-hover:text-amber-700' : 'text-slate-900 group-hover:text-emerald-600'}`}>{v.templeName}</h4>
+                        <span className={`shrink-0 text-[8px] font-black px-2 py-1 rounded-full uppercase ${
                           v.eventType === 'activation' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
                           v.status === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
                         }`}>{v.eventType === 'activation' ? '宮廟開通' : v.status}</span>
                      </div>
-                     <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">{v.notes}</p>
+                     <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed break-all">{v.notes}</p>
                   </div>
                </div>
              ));
