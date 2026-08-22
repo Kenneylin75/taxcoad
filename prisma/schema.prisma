@@ -45,6 +45,7 @@ model Distributor {
   superSalesId String?            @map("super_sales_id")
   temples      Temple[]
   sales        DistributorSales[]
+  contracts    DistributorContract[]
 
   @@map("distributors")
 }
@@ -127,6 +128,22 @@ model DistributorApplication {
   taxId          String?  @map("tax_id")
 
   @@map("distributor_applications")
+}
+
+model DistributorContract {
+  id            String      @id @default(cuid())
+  distributorId String      @map("distributor_id")
+  amount        Int         @default(0)
+  duration      String?     
+  quotaAdded    Int         @default(0) @map("quota_added")
+  type          String      @default("NEW") 
+  note          String?
+  date          DateTime    @default(now())
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at")
+  distributor   Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@map("distributor_contracts")
 }
 
 model SuperSalesOverride {
