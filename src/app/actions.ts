@@ -10566,11 +10566,11 @@ export async function createDistributorAccount(data: any) {
     await prisma.distributorContract.create({
       data: {
         distributorId: newDist.id,
-        amount: 0,
-        duration: "首簽",
+        amount: Number(data.contractAmount) || 0,
+        duration: data.contractDuration || "首簽",
         quotaAdded: Number(data.customNodes) || 100,
         type: "NEW",
-        note: `首簽合約，分配額度 ${Number(data.customNodes) || 100} 宮廟帳戶`,
+        note: `首簽合約，分配額度 ${Number(data.customNodes) || 100} 宮廟帳戶數量`,
         date: new Date()
       }
     });
@@ -11620,6 +11620,27 @@ export async function addDistributorContract(
     return { success: true, contract: newContract };
   } catch (error) {
     console.error("addDistributorContract error:", error);
+    return { success: false, error: String(error) };
+  }
+}
+export async function updateDistributorContract(
+  contractId: string,
+  data: {
+    amount: number;
+    duration: string;
+  }
+) {
+  try {
+    const updatedContract = await prisma.distributorContract.update({
+      where: { id: contractId },
+      data: {
+        amount: data.amount,
+        duration: data.duration,
+      }
+    });
+    return { success: true, contract: updatedContract };
+  } catch (error) {
+    console.error("updateDistributorContract error:", error);
     return { success: false, error: String(error) };
   }
 }

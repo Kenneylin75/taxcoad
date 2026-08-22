@@ -2458,13 +2458,36 @@ export default function SuperAdminClient({
                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 italic">戶名</label>
                                 <input name="accountName" type="text" className="w-full bg-white rounded-2xl p-4 font-black outline-none border border-slate-100 focus:border-emerald-500 transition-all" placeholder="例如：林精英" />
                              </div>
-                             <div className="space-y-2">
+                                   <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 italic">帳號</label>
                                 <input name="accountNumber" type="text" className="w-full bg-white rounded-2xl p-4 font-black outline-none border border-slate-100 focus:border-emerald-500 transition-all" placeholder="例如：1234567890" />
                              </div>
                           </div>
-                       </section>
-                    )}
+                           </div>
+                        </section>
+                     )}
+
+                     {/* --- 2. 經銷商首簽合約設定 --- */}
+                     {accountType === 'Distributor' && (
+                        <section className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
+                           <div className="flex items-center gap-4"><div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest italic">02. 首簽合約設定 (Contract Provisioning)</h4></div>
+                           <div className="grid grid-cols-2 gap-10">
+                              <div className="space-y-4">
+                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">首簽合約金額 (NTD)</label>
+                                 <input name="contractAmount" type="number" defaultValue="0" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
+                              </div>
+                              <div className="space-y-4">
+                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">合約期限 (如: 2年)</label>
+                                 <input name="contractDuration" type="text" defaultValue="2年" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
+                              </div>
+                              <div className="space-y-4 col-span-2">
+                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">首批分配宮廟數量 (Quota)</label>
+                                 <input name="customNodes" type="number" defaultValue="100" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
+                              </div>
+                           </div>
+                        </section>
+                     )}
+
 
                     
 
