@@ -9608,6 +9608,18 @@ export async function approveDistributorBySuperAdmin(
       },
     });
 
+    await prisma.distributorContract.create({
+      data: {
+        distributorId: distId,
+        amount: Number(app.price) || 0,
+        duration: "首簽",
+        quotaAdded: newQuota,
+        type: "NEW",
+        note: `首簽合約，分配額度 ${newQuota} 宮廟帳戶`,
+        date: new Date()
+      }
+    });
+
     const { revalidatePath } = require("next/cache");
     revalidatePath("/super-admin");
     return { success: true };
@@ -10549,6 +10561,18 @@ export async function createDistributorAccount(data: any) {
         bankAccount: newDist.bankInfo?.accountNumber || "",
         bankName: newDist.bankInfo?.bankName || "",
       },
+    });
+
+    await prisma.distributorContract.create({
+      data: {
+        distributorId: newDist.id,
+        amount: 0,
+        duration: "首簽",
+        quotaAdded: Number(data.customNodes) || 100,
+        type: "NEW",
+        note: `首簽合約，分配額度 ${Number(data.customNodes) || 100} 宮廟帳戶`,
+        date: new Date()
+      }
     });
   } catch (e) {
     console.error("DB Insert Error for distributor:", e);
