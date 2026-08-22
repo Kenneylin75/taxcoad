@@ -8321,7 +8321,30 @@ export async function fetchDataBridgeTree() {
       children: [],
     }));
 
-    const templeNodes = temples.map((t: any) => ({
+    const allRentBills = await prisma.templeBill.findMany({
+      where: { itemName: { in: ["YearlyFee", "MonthlyFee"] } },
+      orderBy: { dueDate: "desc" },
+    });
+
+    const templeNodes = temples.map((t: any) => {
+      const templeBills = allRentBills.filter((b: any) => b.templeId === t.id);
+      let pStatus = 'Paid';
+      let bPeriod = '';
+      
+      if (templeBills.length > 0) {
+        const unpaidBills = templeBills.filter((b: any) => b.status === 'Unpaid').sort((a: any, b: any) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime());
+        if (unpaidBills.length > 0) {
+          pStatus = 'Unpaid';
+          bPeriod = unpaidBills[0].billingDate || '';
+        } else {
+          pStatus = 'Paid';
+          bPeriod = templeBills[0].billingDate || '';
+        }
+      }
+
+      const price = t.paymentCycle === "Yearly" ? Math.round((t.monthlyRent || 0) * 12 * (1 - yearlyDiscountRate / 100)) : t.monthlyRent || 0;
+
+      return {
       id: t.id,
       name: t.name || t.templeName || "未知宮廟",
       type: "temple",
@@ -8335,18 +8358,14 @@ export async function fetchDataBridgeTree() {
             : t.paymentCycle === "Yearly"
               ? "年付優惠方案"
               : "月付標準方案",
-      price:
-        t.paymentCycle === "Yearly"
-          ? Math.round(
-              (t.monthlyRent || 0) * 12 * (1 - yearlyDiscountRate / 100),
-            )
-          : t.monthlyRent || 0,
+      price,
       freeType: t.freeType,
       plan: t.plan,
       paymentCycle: t.paymentCycle,
       billingStartDate: t.billingStartDate,
-      paymentStatus: t.paymentStatus,
-    }));
+      paymentStatus: pStatus,
+      billingPeriod: bPeriod,
+    }});
 
     // Build hierarchy
     templeNodes.forEach((tNode: any) => {
