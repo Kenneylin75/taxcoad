@@ -66,6 +66,7 @@ export default function DistributorClient({
 
   const [uploadingBonusId, setUploadingBonusId] = useState<string | null>(null);
   const [receiptBase64, setReceiptBase64] = useState<string>('');
+  const [uploadingBankLast5, setUploadingBankLast5] = useState<string>('');
 
   const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
   const [isDirectCreateModalOpen, setIsDirectCreateModalOpen] = useState(false);
@@ -354,16 +355,21 @@ export default function DistributorClient({
       alert("請先上傳匯款圖片憑證！");
       return;
     }
+    if (!uploadingBankLast5 || uploadingBankLast5.length !== 5) {
+      alert("請輸入匯款後五碼 (5位數字)！");
+      return;
+    }
     const request = bonusRequests.find((r: any) => r.id === id);
     if (!request) return;
 
     try {
-      await uploadReceiptAndApproveBonus(id, receiptBase64);
-      setBonusRequests((prev: any[]) => prev.map((r: any) => r.id === id ? { ...r, status: "Paid", receiptUrl: receiptBase64 } : r));
+      await uploadReceiptAndApproveBonus(id, receiptBase64, uploadingBankLast5);
+      setBonusRequests((prev: any[]) => prev.map((r: any) => r.id === id ? { ...r, status: "Paid", receiptUrl: receiptBase64, bankLast5: uploadingBankLast5 } : r));
       addLog("獎金撥款核銷", `單號: ${id} (${request.sales})`);
       alert(`✅ 已完成單號 ${id} 的撥款核銷`);
       setUploadingBonusId(null);
       setReceiptBase64('');
+      setUploadingBankLast5('');
     } catch (e) {
       alert("核銷失敗，請重試");
     }
@@ -914,14 +920,18 @@ export default function DistributorClient({
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[80px] -mr-20 -mt-20 group-hover:scale-125 transition-all duration-1000"></div>
                   <div className="relative z-10 space-y-8">
                      <p className="text-[10px] font-black text-blue-100 uppercase tracking-[0.5em]">{new Date().getFullYear()} 年度業績總覽</p>
-                     <div className="grid grid-cols-2 gap-8 divide-x divide-white/20">
+                     <div className="grid grid-cols-3 gap-6 divide-x divide-white/20">
                         <div className="space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">宮廟繳費總額</p>
-                           <h2 className="text-4xl font-black tracking-tighter italic text-white drop-shadow-md">${(paymentRecords.reduce((sum: number, p: any) => sum + p.history.filter((h: any) => h.status==='Paid').reduce((s: number, h: any) => s+(h.amount || 0), 0), 0) || 0).toLocaleString()}</h2>
+                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${(paymentRecords.reduce((sum: number, p: any) => sum + p.history.filter((h: any) => h.status==='Paid' && String(h.timestamp || h.billingDate).startsWith(new Date().getFullYear().toString())).reduce((s: number, h: any) => s+(h.amount || 0), 0), 0) || 0).toLocaleString()}</h2>
                         </div>
-                        <div className="pl-8 space-y-2">
+                        <div className="pl-6 space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">預計支出佣金</p>
-                           <h2 className="text-4xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.filter((b: any) => String(b.date).startsWith(monthFilter)).reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
+                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.filter((b: any) => String(b.date).startsWith(new Date().getFullYear().toString()) && b.status !== 'Paid' && b.status !== 'Verified').reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
+                        </div>
+                        <div className="pl-6 space-y-2">
+                           <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">已核銷提領總額</p>
+                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.filter((b: any) => String(b.date).startsWith(new Date().getFullYear().toString()) && (b.status === 'Paid' || b.status === 'Verified')).reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
                         </div>
                      </div>
                   </div>
@@ -1079,8 +1089,9 @@ export default function DistributorClient({
                                <p className="text-xs text-slate-500">請上傳匯款憑證，完成核銷作業。</p>
                                <input type="file" accept="image/*" onChange={onReceiptFileChange} className="w-full text-xs" />
                                {receiptBase64 && <img src={receiptBase64} alt="Receipt Preview" className="w-full h-32 object-cover rounded-2xl" />}
+                               <input type="text" placeholder="請輸入匯款後五碼" value={uploadingBankLast5} onChange={(e) => setUploadingBankLast5(e.target.value.replace(/\D/g, '').slice(0, 5))} className="w-full text-xs p-3 border border-slate-200 rounded-xl" maxLength={5} />
                                <div className="flex gap-4">
-                                  <button onClick={() => { setUploadingBonusId(null); setReceiptBase64(''); }} className="flex-1 py-4 bg-slate-100 rounded-full text-xs font-black text-slate-500">取消</button>
+                                  <button onClick={() => { setUploadingBonusId(null); setReceiptBase64(''); setUploadingBankLast5(''); }} className="flex-1 py-4 bg-slate-100 rounded-full text-xs font-black text-slate-500">取消</button>
                                   <button onClick={() => handleReconcileBonus(uploadingBonusId)} className="flex-1 py-4 bg-blue-600 rounded-full text-xs font-black text-white">確認已匯款</button>
                                </div>
                             </div>

@@ -7494,7 +7494,7 @@ export async function fetchDistributorFinancials(distId: string) {
 
     const salesRes = await prisma.distributorSales.findMany({
       where: { distributorId: distId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, bankAccount: true },
     });
     const salesIds = salesRes.map((s: any) => s.id);
 
@@ -7505,6 +7505,7 @@ export async function fetchDistributorFinancials(distId: string) {
         orderBy: { createdAt: "desc" },
       });
       bonusRes.forEach((r: any) => {
+        const salesRep = salesRes.find((s: any) => s.id === r.salesId);
         myBonusRequests.push({
           id: r.id,
           amount: r.amount,
@@ -7512,6 +7513,9 @@ export async function fetchDistributorFinancials(distId: string) {
           status: r.status,
           method: r.method,
           salesName: r.salesName,
+          receiptUrl: r.receiptUrl,
+          bankLast5: r.bankLast5,
+          bankAccount: salesRep?.bankAccount || null,
         });
       });
     }
@@ -8091,6 +8095,8 @@ export async function fetchSalesBonusRequests(salesId: string) {
       date: r.date || r.createdAt.toISOString().split("T")[0],
       status: r.status,
       method: r.method,
+      receiptUrl: r.receiptUrl,
+      bankLast5: r.bankLast5,
     }));
   } catch (error) {
     console.error("Failed to fetch bonus history", error);
@@ -8100,11 +8106,12 @@ export async function fetchSalesBonusRequests(salesId: string) {
 export async function uploadReceiptAndApproveBonus(
   requestId: string,
   imageUrl: string,
+  bankLast5: string = ""
 ) {
   try {
     await prisma.bonusRequest.update({
       where: { id: requestId },
-      data: { status: "Paid", receiptUrl: imageUrl },
+      data: { status: "Paid", receiptUrl: imageUrl, bankLast5 },
     });
     const { revalidatePath } = require("next/cache");
     revalidatePath("/distributor");
@@ -8863,6 +8870,7 @@ export async function fetchAllSalesBonusRequests() {
       salesName: r.salesName,
       distributorId: r.distributorId,
       receiptUrl: r.receiptUrl,
+      bankLast5: r.bankLast5,
     }));
   } catch (error) {
     console.error("Failed to fetch all bonus requests", error);

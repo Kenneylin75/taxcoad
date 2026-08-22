@@ -791,6 +791,9 @@ export default function DistSalesPage() {
                         <div>
                            <h4 className="font-black text-slate-900">已核准</h4>
                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{req.date} | {req.status}</p>
+                           {req.bankLast5 && (
+                              <p className="text-[10px] font-bold text-slate-500 mt-1">匯款後五碼: {req.bankLast5}</p>
+                           )}
                            {req.receiptUrl && (
                                <button onClick={() => setViewingReceiptUrl(req.receiptUrl)} className="mt-2 px-4 py-2 bg-white text-emerald-600 rounded-[12px] text-[10px] font-black tracking-widest hover:bg-emerald-100 transition-all shadow-sm">
                                   👁️ 查看匯款憑證
@@ -1377,6 +1380,14 @@ export default function DistSalesPage() {
              </div>
           </div>
        )}
+        {viewingReceiptUrl && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+             <div className="bg-white p-4 rounded-[32px] max-w-lg w-full relative">
+                <button onClick={() => setViewingReceiptUrl(null)} className="absolute -top-4 -right-4 w-10 h-10 bg-slate-900 text-white rounded-full font-black flex items-center justify-center hover:scale-110 transition-transform">✕</button>
+                <img src={viewingReceiptUrl} alt="Receipt" className="w-full rounded-[24px] object-cover" />
+             </div>
+          </div>
+        )}
     
 </div>
   );

@@ -846,6 +846,7 @@ model BonusRequest {
   method        String?
   salesName     String?  @map("sales_name")
   receiptUrl    String?  @map("receipt_url")
+  bankLast5     String?  @map("bank_last5")
   createdAt     DateTime @default(now()) @map("timestamp")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
