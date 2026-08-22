@@ -970,18 +970,24 @@ export default function DistributorClient({
                            })}
                         </select>
                      </div>
-                     <div className="grid grid-cols-3 gap-6 divide-x divide-white/20">
-                        <div className="space-y-2">
-                           <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">宮廟繳費總額</p>
-                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${Math.round(overviewStats.totalPayments).toLocaleString()}</h2>
+                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 md:gap-4 divide-y md:divide-y-0 md:divide-x divide-white/20 mt-4">
+                        <div className="flex-1 w-full space-y-3 py-2 md:py-0 md:pr-8">
+                           <p className="text-xs font-black text-blue-100 uppercase tracking-widest opacity-80">宮廟繳費總額</p>
+                           <h2 className="text-4xl lg:text-5xl font-black tracking-tighter text-white drop-shadow-lg truncate">
+                              ${Math.round(overviewStats.totalPayments).toLocaleString()}
+                           </h2>
                         </div>
-                        <div className="pl-6 space-y-2">
-                           <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">預計支出佣金</p>
-                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${Math.round(overviewStats.expectedCommission).toLocaleString()}</h2>
+                        <div className="flex-1 w-full space-y-3 py-2 md:py-0 md:px-8">
+                           <p className="text-xs font-black text-blue-100 uppercase tracking-widest opacity-80">預計支出佣金</p>
+                           <h2 className="text-4xl lg:text-5xl font-black tracking-tighter text-white drop-shadow-lg truncate">
+                              ${Math.round(overviewStats.expectedCommission).toLocaleString()}
+                           </h2>
                         </div>
-                        <div className="pl-6 space-y-2">
-                           <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">已核銷提領總額</p>
-                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${Math.round(overviewStats.totalWithdrawn).toLocaleString()}</h2>
+                        <div className="flex-1 w-full space-y-3 py-2 md:py-0 md:pl-8">
+                           <p className="text-xs font-black text-blue-100 uppercase tracking-widest opacity-80">已核銷提領總額</p>
+                           <h2 className="text-4xl lg:text-5xl font-black tracking-tighter text-white drop-shadow-lg truncate">
+                              ${Math.round(overviewStats.totalWithdrawn).toLocaleString()}
+                           </h2>
                         </div>
                      </div>
                   </div>
