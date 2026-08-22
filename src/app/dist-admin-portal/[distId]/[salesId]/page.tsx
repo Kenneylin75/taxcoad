@@ -491,6 +491,7 @@ export default function DistSalesPage() {
                 </div>
              );
 
+             return filtered.map(v => (
                <div key={v.id} onClick={() => setSelectedCalendarItem(v)} className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom-2 duration-300 hover:border-emerald-200 hover:shadow-md transition-all cursor-pointer group">
                   <div className="flex justify-between items-start">
                      <div className="flex gap-4 items-center min-w-0">

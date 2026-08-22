@@ -7450,6 +7450,12 @@ export async function fetchDistributorFinancials(distId: string) {
       });
     }
 
+    const salesRes = await prisma.distributorSales.findMany({
+      where: { distributorId: distId },
+      select: { id: true, name: true, bankAccount: true, commissionRules: true },
+    });
+    const salesIds = salesRes.map((s: any) => s.id);
+
     const paymentRecords = temples.map((t: any) => {
       const tBills = bills.filter((b: any) => b.templeId === t.id);
       const lastBill = tBills[0];
@@ -7470,6 +7476,16 @@ export async function fetchDistributorFinancials(distId: string) {
           receiptUrl: b.receiptUrl,
         };
       });
+      const s = salesRes.find((x: any) => x.id === t.salesId);
+      let sRules: any = {};
+      if (s && s.commissionRules) {
+        if (typeof s.commissionRules === "string") {
+          try { sRules = JSON.parse(s.commissionRules); } catch(e){}
+        } else {
+          sRules = s.commissionRules;
+        }
+      }
+
       return {
         id: t.id,
         temple: t.templeName || t.name || "未命名宮廟",
@@ -7489,14 +7505,11 @@ export async function fetchDistributorFinancials(distId: string) {
         templeStatus: t.status,
         trialMonths: t.trialMonths || 0,
         history: history || [],
+        salesId: t.salesId,
+        templeCreatedAt: t.createdAt,
+        commissionRules: sRules,
       };
     });
-
-    const salesRes = await prisma.distributorSales.findMany({
-      where: { distributorId: distId },
-      select: { id: true, name: true, bankAccount: true },
-    });
-    const salesIds = salesRes.map((s: any) => s.id);
 
     let myBonusRequests: any[] = [];
     if (salesIds.length > 0) {

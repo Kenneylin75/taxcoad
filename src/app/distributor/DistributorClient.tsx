@@ -130,6 +130,44 @@ export default function DistributorClient({
   const [activeToolPreview, setActiveToolPreview] = useState<any>(null);
   const [paymentRecords, setPaymentRecords] = useState(initialFinancials?.paymentRecords || []);
   const [bonusRequests, setBonusRequests] = useState(initialFinancials?.bonusRequests || []);
+  
+  const [overviewYearFilter, setOverviewYearFilter] = useState(new Date().getFullYear().toString());
+
+  const overviewStats = useMemo(() => {
+    let totalPayments = 0;
+    let expectedCommission = 0;
+    let totalWithdrawn = 0;
+
+    paymentRecords.forEach((p: any) => {
+      const templeStart = new Date(p.templeCreatedAt || new Date());
+      (p.history || []).forEach((h: any) => {
+        if (h.status === 'Paid' && String(h.month).startsWith(overviewYearFilter)) {
+          totalPayments += (h.amount || 0);
+          
+          const isSetup = h.type === "SetupFee" || h.type === "Setup";
+          let rate = 0;
+          if (isSetup) {
+             rate = p.commissionRules?.setupRate || p.commissionRules?.setupFeePercent || 20;
+          } else {
+             const billDate = new Date(h.month + "-01");
+             const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
+             if (yearDiff === 0) rate = p.commissionRules?.rentYear1Rate || p.commissionRules?.rentYear1Percent || 15;
+             else if (yearDiff === 1) rate = p.commissionRules?.rentYear2Rate || p.commissionRules?.rentYear2Percent || 10;
+             else rate = p.commissionRules?.rentYear3PlusRate || p.commissionRules?.rentYear3PlusPercent || 5;
+          }
+          expectedCommission += ((h.amount || 0) * rate) / 100;
+        }
+      });
+    });
+
+    bonusRequests.forEach((b: any) => {
+      if (String(b.date).startsWith(overviewYearFilter) && (b.status === 'Paid' || b.status === 'Verified')) {
+         totalWithdrawn += (b.amount || 0);
+      }
+    });
+    
+    return { totalPayments, expectedCommission, totalWithdrawn };
+  }, [paymentRecords, bonusRequests, overviewYearFilter]);
 
   const [rejectReason, setRejectReason] = useState("");
   const [newSalesForm, setNewSalesForm] = useState({ 
@@ -919,19 +957,31 @@ export default function DistributorClient({
                <section className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 text-white p-10 rounded-[55px] shadow-[0_20px_50px_rgba(37,99,235,0.3)] relative overflow-hidden group border border-white/20">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[80px] -mr-20 -mt-20 group-hover:scale-125 transition-all duration-1000"></div>
                   <div className="relative z-10 space-y-8">
-                     <p className="text-[10px] font-black text-blue-100 uppercase tracking-[0.5em]">{new Date().getFullYear()} 年度業績總覽</p>
+                     <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black text-blue-100 uppercase tracking-[0.5em]">年度業績總覽</p>
+                        <select 
+                           value={overviewYearFilter} 
+                           onChange={e => setOverviewYearFilter(e.target.value)}
+                           className="bg-white/20 text-white border border-white/40 rounded-full px-4 py-1 text-xs font-black outline-none backdrop-blur-sm focus:bg-blue-600 transition-colors"
+                        >
+                           {Array.from({length: 10}).map((_, i) => {
+                              const y = new Date().getFullYear() - 3 + i;
+                              return <option key={y} value={y.toString()} className="text-slate-900">{y} 年</option>;
+                           })}
+                        </select>
+                     </div>
                      <div className="grid grid-cols-3 gap-6 divide-x divide-white/20">
                         <div className="space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">宮廟繳費總額</p>
-                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${(paymentRecords.reduce((sum: number, p: any) => sum + p.history.filter((h: any) => h.status==='Paid' && String(h.timestamp || h.billingDate).startsWith(new Date().getFullYear().toString())).reduce((s: number, h: any) => s+(h.amount || 0), 0), 0) || 0).toLocaleString()}</h2>
+                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${Math.round(overviewStats.totalPayments).toLocaleString()}</h2>
                         </div>
                         <div className="pl-6 space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">預計支出佣金</p>
-                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.filter((b: any) => String(b.date).startsWith(new Date().getFullYear().toString()) && b.status !== 'Paid' && b.status !== 'Verified').reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
+                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${Math.round(overviewStats.expectedCommission).toLocaleString()}</h2>
                         </div>
                         <div className="pl-6 space-y-2">
                            <p className="text-[8px] font-black text-blue-100 uppercase tracking-widest opacity-70">已核銷提領總額</p>
-                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${(bonusRequests.filter((b: any) => String(b.date).startsWith(new Date().getFullYear().toString()) && (b.status === 'Paid' || b.status === 'Verified')).reduce((sum: number, b: any) => sum + (b.amount || 0), 0) || 0).toLocaleString()}</h2>
+                           <h2 className="text-3xl font-black tracking-tighter italic text-white drop-shadow-md">${Math.round(overviewStats.totalWithdrawn).toLocaleString()}</h2>
                         </div>
                      </div>
                   </div>
