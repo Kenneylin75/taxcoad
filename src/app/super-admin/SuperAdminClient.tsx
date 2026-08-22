@@ -2463,7 +2463,6 @@ export default function SuperAdminClient({
                                 <input name="accountNumber" type="text" className="w-full bg-white rounded-2xl p-4 font-black outline-none border border-slate-100 focus:border-emerald-500 transition-all" placeholder="例如：1234567890" />
                              </div>
                           </div>
-                           </div>
                         </section>
                      )}
 
@@ -2484,7 +2483,6 @@ export default function SuperAdminClient({
                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">首批分配宮廟數量 (Quota)</label>
                                  <input name="customNodes" type="number" defaultValue="100" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
                               </div>
-                           </div>
                         </section>
                      )}
 
