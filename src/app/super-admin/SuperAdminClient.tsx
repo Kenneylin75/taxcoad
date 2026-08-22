@@ -132,6 +132,12 @@ export default function SuperAdminClient({
    const [adminUpgradeStoragePlanId, setAdminUpgradeStoragePlanId] = useState('');
    const [adminUpgradeAiPlanId, setAdminUpgradeAiPlanId] = useState('');
    const [newPassword, setNewPassword] = useState('');
+   // Pagination States
+   const [templePage, setTemplePage] = useState(1);
+   const [distributorPage, setDistributorPage] = useState(1);
+   const [superSalesPage, setSuperSalesPage] = useState(1);
+   const ITEMS_PER_PAGE = 12;
+
    
    // Distributor Contract Modal States
    const [isPlanDetailOpen, setIsPlanDetailOpen] = useState(false);
@@ -277,6 +283,19 @@ export default function SuperAdminClient({
   };
 
   if (!config || !analytics) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-10 h-10 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div></div>;
+  // Pagination Calculations
+  const allTemples = initialAccounts.filter((a: any) => a.role === 'Temple');
+  const templeTotalPages = Math.max(1, Math.ceil(allTemples.length / ITEMS_PER_PAGE));
+  const pagedTemples = allTemples.slice((templePage - 1) * ITEMS_PER_PAGE, templePage * ITEMS_PER_PAGE);
+
+  const allDistributors = initialAccounts.filter((a: any) => a.role === 'Distributor');
+  const distributorTotalPages = Math.max(1, Math.ceil(allDistributors.length / ITEMS_PER_PAGE));
+  const pagedDistributors = allDistributors.slice((distributorPage - 1) * ITEMS_PER_PAGE, distributorPage * ITEMS_PER_PAGE);
+
+  const allSuperSales = initialAccounts.filter((a: any) => a.role === 'SuperSales');
+  const superSalesTotalPages = Math.max(1, Math.ceil(allSuperSales.length / ITEMS_PER_PAGE));
+  const pagedSuperSales = allSuperSales.slice((superSalesPage - 1) * ITEMS_PER_PAGE, superSalesPage * ITEMS_PER_PAGE);
+
 
   return (
     <div className="flex h-screen bg-[#F8F9FD] text-slate-600 font-sans overflow-hidden">
@@ -482,7 +501,7 @@ export default function SuperAdminClient({
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-50">
-                          {initialAccounts.filter(a => a.role === 'SuperSales').map((acc: any) => (
+                          {pagedSuperSales.map((acc: any) => (
                             <tr key={acc.id} className="hover:bg-slate-50/30 transition-all group">
                                <td className="px-10 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-indigo-50 text-indigo-600">{acc.role}</span></td>
                                <td className="px-10 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
@@ -558,7 +577,7 @@ export default function SuperAdminClient({
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-50">
-                          {initialAccounts.filter(a => a.role === 'Distributor').map((acc: any) => (
+                          {pagedDistributors.map((acc: any) => (
                             <tr key={acc.id} className="hover:bg-slate-50/30 transition-all group">
                                <td className="px-12 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-emerald-50 text-emerald-600">{acc.role}</span></td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
@@ -637,7 +656,7 @@ export default function SuperAdminClient({
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-50">
-                          {initialAccounts.filter(a => a.role === 'Temple').map((acc: any, idx: number) => (
+                          {pagedTemples.map((acc: any, idx: number) => (
                             <tr key={acc.id} className="hover:bg-slate-50/30 transition-all group">
                                <td className="px-12 py-8 text-lg font-black text-slate-400 tracking-tight italic">No.{String(idx+1).padStart(4, '0')}</td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
