@@ -491,30 +491,35 @@ export default function DistSalesPage() {
                 </div>
              );
 
-             return filtered.map(v => (
-               <div key={v.id} onClick={() => setSelectedCalendarItem(v)} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex gap-5 animate-in slide-in-from-bottom-2 duration-300 hover:border-emerald-200 transition-colors cursor-pointer group">
-                  <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${
-                    v.eventType === 'activation' ? 'bg-amber-50 text-amber-600' :
-                    v.importance === 'High' ? 'bg-rose-50 text-rose-600' : 
-                    v.importance === 'Medium' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
-                  }`}>
-                     {v.eventType === 'activation' ? <span className="text-2xl">🎉</span> : (
-                       <>
-                         <span className="text-[8px] font-black uppercase tracking-widest">NO.{v.visitIndex || 1}</span>
-                         <span className="text-lg font-black">{v.date?.split('-')[2]}</span>
-                       </>
-                     )}
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1">
-                     <div className="flex justify-between items-start gap-2">
-                        <h4 className={`font-black tracking-tighter transition-colors truncate break-all ${v.eventType === 'activation' ? 'text-amber-600 group-hover:text-amber-700' : 'text-slate-900 group-hover:text-emerald-600'}`}>{v.templeName}</h4>
-                        <span className={`shrink-0 text-[8px] font-black px-2 py-1 rounded-full uppercase ${
-                          v.eventType === 'activation' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-                          v.status === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
-                        }`}>{v.eventType === 'activation' ? '宮廟開通' : v.status}</span>
+               <div key={v.id} onClick={() => setSelectedCalendarItem(v)} className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom-2 duration-300 hover:border-emerald-200 hover:shadow-md transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start">
+                     <div className="flex gap-4 items-center min-w-0">
+                         <div className={`w-12 h-12 rounded-[18px] flex flex-col items-center justify-center shrink-0 shadow-inner ${
+                             v.eventType === 'activation' ? 'bg-amber-50 text-amber-600' :
+                             v.importance === 'High' ? 'bg-rose-50 text-rose-600' : 
+                             v.importance === 'Medium' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
+                         }`}>
+                            {v.eventType === 'activation' ? <span className="text-xl">🎉</span> : (
+                              <>
+                                <span className="text-[7px] font-black uppercase tracking-widest opacity-80">NO.{v.visitIndex || 1}</span>
+                                <span className="text-base font-black">{v.date?.split('-')[2]}</span>
+                              </>
+                            )}
+                         </div>
+                         <div className="flex flex-col min-w-0 gap-1.5">
+                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase w-fit ${
+                               v.eventType === 'activation' ? 'bg-amber-100 text-amber-700' :
+                               v.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>{v.eventType === 'activation' ? '宮廟開通' : v.status}</span>
+                            <h4 className={`font-black text-sm tracking-tighter truncate transition-colors ${v.eventType === 'activation' ? 'text-amber-600 group-hover:text-amber-700' : 'text-slate-900 group-hover:text-emerald-600'}`}>{v.templeName}</h4>
+                         </div>
                      </div>
-                     <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed break-all">{v.notes}</p>
                   </div>
+                  {v.notes && (
+                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                         <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed break-words whitespace-pre-wrap">{v.notes}</p>
+                     </div>
+                  )}
                </div>
              ));
           })()}
@@ -895,7 +900,7 @@ export default function DistSalesPage() {
               <div className="space-y-6 bg-slate-50 p-6 rounded-[32px] border border-slate-100">
                  <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">目標宮廟</p>
-                    <p className="text-xl font-black text-slate-900">{selectedCalendarItem.templeName}</p>
+                    <p className="text-xl font-black text-slate-900 break-words">{selectedCalendarItem.templeName}</p>
                  </div>
                  
                  {selectedCalendarItem.timestamp && (
@@ -907,7 +912,7 @@ export default function DistSalesPage() {
                  
                  <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">詳細內容與紀錄</p>
-                    <p className="text-sm font-bold text-slate-700 bg-white p-5 rounded-[24px] border border-slate-100 mt-2 leading-relaxed shadow-sm min-h-[100px]">
+                    <p className="text-sm font-bold text-slate-700 bg-white p-5 rounded-[24px] border border-slate-100 mt-2 leading-relaxed shadow-sm min-h-[100px] break-words whitespace-pre-wrap">
                        {selectedCalendarItem.notes}
                     </p>
                  </div>
