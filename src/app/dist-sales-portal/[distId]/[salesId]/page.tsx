@@ -14,7 +14,8 @@ import {
   fetchCommissionHistory,
   fetchSalesProfileById,
   updateDistSalesBankInfo, requestBonus,
-  fetchRentPlans
+  fetchRentPlans,
+  fetchTempleBills
 } from "@/app/actions";
 import { TAIWAN_CITIES } from "@/app/shared-types";
 import TempleApplicationForm from "@/app/components/TempleApplicationForm";
@@ -57,6 +58,9 @@ export default function DistSalesPage() {
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
   const [viewingTempleDetail, setViewingTempleDetail] = useState<any>(null);
   const [expandedTempleId, setExpandedTempleId] = useState<string | null>(null);
+
+  const [templeBills, setTempleBills] = useState<Record<string, any[]>>({});
+  const [templeBillFilters, setTempleBillFilters] = useState<Record<string, { year: string, month: string }>>({});
 
   // Search & Filter States
   const [templeSearch, setTempleSearch] = useState("");
@@ -145,6 +149,27 @@ export default function DistSalesPage() {
   const loadCommission = async () => {
     const commData = await fetchCommissionHistory(salesId, commYear, commMonth);
     setCommission(commData);
+  };
+
+  const handleExpandTemple = async (templeId: string) => {
+    if (expandedTempleId === templeId) {
+      setExpandedTempleId(null);
+      return;
+    }
+    setExpandedTempleId(templeId);
+    if (!templeBills[templeId]) {
+      const bills = await fetchTempleBills(templeId);
+      setTempleBills(prev => ({ ...prev, [templeId]: bills }));
+    }
+    if (!templeBillFilters[templeId]) {
+      setTempleBillFilters(prev => ({
+        ...prev,
+        [templeId]: {
+          year: new Date().getFullYear().toString(),
+          month: (new Date().getMonth() + 1).toString().padStart(2, '0')
+        }
+      }));
+    }
   };
 
   useEffect(() => {
@@ -407,7 +432,7 @@ export default function DistSalesPage() {
                          </div>
                      </div>
                      <button 
-                       onClick={() => setExpandedTempleId(expandedTempleId === app.id ? null : app.id)}
+                       onClick={() => handleExpandTemple(app.id)}
                        className="text-blue-600 text-[10px] font-black hover:text-blue-700 transition-colors flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-full shrink-0"
                      >
                        <span>歷史紀錄</span>
@@ -418,20 +443,53 @@ export default function DistSalesPage() {
                  {expandedTempleId === app.id && (
                      <div className="bg-slate-50 rounded-2xl p-4 mt-1 space-y-3 animate-in slide-in-from-top-2">
                         <div className="flex justify-between items-center">
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">財務繳款紀錄</p>
+                           <div className="flex items-center gap-2">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">財務繳款紀錄</p>
+                              {templeBillFilters[app.id] && (
+                                <div className="flex gap-1 ml-2">
+                                  <select 
+                                    className="text-[9px] font-bold bg-white text-slate-600 border border-slate-200 rounded px-1 outline-none"
+                                    value={templeBillFilters[app.id].year}
+                                    onChange={(e) => setTempleBillFilters(prev => ({...prev, [app.id]: {...prev[app.id], year: e.target.value}}))}
+                                  >
+                                    {Array.from({length: 10}).map((_, i) => <option key={i} value={String(2020+i)}>{2020+i}年</option>)}
+                                  </select>
+                                  {app.paymentCycle === 'Monthly' && (
+                                    <select 
+                                      className="text-[9px] font-bold bg-white text-slate-600 border border-slate-200 rounded px-1 outline-none"
+                                      value={templeBillFilters[app.id].month}
+                                      onChange={(e) => setTempleBillFilters(prev => ({...prev, [app.id]: {...prev[app.id], month: e.target.value}}))}
+                                    >
+                                      {Array.from({length: 12}).map((_, i) => <option key={i} value={String(i+1).padStart(2, '0')}>{i+1}月</option>)}
+                                    </select>
+                                  )}
+                                </div>
+                              )}
+                           </div>
                            {app.contractEndDate && (
                                <p className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                                  合約到期日: {app.contractEndDate}
                                </p>
                            )}
                         </div>
-                        {commission?.revenueRecords?.filter((r: any) => r.templeId === app.id || r.templeName === (app.templeName || app.name)).length > 0 ? (
+                        {(() => {
+                           const bills = templeBills[app.id] || [];
+                           const filter = templeBillFilters[app.id];
+                           const filtered = bills.filter(b => {
+                              if (!b.date || b.date === '未知' || !filter) return true;
+                              if (app.paymentCycle === 'Yearly') {
+                                 return b.date.startsWith(filter.year);
+                              } else {
+                                 return b.date.startsWith(`${filter.year}-${filter.month}`);
+                              }
+                           });
+                           return filtered.length > 0 ? (
                             <div className="space-y-2">
-                                {commission.revenueRecords.filter((r: any) => r.templeId === app.id || r.templeName === (app.templeName || app.name)).map((r: any, idx: number) => (
+                                {filtered.map((r: any, idx: number) => (
                                     <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100">
                                         <div className="flex gap-3 items-center">
                                             <span className="text-[10px] font-black text-slate-900">{r.date}</span>
-                                            <span className="text-[8px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-md">{r.type}</span>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-md">{r.itemName || (r.type === 'SetupFee' || r.type === 'Setup' ? '系統設定費' : '租用費')}</span>
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs font-black text-slate-900">${(r.amount || 0).toLocaleString()}</span>
@@ -443,9 +501,10 @@ export default function DistSalesPage() {
                                     </div>
                                 ))}
                             </div>
-                        ) : (
-                            <p className="text-[10px] font-bold text-slate-400 text-center py-4">目前無歷史紀錄</p>
-                        )}
+                           ) : (
+                               <p className="text-[10px] font-bold text-slate-400 text-center py-4">目前無歷史紀錄</p>
+                           );
+                        })()}
                      </div>
                  )}
               </div>
@@ -739,35 +798,6 @@ export default function DistSalesPage() {
             </div>
          </div>
        )}
-
-       <div className="space-y-4">
-          <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
-             <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
-             宮廟繳款營業額明細
-          </h3>
-          <div className="space-y-4">
-             {commission?.revenueRecords?.length === 0 ? (
-               <div className="py-20 text-center text-slate-400 font-bold bg-white rounded-[40px] border border-slate-100">該月份尚無繳款紀錄</div>
-             ) : commission?.revenueRecords?.map((rec: any) => (
-                <div key={rec.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex justify-between items-center animate-in slide-in-from-bottom-2 duration-300 hover:border-blue-100">
-                   <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-xl">🏛️</div>
-                      <div>
-                         <h4 className="font-black text-slate-900">{rec.templeName}</h4>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{rec.date} | {rec.type}</p>
-                         {rec.receiptUrl && (
-                             <button onClick={(e) => { e.stopPropagation(); setViewingReceiptUrl(rec.receiptUrl); }} className="mt-2 text-[10px] bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-black hover:bg-blue-100 transition-colors">👁️ 查看匯款憑證</button>
-                         )}
-                      </div>
-                   </div>
-                   <div className="text-right">
-                       <span className="text-lg font-black text-slate-900">${rec.amount.toLocaleString()}</span>
-                       <p className={`text-[9px] font-black uppercase mt-1 ${rec.status === 'Paid' ? 'text-emerald-500' : 'text-amber-500'}`}>{rec.status === 'Paid' ? '已核款' : '待經銷商核款'}</p>
-                   </div>
-                </div>
-             ))}
-          </div>
-       </div>
 
        <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
