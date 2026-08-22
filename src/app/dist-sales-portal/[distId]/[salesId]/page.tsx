@@ -112,6 +112,8 @@ export default function DistSalesPage() {
 
   const [isEditingBank, setIsEditingBank] = useState(false);
   const [bankForm, setBankForm] = useState({ bankCode: '', bankName: '', accountName: '', accountNo: '' });
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
 
   const loadData = async () => {
     const profData = await fetchSalesProfileById(salesId);
@@ -203,9 +205,12 @@ export default function DistSalesPage() {
       alert("目前無可用餘額提領！");
       return;
     }
-    const amtStr = prompt(`請輸入提領金額 (可用餘額: $${commission.balance.toLocaleString()}):`, commission.balance.toString());
-    if (amtStr === null) return;
-    const amt = Number(amtStr);
+    setWithdrawAmount(commission.balance.toString());
+    setIsWithdrawModalOpen(true);
+  };
+
+  const confirmWithdrawal = async () => {
+    const amt = Number(withdrawAmount);
     if (isNaN(amt) || amt <= 0) {
       alert("請輸入有效的金額！");
       return;
@@ -214,11 +219,11 @@ export default function DistSalesPage() {
       alert("提領金額不能超過可用餘額！");
       return;
     }
-    if (confirm(`確定要提領 $${amt.toLocaleString()} 嗎？`)) {
-      await requestBonus(salesId, distId, amt, 'Bank Transfer', salesName);
-      alert("提領申請已送出！");
-      loadData();
-    }
+    await requestBonus(salesId, distId, amt, 'Bank Transfer', salesName);
+    alert("提領申請已送出！");
+    setIsWithdrawModalOpen(false);
+    loadData();
+    loadCommission();
   };
 
   const handleSaveBankInfo = async () => {
@@ -1291,6 +1296,47 @@ export default function DistSalesPage() {
                    >
                      確認下載檔案
                    </button>
+                </div>
+             </div>
+          </div>
+       )}
+
+       {isWithdrawModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+             <div className="bg-white rounded-[40px] p-8 w-full max-w-md shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2">申請提領</h2>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Withdrawal Request</p>
+
+                <div className="bg-emerald-50 p-4 rounded-2xl mb-6">
+                   <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest">目前可用餘額</p>
+                   <p className="text-3xl font-black text-emerald-600 mt-1">${(commission?.balance || 0).toLocaleString()}</p>
+                </div>
+
+                <div className="space-y-2 mb-6">
+                   <div className="flex justify-between items-end">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">提領金額</p>
+                      <button onClick={() => setWithdrawAmount(commission?.balance?.toString() || '0')} className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full hover:bg-emerald-100 transition-colors">全部提領</button>
+                   </div>
+                   <input 
+                      type="number" 
+                      value={withdrawAmount} 
+                      onChange={e => setWithdrawAmount(e.target.value)} 
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 text-2xl font-black outline-none border border-slate-200 focus:border-emerald-500 focus:bg-white transition-all text-slate-900"
+                      placeholder="輸入金額..."
+                   />
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-2xl mb-8 border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><span>🏦</span> 匯入帳戶</p>
+                   <p className="text-sm font-black text-slate-900">{profile?.bankAccount?.bankCode} {profile?.bankAccount?.bankName}</p>
+                   <p className="text-xs font-bold text-slate-500 mt-1">{profile?.bankAccount?.accountNo} ({profile?.bankAccount?.accountName})</p>
+                </div>
+
+                <div className="flex gap-4">
+                   <button onClick={() => setIsWithdrawModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-200 transition-colors">取消</button>
+                   <button onClick={confirmWithdrawal} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">確認提領</button>
                 </div>
              </div>
           </div>
