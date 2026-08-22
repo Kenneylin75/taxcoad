@@ -46,8 +46,23 @@ model Distributor {
   temples      Temple[]
   sales        DistributorSales[]
   contracts    DistributorContract[]
+  logs         DistributorLog[]
 
   @@map("distributors")
+}
+
+model DistributorLog {
+  id            String       @id @default(cuid())
+  distributorId String       @map("distributor_id")
+  action        String?
+  target        String?
+  details       String?
+  operator      String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at")
+  distributor   Distributor  @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@map("distributor_logs")
 }
 
 model DistributorSales {

@@ -8059,13 +8059,19 @@ export async function deactivateLampRecord(recordId: string) {
 
 export async function fetchDistributorLogs(distributorId: string) {
   try {
-    const logs = await prisma.adminLog.findMany({
-      where: { target: { contains: distributorId } },
+    const records = await prisma.distributorLog.findMany({
+      where: { distributorId },
       orderBy: { createdAt: "desc" },
     });
-    return logs;
+    return records.map((log) => ({
+      id: log.id,
+      action: log.action || "操作",
+      target: log.target || "",
+      operator: log.operator || "系統",
+      time: log.createdAt ? log.createdAt.toLocaleString('zh-TW') : "",
+    }));
   } catch (e) {
-    console.error(e);
+    console.error("fetchDistributorLogs error:", e);
     return [];
   }
 }
@@ -8210,11 +8216,24 @@ export async function fetchDistributorTempleBills(distributorId: string) {
     return [];
   }
 }
-export async function logDistributorAction(...args: any[]) {
+export async function logDistributorAction(
+  distributorId: string,
+  action: string,
+  target: string,
+  operator: string = "管理員"
+) {
   try {
-    // Fire and forget
+    await prisma.distributorLog.create({
+      data: {
+        distributorId,
+        action,
+        target,
+        operator,
+      },
+    });
     return { success: true };
   } catch (e) {
+    console.error("logDistributorAction error:", e);
     return { success: false };
   }
 }
