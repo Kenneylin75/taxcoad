@@ -10566,8 +10566,8 @@ export async function createDistributorAccount(data: any) {
     await prisma.distributorContract.create({
       data: {
         distributorId: newDist.id,
-        amount: Number(data.contractAmount) || 0,
-        duration: data.contractDuration || "首簽",
+        amount: Number(data.customPrice) || 0,
+        duration: data.customDuration ? `${data.customDuration}年` : "首簽",
         quotaAdded: Number(data.customNodes) || 100,
         type: "NEW",
         note: `首簽合約，分配額度 ${Number(data.customNodes) || 100} 宮廟帳戶數量`,
