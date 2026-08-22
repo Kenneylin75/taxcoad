@@ -484,10 +484,10 @@ export default function SuperAdminClient({
                        <tbody className="divide-y divide-slate-50">
                           {initialAccounts.filter(a => a.role === 'SuperSales').map((acc: any) => (
                             <tr key={acc.id} className="hover:bg-slate-50/30 transition-all group">
-                               <td className="px-6 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-indigo-50 text-indigo-600">{acc.role}</span></td>
-                               <td className="px-6 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
-                               <td className="px-6 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
-                               <td className="px-6 py-8">
+                               <td className="px-10 py-8"><span className="px-5 py-2 rounded-full text-[10px] font-black uppercase italic bg-indigo-50 text-indigo-600">{acc.role}</span></td>
+                               <td className="px-10 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
+                               <td className="px-10 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
+                               <td className="px-10 py-8">
                                   <button 
                                      onClick={async () => {
                                         if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
@@ -496,19 +496,21 @@ export default function SuperAdminClient({
                                            window.location.reload();
                                         }
                                      }}
-                                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic transition-all ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
+                                     className={`px-4 py-2 rounded-full text-[10px] font-black uppercase italic transition-all shadow-sm flex items-center justify-center gap-2 w-max ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
                                   >
                                      {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
                                   </button>
                                </td>
-                               <td className="px-6 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.distributorsCount || 0}</td>
-                               <td className="px-6 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
-                               <td className="px-6 py-8 text-right flex justify-end gap-4">
-                                  <button onClick={() => setTransferModalData({id: acc.id, role: 'SuperSales', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
+                               <td className="px-10 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.distributorsCount || 0}</td>
+                               <td className="px-10 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
+                               <td className="px-10 py-8 text-right flex justify-end items-center gap-4">
+                                  <button onClick={() => setTransferModalData({id: acc.id, role: 'SuperSales', name: acc.name})} className="px-4 py-2 bg-purple-50 text-purple-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
                                      window.location.href = `/super-sales/${acc.id}`;
-                                  }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
-                                  <button onClick={() => setViewingAccountDetail(acc)} className="text-[11px] font-black text-slate-300 uppercase hover:text-slate-900 transition-all border-b-2 border-transparent hover:border-slate-900 italic mt-2">VIEW DETAIL 🔑</button>
+                                  }} className="px-4 py-2 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
+                                  <button onClick={() => setViewingAccountDetail(acc)} className="px-4 py-2 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black uppercase hover:bg-slate-800 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                     <i className="fas fa-key"></i> DETAIL
+                                  </button>
                                   <button 
                                     onClick={async () => {
                                       if (confirm('確定要永久刪除此超級業務嗎？其旗下的宮廟及經銷商將自動轉移至超級管理員旗下！')) {
@@ -522,8 +524,8 @@ export default function SuperAdminClient({
                                         }
                                       }
                                     }} 
-                                    className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
-                                        <i className="fas fa-trash-alt"></i> 刪除
+                                    className="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-500 rounded-full text-xs font-black uppercase hover:bg-rose-500 hover:text-white transition-all shadow-sm" title="刪除">
+                                        <i className="fas fa-trash-alt"></i>
                                     </button>
                                </td>
                             </tr>
@@ -2466,26 +2468,7 @@ export default function SuperAdminClient({
                         </section>
                      )}
 
-                     {/* --- 2. 經銷商首簽合約設定 --- */}
-                     {accountType === 'Distributor' && (
-                        <section className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
-                           <div className="flex items-center gap-4"><div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div><h4 className="text-xs font-black text-slate-400 uppercase tracking-widest italic">02. 首簽合約設定 (Contract Provisioning)</h4></div>
-                           <div className="grid grid-cols-2 gap-10">
-                              <div className="space-y-4">
-                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">首簽合約金額 (NTD)</label>
-                                 <input name="contractAmount" type="number" defaultValue="0" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
-                              </div>
-                              <div className="space-y-4">
-                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">合約期限 (如: 2年)</label>
-                                 <input name="contractDuration" type="text" defaultValue="2年" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
-                              </div>
-                              <div className="space-y-4 col-span-2">
-                                 <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">首批分配宮廟數量 (Quota)</label>
-                                 <input name="customNodes" type="number" defaultValue="100" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
-                              </div>
-                           </div>
-                        </section>
-                     )}
+
 
 
                     
