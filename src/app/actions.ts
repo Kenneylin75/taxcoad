@@ -9732,8 +9732,22 @@ export async function fetchAllAccountsForAdmin() {
   // SuperSales (New from DistributorSales)
   let pgSuperSalesNew = await prisma.distributorSales.findMany({
     where: { role: "SuperSales" },
+    include: {
+      _count: { select: { temples: true } }
+    }
   });
+  
+  // Get distributor count for each SuperSales
+  const allDistributors = await prisma.distributor.findMany({
+    select: { id: true, superSalesId: true, _count: { select: { sales: true } } }
+  });
+
   pgSuperSalesNew.forEach((s) => {
+    // Count distributors that belong to this SuperSales
+    const ownDistributors = allDistributors.filter(d => d.superSalesId === s.id);
+    const distributorCount = ownDistributors.length;
+    // Count all sales belonging to those distributors
+    const distSalesCount = ownDistributors.reduce((acc, d) => acc + (d._count?.sales || 0), 0);
     accounts.push({
       ...s,
       id: s.id,
@@ -9741,10 +9755,16 @@ export async function fetchAllAccountsForAdmin() {
       role: "SuperSales",
       account: s.account,
       status: s.status || "Active",
+      salesCount: distributorCount + distSalesCount,
+      templesCount: s._count?.temples || 0,
     });
   });
 
-  let pgDistributors = await prisma.distributor.findMany();
+  let pgDistributors = await prisma.distributor.findMany({
+    include: {
+      _count: { select: { temples: true, sales: true } }
+    }
+  });
 
   const allDistributorsMap = new Map();
   pgDistributors.forEach((d) => {
@@ -9772,6 +9792,8 @@ export async function fetchAllAccountsForAdmin() {
       role: "Distributor",
       account: d.account,
       status: d.status || "Active",
+      salesCount: d._count?.sales || 0,
+      templesCount: d._count?.temples || 0,
     });
   });
 
@@ -11522,6 +11544,58 @@ export async function deleteGuestNote(noteId: string) {
     return { success: true };
   } catch (error) {
     console.error("deleteGuestNote error:", error);
+    return { success: false, error: String(error) };
+  }
+}
+export async function fetchDistributorContracts(distributorId: string) {
+  try {
+    const contracts = await prisma.distributorContract.findMany({
+      where: { distributorId },
+      orderBy: { date: 'desc' },
+    });
+    return contracts;
+  } catch (error) {
+    console.error("fetchDistributorContracts error:", error);
+    return [];
+  }
+}
+
+export async function addDistributorContract(
+  distributorId: string,
+  data: {
+    amount: number;
+    duration: string;
+    quotaAdded: number;
+    type: string;
+    note: string;
+    date: Date;
+  }
+) {
+  try {
+    const newContract = await prisma.distributorContract.create({
+      data: {
+        distributorId,
+        amount: data.amount,
+        duration: data.duration,
+        quotaAdded: data.quotaAdded,
+        type: data.type,
+        note: data.note,
+        date: data.date,
+      }
+    });
+
+    if (data.quotaAdded > 0) {
+      await prisma.distributor.update({
+        where: { id: distributorId },
+        data: {
+          quota: { increment: data.quotaAdded }
+        }
+      });
+    }
+
+    return { success: true, contract: newContract };
+  } catch (error) {
+    console.error("addDistributorContract error:", error);
     return { success: false, error: String(error) };
   }
 }

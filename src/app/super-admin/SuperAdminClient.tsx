@@ -132,6 +132,12 @@ export default function SuperAdminClient({
    const [adminUpgradeStoragePlanId, setAdminUpgradeStoragePlanId] = useState('');
    const [adminUpgradeAiPlanId, setAdminUpgradeAiPlanId] = useState('');
    const [newPassword, setNewPassword] = useState('');
+   
+   // Distributor Contract Modal States
+   const [isPlanDetailOpen, setIsPlanDetailOpen] = useState(false);
+   const [selectedPlanDistributor, setSelectedPlanDistributor] = useState<any>(null);
+   const [distributorContracts, setDistributorContracts] = useState<any[]>([]);
+   const [newContractForm, setNewContractForm] = useState({ amount: 0, duration: '', quotaAdded: 0, type: 'ADD_QUOTA', note: '' });
   
   // --- Data Fetching ---
   useEffect(() => {
@@ -542,8 +548,8 @@ export default function SuperAdminClient({
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">經銷商名稱</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">登入帳號</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic">狀態</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">業務數量</th>
-                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟數量</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">業務</th>
+                             <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-center">宮廟</th>
                              <th className="px-12 py-10 text-[11px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                           </tr>
                        </thead>
@@ -569,12 +575,19 @@ export default function SuperAdminClient({
                                </td>
                                <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.salesCount || 0}</td>
                                <td className="px-12 py-8 text-center text-[18px] font-black text-emerald-600 tracking-tighter">{acc.templesCount || 0}</td>
-                               <td className="px-12 py-8 text-right flex justify-end gap-4">
-                                  <button onClick={() => setTransferModalData({id: acc.id, role: 'Distributor', name: acc.name})} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
+                               <td className="px-12 py-8 text-right flex justify-end gap-2 flex-wrap">
+                                  <button onClick={async () => {
+                                      const { fetchDistributorContracts } = await import('../actions');
+                                      const contracts = await fetchDistributorContracts(acc.id);
+                                      setDistributorContracts(contracts);
+                                      setSelectedPlanDistributor(acc);
+                                      setIsPlanDetailOpen(true);
+                                  }} className="px-6 py-2 bg-indigo-500 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-sm">方案內容 📋</button>
+                                  <button onClick={() => setTransferModalData({id: acc.id, role: 'Distributor', name: acc.name})} className="px-6 py-2 bg-purple-100 text-purple-700 rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all shadow-sm">轉移資產</button>
                                   <button onClick={() => {
                                      window.location.href = `/distributor/${acc.id}`;
-                                  }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
-                                  <button onClick={() => setViewingAccountDetail(acc)} className="text-[11px] font-black text-slate-300 uppercase hover:text-slate-900 transition-all border-b-2 border-transparent hover:border-slate-900 italic mt-2">VIEW DETAIL 🔑</button>
+                                  }} className="px-6 py-2 bg-amber-100 text-amber-700 rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-sm">進入後台 (Manage)</button>
+                                  <button onClick={() => setViewingAccountDetail(acc)} className="px-6 py-2 bg-slate-100 text-slate-500 rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-all shadow-sm">詳情 🔑</button>
                                   <button 
                                     onClick={async () => {
                                       if (confirm('確定要永久刪除此經銷商及其所有業務嗎？其旗下的宮廟將自動轉移至超級管理員旗下！')) {
@@ -588,7 +601,7 @@ export default function SuperAdminClient({
                                         }
                                       }
                                     }} 
-                                    className="px-4 py-2 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2">
+                                    className="px-6 py-2 bg-rose-50 text-rose-500 rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2">
                                         <i className="fas fa-trash-alt"></i> 刪除
                                     </button>
                                </td>
@@ -3008,6 +3021,156 @@ export default function SuperAdminClient({
                 </button>
              </div>
           </div>
+        </div>
+      )}
+
+      {/* Distributor Plan Detail Modal */}
+      {isPlanDetailOpen && selectedPlanDistributor && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-3xl z-[300] flex items-center justify-center p-12 animate-in fade-in duration-500">
+           <button onClick={()=>setIsPlanDetailOpen(false)} className="fixed top-12 right-12 w-16 h-16 bg-white rounded-full flex items-center justify-center text-slate-900 text-3xl font-bold shadow-2xl hover:scale-110 hover:bg-rose-500 hover:text-white transition-all z-[310] group">
+              <span className="group-hover:rotate-90 transition-transform">×</span>
+           </button>
+           <div className="bg-white w-full max-w-6xl rounded-[60px] shadow-2xl overflow-hidden animate-in zoom-in-95 my-10 flex flex-col max-h-[90vh]">
+              
+              <div className="bg-indigo-50 p-12 border-b border-indigo-100 flex justify-between items-center">
+                 <div>
+                    <p className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.4em] italic mb-2">Distributor Provisioning Protocol</p>
+                    <h3 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">{selectedPlanDistributor.name} - 方案內容</h3>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-[13px] font-black text-slate-400 uppercase tracking-widest mb-1">總分配額度 / 已開設數量</p>
+                    <p className="text-5xl font-black text-indigo-600 tracking-tighter">
+                       {selectedPlanDistributor.quota || 100} <span className="text-2xl text-slate-300">/</span> {selectedPlanDistributor.templesCount || 0}
+                    </p>
+                 </div>
+              </div>
+
+              <div className="p-12 flex-1 overflow-y-auto bg-slate-50 flex gap-8">
+                
+                {/* 左側：合約歷史 */}
+                <div className="flex-1 bg-white rounded-[40px] shadow-sm border border-slate-100 p-8 h-fit">
+                   <h4 className="text-[13px] font-black text-slate-800 uppercase tracking-widest italic mb-6">合約異動歷程 (Contract History)</h4>
+                   <div className="space-y-4">
+                      {distributorContracts.length === 0 ? (
+                         <div className="text-center py-10 text-slate-400 font-bold text-sm bg-slate-50 rounded-3xl">尚無合約紀錄</div>
+                      ) : (
+                         distributorContracts.map((contract: any) => (
+                           <div key={contract.id} className="p-6 rounded-3xl bg-slate-50 flex justify-between items-center group hover:bg-indigo-50 transition-all border border-slate-100 hover:border-indigo-100">
+                              <div>
+                                 <p className="text-[13px] font-black text-slate-900 mb-1">{contract.note || `${contract.type === 'NEW' ? '新增合約' : contract.type === 'RENEW' ? '合約續約' : '增加額度'} ${contract.amount/10000}萬 ${contract.duration} ${contract.quotaAdded}宮廟帳戶數量`}</p>
+                                 <p className="text-[11px] font-bold text-slate-400 font-mono">{new Date(contract.date).toLocaleDateString()} {new Date(contract.date).toLocaleTimeString()}</p>
+                              </div>
+                              <div className="text-right">
+                                 <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic bg-indigo-100 text-indigo-600">+{contract.quotaAdded} Quota</span>
+                              </div>
+                           </div>
+                         ))
+                      )}
+                   </div>
+                </div>
+
+                {/* 右側：新增紀錄操作區 */}
+                <div className="w-96 bg-white rounded-[40px] shadow-sm border border-slate-100 p-8 h-fit flex flex-col gap-6">
+                   <h4 className="text-[13px] font-black text-slate-800 uppercase tracking-widest italic border-b border-slate-100 pb-4">新增合約操作</h4>
+                   
+                   <div className="space-y-4">
+                      <div>
+                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">操作類型</label>
+                         <select 
+                            value={newContractForm.type}
+                            onChange={(e) => setNewContractForm({...newContractForm, type: e.target.value})}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-[13px] font-bold focus:outline-none focus:border-indigo-500 transition-all"
+                         >
+                            <option value="ADD_QUOTA">增加額度 (Add Quota)</option>
+                            <option value="RENEW">合約續約 (Renew Contract)</option>
+                            <option value="NEW">全新合約 (New Contract)</option>
+                         </select>
+                      </div>
+
+                      <div>
+                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">金額 (NTD)</label>
+                         <input 
+                            type="number"
+                            value={newContractForm.amount}
+                            onChange={(e) => setNewContractForm({...newContractForm, amount: parseInt(e.target.value) || 0})}
+                            placeholder="如: 1600000"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-[13px] font-bold focus:outline-none focus:border-indigo-500 transition-all font-mono"
+                         />
+                      </div>
+
+                      <div>
+                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">期限說明</label>
+                         <input 
+                            type="text"
+                            value={newContractForm.duration}
+                            onChange={(e) => setNewContractForm({...newContractForm, duration: e.target.value})}
+                            placeholder="如: 2年"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-[13px] font-bold focus:outline-none focus:border-indigo-500 transition-all"
+                         />
+                      </div>
+
+                      <div>
+                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">新增宮廟數量</label>
+                         <input 
+                            type="number"
+                            value={newContractForm.quotaAdded}
+                            onChange={(e) => setNewContractForm({...newContractForm, quotaAdded: parseInt(e.target.value) || 0})}
+                            placeholder="如: 30"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-[13px] font-bold focus:outline-none focus:border-indigo-500 transition-all font-mono"
+                         />
+                      </div>
+
+                      <div>
+                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">顯示摘要 (選填)</label>
+                         <textarea 
+                            value={newContractForm.note}
+                            onChange={(e) => setNewContractForm({...newContractForm, note: e.target.value})}
+                            placeholder="如: 合約增加30宮廟帳戶數量。未填將自動產生"
+                            rows={3}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-[13px] font-bold focus:outline-none focus:border-indigo-500 transition-all resize-none"
+                         />
+                      </div>
+                   </div>
+
+                   <button 
+                      onClick={async () => {
+                         if(!newContractForm.quotaAdded && !newContractForm.amount) {
+                           alert('請至少填寫金額或新增額度');
+                           return;
+                         }
+                         if(confirm(`確認要送出此筆合約變更嗎？額外新增額度: ${newContractForm.quotaAdded}`)) {
+                            const { addDistributorContract } = await import('../actions');
+                            
+                            // Auto generate note if empty
+                            let finalNote = newContractForm.note;
+                            if (!finalNote) {
+                              const amountStr = newContractForm.amount > 0 ? `${newContractForm.amount / 10000}萬` : '';
+                              const durationStr = newContractForm.duration ? `${newContractForm.duration}` : '';
+                              const typeStr = newContractForm.type === 'NEW' ? '合約' : newContractForm.type === 'RENEW' ? '合約續' : '合約增加';
+                              finalNote = `${typeStr}${amountStr}${durationStr}${newContractForm.quotaAdded}宮廟帳戶數量`;
+                            }
+
+                            const res = await addDistributorContract(selectedPlanDistributor.id, {
+                              ...newContractForm,
+                              note: finalNote,
+                              date: new Date()
+                            });
+
+                            if(res.success) {
+                               alert('新增成功');
+                               window.location.reload();
+                            } else {
+                               alert('發生錯誤: ' + res.error);
+                            }
+                         }
+                      }}
+                      className="w-full bg-indigo-600 text-white rounded-[20px] py-4 text-[13px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                   >
+                      確認送出 (Submit)
+                   </button>
+                </div>
+              </div>
+           </div>
         </div>
       )}
     </div>
