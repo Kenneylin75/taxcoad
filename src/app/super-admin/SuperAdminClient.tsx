@@ -2483,6 +2483,7 @@ export default function SuperAdminClient({
                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest ml-4 italic">首批分配宮廟數量 (Quota)</label>
                                  <input name="customNodes" type="number" defaultValue="100" className="w-full bg-slate-50 rounded-[25px] p-6 text-xl font-black text-slate-800 outline-none border border-slate-100" />
                               </div>
+                           </div>
                         </section>
                      )}
 
