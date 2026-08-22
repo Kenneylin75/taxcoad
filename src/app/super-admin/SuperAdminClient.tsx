@@ -622,11 +622,19 @@ export default function SuperAdminClient({
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
                                <td className="px-12 py-8 text-[12px] font-bold text-slate-600">{(() => {
-                                  const possibleIds = [acc.salesId, acc.distributorId, acc.superSalesId].filter(Boolean);
-                                  for (const pId of possibleIds) {
-                                     if (pId === 'system-hq') continue;
-                                     const found = initialAccounts.find((a: any) => a.id === pId);
-                                     if (found) return found.name;
+                                  if (acc.superSalesId && acc.superSalesId !== 'system-hq') {
+                                     const superSales = initialAccounts.find((a: any) => a.id === acc.superSalesId);
+                                     return `系統總部 HQ => 超級業務員${superSales?.name || acc.creatorInfo?.salesName || acc.superSalesId}`;
+                                  }
+                                  if (acc.distributorId && acc.distributorId !== 'system-hq') {
+                                     const dist = initialAccounts.find((a: any) => a.id === acc.distributorId);
+                                     const distName = dist?.name || acc.creatorInfo?.distName || acc.distributorId;
+                                     if (acc.salesId && acc.salesId !== 'system-hq') {
+                                        const sales = initialAccounts.find((a: any) => a.id === acc.salesId);
+                                        const salesName = sales?.name || acc.creatorInfo?.salesName || acc.salesId;
+                                        return `${distName}經銷商 => ${salesName}經銷業務`;
+                                     }
+                                     return `${distName}經銷商`;
                                   }
                                   return '系統總部 HQ';
                                })()}</td>
