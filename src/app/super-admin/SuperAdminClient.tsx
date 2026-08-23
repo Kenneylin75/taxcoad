@@ -2821,6 +2821,7 @@ export default function SuperAdminClient({
                                  const formData = new FormData(e.currentTarget);
                                  const newRates = {
                                     ...viewingAccountDetail.commissionRules,
+                                    distributorAuthRate: Number(formData.get('distAuth')),
                                     templeSetupRate: Number(formData.get('setup')),
                                     templeRentRates: [
                                        Number(formData.get('y1')),
@@ -2829,7 +2830,7 @@ export default function SuperAdminClient({
                                     ]
                                  };
                                  const { updateSuperSalesCommission } = await import('../actions');
-                                 await updateSuperSalesCommission(viewingAccountDetail.name, newRates);
+                                 await updateSuperSalesCommission(viewingAccountDetail.id, newRates);
                                  alert('抽成設定已更新！');
                                  window.location.reload();
                               }
@@ -2840,6 +2841,10 @@ export default function SuperAdminClient({
                               </div>
                               <div className="text-[10px] font-black text-slate-900 bg-slate-100 p-4 rounded-xl leading-relaxed mt-2 border border-slate-200 shadow-sm">
                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-slate-500">授權費抽成 (%):</span>
+                                       <input name="distAuth" type="number" defaultValue={viewingAccountDetail.commissionRules.distributorAuthRate || viewingAccountDetail.commissionRules.distributor || 0} className="w-16 bg-white border border-slate-200 rounded-lg text-center py-1.5 outline-none focus:border-indigo-500 text-indigo-600 font-black" />
+                                    </div>
                                     <div className="flex justify-between items-center">
                                        <span className="text-slate-500">建置費抽成 (%):</span>
                                        <input name="setup" type="number" defaultValue={viewingAccountDetail.commissionRules.templeSetupRate || viewingAccountDetail.commissionRules.setupFeePercent || 0} className="w-16 bg-white border border-slate-200 rounded-lg text-center py-1.5 outline-none focus:border-indigo-500 text-indigo-600 font-black" />
