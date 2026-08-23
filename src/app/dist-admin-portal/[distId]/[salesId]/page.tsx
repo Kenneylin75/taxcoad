@@ -132,7 +132,7 @@ export default function DistSalesPage() {
       fetchFreeApplications(),
       fetchVisitationRecords(currentName),
       fetchSalesTools(),
-      fetchEContracts(currentName),
+      fetchEContracts(),
       fetchDistributorCapacity(distId),
       fetchRentPlans(),
       fetchSalesBonusRequests(currentName)
@@ -230,7 +230,7 @@ export default function DistSalesPage() {
       return;
     }
     if (confirm(`確定要提領 $${amt.toLocaleString()} 嗎？`)) {
-      await requestBonus(salesName, amt);
+      await requestBonus(salesId, distId, amt);
       alert("提領申請已送出！");
       loadData();
     }
