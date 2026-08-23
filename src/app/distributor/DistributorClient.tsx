@@ -55,6 +55,9 @@ export default function DistributorClient({
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [schedulePage, setSchedulePage] = useState(1);
+  const [distLogDateFilter, setDistLogDateFilter] = useState(
+    new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  );
 
   useEffect(() => {
     setSchedulePage(1);
@@ -1409,10 +1412,27 @@ export default function DistributorClient({
             <div className="space-y-6 animate-in slide-in-from-right-10 duration-700">
                <div className="bg-slate-950/90 backdrop-blur-xl rounded-[48px] p-10 space-y-8 shadow-2xl relative overflow-hidden border border-white/10">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-[50px]"></div>
-                  {logs.length === 0 ? (
-                     <div className="py-20 text-center text-slate-400 font-black text-sm uppercase tracking-widest">尚無系統紀錄</div>
-                  ) : logs.map((log: any) => (
-                     <div key={log.id} className="relative pl-8 border-l-2 border-blue-500/20 py-2 group/log">
+                  <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/10 pb-6 mb-6">
+                    <h3 className="text-2xl font-black text-white tracking-tighter italic">系統日誌 <span className="text-blue-500">Sys</span></h3>
+                    <input 
+                      type="date" 
+                      value={distLogDateFilter}
+                      onChange={(e) => setDistLogDateFilter(e.target.value)}
+                      className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-slate-300 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  {logs.filter((l: any) => {
+                    if(!l.createdAt) return false;
+                    const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                    return localDate === distLogDateFilter;
+                  }).length === 0 ? (
+                     <div className="py-20 text-center text-slate-400 font-black text-sm uppercase tracking-widest relative z-10">選擇的日期尚無系統紀錄</div>
+                  ) : logs.filter((l: any) => {
+                    if(!l.createdAt) return false;
+                    const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                    return localDate === distLogDateFilter;
+                  }).map((log: any) => (
+                     <div key={log.id} className="relative z-10 pl-8 border-l-2 border-blue-500/20 py-2 group/log">
                         <div className="absolute -left-[9px] top-2.5 w-4 h-4 rounded-full bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.8)] group-hover/log:scale-125 transition-transform"></div>
                         <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1.5">{log.time} <span className="ml-2 text-slate-500 opacity-50">操作者: {log.operator}</span></p>
                         <h4 className="text-sm font-black text-white tracking-tight">{log.action}：<span className="text-slate-400 group-hover/log:text-blue-400 transition-colors">{log.target}</span></h4>

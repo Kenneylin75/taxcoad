@@ -15,7 +15,8 @@ import {
   fetchSalesProfileById,
   updateDistSalesBankInfo, requestBonus,
   fetchRentPlans,
-  fetchTempleBills
+  fetchTempleBills,
+  fetchDistSalesLogs
 } from "@/app/actions";
 import { TAIWAN_CITIES } from "@/app/shared-types";
 import TempleApplicationForm from "@/app/components/TempleApplicationForm";
@@ -120,6 +121,9 @@ export default function DistSalesPage() {
   const [bankForm, setBankForm] = useState({ bankCode: '', bankName: '', accountName: '', accountNo: '' });
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [logDateFilter, setLogDateFilter] = useState(
+    new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  );
 
   const loadData = async () => {
     const profData = await fetchSalesProfileById(salesId);
@@ -146,6 +150,8 @@ export default function DistSalesPage() {
     setCapacity(capData);
     if (profData?.bankAccount) setBankForm(profData.bankAccount);
     setRentPlans(plans);
+    const logsData = await fetchDistSalesLogs(salesId);
+    setLogs(logsData || []);
   };
 
   const loadCommission = async () => {
@@ -1391,6 +1397,50 @@ export default function DistSalesPage() {
           </div>
         )}
     
+        {isLogModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[900] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-lg rounded-[40px] p-8 shadow-2xl relative flex flex-col max-h-[85vh]">
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">操作紀錄日誌</h3>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Operation History Logs</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="date" 
+                    value={logDateFilter}
+                    onChange={(e) => setLogDateFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 focus:outline-none focus:border-blue-500 bg-slate-50"
+                  />
+                  <button onClick={() => setIsLogModalOpen(false)} className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pr-2">
+                {logs.filter((l: any) => {
+                  const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                  return localDate === logDateFilter;
+                }).length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 font-bold text-sm">選擇的日期尚無操作紀錄</div>
+                ) : (
+                  logs.filter((l: any) => {
+                    const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                    return localDate === logDateFilter;
+                  }).map((log: any) => (
+                    <div key={log.id} className="bg-slate-50 p-4 rounded-3xl border border-slate-100/50 hover:bg-white hover:shadow-xl transition-all flex flex-col gap-2">
+                      <div className="flex justify-between items-start">
+                         <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full">{log.action}</span>
+                         <span className="text-[10px] font-bold text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
+                      </div>
+                      {log.target && <p className="text-sm font-black text-slate-900">目標: {log.target}</p>}
+                      {log.details && <p className="text-xs font-bold text-slate-500">{log.details}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 </div>
   );
 }

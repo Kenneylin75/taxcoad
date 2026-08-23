@@ -3775,6 +3775,10 @@ export async function approveTempleByDistributor(id: string) {
       where: { id },
       data: { status: "Active" },
     });
+
+    if (temple.distributorId) {
+      await logDistributorAction(temple.distributorId, '核准宮廟申請', temple.name, '管理員');
+    }
     await generateInitialBills(t);
 
     if (t.account && t.password) {
@@ -8049,6 +8053,10 @@ export async function deactivateLampRecord(recordId: string) {
       where: { id: recordId },
       data: { status: "Pending" },
     });
+
+    if (temple.distributorId) {
+      await logDistributorAction(temple.distributorId, '退回宮廟申請', temple.name, '管理員');
+    }
     await revalidateTemple();
     return { success: true };
   } catch (e) {
@@ -8069,6 +8077,7 @@ export async function fetchDistributorLogs(distributorId: string) {
       target: log.target || "",
       operator: log.operator || "系統",
       time: log.createdAt ? log.createdAt.toLocaleString('zh-TW') : "",
+      createdAt: log.createdAt ? log.createdAt.toISOString() : null,
     }));
   } catch (e) {
     console.error("fetchDistributorLogs error:", e);
@@ -8220,7 +8229,8 @@ export async function logDistributorAction(
   distributorId: string,
   action: string,
   target: string,
-  operator: string = "管理員"
+  operator: string = "管理員",
+  details: string = ""
 ) {
   try {
     await prisma.distributorLog.create({
@@ -8229,6 +8239,7 @@ export async function logDistributorAction(
         action,
         target,
         operator,
+        details,
       },
     });
     return { success: true };
@@ -11319,6 +11330,7 @@ export async function addSalesMember(data: any) {
     console.error("DB Insert Error for sales:", e);
     return { success: false, error: "建立業務菁英失敗" };
   }
+  await logDistributorAction(data.distributorId || "dist-1", '新增業務人員', data.name || "未命名業務員", '管理員', `帳號: ${data.account || 'sales_' + id}`);
   revalidatePath("/distributor");
   return { success: true, id };
 }
@@ -11748,10 +11760,14 @@ export async function fetchDistSalesLogs(salesId: string) {
 export async function updateSalesCommission(salesId: string, commissionRules: any) {
   try {
     if (!salesId) return { success: false, error: '缺少業務 ID' };
-    await prisma.distributorSales.update({
+    const sales = await prisma.distributorSales.update({
       where: { id: salesId },
       data: { commissionRules },
+      select: { distributorId: true, name: true }
     });
+    if (sales.distributorId) {
+      await logDistributorAction(sales.distributorId, '修改業務分潤', sales.name, '管理員', '新分潤規則已儲存');
+    }
     return { success: true };
   } catch (e) {
     console.error("Failed to update sales commission:", e);
@@ -11762,10 +11778,14 @@ export async function updateSalesCommission(salesId: string, commissionRules: an
 export async function updateSalesPassword(salesId: string, newPassword: string) {
   try {
     if (!salesId || !newPassword) return { success: false, error: '缺少必要參數' };
-    await prisma.distributorSales.update({
+    const sales = await prisma.distributorSales.update({
       where: { id: salesId },
       data: { password: newPassword },
+      select: { distributorId: true, name: true }
     });
+    if (sales.distributorId) {
+      await logDistributorAction(sales.distributorId, '修改業務密碼', sales.name, '管理員', '已重置密碼');
+    }
     return { success: true };
   } catch (e) {
     console.error("Failed to update sales password:", e);

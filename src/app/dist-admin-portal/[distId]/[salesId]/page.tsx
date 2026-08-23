@@ -7,6 +7,15 @@ import {
   fetchSalesPerformance,
   fetchVisitationRecords,
   addVisitationRecord,
+// @ts-nocheck
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { 
+  fetchFreeApplications, 
+  fetchSalesPerformance,
+  fetchVisitationRecords,
+  addVisitationRecord,
   fetchSalesTools,
   fetchEContracts,
   submitEContract,
@@ -16,7 +25,8 @@ import {
   fetchRentPlans,
   requestBonus,
   fetchSalesBonusRequests,
-  approveWithdrawal
+  approveWithdrawal,
+  fetchDistSalesLogs
 } from "@/app/actions";
 import { TAIWAN_CITIES } from "@/app/shared-types";
 import TempleApplicationForm from "@/app/components/TempleApplicationForm";
@@ -47,6 +57,9 @@ export default function DistSalesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
+  const [logDateFilter, setLogDateFilter] = useState(
+    new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  );
   const [salesName, setSalesName] = useState("");
   const [performance, setPerformance] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
@@ -143,6 +156,8 @@ export default function DistSalesPage() {
     setCapacity(capData);
     setRentPlans(plans);
     setBonusRequests(bonusReqs);
+    const logsData = await fetchDistSalesLogs(salesId);
+    setLogs(logsData || []);
   };
 
   const loadCommission = async () => {
@@ -946,164 +961,6 @@ export default function DistSalesPage() {
         }
         ::placeholder { color: #cbd5e1; }
       `}</style>
-    {/* --- TOOL PREVIEW MODAL --- */}
-       {activeToolPreview && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
-             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="flex justify-between items-center p-6 border-b border-slate-100">
-                   <div>
-                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.type}</p>
-                   </div>
-                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
-                </div>
-                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
-                   {activeToolPreview.type === 'photo' ? (
-                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
-                   ) : activeToolPreview.type === 'video' ? (
-                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
-                   ) : (
-                      <div className="text-center space-y-4">
-                         <span className="text-6xl block">📄</span>
-                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
-                      </div>
-                   )}
-                   
-                   <button 
-                      className="px-8 py-4 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-lg hover:bg-blue-700 transition-all mt-4" 
-                      onClick={() => {
-                        const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
-                        if (!fileUrl) {
-                          alert('檔案連結無效，無法下載。');
-                          return;
-                        }
-                        try {
-                          if (fileUrl.startsWith('data:')) {
-                            const arr = fileUrl.split(',');
-                            const mime = arr[0].match(/:(.*?);/)[1];
-                            const bstr = atob(arr[1]);
-                            let n = bstr.length;
-                            const u8arr = new Uint8Array(n);
-                            while (n--) {
-                              u8arr[n] = bstr.charCodeAt(n);
-                            }
-                            const blob = new Blob([u8arr], { type: mime });
-                            const blobUrl = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = blobUrl;
-                            a.download = activeToolPreview.title || 'download';
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-                          } else {
-                            const a = document.createElement('a');
-                            a.href = fileUrl;
-                            a.download = activeToolPreview.title || 'download';
-                            a.target = '_blank';
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          }
-                        } catch (err) {
-                          alert('下載失敗，檔案可能已損壞或過大。');
-                          console.error(err);
-                        }
-                      }}
-                   >確認下載檔案 (Download)</button>
-                </div>
-             </div>
-          </div>
-       )}
-
-
-       {/* --- TOOL PREVIEW MODAL --- */}
-       {activeToolPreview && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActiveToolPreview(null)}></div>
-             <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="flex justify-between items-center p-6 border-b border-slate-100">
-                   <div>
-                      <h3 className="font-black text-slate-900 text-lg">{activeToolPreview.title}</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeToolPreview.category} • {activeToolPreview.type}</p>
-                   </div>
-                   <button onClick={() => setActiveToolPreview(null)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
-                </div>
-                <div className="p-8 overflow-y-auto bg-slate-50 flex-1 flex items-center justify-center flex-col gap-6">
-                   {activeToolPreview.type === 'photo' ? (
-                      <img src={activeToolPreview.url || activeToolPreview.thumbnail} className="max-w-full max-h-full rounded-2xl shadow-sm" />
-                   ) : activeToolPreview.type === 'video' ? (
-                      <video src={activeToolPreview.url || activeToolPreview.thumbnail} controls className="w-full aspect-video bg-black rounded-2xl shadow-lg" />
-                   ) : (
-                      <div className="text-center space-y-4">
-                         <span className="text-6xl block">📄</span>
-                         <p className="text-sm font-black text-slate-900">{activeToolPreview.title}</p>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase">文件已被安全保護，請點擊下方按鈕下載檢閱</p>
-                      </div>
-                   )}
-                </div>
-                <div className="p-6 border-t border-slate-100 bg-white flex justify-end">
-                   <button 
-                     onClick={() => {
-                        if (['video', 'photo'].includes(activeToolPreview.type)) {
-                           const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
-                           if (fileUrl.startsWith('data:')) {
-                             const a = document.createElement('a');
-                             a.href = fileUrl;
-                             a.download = activeToolPreview.title || 'download';
-                             document.body.appendChild(a);
-                             a.click();
-                             document.body.removeChild(a);
-                           } else {
-                             const a = document.createElement('a');
-                             a.href = fileUrl;
-                             a.download = activeToolPreview.title || 'download';
-                             a.target = '_blank';
-                             document.body.appendChild(a);
-                             a.click();
-                             document.body.removeChild(a);
-                           }
-                        } else {
-                           const fileUrl = activeToolPreview.url || activeToolPreview.thumbnail;
-                           if (fileUrl.startsWith('data:')) {
-                             const arr = fileUrl.split(',');
-                             const bstr = atob(arr[1]);
-                             let n = bstr.length;
-                             const u8arr = new Uint8Array(n);
-                             while(n--){
-                                 u8arr[n] = bstr.charCodeAt(n);
-                             }
-                             const blob = new Blob([u8arr], {type: arr[0].match(/:(.*?);/)[1]});
-                             const url = URL.createObjectURL(blob);
-                             const a = document.createElement('a');
-                             a.href = url;
-                             a.download = activeToolPreview.title || 'download';
-                             a.target = '_blank';
-                             document.body.appendChild(a);
-                             a.click();
-                             document.body.removeChild(a);
-                             URL.revokeObjectURL(url);
-                           } else {
-                             const a = document.createElement('a');
-                             a.href = fileUrl;
-                             a.download = activeToolPreview.title || 'download';
-                             a.target = '_blank';
-                             document.body.appendChild(a);
-                             a.click();
-                             document.body.removeChild(a);
-                           }
-                        }
-                     }} 
-                     className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 transition-all active:scale-95"
-                   >
-                     確認下載檔案
-                   </button>
-                </div>
-             </div>
-          </div>
-       )}
     
     {viewingReceiptUrl && (
        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4" onClick={() => setViewingReceiptUrl(null)}>
@@ -1112,6 +969,51 @@ export default function DistSalesPage() {
              <button onClick={() => setViewingReceiptUrl(null)} className="w-full mt-4 py-4 bg-slate-100 text-slate-600 rounded-full text-xs font-black hover:bg-slate-200 transition-all">關閉</button>
           </div>
        </div>
+    )}
+
+    {isLogModalOpen && (
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl z-[900] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+        <div className="bg-white w-full max-w-lg rounded-[40px] p-8 shadow-2xl relative flex flex-col max-h-[85vh]">
+          <div className="flex justify-between items-center mb-6 shrink-0">
+            <div className="space-y-1">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">操作紀錄日誌</h3>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Operation History Logs</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <input 
+                type="date" 
+                value={logDateFilter}
+                onChange={(e) => setLogDateFilter(e.target.value)}
+                className="px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 focus:outline-none focus:border-blue-500 bg-slate-50"
+              />
+              <button onClick={() => setIsLogModalOpen(false)} className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pr-2">
+            {logs.filter((l: any) => {
+              const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+              return localDate === logDateFilter;
+            }).length === 0 ? (
+              <div className="py-12 text-center text-slate-400 font-bold text-sm">選擇的日期尚無操作紀錄</div>
+            ) : (
+              logs.filter((l: any) => {
+                const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                return localDate === logDateFilter;
+              }).map((log: any) => (
+                <div key={log.id} className="bg-slate-50 p-4 rounded-3xl border border-slate-100/50 hover:bg-white hover:shadow-xl transition-all flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                     <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full">{log.action}</span>
+                     <span className="text-[10px] font-bold text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
+                  </div>
+                  {log.target && <p className="text-sm font-black text-slate-900">目標: {log.target}</p>}
+                  {log.details && <p className="text-xs font-bold text-slate-500">{log.details}</p>}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     )}
 </div>
   );
