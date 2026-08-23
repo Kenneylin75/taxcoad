@@ -49,6 +49,7 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'linepay' | 'ecpay'>('linepay');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [bankLast5, setBankLast5] = useState('');
+  const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
 
   const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
   const [editingRemarkText, setEditingRemarkText] = useState('');
@@ -510,9 +511,9 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                                   </button>
                                ) : (
                                   exp.receiptUrl ? (
-                                    <a href={exp.receiptUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 transition-all text-xs font-bold flex items-center justify-end gap-1">
+                                    <button onClick={() => setViewImageUrl(exp.receiptUrl)} className="text-blue-500 hover:text-blue-700 transition-all text-xs font-bold flex items-center justify-end gap-1">
                                       📄 查看匯款單
-                                    </a>
+                                    </button>
                                   ) : (
                                     <button className="text-slate-300 hover:text-slate-600 transition-all cursor-not-allowed text-xs font-bold flex items-center justify-end gap-1">
                                       📄 無附件
@@ -641,6 +642,18 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                      )}
                  </div>
               )}
+           </div>
+        </div>
+      )}
+
+      {/* 匯款單預覽視窗 */}
+      {viewImageUrl && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setViewImageUrl(null)}>
+           <div className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setViewImageUrl(null)} className="absolute top-0 right-0 p-3 bg-white/20 hover:bg-white/40 rounded-full text-white backdrop-blur-md transition-all shadow-lg hover:rotate-90 z-10">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+              <img src={viewImageUrl} alt="匯款單預覽" className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
            </div>
         </div>
       )}
