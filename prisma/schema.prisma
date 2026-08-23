@@ -21,88 +21,90 @@ model PricePlan {
 }
 
 model Distributor {
-  id           String             @id @default(cuid())
-  name         String
-  status       String             @default("Active")
-  setupFee     Int                @default(0)
-  monthlyRent  Int                @default(0)
-  paymentCycle String             @default("Yearly")
-  contactName  String?            @map("contact_name")
-  contactPhone String?            @map("contact_phone")
-  email        String?
-  account      String?
-  password     String?
-  createdAt    DateTime           @default(now()) @map("created_at")
-  updatedAt    DateTime           @default(now()) @updatedAt @map("updated_at")
-  address      String?
-  b2bPayment   Json?              @map("b2b_payment_config")
-  bankAccount  String?            @map("bank_account")
-  bankCode     String?            @map("bank_code")
-  bankName     String?            @map("bank_name")
-  bankAccountName String?         @map("bank_account_name")
-  customNodes  Int?               @default(100) @map("custom_nodes")
-  nodes        Int?               @default(100)
-  quota        Int?               @default(100)
-  superSalesId String?            @map("super_sales_id")
-  temples      Temple[]
-  sales        DistributorSales[]
-  contracts    DistributorContract[]
-  logs         DistributorLog[]
+  id              String                @id @default(cuid())
+  name            String
+  status          String                @default("Active")
+  setupFee        Int                   @default(0)
+  monthlyRent     Int                   @default(0)
+  paymentCycle    String                @default("Yearly")
+  contactName     String?               @map("contact_name")
+  contactPhone    String?               @map("contact_phone")
+  email           String?
+  account         String?
+  password        String?
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @default(now()) @updatedAt @map("updated_at")
+  address         String?
+  b2bPayment      Json?                 @map("b2b_payment_config")
+  bankAccount     String?               @map("bank_account")
+  bankCode        String?               @map("bank_code")
+  bankName        String?               @map("bank_name")
+  customNodes     Int?                  @default(100) @map("custom_nodes")
+  nodes           Int?                  @default(100)
+  quota           Int?                  @default(100)
+  usedQuota       Int                   @default(0) @map("used_quota")
+  superSalesId    String?               @map("super_sales_id")
+  bankAccountName String?               @map("bank_account_name")
+  temples         Temple[]
+  templeApps      TempleApplication[]
+  sales           DistributorSales[]
+  contracts       DistributorContract[]
+  logs            DistributorLog[]
 
   @@map("distributors")
 }
 
 model DistributorLog {
-  id            String       @id @default(cuid())
-  distributorId String       @map("distributor_id")
+  id            String      @id @default(cuid())
+  distributorId String      @map("distributor_id")
   action        String?
   target        String?
   details       String?
   operator      String?
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at")
-  distributor   Distributor  @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at")
+  distributor   Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
 
   @@map("distributor_logs")
 }
 
 model DistSalesLog {
-  id        String   @id @default(cuid())
-  salesId   String   @map("sales_id")
+  id        String           @id @default(cuid())
+  salesId   String           @map("sales_id")
   action    String?
   target    String?
   details   String?
   operator  String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at")
   sales     DistributorSales @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
   @@map("dist_sales_logs")
 }
 
 model DistributorSales {
-  id              String       @id @default(cuid())
-  distributorId   String?      @map("distributor_id")
+  id              String         @id @default(cuid())
+  distributorId   String?        @map("distributor_id")
   name            String
   phone           String?
-  status          String       @default("Active")
-  setupFee        Int          @default(0)
-  monthlyRent     Int          @default(0)
-  paymentCycle    String       @default("Yearly")
+  status          String         @default("Active")
+  setupFee        Int            @default(0)
+  monthlyRent     Int            @default(0)
+  paymentCycle    String         @default("Yearly")
   role            String?
   account         String?
   password        String?
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
-  bankAccount     Json?        @map("bank_account_info")
-  commissionRules Json?        @map("commission_rules")
-  joinedAt        String?      @map("joined_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
+  bankAccount     Json?          @map("bank_account_info")
+  commissionRules Json?          @map("commission_rules")
+  joinedAt        String?        @map("joined_at")
   email           String?
   temples         Temple[]
   commissions     Commission[]
-  distributor     Distributor? @relation(fields: [distributorId], references: [id])
-  visits          SalesVisit[]
+  distributor     Distributor?   @relation(fields: [distributorId], references: [id])
   logs            DistSalesLog[]
+  visits          SalesVisit[]
 
   @@map("dist_sales")
 }
@@ -125,42 +127,42 @@ model SalesVisit {
   templeName String?           @map("temple_name")
   content    String?
   date       String?
-  visitIndex Int?              @map("visit_index")
-  notes      String?
-  status     String?           @default("Planned")
-  importance String?           @default("Medium")
   createdAt  DateTime          @default(now()) @map("created_at")
   updatedAt  DateTime          @default(now()) @updatedAt @map("updated_at")
   salesName  String?           @map("sales_name")
+  importance String?           @default("Medium")
+  notes      String?
+  status     String?           @default("Planned")
+  visitIndex Int?              @map("visit_index")
   sales      DistributorSales? @relation(fields: [salesId], references: [id])
 
   @@map("sales_visits")
 }
 
 model DistributorApplication {
-  id             String   @id @default(cuid())
-  name           String?
-  status         String   @default("Pending")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
-  submittedBy    String?  @map("submitted_by")
-  account        String?
-  address        String?
-  contactName    String?  @map("contact_name")
-  email          String?
-  expirationDate String?  @map("expiration_date")
-  nodes          Int?
-  password       String?
-  phone          String?
-  planId         String?  @map("plan_id")
-  price          Int?
-  rejectReason   String?  @map("reject_reason")
-  rejectedAt     String?  @map("rejected_at")
-  taxId          String?  @map("tax_id")
-  bankCode       String?  @map("bank_code")
-  bankName       String?  @map("bank_name")
-  bankAccount    String?  @map("bank_account")
-  bankAccountName String? @map("bank_account_name")
+  id              String   @id @default(cuid())
+  name            String?
+  status          String   @default("Pending")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+  submittedBy     String?  @map("submitted_by")
+  account         String?
+  address         String?
+  contactName     String?  @map("contact_name")
+  email           String?
+  expirationDate  String?  @map("expiration_date")
+  nodes           Int?
+  password        String?
+  phone           String?
+  planId          String?  @map("plan_id")
+  price           Int?
+  rejectReason    String?  @map("reject_reason")
+  rejectedAt      String?  @map("rejected_at")
+  taxId           String?  @map("tax_id")
+  bankAccount     String?  @map("bank_account")
+  bankAccountName String?  @map("bank_account_name")
+  bankCode        String?  @map("bank_code")
+  bankName        String?  @map("bank_name")
 
   @@map("distributor_applications")
 }
@@ -169,9 +171,9 @@ model DistributorContract {
   id            String      @id @default(cuid())
   distributorId String      @map("distributor_id")
   amount        Int         @default(0)
-  duration      String?     
+  duration      String?
   quotaAdded    Int         @default(0) @map("quota_added")
-  type          String      @default("NEW") 
+  type          String      @default("NEW")
   note          String?
   date          DateTime    @default(now())
   createdAt     DateTime    @default(now()) @map("created_at")
@@ -212,10 +214,6 @@ model Temple {
   templeName          String?              @map("temple_name")
   updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
   email               String?
-  creatorRole         String?              @map("creator_role")
-  creatorId           String?              @map("creator_id")
-  bankAccount         Json?                @map("bank_account_info")
-  businessType        String?              @map("business_type")
   analyticsData       Json?                @map("analytics_data")
   bannerUrl           String?              @map("banner_url")
   guestSettings       Json?                @map("guest_settings")
@@ -230,6 +228,10 @@ model Temple {
   billingStartDate    DateTime?            @map("billing_start_date")
   freeType            String?              @default("Normal") @map("free_type")
   trialMonths         Int?                 @default(0) @map("trial_months")
+  bankAccount         Json?                @map("bank_account_info")
+  businessType        String?              @map("business_type")
+  creatorId           String?              @map("creator_id")
+  creatorRole         String?              @map("creator_role")
   distributor         Distributor?         @relation(fields: [distributorId], references: [id])
   plan                PricePlan?           @relation(fields: [planId], references: [id])
   sales               DistributorSales?    @relation(fields: [salesId], references: [id])
@@ -263,17 +265,20 @@ model Temple {
 }
 
 model TempleApplication {
-  id            String   @id @default(cuid())
-  status        String   @default("Pending")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-  contactPerson String?  @map("contact_person")
-  contactPhone  String?  @map("contact_phone")
-  monthlyFee    Int      @map("monthly_fee")
-  planId        String   @map("plan_id")
-  salesId       String?  @map("sales_id")
-  setupFee      Int      @map("setup_fee")
-  templeName    String   @map("temple_name")
+  id            String       @id @default(cuid())
+  status        String       @default("Pending")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at")
+  contactPerson String?      @map("contact_person")
+  contactPhone  String?      @map("contact_phone")
+  monthlyFee    Int          @map("monthly_fee")
+  planId        String       @map("plan_id")
+  salesId       String?      @map("sales_id")
+  distributorId String?      @map("distributor_id")
+  creatorRole   String?      @map("creator_role")
+  setupFee      Int          @map("setup_fee")
+  templeName    String       @map("temple_name")
+  distributor   Distributor? @relation(fields: [distributorId], references: [id])
 
   @@map("temple_applications")
 }
@@ -299,29 +304,29 @@ model TempleBill {
 
 model StoragePlan {
   id           String   @id @default(cuid())
-  name         String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   priceMonthly Int      @map("price_monthly")
   priceYearly  Int      @map("price_yearly")
   sizeGb       Int      @map("size_gb")
+  name         String?
 
   @@map("storage_plans")
 }
 
 model TempleStorage {
-  id             String   @id @default(cuid())
-  templeId       String   @unique @map("temple_id")
-  usedBytes      BigInt   @default(0) @map("used_bytes")
-  planId         String?  @map("plan_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
-  allocatedBytes BigInt   @default(21474836480) @map("allocated_bytes")
-  city           String?
-  planName       String?  @map("plan_name")
-  temple         Temple   @relation(fields: [templeId], references: [id])
-  paymentCycle     String?   @map("payment_cycle")
+  id               String    @id @default(cuid())
+  templeId         String    @unique @map("temple_id")
+  usedBytes        BigInt    @default(0) @map("used_bytes")
+  planId           String?   @map("plan_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  allocatedBytes   BigInt    @default(21474836480) @map("allocated_bytes")
+  city             String?
+  planName         String?   @map("plan_name")
   billingStartDate DateTime? @map("billing_start_date")
+  paymentCycle     String?   @map("payment_cycle")
+  temple           Temple    @relation(fields: [templeId], references: [id])
 
   @@map("temple_storages")
 }
@@ -881,9 +886,9 @@ model BonusRequest {
   method        String?
   salesName     String?  @map("sales_name")
   receiptUrl    String?  @map("receipt_url")
-  bankLast5     String?  @map("bank_last5")
   createdAt     DateTime @default(now()) @map("timestamp")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  bankLast5     String?  @map("bank_last5")
 
   @@map("bonus_requests")
 }
@@ -940,8 +945,8 @@ model TempleNotification {
   sendTime        DateTime  @map("send_time")
   title           String
   expiresAt       DateTime? @map("expires_at")
-  isCarousel      Boolean   @default(true) @map("is_carousel")
   carouselSeconds Int       @default(5) @map("carousel_seconds")
+  isCarousel      Boolean   @default(true) @map("is_carousel")
   guest           Guest?    @relation(fields: [guestId], references: [id])
   temple          Temple    @relation(fields: [templeId], references: [id])
 
