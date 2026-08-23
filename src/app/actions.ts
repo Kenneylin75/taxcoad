@@ -9551,10 +9551,7 @@ export async function submitFreeAccountApplication(data: any) {
   // Create Notification for Super Admin
   await null;
 
-  revalidatePath("/dist-sales");
-  revalidatePath("/distributor");
-  revalidatePath("/super-admin");
-  revalidatePath("/super-sales");
+  await revalidateTemple(newTemple.id);
 
   return { success: true, templeId: newTemple.id };
 }
@@ -10145,9 +10142,9 @@ export async function submitEContract(fd: any) {
 
 export async function fetchDistributorCapacity(distId?: string) {
   try {
-    let whereClause: any = {};
+    let whereClause: any = { status: { not: "Pending" } };
     if (distId) {
-      whereClause = { distributorId: distId };
+      whereClause.distributorId = distId;
     }
 
     const temples = (await prisma.temple.findMany({
