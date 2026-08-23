@@ -9453,7 +9453,7 @@ export async function submitFreeAccountApplication(data: any) {
         status: newTemple.status,
         salesId: newTemple.salesId,
         distributorId: newTemple.distributorId,
-        setupFee: newTemple.setupFee || 0,
+        setupFee: newTemple.setupFee ?? 12000,
         monthlyRent: newTemple.monthlyRent || 0,
         paymentCycle: newTemple.paymentCycle,
         account: newTemple.account,
@@ -10827,7 +10827,7 @@ export async function createTempleAccount(data: any) {
       superSalesId: data.superSalesId || null,
       creatorRole: newTemple.creatorRole,
       creatorId: newTemple.creatorId,
-      setupFee: newTemple.setupFee || 0,
+      setupFee: newTemple.setupFee ?? 12000,
       monthlyRent: newTemple.monthlyRent || 0,
       paymentCycle: newTemple.paymentCycle || "Monthly",
       billingStartDate: newTemple.billingStartDate
