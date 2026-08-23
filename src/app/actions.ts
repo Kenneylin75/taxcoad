@@ -3669,6 +3669,12 @@ export async function fetchDistributorTemples(distributorId: string) {
       },
     })) as any;
 
+    const templeIds = temples.map((t: any) => t.id);
+    const bills = await prisma.templeBill.findMany({
+      where: { templeId: { in: templeIds } },
+      orderBy: { createdAt: "desc" },
+    });
+
     temples.forEach((t: any) => {
       if (t.salesId) {
         t.sales = distSales.find((s: any) => s.id === t.salesId) || null;
@@ -3679,8 +3685,9 @@ export async function fetchDistributorTemples(distributorId: string) {
     const discountRate = sysConfig?.yearlyDiscountRate || 20;
 
     return temples.map((t: any) => {
+      const lastBill = bills.find((b: any) => b.templeId === t.id);
       const { paymentStatusLabel, contractEndDate, trialDaysRemaining } =
-        enrichTempleWithFinancialStatus(t);
+        enrichTempleWithFinancialStatus(t, lastBill);
       return {
         ...t,
         paymentStatusLabel,
