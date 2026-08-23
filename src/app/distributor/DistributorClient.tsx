@@ -30,9 +30,15 @@ export default function DistributorClient({
   const [viewTempleDetail, setViewTempleDetail] = useState<any>(null);
   const [isPending, startTransition] = useTransition();
   React.useEffect(() => {
-    import('@/app/actions').then(m => m.fetchDistributorTempleBills && m.fetchDistributorTempleBills(initialProfile?.id)).then(res => {
-         if (res) setTemplePayments(res);
+    let isMounted = true;
+    import('@/app/actions')
+      .then(m => m.fetchDistributorTempleBills && m.fetchDistributorTempleBills(initialProfile?.id))
+      .then(res => {
+        if (isMounted && res) setTemplePayments(res);
       });
+    return () => {
+      isMounted = false;
+    };
   }, [initialProfile?.id]);
 
   // --- Financial Sub-Tab State ---
@@ -44,9 +50,12 @@ export default function DistributorClient({
   const [currentPerformanceIndex, setCurrentPerformanceIndex] = useState(0);
 
   React.useEffect(() => {
+    let isMounted = true;
     if (activeTab === 'financials' && initialProfile?.id) {
-      import('@/app/actions').then(m => m.fetchDistributorSalesPerformance(initialProfile.id, undefined)).then(res => {
-        if (res) {
+      import('@/app/actions')
+        .then(m => m.fetchDistributorSalesPerformance && m.fetchDistributorSalesPerformance(initialProfile.id, undefined))
+        .then(res => {
+          if (isMounted && res) {
             setTeamPerformance(res);
             setCurrentPerformanceIndex(0);
         }

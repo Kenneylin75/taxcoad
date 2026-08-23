@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const t = await prisma.temple.findFirst({ where: { account: 'admin2201' } }); console.log(t?.id); if(t) { const b = await prisma.templeBill.findMany({ where: { templeId: t.id } }); console.log(b); } } main().catch(console.error).finally(() => prisma.$disconnect());
