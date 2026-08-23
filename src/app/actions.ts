@@ -10367,7 +10367,10 @@ export async function fetchSuperSalesRegistry(salesId: string) {
       const annualContribution = yearlyRent + setupFee;
 
       const bills = await prisma.templeBill.findMany({
-        where: { templeId: t.id },
+        where: {
+          templeId: t.id,
+          type: { notIn: ["StorageUpgrade", "AiUpgrade"] }
+        },
       });
       const now = new Date();
       let lastBillDate = now;
@@ -10395,6 +10398,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
         if (b.status === "PendingVerification") hasPending = true;
       });
 
+      let paymentStatus = "";
       if (
         t.paymentStatus === "PendingPayment" ||
         (bills.length === 0 &&
@@ -11117,7 +11121,7 @@ export async function fetchCommissionHistory(
 
   myTemples.forEach((t) => {
     const bills = listBills.filter(
-      (b) => b.templeId === t.id && b.status !== "Rejected",
+      (b) => b.templeId === t.id && b.status !== "Rejected" && b.type !== "StorageUpgrade" && b.type !== "AiUpgrade",
     );
 
     bills.forEach((bill) => {
