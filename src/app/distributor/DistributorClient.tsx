@@ -1044,7 +1044,28 @@ export default function DistributorClient({
                              <div className="space-y-4">
                                 {records.map((p: any) => (
                                    <div key={p.id} onClick={() => setExpandedTempleId(expandedTempleId === p.id ? null : p.id)} className="bg-white/60 backdrop-blur-xl rounded-[40px] border border-white shadow-xl overflow-hidden transition-all duration-500 cursor-pointer group">
-                                      <div className={`flex items-center justify-between p-6 group-hover:bg-white transition-all`}><div className="flex items-center gap-5"><div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xl shadow-xl italic transition-all group-hover:bg-blue-600 group-hover:scale-110">🏛️</div><div><h4 className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors">{p.temple} {p.trialMonths > 0 && p.templeStatus === 'Active' && <span className="ml-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2 py-0.5 rounded-full text-[9px]">免費體驗中</span>}</h4><p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">最後繳費：{p.date}</p></div></div><div className="text-right flex items-center gap-4"><div><p className="text-lg font-black text-slate-900">${(p.amount || 0).toLocaleString()}</p><span className={`text-[7px] font-black px-3 py-1 rounded-full uppercase ${p.paymentStatusLabel && p.paymentStatusLabel.includes('已付') ? 'text-emerald-600 bg-emerald-50' : p.paymentStatusLabel && p.paymentStatusLabel.includes('免費試用') ? 'text-blue-600 bg-blue-50' : p.templeStatus === 'UnderReview' ? 'text-amber-600 bg-amber-50' : p.templeStatus === 'PendingPayment' ? 'text-purple-600 bg-purple-50' : 'text-rose-600 bg-rose-50'}`}>{p.status === 'Paid' ? '已入帳' : p.templeStatus === 'UnderReview' ? '待核款' : p.templeStatus === 'PendingPayment' ? '待付開辦費' : '催收中'}</span></div>{p.templeStatus === 'UnderReview' && (<button onClick={(e) => { e.stopPropagation(); handleApprovePayment(p.id); }} className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">核款</button>)}<span className={`text-slate-300 transition-transform duration-500 ${expandedTempleId === p.id ? 'rotate-180 text-blue-600' : ''}`}>▼</span></div></div>
+                                      <div className={`flex items-center justify-between p-6 group-hover:bg-white transition-all`}>
+                                        <div className="flex items-center gap-5">
+                                          <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-2xl shadow-xl italic transition-all group-hover:bg-slate-900 group-hover:scale-110">🏛️</div>
+                                          <div>
+                                            <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                                              {p.temple} {p.trialMonths > 0 && p.templeStatus === 'Active' && <span className="ml-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white px-2 py-0.5 rounded-full text-[9px]">免費體驗中</span>}
+                                            </h4>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">最後繳費：{p.date}</p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right flex items-center gap-5">
+                                          <div>
+                                            <span className={`text-[11px] font-black px-4 py-1.5 rounded-full uppercase shadow-sm tracking-wide ${p.status === 'Paid' ? 'text-emerald-700 bg-emerald-100 border border-emerald-200/50' : 'text-rose-700 bg-rose-100 border border-rose-200/50'}`}>
+                                              {p.status === 'Paid' ? '已付款' : '未付款'}
+                                            </span>
+                                          </div>
+                                          {p.templeStatus === 'UnderReview' && (
+                                            <button onClick={(e) => { e.stopPropagation(); handleApprovePayment(p.id); }} className="bg-indigo-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">核款</button>
+                                          )}
+                                          <span className={`text-slate-300 transition-transform duration-500 ml-1 ${expandedTempleId === p.id ? 'rotate-180 text-blue-600' : ''}`}>▼</span>
+                                        </div>
+                                      </div>
                                       {expandedTempleId === p.id && (
                                          <div className="bg-slate-50/80 p-8 border-t border-white/50 space-y-4 animate-in slide-in-from-top-4 duration-500">
                                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 px-2">歷史付款紀錄 History Records</p>
