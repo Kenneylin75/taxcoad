@@ -1,13 +1,3 @@
-// @ts-nocheck
-"use client";
-
-import { useState, useEffect, useMemo } from "react";
-import { 
-  fetchFreeApplications, 
-  fetchSalesPerformance,
-  fetchVisitationRecords,
-  addVisitationRecord,
-// @ts-nocheck
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
