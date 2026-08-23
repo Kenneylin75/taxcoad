@@ -1471,61 +1471,67 @@ export default function DistributorClient({
                            </div>
                         ) : (
                           filteredPayments.map((payment: any) => (
-                            <div key={payment.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-blue-100 hover:shadow-md transition-all group">
-                               <div className="flex items-center gap-5">
-                                  <div className={`w-14 h-14 rounded-[20px] flex items-center justify-center text-2xl shadow-inner ${
-                                    payment.type === 'SetupFee' ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'
-                                  }`}>
-                                    {payment.type === 'SetupFee' ? '🚀' : '📅'}
-                                  </div>
-                                  <div>
-                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{payment.templeName}</h4>
-                                        <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md uppercase tracking-widest border border-slate-100">
-                                          {payment.type === 'MonthlyFee' ? '月租費' : payment.type === 'YearlyFee' ? '年租費' : payment.type === 'SetupFee' ? '開辦費' : payment.type}
-                                        </span>
+                            <div key={payment.id} className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 flex flex-col gap-4 hover:border-blue-100 hover:shadow-md transition-all group">
+                               <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                     <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center text-xl shadow-inner shrink-0 ${
+                                        payment.type === 'SetupFee' ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'
+                                     }`}>
+                                        {payment.type === 'SetupFee' ? '🚀' : '📅'}
                                      </div>
-                                     <p className="text-xs font-bold text-slate-400 mt-1 flex items-center gap-2">
-                                        <span>🗓️ {payment.billingDate}</span>
-                                        <span>•</span>
-                                        <span className="text-slate-500">NT$ {(payment.amount || 0).toLocaleString()}</span>
-                                     </p>
+                                     <div className="overflow-hidden">
+                                        <div className="flex items-center gap-2">
+                                           <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate max-w-[120px] sm:max-w-full">{payment.templeName}</h4>
+                                           <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md uppercase tracking-widest border border-slate-100 whitespace-nowrap shrink-0">
+                                             {payment.type === 'MonthlyFee' ? '月租費' : payment.type === 'YearlyFee' ? '年租費' : payment.type === 'SetupFee' ? '開辦費' : payment.type}
+                                           </span>
+                                        </div>
+                                     </div>
                                   </div>
-                               </div>
-                               
-                               <div className="flex items-center gap-3">
-                                  {payment.receiptUrl && (
-                                    <button 
-                                      onClick={() => {setCurrentOrderId(payment.id); setCurrentReceiptImage(payment.receiptUrl); setCurrentOrderType('temple_bill'); setB2bReceiptViewerOpen(true);}} 
-                                      className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-[16px] text-xs font-black hover:bg-blue-100 transition-colors"
-                                    >
-                                      <span>👁️</span> 檢視憑證
-                                    </button>
-                                  )}
                                   <button 
-                                    onClick={async () => {
-                                       const newStatus = payment.status === 'Paid' ? 'Unpaid' : 'Paid';
-                                       if(confirm(newStatus === 'Paid' ? '確認已收到款項？核銷後將計算營業額與獎金。' : '確認退回未付款狀態？')) {
-                                         const { toggleBillStatusSimple, approveTempleBill } = await import('@/app/actions');
-                                         if (newStatus === 'Paid') {
-                                            await approveTempleBill(payment.id);
-                                         } else {
-                                            await toggleBillStatusSimple(payment.id, 'Unpaid');
-                                         }
-                                         setTemplePayments((prev: any[]) => prev.map(p => p.id === payment.id ? { ...p, status: newStatus } : p));
-                                       }
-                                    }}
-                                    className={`flex items-center gap-2 px-5 py-3 rounded-[16px] text-xs font-black transition-all shadow-sm ${
-                                      payment.status === 'Paid' 
-                                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100' 
-                                        : payment.receiptUrl 
-                                          ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' 
-                                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                    }`}
+                                     onClick={async () => {
+                                        const newStatus = payment.status === 'Paid' ? 'Unpaid' : 'Paid';
+                                        if(confirm(newStatus === 'Paid' ? '確認已收到款項？核銷後將計算營業額與獎金。' : '確認退回未付款狀態？')) {
+                                          const { toggleBillStatusSimple, approveTempleBill } = await import('@/app/actions');
+                                          if (newStatus === 'Paid') {
+                                             await approveTempleBill(payment.id);
+                                          } else {
+                                             await toggleBillStatusSimple(payment.id, 'Unpaid');
+                                          }
+                                          setTemplePayments((prev: any[]) => prev.map(p => p.id === payment.id ? { ...p, status: newStatus } : p));
+                                        }
+                                     }}
+                                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-[12px] text-[11px] font-black transition-all shadow-sm whitespace-nowrap ${
+                                       payment.status === 'Paid' 
+                                         ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100' 
+                                         : payment.receiptUrl 
+                                           ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' 
+                                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                     }`}
                                   >
-                                    {payment.status === 'Paid' ? '✅ 已付款' : payment.receiptUrl ? '⏳ 待審核' : '未付款'}
+                                     {payment.status === 'Paid' ? '✅ 已付款' : payment.receiptUrl ? '⏳ 待審核' : '未付款'}
                                   </button>
                                </div>
+                               
+                               <div className="bg-slate-50 rounded-[16px] p-4 flex items-center justify-between">
+                                  <div className="space-y-1">
+                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">帳單日期</p>
+                                     <p className="text-sm font-bold text-slate-700">{payment.billingDate}</p>
+                                  </div>
+                                  <div className="text-right space-y-1">
+                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">應繳金額</p>
+                                     <p className="text-base font-black text-slate-900">NT$ {(payment.amount || 0).toLocaleString()}</p>
+                                  </div>
+                               </div>
+
+                               {payment.receiptUrl && (
+                                 <button 
+                                   onClick={() => {setCurrentOrderId(payment.id); setCurrentReceiptImage(payment.receiptUrl); setCurrentOrderType('temple_bill'); setB2bReceiptViewerOpen(true);}} 
+                                   className="w-full flex justify-center items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-[16px] text-xs font-black hover:bg-blue-100 transition-colors whitespace-nowrap"
+                                 >
+                                   <span>👁️</span> 檢視付款憑證
+                                 </button>
+                               )}
                             </div>
                           ))
                         )}
