@@ -11744,3 +11744,31 @@ export async function fetchDistSalesLogs(salesId: string) {
     return [];
   }
 }
+
+export async function updateSalesCommission(salesId: string, commissionRules: any) {
+  try {
+    if (!salesId) return { success: false, error: '缺少業務 ID' };
+    await prisma.distributorSales.update({
+      where: { id: salesId },
+      data: { commissionRules },
+    });
+    return { success: true };
+  } catch (e) {
+    console.error("Failed to update sales commission:", e);
+    return { success: false, error: '分潤設定失敗' };
+  }
+}
+
+export async function updateSalesPassword(salesId: string, newPassword: string) {
+  try {
+    if (!salesId || !newPassword) return { success: false, error: '缺少必要參數' };
+    await prisma.distributorSales.update({
+      where: { id: salesId },
+      data: { password: newPassword },
+    });
+    return { success: true };
+  } catch (e) {
+    console.error("Failed to update sales password:", e);
+    return { success: false, error: '密碼修改失敗' };
+  }
+}

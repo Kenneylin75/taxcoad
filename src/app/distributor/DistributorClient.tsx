@@ -2,7 +2,7 @@
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
 import TempleApplicationForm from '../components/TempleApplicationForm';
-import { addSalesMember, approveTempleByDistributor, rejectTempleByDistributor, uploadReceiptAndApproveBonus } from '../actions';
+import { addSalesMember, approveTempleByDistributor, rejectTempleByDistributor, uploadReceiptAndApproveBonus , updateSalesCommission, updateSalesPassword } from '../actions';
 
 /**
  * Aurora Background Component - Enhanced with more vibrant but subtle blobs
@@ -69,6 +69,8 @@ export default function DistributorClient({
   const [uploadingBankLast5, setUploadingBankLast5] = useState<string>('');
 
   const [isEditRateModalOpen, setIsEditRateModalOpen] = useState(false);
+  const [isEditPasswordModalOpen, setIsEditPasswordModalOpen] = useState(false);
+  const [editingPassword, setEditingPassword] = useState('');
   const [isDirectCreateModalOpen, setIsDirectCreateModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isTempleListModalOpen, setIsTempleListModalOpen] = useState(false);
@@ -771,7 +773,8 @@ export default function DistributorClient({
                           <div className="w-16 h-16 rounded-[24px] bg-slate-900 text-white flex items-center justify-center text-2xl font-black italic shadow-2xl group-hover:bg-blue-600 transition-all duration-500">{m.name.substring(0,1)}</div>
                           <div><h4 className="text-xl font-black text-slate-900 tracking-tighter">{m.name}</h4><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">ID: {m.account}</p></div>
                        </div>
-                       <button onClick={() => {
+                       <div className="flex flex-col gap-2 items-end">
+<button onClick={() => {
                           setSelectedSales(m); 
                           setEditingRates({
                             setupRate: m.commissionRules?.setupFeePercent || 20,
@@ -781,6 +784,8 @@ export default function DistributorClient({
                           });
                           setIsEditRateModalOpen(true);
                        }} className="text-[8px] font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-full border border-blue-100 uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">調整分潤</button>
+  <button onClick={() => { setSelectedSales(m); setIsEditPasswordModalOpen(true); setEditingPassword(''); }} className="text-[8px] font-black text-rose-600 bg-rose-50 px-4 py-2 rounded-full border border-rose-100 uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all">修改密碼</button>
+</div>
                     </div>
                     <div className="grid grid-cols-4 gap-2 pt-2">
                        <div className="p-3 bg-blue-50/80 rounded-2xl text-center border border-blue-100/30 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500">
@@ -1743,7 +1748,36 @@ export default function DistributorClient({
              </div>
           </div>
        )}
-       {isRejectModalOpen && (
+       
+       {isEditPasswordModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[400] flex items-center justify-center p-6 animate-in fade-in duration-300">
+             <div className="bg-white w-full max-w-sm rounded-[60px] p-12 shadow-2xl text-center animate-in zoom-in-95 duration-500 space-y-8">
+                <div className="space-y-2">
+                   <h3 className="text-3xl font-black text-slate-900 tracking-tighter italic">修改密碼</h3>
+                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{selectedSales?.name}</p>
+                </div>
+                <div className="space-y-4">
+                   <input type="text" placeholder="輸入新密碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all text-center" value={editingPassword} onChange={e=>setEditingPassword(e.target.value)} />
+                </div>
+                <div className="flex gap-4 pt-4">
+                   <button onClick={() => setIsEditPasswordModalOpen(false)} className="flex-1 py-6 bg-slate-50 text-slate-400 rounded-3xl font-black uppercase text-[10px] tracking-widest">取消</button>
+                   <button onClick={async () => {
+                      if (!editingPassword) return alert("請輸入新密碼");
+                      const res = await updateSalesPassword(selectedSales.id, editingPassword);
+                      if (res.success) {
+                         addLog("業務密碼修改", selectedSales.name); 
+                         setIsEditPasswordModalOpen(false); 
+                         alert("✅ 密碼已更新");
+                      } else {
+                         alert(res.error || "密碼修改失敗");
+                      }
+                   }} className="flex-[1.5] py-6 bg-slate-950 text-white rounded-3xl font-black uppercase text-[10px] tracking-[0.2em] italic hover:bg-blue-600 shadow-2xl transition-all">確認修改</button>
+                </div>
+             </div>
+          </div>
+       )}
+
+{isRejectModalOpen && (
          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[500] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
             <div className="bg-white w-full max-sm rounded-[55px] p-12 shadow-2xl space-y-8 text-center border border-white">
                <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">駁回開戶申請</h3>
