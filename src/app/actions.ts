@@ -8592,12 +8592,13 @@ export async function fetchSalesProfileById(salesId: string) {
         parentDistributor: sales.distributor?.name || "未指派",
         account: sales.account,
         bankAccount: sales.bankAccount,
+        commissionRates: sales.commissionRules,
       };
     }
-    return { name: "未知", parentDistributor: "未指派", account: "" };
+    return { name: "未知", parentDistributor: "未指派", account: "", commissionRates: null };
   } catch (error) {
     console.error("fetchSalesProfileById error:", error);
-    return { name: "未知", parentDistributor: "未指派", account: "" };
+    return { name: "未知", parentDistributor: "未指派", account: "", commissionRates: null };
   }
 }
 
@@ -10170,10 +10171,10 @@ export async function fetchDistributorCapacity(distId?: string) {
       const dist = await prisma.distributor.findUnique({
         where: { id: distId },
       });
-      total = dist?.nodes || 100;
+      total = dist?.quota || 100;
     } else {
       const dists = await prisma.distributor.findMany();
-      total = dists.reduce((acc, d) => acc + (d.nodes || 100), 0);
+      total = dists.reduce((acc, d) => acc + (d.quota || 100), 0);
     }
 
     return { used, total, isUnlimited: total >= 1000 };
