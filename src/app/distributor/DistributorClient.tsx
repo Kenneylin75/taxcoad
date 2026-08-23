@@ -1417,8 +1417,8 @@ export default function DistributorClient({
                        </div>
                        {b2bPayment.linePay?.enabled && (
                           <div className="grid grid-cols-1 gap-4 mt-4">
-                             <input type="text" placeholder="Channel ID" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.linePay.channelId} onChange={e=>setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelId: e.target.value}})} />
-                             <input type="text" placeholder="Channel Secret" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.linePay.channelSecret} onChange={e=>setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelSecret: e.target.value}})} />
+                             <input type="text" placeholder="Channel ID" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.linePay.channelId || ''} onChange={e=>setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelId: e.target.value}})} />
+                             <input type="text" placeholder="Channel Secret" className="bg-white p-4 rounded-xl border border-slate-100 font-bold text-sm" value={b2bPayment.linePay.channelSecret || ''} onChange={e=>setB2bPayment({...b2bPayment, linePay: {...b2bPayment.linePay, channelSecret: e.target.value}})} />
                           </div>
                        )}
                     </div>
@@ -1816,11 +1816,11 @@ export default function DistributorClient({
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">正式姓名 Full Name</p>
-                           <input type="text" placeholder="輸入業務姓名" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.name} onChange={e=>setNewSalesForm({...newSalesForm, name:e.target.value})} required />
+                           <input type="text" placeholder="輸入業務姓名" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.name || ''} onChange={e=>setNewSalesForm({...newSalesForm, name:e.target.value})} required />
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">聯繫電話 Phone</p>
-                           <input type="tel" placeholder="輸入電話號碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.phone} onChange={e=>setNewSalesForm({...newSalesForm, phone:e.target.value})} required />
+                           <input type="tel" placeholder="輸入電話號碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.phone || ''} onChange={e=>setNewSalesForm({...newSalesForm, phone:e.target.value})} required />
                         </div>
                      </div>
                      <div className="grid grid-cols-2 gap-4">
@@ -1835,7 +1835,7 @@ export default function DistributorClient({
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">安全密碼 Password</p>
-                           <input type="password" placeholder="輸入初始密碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.password} onChange={e=>setNewSalesForm({...newSalesForm, password:e.target.value})} required />
+                           <input type="password" placeholder="輸入初始密碼" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-blue-200 transition-all" value={newSalesForm.password || ''} onChange={e=>setNewSalesForm({...newSalesForm, password:e.target.value})} required />
                         </div>
                      </div>
                   </div>
@@ -1873,21 +1873,21 @@ export default function DistributorClient({
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行代碼 Bank Code</p>
-                           <input type="text" placeholder="例: 808" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.bankCode} onChange={e=>setNewSalesForm({...newSalesForm, bankCode:e.target.value})} required />
+                           <input type="text" placeholder="例: 808" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.bankCode || ''} onChange={e=>setNewSalesForm({...newSalesForm, bankCode:e.target.value})} required />
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行名稱 Bank Name</p>
-                           <input type="text" placeholder="例: 玉山銀行" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.bankName} onChange={e=>setNewSalesForm({...newSalesForm, bankName:e.target.value})} required />
+                           <input type="text" placeholder="例: 玉山銀行" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.bankName || ''} onChange={e=>setNewSalesForm({...newSalesForm, bankName:e.target.value})} required />
                         </div>
                      </div>
                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">戶名 Account Name</p>
-                           <input type="text" placeholder="例: 王大明" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.accountName} onChange={e=>setNewSalesForm({...newSalesForm, accountName:e.target.value})} required />
+                           <input type="text" placeholder="例: 王大明" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.accountName || ''} onChange={e=>setNewSalesForm({...newSalesForm, accountName:e.target.value})} required />
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行帳號 Account No.</p>
-                           <input type="text" placeholder="輸入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.accountNo} onChange={e=>setNewSalesForm({...newSalesForm, accountNo:e.target.value})} required />
+                           <input type="text" placeholder="輸入帳號" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none border-2 border-transparent focus:border-emerald-200 transition-all" value={newSalesForm.accountNo || ''} onChange={e=>setNewSalesForm({...newSalesForm, accountNo:e.target.value})} required />
                         </div>
                      </div>
                   </div>
@@ -2052,15 +2052,15 @@ export default function DistributorClient({
                <div className="space-y-6">
                   <div className="space-y-2">
                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">經銷商名稱</p>
-                     <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.name} onChange={e=>setEditProfileForm({...editProfileForm, name: e.target.value})} required />
+                     <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.name || ''} onChange={e=>setEditProfileForm({...editProfileForm, name: e.target.value})} required />
                   </div>
                   <div className="space-y-2">
                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">官方通訊信箱</p>
-                     <input type="email" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.email} onChange={e=>setEditProfileForm({...editProfileForm, email: e.target.value})} required />
+                     <input type="email" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.email || ''} onChange={e=>setEditProfileForm({...editProfileForm, email: e.target.value})} required />
                   </div>
                   <div className="space-y-2">
                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">總部地址</p>
-                     <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.address} onChange={e=>setEditProfileForm({...editProfileForm, address: e.target.value})} required />
+                     <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.address || ''} onChange={e=>setEditProfileForm({...editProfileForm, address: e.target.value})} required />
                   </div>
                   
                   <div className="pt-6 border-t border-slate-100">
