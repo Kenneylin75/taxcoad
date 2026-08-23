@@ -200,6 +200,10 @@ export default function DistributorClient({
    const [templePayments, setTemplePayments] = useState<any[]>(initialFinancials?.paymentRecords || []);
    const [paymentYear, setPaymentYear] = useState(new Date().getFullYear().toString());
    const [paymentMonth, setPaymentMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
+   const [paymentCurrentPage, setPaymentCurrentPage] = useState(1);
+   useEffect(() => {
+     setPaymentCurrentPage(1);
+   }, [paymentYear, paymentMonth]);
    const [b2bReceiptViewerOpen, setB2bReceiptViewerOpen] = useState(false);
    const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
    const [currentReceiptImage, setCurrentReceiptImage] = useState<string | null>(null);
@@ -1462,6 +1466,10 @@ export default function DistributorClient({
                       return true;
                     });
                 
+                    const ITEMS_PER_PAGE = 6;
+                    const totalPages = Math.ceil(filteredPayments.length / ITEMS_PER_PAGE);
+                    const paginatedPayments = filteredPayments.slice((paymentCurrentPage - 1) * ITEMS_PER_PAGE, paymentCurrentPage * ITEMS_PER_PAGE);
+                
                     return (
                       <div className="space-y-4">
                         {filteredPayments.length === 0 ? (
@@ -1470,7 +1478,8 @@ export default function DistributorClient({
                              <p className="text-sm font-black text-slate-400">指定月份尚無帳款紀錄</p>
                            </div>
                         ) : (
-                          filteredPayments.map((payment: any) => (
+                          <>
+                            {paginatedPayments.map((payment: any) => (
                             <div key={payment.id} className="bg-white p-5 rounded-[28px] shadow-sm border border-slate-100 flex flex-col gap-4 hover:border-blue-100 hover:shadow-md transition-all group">
                                <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-3 overflow-hidden">
@@ -1533,7 +1542,25 @@ export default function DistributorClient({
                                  </button>
                                )}
                             </div>
-                          ))
+                            ))}
+                            {totalPages > 1 && (
+                               <div className="flex justify-center items-center gap-4 pt-4 mt-2">
+                                   <button 
+                                      onClick={() => setPaymentCurrentPage(prev => Math.max(1, prev - 1))}
+                                      disabled={paymentCurrentPage === 1}
+                                      className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-slate-50 transition-all font-black text-xs border border-slate-100"
+                                   >◄</button>
+                                   <div className="text-[11px] font-black text-slate-400 bg-slate-50 px-5 py-2.5 rounded-full border border-slate-100">
+                                      {paymentCurrentPage} <span className="text-slate-300 mx-1">/</span> {totalPages}
+                                   </div>
+                                   <button 
+                                      onClick={() => setPaymentCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                      disabled={paymentCurrentPage === totalPages}
+                                      className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-slate-50 transition-all font-black text-xs border border-slate-100"
+                                   >►</button>
+                               </div>
+                            )}
+                          </>
                         )}
                       </div>
                     );
