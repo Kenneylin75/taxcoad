@@ -10253,6 +10253,13 @@ export async function fetchSuperSalesProfile(salesId: string) {
         accountNumber: "",
         accountName: sales.name,
       };
+
+      if (typeof sales.commissionRules === "string") {
+        try {
+          sales.commissionRules = JSON.parse(sales.commissionRules);
+        } catch (e) {}
+      }
+      (sales as any).commissionRates = sales.commissionRules || {};
     }
     return sales;
   } catch (e) {
