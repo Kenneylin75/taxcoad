@@ -39,6 +39,7 @@ model Distributor {
   bankAccount  String?            @map("bank_account")
   bankCode     String?            @map("bank_code")
   bankName     String?            @map("bank_name")
+  bankAccountName String?         @map("bank_account_name")
   customNodes  Int?               @default(100) @map("custom_nodes")
   nodes        Int?               @default(100)
   quota        Int?               @default(100)
@@ -156,6 +157,10 @@ model DistributorApplication {
   rejectReason   String?  @map("reject_reason")
   rejectedAt     String?  @map("rejected_at")
   taxId          String?  @map("tax_id")
+  bankCode       String?  @map("bank_code")
+  bankName       String?  @map("bank_name")
+  bankAccount    String?  @map("bank_account")
+  bankAccountName String? @map("bank_account_name")
 
   @@map("distributor_applications")
 }

@@ -5314,7 +5314,7 @@ export async function fetchDistributorProfile(distId?: string) {
         bankCode: dist.bankCode || "",
         bankName: dist.bankName || "",
         accountNumber: dist.bankAccount || "",
-        accountName: dist.name,
+        accountName: dist.bankAccountName || dist.name,
       },
     };
   } catch (e) {
@@ -9676,6 +9676,19 @@ export async function approveDistributorBySuperAdmin(
         address: app.address || "",
         superSalesId:
           app.submittedBy !== "System Admin" ? app.submittedBy : null,
+        bankCode: app.bankCode || "",
+        bankAccount: app.bankAccount || "",
+        bankName: app.bankName || "",
+        bankAccountName: app.bankAccountName || "",
+        b2bPayment: {
+          customTransfer: {
+            enabled: true,
+            bankCode: app.bankCode || "",
+            bankName: app.bankName || "",
+            accountName: app.bankAccountName || "",
+            accountNo: app.bankAccount || "",
+          }
+        },
       },
     });
 
@@ -10206,6 +10219,10 @@ export async function submitDistributorApplication(data: any) {
         account: safeAccount,
         password: safePassword,
         expirationDate: newApp.expirationDate,
+        bankCode: data.bankCode || "",
+        bankName: data.bankName || "",
+        bankAccount: data.accountNumber || "",
+        bankAccountName: data.accountName || "",
       },
     });
   } catch (e) {
@@ -10631,6 +10648,16 @@ export async function createDistributorAccount(data: any) {
         bankCode: newDist.bankInfo?.bankCode || "",
         bankAccount: newDist.bankInfo?.accountNumber || "",
         bankName: newDist.bankInfo?.bankName || "",
+        bankAccountName: newDist.bankInfo?.accountName || "",
+        b2bPayment: {
+          customTransfer: {
+            enabled: true,
+            bankCode: newDist.bankInfo?.bankCode || "",
+            bankName: newDist.bankInfo?.bankName || "",
+            accountName: newDist.bankInfo?.accountName || "",
+            accountNo: newDist.bankInfo?.accountNumber || "",
+          }
+        },
       },
     });
 
