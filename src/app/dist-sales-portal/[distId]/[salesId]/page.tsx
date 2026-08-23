@@ -766,14 +766,14 @@ export default function DistSalesPage() {
           </div>
        </div>
 
-       {commission?.pendingRequests?.length > 0 && (
+       {commission?.pendingRequests?.filter((req: any) => req.date && req.date.startsWith(`${commYear}-${commMonth}`)).length > 0 && (
          <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
                <span className="w-1 h-4 bg-orange-500 rounded-full"></span>
                等待提領審核區
             </h3>
             <div className="space-y-4">
-               {commission.pendingRequests.map((req: any) => (
+               {commission.pendingRequests.filter((req: any) => req.date && req.date.startsWith(`${commYear}-${commMonth}`)).map((req: any) => (
                   <div key={req.id} className="bg-orange-50 p-6 rounded-[32px] shadow-sm border border-orange-100 flex justify-between items-center">
                      <div className="flex items-center gap-5">
                         <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-sm">⏳</div>
@@ -789,14 +789,14 @@ export default function DistSalesPage() {
          </div>
        )}
 
-       {commission?.withdrawals?.filter((w: any) => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').length > 0 && (
+       {commission?.withdrawals?.filter((w: any) => (w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid') && w.date && w.date.startsWith(`${commYear}-${commMonth}`)).length > 0 && (
          <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-900 px-2 flex items-center gap-2">
                <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
                已核准提領紀錄
             </h3>
             <div className="space-y-4">
-               {commission.withdrawals.filter((w: any) => w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid').map((req: any) => (
+               {commission.withdrawals.filter((w: any) => (w.status === 'Verified' || w.status === 'Approved' || w.status === 'Paid') && w.date && w.date.startsWith(`${commYear}-${commMonth}`)).map((req: any) => (
                   <div key={req.id} className="bg-emerald-50 p-6 rounded-[32px] shadow-sm border border-emerald-100 flex justify-between items-center">
                      <div className="flex items-center gap-5">
                         <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-xl shadow-sm">✅</div>
