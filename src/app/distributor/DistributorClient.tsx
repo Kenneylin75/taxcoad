@@ -981,21 +981,25 @@ export default function DistributorClient({
                   <div className="relative z-10 space-y-8">
                      <div className="flex justify-between items-center">
                         <p className="text-[10px] font-black text-blue-100 uppercase tracking-[0.5em]">年度業績總覽</p>
-                        <select 
-                           value={overviewYearFilter} 
-                           onChange={e => setOverviewYearFilter(e.target.value)}
-                           className="bg-white/20 text-white border border-white/40 rounded-full px-4 py-1 text-xs font-black outline-none backdrop-blur-sm focus:bg-blue-600 transition-colors"
-                        >
-                           {Array.from({length: 10}).map((_, i) => {
-                              const y = new Date().getFullYear() - 3 + i;
-                              return <option key={y} value={y.toString()} className="text-slate-900">{y} 年</option>;
-                           })}
-                        </select>
+                        <div className="flex items-center gap-2 bg-white/20 border border-white/40 rounded-full px-2 py-1 backdrop-blur-sm">
+                           <button 
+                             onClick={() => setOverviewYearFilter((parseInt(overviewYearFilter) - 1).toString())}
+                             className="text-white hover:bg-white/20 rounded-full transition-colors flex items-center justify-center w-5 h-5 text-[10px]"
+                           >
+                             ◄
+                           </button>
+                           <span className="text-white text-xs font-black w-10 text-center tracking-widest">{overviewYearFilter}</span>
+                           <button 
+                             onClick={() => setOverviewYearFilter((parseInt(overviewYearFilter) + 1).toString())}
+                             className="text-white hover:bg-white/20 rounded-full transition-colors flex items-center justify-center w-5 h-5 text-[10px]"
+                           >
+                             ►
+                           </button>
+                        </div>
                      </div>
                      <div className="flex flex-col space-y-6 mt-8">
                         <div className="flex items-center justify-between bg-white/10 p-5 rounded-2xl border border-white/20 hover:bg-white/20 transition-all">
                            <div className="flex items-center gap-4">
-                              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-blue-600 font-black text-sm shadow-md">1</span>
                               <p className="text-sm md:text-base font-black text-blue-50 tracking-widest">宮廟繳費總額</p>
                            </div>
                            <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-white drop-shadow-lg">
@@ -1005,7 +1009,6 @@ export default function DistributorClient({
 
                         <div className="flex items-center justify-between bg-white/10 p-5 rounded-2xl border border-white/20 hover:bg-white/20 transition-all">
                            <div className="flex items-center gap-4">
-                              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-blue-600 font-black text-sm shadow-md">2</span>
                               <p className="text-sm md:text-base font-black text-blue-50 tracking-widest">預計支出佣金</p>
                            </div>
                            <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-white drop-shadow-lg">
@@ -1015,7 +1018,6 @@ export default function DistributorClient({
 
                         <div className="flex items-center justify-between bg-white/10 p-5 rounded-2xl border border-white/20 hover:bg-white/20 transition-all">
                            <div className="flex items-center gap-4">
-                              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-blue-600 font-black text-sm shadow-md">3</span>
                               <p className="text-sm md:text-base font-black text-blue-50 tracking-widest">已核銷提領總額</p>
                            </div>
                            <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-white drop-shadow-lg">
