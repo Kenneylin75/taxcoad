@@ -39,6 +39,7 @@ export default function DistributorClient({
   const [financialTab, setFinancialTab] = useState<'payments' | 'performance' | 'bonuses'>('payments');
   const [expandedTempleId, setExpandedTempleId] = useState<string | null>(null);
   const [monthFilter, setMonthFilter] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+  const [financialRegionFilter, setFinancialRegionFilter] = useState("");
   const [teamPerformance, setTeamPerformance] = useState(initialTeam);
 
   React.useEffect(() => {
@@ -435,6 +436,8 @@ export default function DistributorClient({
   const groupedPayments = useMemo(() => {
     const groups: Record<string, typeof paymentRecords> = {};
     paymentRecords.forEach((p: any) => {
+      if (financialRegionFilter && p.region !== financialRegionFilter) return;
+
       const hasBillInMonth = p.history.some((h: any) => h.month === monthFilter);
       if (!hasBillInMonth) return;
       
@@ -447,7 +450,7 @@ export default function DistributorClient({
       groups[filteredP.region].push(filteredP);
     });
     return groups;
-  }, [paymentRecords, monthFilter]);
+  }, [paymentRecords, monthFilter, financialRegionFilter]);
 
   const TAIWAN_CITIES = [
     '基隆市','臺北市','新北市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣',
@@ -1023,11 +1026,19 @@ export default function DistributorClient({
                </div>
 
                {true && (
-                 <div className="flex justify-end mb-6">
+                 <div className="flex justify-between items-center mb-6">
+                    <select 
+                      value={financialRegionFilter} 
+                      onChange={(e) => setFinancialRegionFilter(e.target.value)}
+                      className="bg-white/80 backdrop-blur-md border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-xs appearance-none"
+                    >
+                      <option value="">全部地域</option>
+                      {TAIWAN_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
+                    </select>
                     <input 
                       type="month" 
-            min="2020-01"
-            max="2056-12"
+                      min="2020-01"
+                      max="2056-12"
                       value={monthFilter} 
                       onChange={(e) => setMonthFilter(e.target.value)}
                       className="bg-white/80 backdrop-blur-md border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
