@@ -39,6 +39,8 @@ export async function revalidateTemple(templeId?: string) {
   const tId = templeId || (await getDynamicTempleId());
   revalidatePath(`/${tId}`, "layout");
   revalidatePath("/super-admin", "layout");
+  revalidatePath("/distributor", "layout");
+  revalidatePath("/dist-sales", "layout");
   revalidatePath("/", "layout");
 }
 

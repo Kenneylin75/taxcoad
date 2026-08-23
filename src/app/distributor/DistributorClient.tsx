@@ -843,7 +843,7 @@ export default function DistributorClient({
                     <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/10 rounded-full blur-2xl"></div>
                     <div className="flex items-center gap-6 relative z-10">
                        <div className="w-16 h-16 rounded-[28px] bg-slate-900 text-white flex items-center justify-center text-3xl shadow-xl italic group hover:scale-110 transition-transform">🏛️</div>
-                       <div><h4 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{app.templeName}</h4><p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-3">業務員：{app.creatorId || app.submittedBy}</p></div>
+                       <div><h4 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{app.templeName || app.name}</h4><p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-3">業務員：{app.creatorId || app.submittedBy}</p></div>
                     </div>
                     <div className="p-8 bg-blue-50/50 rounded-[40px] space-y-5 border border-blue-100/30 shadow-inner">
                        <div className="flex justify-between text-[11px] font-black"><span className="text-slate-400 uppercase tracking-widest">合約開辦費</span><span className="text-slate-900 font-black">${app.setupFee?.toLocaleString() || '12,000'}</span></div>
