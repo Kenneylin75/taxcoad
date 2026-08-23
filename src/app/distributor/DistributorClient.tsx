@@ -154,18 +154,20 @@ export default function DistributorClient({
         if (h.status === 'Paid' && String(h.month).startsWith(overviewYearFilter)) {
           totalPayments += (h.amount || 0);
           
-          const isSetup = h.type === "SetupFee" || h.type === "Setup";
-          let rate = 0;
-          if (isSetup) {
-             rate = p.commissionRules?.setupRate || p.commissionRules?.setupFeePercent || 20;
-          } else {
-             const billDate = new Date(h.month + "-01");
-             const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
-             if (yearDiff === 0) rate = p.commissionRules?.rentYear1Rate || p.commissionRules?.rentYear1Percent || 15;
-             else if (yearDiff === 1) rate = p.commissionRules?.rentYear2Rate || p.commissionRules?.rentYear2Percent || 10;
-             else rate = p.commissionRules?.rentYear3PlusRate || p.commissionRules?.rentYear3PlusPercent || 5;
+          if (p.salesId) {
+            const isSetup = h.type === "SetupFee" || h.type === "Setup";
+            let rate = 0;
+            if (isSetup) {
+               rate = p.commissionRules?.setupRate || p.commissionRules?.setupFeePercent || 20;
+            } else {
+               const billDate = new Date(h.month + "-01");
+               const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
+               if (yearDiff === 0) rate = p.commissionRules?.rentYear1Rate || p.commissionRules?.rentYear1Percent || 15;
+               else if (yearDiff === 1) rate = p.commissionRules?.rentYear2Rate || p.commissionRules?.rentYear2Percent || 10;
+               else rate = p.commissionRules?.rentYear3PlusRate || p.commissionRules?.rentYear3PlusPercent || 5;
+            }
+            expectedCommission += ((h.amount || 0) * rate) / 100;
           }
-          expectedCommission += ((h.amount || 0) * rate) / 100;
         }
       });
     });
