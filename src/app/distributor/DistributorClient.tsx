@@ -478,6 +478,12 @@ export default function DistributorClient({
     return s ? s.name : '未知業務';
   };
 
+  const getSalesPhone = (salesId?: string) => {
+    if (!salesId) return null;
+    const s = initialTeam.find(m => m.id === salesId);
+    return s ? s.phone : '未提供';
+  };
+
   const renderTemples = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
        <div className="bg-white/60 backdrop-blur-3xl p-6 rounded-[40px] shadow-sm border border-white space-y-4">
@@ -1278,9 +1284,13 @@ export default function DistributorClient({
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">加入時間</p>
                         <p className="text-md font-black text-slate-900 group-hover:text-blue-600 transition-colors">{initialProfile?.joinedAt || '未設定'}</p>
                      </div>
-                     <div className="p-6 bg-white/40 rounded-[35px] border border-white/60 space-y-1 group hover:bg-white transition-all col-span-2">
+                     <div className="p-6 bg-white/40 rounded-[35px] border border-white/60 space-y-1 group hover:bg-white transition-all">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">官方通訊信箱</p>
                         <p className="text-md font-black text-slate-900 group-hover:text-blue-600 transition-colors">{initialProfile?.email || '未設定'}</p>
+                     </div>
+                     <div className="p-6 bg-white/40 rounded-[35px] border border-white/60 space-y-1 group hover:bg-white transition-all">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">聯絡電話</p>
+                        <p className="text-md font-black text-slate-900 group-hover:text-blue-600 transition-colors">{initialProfile?.contactPhone || '未設定'}</p>
                      </div>
                      <div className="p-6 bg-white/40 rounded-[35px] border border-white/60 space-y-1 group hover:bg-white transition-all col-span-2">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">營運總部地址</p>
@@ -1736,11 +1746,11 @@ export default function DistributorClient({
                        </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡人 / 負責人</p>
-                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.creatorId || viewTempleDetail.contactName || (viewTempleDetail.creatorRole === 'DistSales' ? getSalesName(viewTempleDetail.salesId) : initialProfile?.name || initialProfile?.account || '未設定')}</p>
+                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.creatorRole === 'DistSales' ? getSalesName(viewTempleDetail.salesId) : (initialProfile?.name || initialProfile?.contactName || '未設定')}</p>
                        </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">聯絡電話</p>
-                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.phone || viewTempleDetail.contactPhone || '未提供'}</p>
+                          <p className="text-xs font-black text-slate-800">{viewTempleDetail.creatorRole === 'DistSales' ? (getSalesPhone(viewTempleDetail.salesId) || '未提供') : (initialProfile?.contactPhone || '未設定')}</p>
                        </div>
                        <div className="bg-white border border-slate-200 p-3 rounded-2xl">
                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">登入帳號</p>
