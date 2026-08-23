@@ -780,10 +780,10 @@ export default function DistributorClient({
 <button onClick={() => {
                           setSelectedSales(m); 
                           setEditingRates({
-                            setupRate: m.commissionRules?.setupFeePercent || 20,
-                            rentYear1Rate: m.commissionRules?.rentYear1Percent || 15,
-                            rentYear2Rate: m.commissionRules?.rentYear2Percent || 10,
-                            rentYear3PlusRate: m.commissionRules?.rentYear3PlusPercent || 5
+                            setupRate: m.commissionRules?.setupFeePercent ?? m.commissionRules?.setupRate ?? 20,
+                            rentYear1Rate: m.commissionRules?.rentYear1Percent ?? m.commissionRules?.rentYear1Rate ?? 15,
+                            rentYear2Rate: m.commissionRules?.rentYear2Percent ?? m.commissionRules?.rentYear2Rate ?? 10,
+                            rentYear3PlusRate: m.commissionRules?.rentYear3PlusPercent ?? m.commissionRules?.rentYear3PlusRate ?? 5
                           });
                           setIsEditRateModalOpen(true);
                        }} className="text-[8px] font-black text-blue-600 bg-blue-50 px-4 py-2 rounded-full border border-blue-100 uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">調整分潤</button>
@@ -793,19 +793,19 @@ export default function DistributorClient({
                     <div className="grid grid-cols-4 gap-2 pt-2">
                        <div className="p-3 bg-blue-50/80 rounded-2xl text-center border border-blue-100/30 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500">
                           <p className="text-[6px] font-black opacity-50 uppercase mb-1 leading-none">開辦分潤</p>
-                          <p className="text-xs font-black">{m.commissionRules?.setupFeePercent || 20}%</p>
+                          <p className="text-xs font-black">{m.commissionRules?.setupFeePercent ?? m.commissionRules?.setupRate ?? 20}%</p>
                        </div>
                        <div className="p-3 bg-slate-50/80 rounded-2xl text-center border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500">
                           <p className="text-[6px] font-black opacity-50 uppercase mb-1 leading-none">第一年月租</p>
-                          <p className="text-xs font-black">{m.commissionRules?.rentYear1Percent || 15}%</p>
+                          <p className="text-xs font-black">{m.commissionRules?.rentYear1Percent ?? m.commissionRules?.rentYear1Rate ?? 15}%</p>
                        </div>
                        <div className="p-3 bg-slate-50/80 rounded-2xl text-center border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 opacity-80">
                           <p className="text-[6px] font-black opacity-50 uppercase mb-1 leading-none">第二年月租</p>
-                          <p className="text-xs font-black">{m.commissionRules?.rentYear2Percent || 10}%</p>
+                          <p className="text-xs font-black">{m.commissionRules?.rentYear2Percent ?? m.commissionRules?.rentYear2Rate ?? 10}%</p>
                        </div>
                        <div className="p-3 bg-slate-50/80 rounded-2xl text-center border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 opacity-60">
                           <p className="text-[6px] font-black opacity-50 uppercase mb-1 leading-none">第三年後</p>
-                          <p className="text-xs font-black">{m.commissionRules?.rentYear3PlusPercent || 5}%</p>
+                          <p className="text-xs font-black">{m.commissionRules?.rentYear3PlusPercent ?? m.commissionRules?.rentYear3PlusRate ?? 5}%</p>
                        </div>
                     </div>
                  </div>
@@ -1759,10 +1759,21 @@ export default function DistributorClient({
                 </div>
                 <div className="flex gap-4 pt-4">
                    <button onClick={() => setIsEditRateModalOpen(false)} className="flex-1 py-6 bg-slate-50 text-slate-400 rounded-3xl font-black uppercase text-[10px] tracking-widest">取消變更</button>
-                   <button onClick={() => {
-                      addLog("分潤協議變更", selectedSales.name); 
-                      setIsEditRateModalOpen(false); 
-                      alert("✅ 協議已更新並即刻生效");
+                   <button onClick={async () => {
+                      const res = await updateSalesCommission(selectedSales.id, {
+                         setupFeePercent: editingRates.setupRate,
+                         rentYear1Percent: editingRates.rentYear1Rate,
+                         rentYear2Percent: editingRates.rentYear2Rate,
+                         rentYear3PlusPercent: editingRates.rentYear3PlusRate
+                      });
+                      if (res.success) {
+                         addLog("分潤協議變更", selectedSales.name); 
+                         setIsEditRateModalOpen(false); 
+                         alert("✅ 協議已更新並即刻生效");
+                         window.location.reload();
+                      } else {
+                         alert(res.error || "更新失敗");
+                      }
                    }} className="flex-[1.5] py-6 bg-slate-950 text-white rounded-3xl font-black uppercase text-[10px] tracking-[0.2em] italic hover:bg-blue-600 shadow-2xl transition-all">確認簽署新協議</button>
                 </div>
              </div>
