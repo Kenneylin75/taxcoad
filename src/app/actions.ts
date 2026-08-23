@@ -7466,7 +7466,13 @@ export async function fetchDistributorFinancials(distId: string) {
     let bills: any[] = [];
     if (templeIds.length > 0) {
       bills = await prisma.templeBill.findMany({
-        where: { templeId: { in: templeIds } },
+        where: { 
+          templeId: { in: templeIds },
+          OR: [
+            { type: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] } },
+            { itemName: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] } }
+          ]
+        },
         orderBy: { createdAt: "desc" },
       });
     }
