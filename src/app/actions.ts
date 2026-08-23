@@ -9733,13 +9733,18 @@ export async function rejectDistributorBySuperAdmin(
 }
 
 export async function updateSuperSalesCommission(
-  salesName: string,
+  salesId: string,
   rates: any,
 ) {
-  console.log(`Updating rates for ${salesName}:`, rates);
-  [][salesName] = rates;
-
-  await null;
+  console.log(`Updating rates for ${salesId}:`, rates);
+  try {
+    await prisma.distributorSales.update({
+      where: { id: salesId },
+      data: { commissionRules: rates },
+    });
+  } catch (e) {
+    console.error("Failed to update commission:", e);
+  }
 
   revalidatePath("/super-admin");
   revalidatePath("/super-sales");
