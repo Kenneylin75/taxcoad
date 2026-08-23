@@ -11707,3 +11707,40 @@ export async function updateDistributorContract(
     return { success: false, error: String(error) };
   }
 }
+
+export async function logDistSalesAction(salesId: string, action: string, target?: string, details?: string, operator?: string) {
+  try {
+    if (!salesId) return;
+    await prisma.distSalesLog.create({
+      data: {
+        salesId,
+        action,
+        target,
+        details,
+        operator,
+      },
+    });
+  } catch (e) {
+    console.error("Failed to log dist sales action:", e);
+  }
+}
+
+export async function fetchDistSalesLogs(salesId: string) {
+  try {
+    const records = await prisma.distSalesLog.findMany({
+      where: { salesId },
+      orderBy: { createdAt: "desc" },
+    });
+    return records.map(r => ({
+      id: r.id,
+      action: r.action || "",
+      target: r.target || "",
+      details: r.details || "",
+      operator: r.operator || "",
+      createdAt: r.createdAt.toISOString(),
+    }));
+  } catch (e) {
+    console.error("Failed to fetch dist sales logs:", e);
+    return [];
+  }
+}

@@ -65,6 +65,20 @@ model DistributorLog {
   @@map("distributor_logs")
 }
 
+model DistSalesLog {
+  id        String   @id @default(cuid())
+  salesId   String   @map("sales_id")
+  action    String?
+  target    String?
+  details   String?
+  operator  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  sales     DistributorSales @relation(fields: [salesId], references: [id], onDelete: Cascade)
+
+  @@map("dist_sales_logs")
+}
+
 model DistributorSales {
   id              String       @id @default(cuid())
   distributorId   String?      @map("distributor_id")
@@ -87,6 +101,7 @@ model DistributorSales {
   commissions     Commission[]
   distributor     Distributor? @relation(fields: [distributorId], references: [id])
   visits          SalesVisit[]
+  logs            DistSalesLog[]
 
   @@map("dist_sales")
 }

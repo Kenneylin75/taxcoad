@@ -45,6 +45,8 @@ export default function DistSalesPage() {
   const salesId = params.salesId as string;
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
   const [salesName, setSalesName] = useState("");
   const [performance, setPerformance] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
@@ -765,9 +767,9 @@ export default function DistSalesPage() {
                {activeTab === 'profile' && '個人中心'}
             </h1>
          </div>
-         <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-black shadow-xl rotate-3">
+         <button onClick={() => setIsLogModalOpen(true)} className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-black shadow-xl rotate-3 hover:scale-105 transition-all active:scale-95 hover:shadow-blue-500/50 hover:bg-blue-600">
             {profile?.name?.substring(0, 1)}
-         </div>
+         </button>
       </div>
 
       <main className="max-w-md mx-auto px-6 mt-8 relative z-20">
