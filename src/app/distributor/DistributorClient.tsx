@@ -41,14 +41,18 @@ export default function DistributorClient({
   const [monthFilter, setMonthFilter] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
   const [financialRegionFilter, setFinancialRegionFilter] = useState("");
   const [teamPerformance, setTeamPerformance] = useState(initialTeam);
+  const [currentPerformanceIndex, setCurrentPerformanceIndex] = useState(0);
 
   React.useEffect(() => {
     if (activeTab === 'financials' && initialProfile?.id) {
-      import('@/app/actions').then(m => m.fetchDistributorSalesPerformance(initialProfile.id, monthFilter)).then(res => {
-        if (res) setTeamPerformance(res);
+      import('@/app/actions').then(m => m.fetchDistributorSalesPerformance(initialProfile.id, undefined)).then(res => {
+        if (res) {
+            setTeamPerformance(res);
+            setCurrentPerformanceIndex(0);
+        }
       });
     }
-  }, [monthFilter, activeTab, initialProfile?.id]);
+  }, [activeTab, initialProfile?.id]);
 
   // --- Calendar & Period State ---
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -1025,16 +1029,18 @@ export default function DistributorClient({
                   ))}
                </div>
 
-               {true && (
-                 <div className="flex justify-between items-center mb-6">
-                    <select 
-                      value={financialRegionFilter} 
-                      onChange={(e) => setFinancialRegionFilter(e.target.value)}
-                      className="bg-white/80 backdrop-blur-md border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-xs appearance-none"
-                    >
-                      <option value="">全部地域</option>
-                      {TAIWAN_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
-                    </select>
+               {financialTab !== 'performance' && (
+                 <div className={`flex items-center mb-6 ${financialTab === 'payments' ? 'justify-between' : 'justify-end'}`}>
+                    {financialTab === 'payments' && (
+                      <select 
+                        value={financialRegionFilter} 
+                        onChange={(e) => setFinancialRegionFilter(e.target.value)}
+                        className="bg-white/80 backdrop-blur-md border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-xs appearance-none"
+                      >
+                        <option value="">全部地域</option>
+                        {TAIWAN_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
+                      </select>
+                    )}
                     <input 
                       type="month" 
                       min="2020-01"
@@ -1101,48 +1107,71 @@ export default function DistributorClient({
                        ))}
                     </div>
                   )}
-                  {financialTab === 'performance' && (
+                  {financialTab === 'performance' && teamPerformance.length > 0 && (
                     <div className="space-y-4">
-                       {teamPerformance.map((s: any, idx: number) => (
-                          <div key={s.id} className="bg-white/60 backdrop-blur-xl p-7 rounded-[40px] border border-white shadow-xl space-y-6 group hover:bg-white transition-all duration-500">
-                              <div className="flex justify-between items-center">
-                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-950 text-white flex items-center justify-center text-sm font-black italic shadow-xl group-hover:bg-blue-600 transition-all">0{idx+1}</div>
-                                    <div>
-                                       <h4 className="text-sm font-black text-slate-900">{s.name}</h4>
-                                       <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">ID: {s.account}</p>
-                                    </div>
-                                 </div>
+                       <div className="flex justify-between items-center px-6 mb-2">
+                           <button onClick={() => setCurrentPerformanceIndex(prev => prev > 0 ? prev - 1 : teamPerformance.length - 1)} className="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-all font-black">◄</button>
+                           <div className="text-center">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">總共 {teamPerformance.length} 位業務</p>
+                              <div className="bg-slate-950 text-white px-4 py-1.5 rounded-full text-sm font-black inline-flex items-center gap-2">
+                                  <span>{String(currentPerformanceIndex + 1).padStart(2, '0')}</span>
+                                  <span className="text-slate-500">/</span>
+                                  <span>{String(teamPerformance.length).padStart(2, '0')}</span>
                               </div>
-                              <div className="grid grid-cols-2 gap-4 mt-4">
-                                  <div className="bg-slate-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
-                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">總營業額</p>
-                                      <p className="text-lg font-black text-slate-900">${(s.totalSales || 0).toLocaleString()}</p>
+                           </div>
+                           <button onClick={() => setCurrentPerformanceIndex(prev => prev < teamPerformance.length - 1 ? prev + 1 : 0)} className="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-all font-black">►</button>
+                       </div>
+                       
+                       {(() => {
+                           const s = teamPerformance[currentPerformanceIndex];
+                           return (
+                              <div key={s.id} className="bg-white/60 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl space-y-8 transition-all duration-500">
+                                  <div className="flex justify-center items-center">
+                                     <div className="flex flex-col items-center gap-2">
+                                        <div className="w-16 h-16 rounded-3xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black italic shadow-xl">
+                                            {String(currentPerformanceIndex + 1).padStart(2, '0')}
+                                        </div>
+                                        <div className="text-center">
+                                           <h4 className="text-lg font-black text-slate-900">{s.name}</h4>
+                                           <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">ID: {s.account}</p>
+                                        </div>
+                                     </div>
                                   </div>
-                                  <div className="bg-slate-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
-                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">總宮廟開設數</p>
-                                      <p className="text-lg font-black text-slate-900">{s.totalTemplesCount || 0} <span className="text-[10px] text-slate-500">家</span></p>
-                                  </div>
-                                  <div className="bg-emerald-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-emerald-100">
-                                      <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-1">總獎金</p>
-                                      <p className="text-lg font-black text-emerald-700">${(s.commission || 0).toLocaleString()}</p>
-                                  </div>
-                                  <div className="bg-blue-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-blue-100">
-                                      <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mb-1">總已提領獎金</p>
-                                      <p className="text-lg font-black text-blue-700">${(s.totalWithdrawn || 0).toLocaleString()}</p>
-                                  </div>
-                                  <div className="bg-purple-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-purple-100">
-                                      <p className="text-[10px] text-purple-600 font-bold uppercase tracking-widest mb-1">可提領獎金</p>
-                                      <p className="text-lg font-black text-purple-700">${(s.availableBonus || 0).toLocaleString()}</p>
-                                  </div>
-                                  <div className="bg-amber-50 rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-amber-100">
-                                      <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest mb-1">拜訪未成業務</p>
-                                      <p className="text-lg font-black text-amber-700">{s.unconvertedVisitsCount || 0} <span className="text-[10px] text-amber-600/70">家</span></p>
+                                  <div className="grid grid-cols-2 gap-4">
+                                      <div className="bg-slate-50 rounded-[24px] p-6 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+                                          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-2">總營業額</p>
+                                          <p className="text-2xl font-black text-slate-900">${(s.totalSales || 0).toLocaleString()}</p>
+                                      </div>
+                                      <div className="bg-slate-50 rounded-[24px] p-6 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+                                          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-2">總宮廟開設數</p>
+                                          <p className="text-2xl font-black text-slate-900">{s.totalTemplesCount || 0} <span className="text-[12px] text-slate-500 font-bold">家</span></p>
+                                      </div>
+                                      <div className="bg-emerald-50 rounded-[24px] p-6 flex flex-col justify-center items-center text-center border border-emerald-100 hover:shadow-md transition-shadow">
+                                          <p className="text-[11px] text-emerald-600 font-bold uppercase tracking-widest mb-2">總獎金</p>
+                                          <p className="text-2xl font-black text-emerald-700">${(s.commission || 0).toLocaleString()}</p>
+                                      </div>
+                                      <div className="bg-blue-50 rounded-[24px] p-6 flex flex-col justify-center items-center text-center border border-blue-100 hover:shadow-md transition-shadow">
+                                          <p className="text-[11px] text-blue-600 font-bold uppercase tracking-widest mb-2">總已提領獎金</p>
+                                          <p className="text-2xl font-black text-blue-700">${(s.totalWithdrawn || 0).toLocaleString()}</p>
+                                      </div>
+                                      <div className="bg-purple-50 rounded-[24px] p-6 flex flex-col justify-center items-center text-center border border-purple-100 hover:shadow-md transition-shadow">
+                                          <p className="text-[11px] text-purple-600 font-bold uppercase tracking-widest mb-2">可提領獎金</p>
+                                          <p className="text-2xl font-black text-purple-700">${(s.availableBonus || 0).toLocaleString()}</p>
+                                      </div>
+                                      <div className="bg-amber-50 rounded-[24px] p-6 flex flex-col justify-center items-center text-center border border-amber-100 hover:shadow-md transition-shadow">
+                                          <p className="text-[11px] text-amber-600 font-bold uppercase tracking-widest mb-2">拜訪未成業務</p>
+                                          <p className="text-2xl font-black text-amber-700">{s.unconvertedVisitsCount || 0} <span className="text-[12px] text-amber-600/70 font-bold">家</span></p>
+                                      </div>
                                   </div>
                               </div>
-                          </div>
-                       ))}
+                           );
+                       })()}
                     </div>
+                  )}
+                  {financialTab === 'performance' && teamPerformance.length === 0 && (
+                      <div className="flex flex-col items-center justify-center p-10 bg-white/50 backdrop-blur-md rounded-[40px] border border-white shadow-xl">
+                          <p className="text-sm font-black text-slate-400">尚無經銷業務</p>
+                      </div>
                   )}
                   {financialTab === 'bonuses' && (
                     <div className="space-y-4">
