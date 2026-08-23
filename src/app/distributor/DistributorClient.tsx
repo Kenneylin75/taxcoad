@@ -1821,7 +1821,7 @@ export default function DistributorClient({
                            <div key={item.key} className="bg-slate-50 p-5 rounded-[30px] border border-slate-100 flex flex-col items-center justify-center space-y-4 hover:bg-slate-950 hover:text-white transition-all duration-500">
                               <p className="text-[9px] font-black opacity-50 uppercase text-center leading-tight">{item.label}<br/>{item.sub}</p>
                               <div className="relative">
-                                 <input type="number" className="bg-transparent w-12 text-2xl font-black text-center outline-none" value={(newSalesForm as any)[item.key]} onChange={e=>setNewSalesForm({...newSalesForm, [item.key]:parseInt(e.target.value)})} />
+                                 <input type="number" className="bg-transparent w-12 text-2xl font-black text-center outline-none" value={(newSalesForm as any)[item.key] || 0} onChange={e=>setNewSalesForm({...newSalesForm, [item.key]:parseInt(e.target.value)})} />
                                  <span className="absolute -right-3 bottom-0.5 text-[10px] font-bold">%</span>
                               </div>
                            </div>
@@ -1881,7 +1881,7 @@ export default function DistributorClient({
                     <div key={k.key} className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex flex-col items-center justify-center space-y-3 hover:bg-blue-600 hover:text-white transition-all">
                        <p className="text-[9px] font-black opacity-50 uppercase leading-tight">{k.label}<br/>{k.sub}</p>
                        <div className="relative">
-                          <input type="number" className="bg-transparent w-full text-center font-black text-2xl outline-none" value={(editingRates as any)[k.key]} onChange={e=>setEditingRates({...editingRates, [k.key]:parseInt(e.target.value)})} />
+                          <input type="number" className="bg-transparent w-full text-center font-black text-2xl outline-none" value={(editingRates as any)[k.key] || 0} onChange={e=>setEditingRates({...editingRates, [k.key]:parseInt(e.target.value)})} />
                        </div>
                     </div>
                   ))}
@@ -2033,7 +2033,7 @@ export default function DistributorClient({
                      <div className="space-y-4">
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">支付銀行名稱</p>
-                           <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.bankName} onChange={e=>setEditProfileForm({...editProfileForm, bankName: e.target.value})} />
+                           <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.bankName || ''} onChange={e=>setEditProfileForm({...editProfileForm, bankName: e.target.value})} />
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行代碼 (Bank Code)</p>
@@ -2041,11 +2041,11 @@ export default function DistributorClient({
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">戶名</p>
-                           <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.accountName} onChange={e=>setEditProfileForm({...editProfileForm, accountName: e.target.value})} />
+                           <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.accountName || ''} onChange={e=>setEditProfileForm({...editProfileForm, accountName: e.target.value})} />
                         </div>
                         <div className="space-y-2">
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">銀行帳號</p>
-                           <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.accountNumber} onChange={e=>setEditProfileForm({...editProfileForm, accountNumber: e.target.value})} />
+                           <input type="text" className="w-full bg-slate-50 rounded-[28px] p-6 text-sm font-black outline-none focus:border-blue-200 border-2 border-transparent transition-all" value={editProfileForm.accountNumber || ''} onChange={e=>setEditProfileForm({...editProfileForm, accountNumber: e.target.value})} />
                         </div>
                      </div>
                   </div>
