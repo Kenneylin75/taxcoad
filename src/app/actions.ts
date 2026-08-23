@@ -8113,6 +8113,7 @@ export async function requestBonus(
         salesName: salesName || "",
       },
     });
+    await logDistSalesAction(salesId, "申請獎金提領", "獎金系統", `申請金額: ${amount} 元`);
     return { success: true };
   } catch (e) {
     return { success: false };
@@ -8935,6 +8936,7 @@ export async function updateDistSalesBankInfo(salesId: string, bankInfo: any) {
       where: { id: salesId },
       data: { bankAccount: bankInfo },
     });
+    await logDistSalesAction(salesId, "更新銀行帳戶資訊", "個人資料", "修改匯款銀行帳號");
     return { success: true };
   } catch (e) {
     return { success: false };
@@ -9986,6 +9988,7 @@ export async function addVisitationRecord(data: any) {
         content: data.notes,
       },
     });
+    await logDistSalesAction(data.salesId, "新增拜訪紀錄", data.templeName, `第 ${data.visitIndex || 1} 次拜訪`);
     const { revalidatePath } = require("next/cache");
     revalidatePath("/dist-sales");
     revalidatePath("/dist-admin");
