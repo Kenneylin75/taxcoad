@@ -4252,7 +4252,7 @@ async function autoGenerateRecurringBills(temple: any) {
 
     if (!hasBill) {
       generateBills.push({
-        id: `BILL-RENT-${temple.id.substring(0, 4)}-${billingStr}`,
+        id: `BILL-RENT-${temple.id}-${billingStr}`,
         templeId: temple.id,
         itemName: rentType,
         amount: rentAmount,
@@ -8698,7 +8698,7 @@ async function autoGenerateStorageBills(templeId: string) {
 
       if (!hasBill) {
         generateBills.push({
-          id: `BILL-STORAGE-${Date.now()}-${billingStr}`,
+          id: `BILL-STORAGE-${templeId}-${billingStr}`,
           templeId,
           itemName: `雲端空間擴充方案 - ${plan.name} (${plan.id})`,
           amount,
