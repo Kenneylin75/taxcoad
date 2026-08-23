@@ -246,7 +246,7 @@ export default function DistSalesPage() {
                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">直屬：{profile?.parentDistributor}</p>
             </div>
          </div>
-         <button onClick={() => setActiveTab('profile')} className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"><IconArrowRight /></button>
+         <button onClick={() => setActiveTab('profile')} className="px-5 py-2 rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-sm hover:bg-emerald-600 transition-colors shadow-lg shadow-slate-900/20 active:scale-95">設定</button>
       </section>
 
       {/* Performance Metrics */}

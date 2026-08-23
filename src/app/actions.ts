@@ -11312,6 +11312,7 @@ export async function addSalesMember(data: any) {
           rentYear2Rate: data.rentYear2Percent || 10,
           rentYear3PlusRate: data.rentYear3PlusPercent || 5,
         },
+        bankAccount: data.bankInfo || null,
       },
     });
   } catch (e) {
@@ -11335,6 +11336,7 @@ export async function createDistributorSales(distId: string, data: any) {
     rentYear1Rate,
     rentYear2Rate,
     rentYear3PlusRate,
+    bankInfo
   } = data;
   const newSalesId = "dist-sales-" + Date.now();
   const joinedAt = new Date().toISOString().split("T")[0];
@@ -11370,6 +11372,7 @@ export async function createDistributorSales(distId: string, data: any) {
             rentYear2Rate,
             rentYear3PlusRate,
           },
+          bankAccount: bankInfo || null,
         },
       });
     }
