@@ -453,6 +453,7 @@ export default function DistributorClient({
   ];
 
   const filteredTemples = (initialTemples || []).filter(t => {
+    if (t.status === 'Pending') return false; // 隱藏尚未核定的宮廟
     const matchSearch = (t.templeName || t.name || "").includes(templeSearch) || (t.creatorId || "").includes(templeSearch);
     const matchLocation = templeLocationFilter === "" || t.city === templeLocationFilter;
     return matchSearch && matchLocation;
