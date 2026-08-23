@@ -143,7 +143,11 @@ export default function DistSalesPage() {
       fetchRentPlans()
     ]);
     setPerformance(perf);
-    setApplications(apps.filter((a: any) => a.salesId === salesId).sort((a: any, b: any) => b.timestamp.localeCompare(a.timestamp)));
+    setApplications(apps.filter((a: any) => a.salesId === salesId).sort((a: any, b: any) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    }));
     setVisits(visitData);
     setTools(toolData);
     setContracts(conData);
