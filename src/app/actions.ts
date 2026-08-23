@@ -3785,8 +3785,8 @@ export async function approveTempleByDistributor(id: string) {
       data: { status: "Active" },
     });
 
-    if (temple.distributorId) {
-      await logDistributorAction(temple.distributorId, '核准宮廟申請', temple.name, '管理員');
+    if (t.distributorId) {
+      await logDistributorAction(t.distributorId, '核准宮廟申請', t.name, '管理員');
     }
     await generateInitialBills(t);
 
