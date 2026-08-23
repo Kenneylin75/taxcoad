@@ -4638,6 +4638,14 @@ export async function fetchFinancialOverview() {
 
   try {
     /* removed duplicate import */
+    let distName = "系統總部";
+    if (temple?.distributorId) {
+      const dist = await prisma.distributor.findUnique({ where: { id: temple.distributorId } });
+      if (dist) {
+        distName = dist.companyName || dist.name || "系統總部";
+      }
+    }
+
     let rows = await prisma.templeBill.findMany({ where: { templeId } });
     if (
       temple &&
@@ -4679,6 +4687,8 @@ export async function fetchFinancialOverview() {
               : String(r.createdAt || r.created_at || "").substring(0, 7)),
           payeeRole: r.payeeRole || r.payee_role || fallbackRole,
           payeeId: r.payeeId || r.payee_id || fallbackId,
+          payeeName: (r.payeeRole || r.payee_role || fallbackRole) === "SuperAdmin" ? "系統總部" : distName,
+          receiptUrl: r.receiptUrl || r.receipt_url || null,
         };
       });
     }

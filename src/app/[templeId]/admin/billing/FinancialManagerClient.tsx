@@ -482,6 +482,9 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                                </span>
                             </td>
                             <td className="px-6 py-4">
+                               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{exp.payeeName || '系統總部'}</span>
+                            </td>
+                            <td className="px-6 py-4">
                                {exp.status === 'Paid' ? (
                                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
                                      ✓ 已付款
@@ -506,7 +509,15 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                                      {isPending ? "連線中..." : (exp.status === 'PendingVerification' ? "查看審核狀態" : "💳 支付")}
                                   </button>
                                ) : (
-                                  <button className="text-slate-300 hover:text-slate-600 transition-all">📄</button>
+                                  exp.receiptUrl ? (
+                                    <a href={exp.receiptUrl} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 transition-all text-xs font-bold flex items-center justify-end gap-1">
+                                      📄 查看匯款單
+                                    </a>
+                                  ) : (
+                                    <button className="text-slate-300 hover:text-slate-600 transition-all cursor-not-allowed text-xs font-bold flex items-center justify-end gap-1">
+                                      📄 無附件
+                                    </button>
+                                  )
                                )}
                             </td>
                           </tr>
