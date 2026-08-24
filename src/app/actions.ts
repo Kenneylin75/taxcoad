@@ -39,8 +39,9 @@ export async function revalidateTemple(templeId?: string) {
   const tId = templeId || (await getDynamicTempleId());
   revalidatePath(`/${tId}`, "layout");
   revalidatePath("/super-admin", "layout");
-  revalidatePath("/distributor", "layout");
-  revalidatePath("/dist-sales", "layout");
+  revalidatePath("/distributor/[distId]", "page");
+  revalidatePath("/dist-sales/[salesId]", "page");
+  revalidatePath("/dist-sales-portal/[distId]/[salesId]", "page");
   revalidatePath("/", "layout");
 }
 
@@ -11400,7 +11401,7 @@ export async function addSalesMember(data: any) {
     return { success: false, error: "建立業務菁英失敗" };
   }
   await logDistributorAction(data.distributorId || "dist-1", '新增業務人員', data.name || "未命名業務員", '管理員', `帳號: ${data.account || 'sales_' + id}`);
-  revalidatePath("/distributor");
+  revalidatePath("/distributor/[distId]", "page");
   return { success: true, id };
 }
 
@@ -11462,6 +11463,7 @@ export async function createDistributorSales(distId: string, data: any) {
     return { success: false, error: String(e) };
   }
 
+  revalidatePath("/distributor/[distId]", "page");
   return { success: true, data: { id: newSalesId } };
 }
 
