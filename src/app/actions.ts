@@ -8702,6 +8702,7 @@ async function autoGenerateStorageBills(templeId: string) {
         generateBills.push({
           id: `BILL-STORAGE-${templeId}-${billingStr}`,
           templeId,
+          type: "StorageUpgrade",
           itemName: `雲端空間擴充方案 - ${plan.name} (${plan.id})`,
           amount,
           dueDate: cycleDate.toISOString().split("T")[0],
@@ -11870,7 +11871,15 @@ export async function updateSalesPassword(salesId: string, newPassword: string) 
 export async function fetchPendingStorageBills() {
   try {
     const bills = await prisma.templeBill.findMany({
-      where: { payeeRole: "SuperAdmin", itemName: { contains: "雲端空間擴充" } },
+      where: {
+        payeeRole: "SuperAdmin",
+        OR: [
+          { type: "StorageUpgrade" },
+          { itemName: { contains: "雲端空間擴充" } },
+          { itemName: { contains: "雲端空間專案" } },
+          { itemName: "StorageUpgrade" }
+        ]
+      },
       include: { temple: true },
       orderBy: { createdAt: "desc" }
     });
