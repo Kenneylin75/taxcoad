@@ -1384,141 +1384,158 @@ export default function SuperAdminClient({
                    </div>
                 </div>
 
-                {/* --- 2. AI Plans Pricing Redesign (Light Theme) --- */}
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-fuchsia-500/5 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-bl from-fuchsia-50 to-pink-50 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-                   
-                   <div className="relative z-10">
-                      <div className="flex justify-between items-end mb-8">
-                        <div>
-                          <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tighter">AI 方案定價與配置</h4>
-                          <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">SaaS Plan Pricing & Limits</p>
-                        </div>
-                        <button onClick={() => setAiPlans([...aiPlans, { id: 'NEW-'+Date.now(), name: '新方案', monthlyFee: 0, chatLimit: 0 }])} className="px-6 py-2.5 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-100 rounded-xl text-[11px] font-black tracking-widest uppercase hover:bg-fuchsia-600 hover:text-white transition-colors shadow-sm">
-                           + 新增方案
-                        </button>
+                {/* --- 2. AI 模組全局定價 --- */}
+                 <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-fuchsia-500/5 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-bl from-fuchsia-50 to-pink-50 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+                    
+                    <div className="relative z-10">
+                       <div className="flex justify-between items-end mb-8">
+                         <div>
+                           <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tighter">AI 模組全局定價</h4>
+                           <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">Global SaaS Pricing</p>
+                         </div>
+                       </div>
+
+                       <div className="flex flex-col bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-8 max-w-md">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">AI 模組一年費用 (NT$)</label>
+                          <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-xl px-4 focus-within:border-fuchsia-400 focus-within:ring-4 focus-within:ring-fuchsia-500/10 transition-all">
+                             <span className="text-fuchsia-500 font-black text-xl">$</span>
+                             <input type="number" value={config?.aiAnnualFee || 0} onChange={e => setConfig({...config, aiAnnualFee: Number(e.target.value)})} className="w-full bg-transparent py-4 text-3xl font-black text-slate-800 outline-none" />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-4 font-bold">當宮廟開啟 AI 功能時，系統將自動以此金額產出一張「AIFee」年度帳單。</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* --- 2.5 AI 帳單審核區塊 --- */}
+                 <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-emerald-500/5 relative overflow-hidden mt-12">
+                    <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-bl from-emerald-50 to-teal-50 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+                    <div className="relative z-10">
+                       <div className="flex justify-between items-end mb-8">
+                         <div>
+                           <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tighter">AI 開通帳單審核</h4>
+                           <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">AI Activation Billing Review</p>
+                         </div>
+                       </div>
+                       
+                       <div className="space-y-4">
+                          {(() => {
+                             const aiBills = (finance?.templeBills || []).filter((b: any) => b.item_name === 'AIFee' && (b.status === 'Pending' || b.status === 'Unpaid'));
+                             
+                             if (aiBills.length === 0) {
+                               return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的 AI 帳單</p></div>;
+                             }
+                             return aiBills.map((b: any) => {
+                               const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                               return (
+                               <div key={b.id} className="bg-white p-6 rounded-[20px] border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-500/5 transition-all">
+                                  <div>
+                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
+                                     <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
+                                     <p className="text-[11px] font-bold text-emerald-600 mt-1">AI 模組年度授權費</p>
+                                  </div>
+                                  <div className="text-right">
+                                     <span className="text-emerald-500 text-xl font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
+                                     <p className="text-[11px] font-bold text-slate-500 mt-1">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                     {b.receipt_url || b.receiptUrl ? (
+                                        <button 
+                                          onClick={() => {
+                                             setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
+                                             setPreviewModalOpen(true);
+                                          }}
+                                          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-sm"
+                                        >查看匯款截圖</button>
+                                     ) : (
+                                        <span className="text-[10px] font-bold text-slate-400 px-4 py-2">無圖片</span>
+                                     )}
+                                     <button 
+                                        onClick={async () => {
+                                           if (confirm('確定要將此帳單標記為已付款嗎？此操作將開通該宮廟的 AI 服務。')) {
+                                              await fetch('/api/db', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'updateTempleBill', id: b.id, data: { status: 'Paid' } }) });
+                                              window.location.reload();
+                                           }
+                                        }}
+                                        className="px-6 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
+                                     >標記已付款</button>
+                                  </div>
+                               </div>
+                             )});
+                          })()}
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* --- 3. 宮廟 AI 使用狀況監控 --- */}
+                 <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-emerald-500/5 mb-12">
+                    <div className="flex justify-between items-end mb-6">
+                      <div>
+                        <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tighter">宮廟 AI 使用狀況監控</h4>
+                        <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">Real-time Usage Analytics</p>
                       </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {aiPlans.map((plan, i) => (
-                           <div key={i} className="group flex flex-col bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:shadow-fuchsia-500/10 hover:border-fuchsia-200 transition-all duration-300 relative overflow-hidden">
-                              <div className="relative z-10 flex-1 space-y-5">
-                                 <div>
-                                    <label className="block text-[9px] font-black text-fuchsia-500 uppercase tracking-widest mb-1.5">Plan Name</label>
-                                    <input type="text" value={plan.name} onChange={e => {
-                                      const copy = [...aiPlans]; copy[i].name = e.target.value; setAiPlans(copy);
-                                    }} className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xl font-black text-slate-800 italic tracking-tighter outline-none focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-500/10 transition-colors" />
-                                 </div>
-                                 
-                                 <div>
-                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Monthly Fee (NT$)</label>
-                                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg px-3 focus-within:border-fuchsia-300 focus-within:ring-2 focus-within:ring-fuchsia-500/10 transition-colors">
-                                       <span className="text-slate-400 font-bold text-sm">$</span>
-                                       <input type="number" value={plan.monthlyFee} onChange={e => {
-                                         const copy = [...aiPlans]; copy[i].monthlyFee = Number(e.target.value); setAiPlans(copy);
-                                       }} className="w-full bg-transparent py-2 text-2xl font-black text-slate-800 outline-none" />
-                                    </div>
-                                 </div>
-
-                                 <div>
-                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Monthly Chat Limit</label>
-                                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg px-3 focus-within:border-fuchsia-300 focus-within:ring-2 focus-within:ring-fuchsia-500/10 transition-colors">
-                                       <span className="text-slate-400 font-bold text-xs">Tokens</span>
-                                       <input type="number" value={plan.chatLimit} onChange={e => {
-                                         const copy = [...aiPlans]; copy[i].chatLimit = Number(e.target.value); setAiPlans(copy);
-                                       }} className="w-full bg-transparent py-2 text-lg font-black text-slate-600 outline-none" />
-                                    </div>
-                                 </div>
-                              </div>
-                              
-                              <div className="relative z-10 mt-6 pt-5 border-t border-slate-100 flex justify-between items-center">
-                                 <button onClick={() => {
-                                    if(confirm('確定要刪除這個方案嗎？')) setAiPlans(aiPlans.filter((_, idx) => idx !== i));
-                                 }} className="text-[10px] font-black text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-widest px-2 py-1 rounded hover:bg-rose-50">
-                                    Delete
-                                 </button>
-                                 <button onClick={async () => {
-                                    await saveAiPlan(plan);
-                                    alert(`✨ 方案 [${plan.name}] 已更新儲存！`);
-                                 }} className="px-6 py-2 bg-slate-800 text-white rounded-lg text-[10px] font-black tracking-widest uppercase hover:bg-fuchsia-600 shadow-md hover:shadow-fuchsia-500/30 transition-all">
-                                   Save
-                                 </button>
-                              </div>
-                           </div>
-                        ))}
-                      </div>
-                   </div>
-                </div>
-
-                {/* --- 3. Temple AI Usage Analytics Table (Light Theme) --- */}
-                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-emerald-500/5">
-                   <div className="flex justify-between items-end mb-6">
-                     <div>
-                       <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tighter">宮廟 AI 使用狀況監控</h4>
-                       <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">Real-time Usage Analytics</p>
-                     </div>
-                   </div>
-                   
-                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                           <tr>
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">宮廟名稱</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">目前方案</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-1/4">當月使用額度</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">狀態</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">系統設定權</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                           {allTempleAiUsage.map((u, i) => {
-                              const isExpired = new Date(u.expiryDate).getTime() < Date.now();
-                              const isExhausted = u.usedCount >= u.chatLimit;
-                              const usagePercent = u.isVip ? 0 : Math.min(100, Math.round((u.usedCount / Math.max(1, u.chatLimit)) * 100));
-                              
-                              let statusBadge = <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[9px] font-black tracking-widest uppercase">啟用中 (Active)</span>;
-                              if (u.isVip) statusBadge = <span className="px-2.5 py-1 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-100 rounded text-[9px] font-black tracking-widest uppercase">無限免費 (VIP)</span>;
-                              else if (!u.enabled) statusBadge = <span className="px-2.5 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded text-[9px] font-black tracking-widest uppercase">已停用 (Disabled)</span>;
-                              else if (isExpired) statusBadge = <span className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded text-[9px] font-black tracking-widest uppercase">已過期 (Expired)</span>;
-                              else if (isExhausted) statusBadge = <span className="px-2.5 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[9px] font-black tracking-widest uppercase">額度耗盡 (Exhausted)</span>;
-
-                              return (
-                                 <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-5 text-sm font-black text-slate-700">{u.templeName}</td>
-                                    <td className="px-6 py-5 text-xs font-bold text-slate-500">{u.planName}</td>
-                                    <td className="px-6 py-5">
-                                       <div className="flex justify-between items-end mb-1.5">
-                                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{u.isVip ? '無限制' : 'Usage'}</span>
-                                          <span className={`text-[10px] font-black tracking-widest ${usagePercent > 90 ? 'text-rose-500' : 'text-indigo-500'}`}>
-                                             {u.isVip ? '∞' : `${u.usedCount} / ${u.chatLimit}`}
-                                          </span>
-                                       </div>
-                                       {!u.isVip && (
-                                          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                             <div className={`h-full rounded-full transition-all duration-1000 ${usagePercent > 90 ? 'bg-rose-500' : usagePercent > 70 ? 'bg-amber-400' : 'bg-indigo-400'}`} style={{ width: `${usagePercent}%` }}></div>
-                                          </div>
-                                       )}
-                                    </td>
-                                    <td className="px-6 py-5">{statusBadge}</td>
-                                    <td className="px-6 py-5 text-right">
-                                       <button onClick={async () => {
-                                          await grantTempleAiVip(u.templeId, !u.isVip);
-                                          fetchAllTempleAiUsage().then(setAllTempleAiUsage);
-                                       }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all active:scale-95 ${u.isVip ? 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700' : 'bg-slate-800 border-slate-800 text-white shadow hover:bg-indigo-600 hover:border-indigo-600'}`}>
-                                          {u.isVip ? '取消特權 (Revoke)' : '✨ 設為無限免費'}
-                                       </button>
-                                    </td>
-                                 </tr>
-                              )
-                           })}
-                           {allTempleAiUsage.length === 0 && (
-                              <tr><td colSpan={5} className="px-6 py-12 text-center text-[11px] font-black uppercase tracking-widest text-slate-400 italic">目前沒有任何宮廟使用 AI 助理</td></tr>
-                           )}
-                        </tbody>
-                     </table>
-                   </div>
-                </div>
-             </div>
+                    </div>
+                    
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                         <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                               <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">宮廟名稱</th>
+                               <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">當前狀態</th>
+                               <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">今年度 AI 回答總次數</th>
+                               <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">今年度信眾輸入總次數</th>
+                            </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-100">
+                            {(() => {
+                               const perPage = 12;
+                               const pagedUsages = allTempleAiUsage.slice((aiAnalyticsPage - 1) * perPage, aiAnalyticsPage * perPage);
+                               if (pagedUsages.length === 0) return <tr><td colSpan={4} className="text-center py-8 text-xs font-bold text-slate-400">目前沒有資料</td></tr>;
+                               
+                               return pagedUsages.map((u: any, i: number) => {
+                                  let statusBadge = <span className="px-3 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-full text-[9px] font-black tracking-widest uppercase">關閉 (OFF)</span>;
+                                  if (u.planId === 'ON') statusBadge = <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[9px] font-black tracking-widest uppercase">開啟 (ON)</span>;
+                                  if (u.planId === 'FREE') statusBadge = <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 rounded-full text-[9px] font-black tracking-widest uppercase">免費 (FREE)</span>;
+                                  if (u.isVip) statusBadge = <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 rounded-full text-[9px] font-black tracking-widest uppercase">無限免費 (VIP)</span>;
+                                  
+                                  return (
+                                     <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                           <div className="flex items-center gap-3">
+                                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-black">
+                                                 {u.temple?.name?.[0] || 'T'}
+                                              </div>
+                                              <div>
+                                                <p className="text-sm font-black text-slate-800">{u.temple?.name || '未知宮廟'}</p>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{u.templeId}</p>
+                                              </div>
+                                           </div>
+                                        </td>
+                                        <td className="px-6 py-4">{statusBadge}</td>
+                                        <td className="px-6 py-4 text-center text-sm font-black text-slate-700">{u.aiReplyCount || 0}</td>
+                                        <td className="px-6 py-4 text-center text-sm font-black text-slate-700">{u.userQueryCount || 0}</td>
+                                     </tr>
+                                  );
+                               });
+                            })()}
+                         </tbody>
+                      </table>
+                      {(() => {
+                          const totalPages = Math.max(1, Math.ceil(allTempleAiUsage.length / 12));
+                          if (totalPages > 1) {
+                             return (
+                                <div className="flex justify-center items-center gap-4 py-4 bg-slate-50 border-t border-slate-200">
+                                   <button disabled={aiAnalyticsPage === 1} onClick={() => setAiAnalyticsPage(prev => prev - 1)} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50">上一頁</button>
+                                   <span className="text-xs font-bold text-slate-400">{aiAnalyticsPage} / {totalPages}</span>
+                                   <button disabled={aiAnalyticsPage === totalPages} onClick={() => setAiAnalyticsPage(prev => prev + 1)} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50">下一頁</button>
+                                </div>
+                             );
+                          }
+                          return null;
+                      })()}
+                    </div>
+                 </div>
+              </div>
            )}
 
                       {activeTab === 'finance' && (() => {

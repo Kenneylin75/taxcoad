@@ -7209,7 +7209,33 @@ export async function saveAiApiModels(models: any[]) {
 
 export async function fetchAllTempleAiUsage() {
   try {
-    return await prisma.templeAiUsage.findMany({ include: { temple: true } });
+    const usages = await prisma.templeAiUsage.findMany({ include: { temple: true } });
+    const currentYear = new Date().getFullYear();
+    const startDate = new Date(`${currentYear}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${currentYear}-12-31T23:59:59.999Z`);
+    
+    const logs = await prisma.aiChatLog.groupBy({
+      by: ['templeId'],
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      _count: {
+        userQuery: true,
+        aiReply: true,
+      },
+    });
+
+    return usages.map(u => {
+      const log = logs.find(l => l.templeId === u.templeId);
+      return {
+        ...u,
+        userQueryCount: log?._count.userQuery || 0,
+        aiReplyCount: log?._count.aiReply || 0,
+      };
+    });
   } catch (e) {
     return [];
   }
