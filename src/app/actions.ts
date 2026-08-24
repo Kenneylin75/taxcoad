@@ -7789,15 +7789,15 @@ export async function fetchSuperAdminFinancials() {
       const discountRate = config.yearlyDiscountRate || 20;
       const discountMultiplier = 1 - discountRate / 100;
       const calcPrice = isYearly
-        ? (t.monthlyRent || 3600) * 12 * discountMultiplier
-        : t.monthlyRent || 3600;
+        ? (Number(t.monthlyRent) || config.fixedMonthlyRent || 3600) * 12 * discountMultiplier
+        : (Number(t.monthlyRent) || config.fixedMonthlyRent || 3600);
       const rentAmount = t.freeType === "Permanent" ? 0 : calcPrice;
       const isPaid = bills.length > 0 && unpaidBills.length === 0;
 
       return {
         id: t.id,
         name: t.templeName || t.name,
-        monthlyRent: t.monthlyRent || 3600,
+        monthlyRent: Number(t.monthlyRent) || config.fixedMonthlyRent || 3600,
         rentAmount: rentAmount,
         paymentCycle: t.paymentCycle || "Monthly",
         status:
@@ -8420,7 +8420,8 @@ export async function fetchDataBridgeTree() {
         }
       }
 
-      const price = t.paymentCycle === "Yearly" ? Math.round((t.monthlyRent || 0) * 12 * (1 - yearlyDiscountRate / 100)) : t.monthlyRent || 0;
+      const rent = Number(t.monthlyRent) || config?.fixedMonthlyRent || 3600;
+      const price = t.paymentCycle === "Yearly" ? Math.round(rent * 12 * (1 - yearlyDiscountRate / 100)) : rent;
 
       return {
       id: t.id,
@@ -10349,6 +10350,8 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   let listTemples = [...[]];
   let listDistributors = [...[]];
   let listSales = [...[]];
+  const config = await fetchSystemConfig();
+  const yearlyDiscountRate = config.yearlyDiscountRate || 20;
 
   /* removed duplicate import */
   const resTemples = { rows: await prisma.temple.findMany() };
@@ -10397,12 +10400,10 @@ export async function fetchSuperSalesRegistry(salesId: string) {
       let yearlyRent = 0;
       let setupFee = 0;
       if (t.freeType !== "Permanent") {
-        const config = await fetchSystemConfig();
         const rent = Number(t.monthlyRent) || config.fixedMonthlyRent || 3600;
         const cycle = t.paymentCycle || "Monthly";
-        const discount = config.yearlyDiscountRate || 20;
         yearlyRent =
-          cycle === "Yearly" ? rent * 12 * (1 - discount / 100) : rent * 12;
+          cycle === "Yearly" ? rent * 12 * (1 - yearlyDiscountRate / 100) : rent * 12;
         setupFee = t.setupFee ?? 12000;
       }
       const annualContribution = yearlyRent + setupFee;
@@ -10492,7 +10493,12 @@ export async function fetchSuperSalesRegistry(salesId: string) {
       const distTemples = listTemples.filter((t) => t.distributorId === d.id);
       const distSales = listSales.filter((s) => s.distributorId === d.id);
       const totalIncome = distTemples.reduce(
-        (acc, t) => acc + (Number(t.monthlyRent) || 0) * 12,
+        (acc, t) => {
+          const rent = Number(t.monthlyRent) || config.fixedMonthlyRent || 3600;
+          const cycle = t.paymentCycle || "Monthly";
+          const yearly = cycle === "Yearly" ? rent * 12 * (1 - yearlyDiscountRate / 100) : rent * 12;
+          return acc + yearly;
+        },
         0,
       );
       const commissionExpense = Math.floor(totalIncome * 0.2); // 預設費用20%
