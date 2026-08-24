@@ -134,6 +134,7 @@ export default function SuperAdminClient({
    const [adminUpgradeAiPlanId, setAdminUpgradeAiPlanId] = useState('');
    const [storageBills, setStorageBills] = useState<any[]>(initialStorageBills || []);
    const [storageBillPage, setStorageBillPage] = useState(1);
+   const [previewImage, setPreviewImage] = useState<string | null>(null);
    const [matrixPage, setMatrixPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States
@@ -1124,10 +1125,7 @@ export default function SuperAdminClient({
                                                    )}
                                                    {b.receiptUrl && (
                                                       <button 
-                                                         onClick={() => {
-                                                            const w = window.open("");
-                                                            if (w) w.document.write(`<img src="${b.receiptUrl}" style="max-width: 100%;" />`);
-                                                         }}
+                                                         onClick={() => setPreviewImage(b.receiptUrl)}
                                                          className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-bold hover:bg-blue-100 transition-colors"
                                                       >
                                                          查看圖片
@@ -3395,6 +3393,30 @@ export default function SuperAdminClient({
                 </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm cursor-pointer transition-opacity" 
+            onClick={() => setPreviewImage(null)}
+          />
+          <div className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-4xl max-h-[90vh] flex flex-col z-10 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100">
+              <h3 className="text-sm font-black text-slate-800 tracking-wider">匯款收據圖片</h3>
+              <button 
+                onClick={() => setPreviewImage(null)}
+                className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-auto p-4 flex items-center justify-center bg-slate-50">
+              <img src={previewImage} alt="匯款圖片" className="max-w-full max-h-[70vh] object-contain rounded-xl" />
+            </div>
+          </div>
         </div>
       )}
     </div>
