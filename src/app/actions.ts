@@ -10024,29 +10024,17 @@ export async function addVisitationRecord(data: any) {
 
 export async function fetchSalesTools() {
   try {
-    let tools = await prisma.tool.findMany();
-    if (tools.length === 0) {
-      const defaultTools = [
-        { name: "管理工具", description: "", isEnabled: true },
-        { name: "行銷工具", description: "", isEnabled: true },
-        { name: "系統工具", description: "", isEnabled: true },
-        { name: "其他工具", description: "", isEnabled: true },
-      ];
-      for (const t of defaultTools) {
-        await prisma.tool.create({ data: t });
-      }
-      tools = await prisma.tool.findMany();
-    }
-    const colorMap = [
-      "bg-indigo-50 text-indigo-600",
-      "bg-purple-50 text-purple-600",
-      "bg-emerald-50 text-emerald-600",
-      "bg-slate-100 text-slate-900",
-    ];
-    return tools.map((t, i) => ({
-      n: t.name,
-      icon: t.description,
-      c: colorMap[i % 4],
+    let tools = await prisma.salesTool.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+    return tools.map((t) => ({
+      id: t.id,
+      type: t.type,
+      title: t.title,
+      category: t.category,
+      thumbnail: t.thumbnail,
+      url: t.url,
+      createdAt: t.createdAt.toISOString().split("T")[0],
     }));
   } catch (error) {
     console.error("fetchSalesTools error:", error);
@@ -10122,9 +10110,8 @@ export async function uploadTool(formData: FormData) {
     }
   }
 
-  const uploadedAt = new Date().toISOString().split("T")[0];
   try {
-    await prisma.tool.create({
+    await prisma.salesTool.create({
       data: {
         id: "tool-" + Date.now(),
         type: type,
@@ -10132,8 +10119,6 @@ export async function uploadTool(formData: FormData) {
         category: category,
         url: url,
         thumbnail: thumbnail,
-        uploadedAt: uploadedAt,
-        uploadedBy: "System",
       },
     });
   } catch (e) {

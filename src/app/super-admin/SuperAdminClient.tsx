@@ -1243,7 +1243,7 @@ export default function SuperAdminClient({
                              </div>
                           </div>
                           <div className="p-10 space-y-4">
-                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category} • {tool.uploadedAt || new Date().toISOString().split('T')[0].replace(/-/g, '/')}</p>
+                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest italic">{tool.category} • {tool.createdAt || new Date().toISOString().split('T')[0].replace(/-/g, '/')}</p>
                              <h5 className="text-xl font-black text-slate-900 tracking-tight italic">{tool.title}</h5>
                              <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                 <span className="text-[10px] font-black text-emerald-500 uppercase italic">Synced All Nodes</span>
