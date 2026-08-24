@@ -3553,6 +3553,8 @@ export async function fetchSystemConfig() {
     const defaultConfig = {
       fixedMonthlyRent: 3600,
       yearlyDiscountRate: 20,
+      aiAnnualFee: 12000,
+      aiSystemPrompt: "您好！你現在是本宮廟的專屬 AI 助理。你的語氣要慈悲、莊嚴。當信眾詢問服務時，你要引導他們使用系統內的「點燈」、「預約」或「法會報名」功能。請勿回答與宗教或本宮廟無關的政治議題。",
       defaultSuperSalesRates: {
         distributorAuthRate: 15,
         templeSetupRate: 10,
@@ -10873,16 +10875,37 @@ export async function createTempleAccount(data: any) {
     },
   });
 
-  let aiPlanId = isVip ? "VIP-AI" : data.aiLife || "FREE";
+  let aiPlanId = "OFF";
+  if (isVip || data.aiLife === "FREE") aiPlanId = "FREE";
+  else if (data.aiLife === "ON" || data.enableAi) aiPlanId = "ON";
+  else if (data.aiLife === "OFF" || data.enableAi === false) aiPlanId = "OFF";
+
   await prisma.templeAiUsage.create({
     data: {
       templeId: id,
       planId: aiPlanId,
-      enabled: data.enableAi ?? true,
+      enabled: aiPlanId === "ON" || aiPlanId === "FREE",
       usedCount: 0,
       isVip: isVip,
     },
   });
+
+  // 如果宮廟選擇開啟 AI，產生 AIFee 帳單
+  if (aiPlanId === "ON") {
+    await prisma.templeBill.create({
+      data: {
+        templeId: id,
+        type: "INCOME",
+        itemName: "AIFee",
+        amount: config.aiAnnualFee || 12000,
+        status: "Unpaid",
+        timestamp: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        payeeRole: "SuperAdmin",
+        payeeId: "SuperAdmin",
+      }
+    });
+  }
 
   if (data.account && data.password) {
     await prisma.user.create({
