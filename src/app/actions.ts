@@ -11164,7 +11164,7 @@ export async function fetchCommissionHistory(
 
   myTemples.forEach((t) => {
     const bills = listBills.filter(
-      (b) => b.templeId === t.id && b.status !== "Rejected" && b.type !== "StorageUpgrade" && b.type !== "AiUpgrade",
+      (b) => b.templeId === t.id && b.status !== "Rejected" && b.type !== "StorageUpgrade" && b.type !== "AiUpgrade" && b.payeeRole !== "SuperAdmin",
     );
 
     bills.forEach((bill) => {

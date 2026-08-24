@@ -488,6 +488,7 @@ export default function DistSalesPage() {
                            const bills = templeBills[app.id] || [];
                            const filter = templeBillFilters[app.id];
                            const filtered = bills.filter(b => {
+                              if (b.payeeRole === 'SuperAdmin' || b.type === 'StorageUpgrade' || b.type === 'AiUpgrade') return false;
                               if (!b.date || b.date === '未知' || !filter) return true;
                               if (app.paymentCycle === 'Yearly') {
                                  return b.date.startsWith(filter.year);
