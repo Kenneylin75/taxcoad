@@ -35,6 +35,7 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
     trialMonths: 0,
     enableAi: true,
     cloudStorage: '',
+    cloudStoragePaymentCycle: 'Monthly',
     aiLife: ''
   });
   const [accountError, setAccountError] = useState('');
@@ -250,19 +251,28 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
             </div>
             
             <div className="grid grid-cols-2 gap-3">
-               <div className="relative group">
-                  <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">雲端空間</p>
-                  <select value={form.cloudStorage || ''} onChange={e => setForm({...form, cloudStorage: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
-                     <option value="" disabled>請選擇雲端空間方案</option>
-                     {storagePlans.map(plan => (
-                        <option key={plan.id} value={plan.id}>{plan.name} (${plan.priceMonthly}/月)</option>
-                     ))}
-                     {role === 'super-admin' && <option value="Free">無限使用 (Free)</option>}
-                  </select>
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
+               <div className="relative group col-span-2 sm:col-span-1 flex gap-2">
+                  <div className="relative flex-1">
+                     <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">雲端空間</p>
+                     <select value={form.cloudStorage || ''} onChange={e => setForm({...form, cloudStorage: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
+                        <option value="" disabled>請選擇雲端空間方案</option>
+                        {storagePlans.map(plan => (
+                           <option key={plan.id} value={plan.id}>{plan.name} (${plan.priceMonthly}/月)</option>
+                        ))}
+                        {role === 'super-admin' && <option value="Free">無限使用 (Free)</option>}
+                     </select>
+                     <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
+                  </div>
+                  <div className="relative w-32">
+                     <select value={form.cloudStoragePaymentCycle} onChange={e => setForm({...form, cloudStoragePaymentCycle: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
+                        <option value="Monthly">月繳</option>
+                        <option value="Yearly">年繳</option>
+                     </select>
+                     <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
+                  </div>
                </div>
 
-               <div className="relative group">
+               <div className="relative group col-span-2 sm:col-span-1">
                   <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 生活</p>
                   <select value={form.aiLife || ''} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
                      <option value="" disabled>請選擇 AI 生活方案</option>

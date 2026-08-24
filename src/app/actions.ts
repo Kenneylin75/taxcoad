@@ -10876,6 +10876,8 @@ export async function createTempleAccount(data: any) {
       planName: newStorage.planName,
       planId: newStorage.planId || "FREE",
       city: "未設定",
+      paymentCycle: data.cloudStoragePaymentCycle || "Monthly",
+      billingStartDate: new Date(),
     },
   });
 
@@ -11862,5 +11864,32 @@ export async function updateSalesPassword(salesId: string, newPassword: string) 
   } catch (e) {
     console.error("Failed to update sales password:", e);
     return { success: false, error: '密碼修改失敗' };
+  }
+}
+
+export async function fetchPendingStorageBills() {
+  try {
+    const bills = await prisma.templeBill.findMany({
+      where: { payeeRole: "SuperAdmin", itemName: { contains: "雲端空間擴充" } },
+      include: { temple: true },
+      orderBy: { createdAt: "desc" }
+    });
+    return bills.map((b: any) => ({ ...b, templeName: b.temple?.templeName || b.temple?.name || "未知宮廟" }));
+  } catch (e) {
+    console.error("fetchPendingStorageBills error:", e);
+    return [];
+  }
+}
+
+export async function verifyStorageBill(billId: string) {
+  try {
+    const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
+    if (!bill) return { success: false, error: "找不到帳單" };
+    if (bill.status === "Paid") return { success: true };
+    await prisma.templeBill.update({ where: { id: billId }, data: { status: "Paid" } });
+    return { success: true };
+  } catch (e) {
+    console.error("verifyStorageBill error:", e);
+    return { success: false, error: "系統錯誤" };
   }
 }

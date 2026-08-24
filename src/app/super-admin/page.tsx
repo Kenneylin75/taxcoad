@@ -3,7 +3,8 @@ import {
   fetchSalesTools,
   fetchAllAccountsForAdmin,
   fetchSystemConfig,
-  fetchAllWithdrawals
+  fetchAllWithdrawals,
+  fetchPendingStorageBills
 } from '../actions';
 import SuperAdminClient from './SuperAdminClient';
 
@@ -40,6 +41,7 @@ export default async function SuperAdminPage() {
     const superSalesWithdrawals = allWithdrawals.filter((w: any) => 
       accounts.some((a: any) => a.role === 'SuperSales' && a.name === w.salesName)
     );
+    const initialStorageBills = await fetchPendingStorageBills();
 
     return (
       <SuperAdminClient 
@@ -49,6 +51,7 @@ export default async function SuperAdminPage() {
         initialMedia={initialTools}
         initialTemples={initialTemples}
         initialWithdrawals={superSalesWithdrawals}
+        initialStorageBills={initialStorageBills}
       />
     );
   } catch (error: any) {

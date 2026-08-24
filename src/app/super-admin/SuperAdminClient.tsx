@@ -47,9 +47,9 @@ import {
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Bar, Cell } from 'recharts';
 
 export default function SuperAdminClient({ 
-  initialStats, initialAccounts, initialPlans, initialMedia, initialTemples, initialWithdrawals
+  initialStats, initialAccounts, initialPlans, initialMedia, initialTemples, initialWithdrawals, initialStorageBills
 }: { 
-  initialStats: any, initialAccounts: any[], initialPlans: any[], initialMedia: any[], initialTemples: any[], initialWithdrawals?: any[]
+  initialStats: any, initialAccounts: any[], initialPlans: any[], initialMedia: any[], initialTemples: any[], initialWithdrawals?: any[], initialStorageBills?: any[]
 }) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>('dashboard');
   const [analytics, setAnalytics] = useState<any>(null);
@@ -130,7 +130,11 @@ export default function SuperAdminClient({
    const [viewingAccountDetail, setViewingAccountDetail] = useState<any>(null);
    const [editDistributorForm, setEditDistributorForm] = useState<any>({});
    const [adminUpgradeStoragePlanId, setAdminUpgradeStoragePlanId] = useState('');
+   const [adminUpgradeStorageCycle, setAdminUpgradeStorageCycle] = useState<'Monthly' | 'Yearly'>('Monthly');
    const [adminUpgradeAiPlanId, setAdminUpgradeAiPlanId] = useState('');
+   const [storageBills, setStorageBills] = useState<any[]>(initialStorageBills || []);
+   const [storageBillPage, setStorageBillPage] = useState(1);
+   const [matrixPage, setMatrixPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States
    const [templePage, setTemplePage] = useState(1);
@@ -315,7 +319,7 @@ export default function SuperAdminClient({
              { id: 'dashboard', label: '決策儀表板', icon: '📊' },
              { id: 'accounts', label: '帳戶管理', icon: '👤' },
              { id: 'approvals', label: '審核中心', icon: '⚖️', count: pendingDistributors.length + initialTemples.filter(t => t.status === 'Pending' && !t.distributorId).length },
-             { id: 'space', label: '雲端空間管理', icon: '☁️' },
+             { id: 'space', label: '雲端空間管理', icon: '☁️', count: storageBills.filter(b => b.status === 'Unpaid').length },
              { id: 'ai', label: 'AI 引擎與方案管理', icon: '🤖' },
              { id: 'tools', label: '資源同步', icon: '🔄' },
              { id: 'finance', label: '財務中心', icon: '💰' },
@@ -1005,59 +1009,148 @@ export default function SuperAdminClient({
                     </div>
 
                     <div className="overflow-x-auto">
-                       <table className="w-full text-left border-collapse">
-                          <thead>
-                             <tr className="bg-slate-50/50">
-                                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">宮廟名稱</th>
-                                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">地區</th>
-                                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">目前容量方案</th>
-                                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">使用進度</th>
-                                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">空間狀態</th>
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                             {templeStorages
-                                .filter(s => !selectedRegion || s.city === selectedRegion)
-                                .filter(s => !searchTemple || s.templeName.toLowerCase().includes(searchTemple.toLowerCase()))
-                                .map((s) => {
-                                   const percentage = Math.min(((s.usedBytes / (s.quotaGb * 1024 * 1024 * 1024)) * 100), 100);
-                                   const usedGb = (s.usedBytes / (1024 * 1024 * 1024)).toFixed(2);
-                                   return (
-                                      <tr key={s.templeId || s.id || s.templeName} className="hover:bg-slate-50/30 transition-all">
-                                         <td className="px-8 py-6 text-base font-black text-slate-800 tracking-tight italic">{s.templeName}</td>
-                                         <td className="px-8 py-6"><span className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-500 uppercase tracking-widest">{s.city}</span></td>
-                                         <td className="px-8 py-6 font-bold text-slate-600">{s.planName}</td>
-                                         <td className="px-8 py-6">
-                                            <div className="w-full space-y-2">
-                                               <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                                  <span>{usedGb} GB 已使用</span>
-                                                  <span>上限 {s.quotaGb} GB</span>
-                                               </div>
-                                               <div className="w-48 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                  <div 
-                                                     className={`h-full rounded-full transition-all ${percentage >= 85 ? 'bg-rose-500' : 'bg-indigo-500'}`}
-                                                     style={{ width: `${percentage}%` }}
-                                                  ></div>
-                                               </div>
-                                            </div>
-                                         </td>
-                                         <td className="px-8 py-6 text-right">
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                                               percentage >= 85 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
-                                            }`}>
-                                               <div className={`w-1.5 h-1.5 rounded-full ${percentage >= 85 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                                               {percentage >= 85 ? '容量即將爆滿' : '正常'}
-                                            </span>
-                                         </td>
-                                      </tr>
-                                   );
-                                })}
-                          </tbody>
-                       </table>
-                    </div>
-                 </div>
-              </div>
-           )}
+                        {(() => {
+                           const filteredMatrix = templeStorages
+                              .filter(s => !selectedRegion || s.city === selectedRegion)
+                              .filter(s => !searchTemple || s.templeName.toLowerCase().includes(searchTemple.toLowerCase()));
+                           const totalMatrixPages = Math.max(1, Math.ceil(filteredMatrix.length / 12));
+                           const paginatedMatrix = filteredMatrix.slice((matrixPage - 1) * 12, matrixPage * 12);
+                           
+                           return (
+                              <>
+                                 <table className="w-full text-left border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-50/50">
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">宮廟名稱</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">地區</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">目前容量方案</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">使用進度</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">空間狀態</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                       {paginatedMatrix.map((s) => {
+                                          const percentage = Math.min(((s.usedBytes / (s.quotaGb * 1024 * 1024 * 1024)) * 100), 100);
+                                          const usedGb = (s.usedBytes / (1024 * 1024 * 1024)).toFixed(2);
+                                          return (
+                                             <tr key={s.templeId || s.id || s.templeName} className="hover:bg-slate-50/30 transition-all">
+                                                <td className="px-8 py-6 text-base font-black text-slate-800 tracking-tight italic">{s.templeName}</td>
+                                                <td className="px-8 py-6"><span className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-500 uppercase tracking-widest">{s.city}</span></td>
+                                                <td className="px-8 py-6 font-bold text-slate-600">{s.planName}</td>
+                                                <td className="px-8 py-6">
+                                                   <div className="w-full space-y-2">
+                                                      <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                         <span>{usedGb} GB 已使用</span>
+                                                         <span>上限 {s.quotaGb} GB</span>
+                                                      </div>
+                                                      <div className="w-48 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                         <div 
+                                                            className={`h-full rounded-full transition-all ${percentage >= 85 ? 'bg-rose-500' : 'bg-indigo-500'}`}
+                                                            style={{ width: `${percentage}%` }}
+                                                         ></div>
+                                                      </div>
+                                                   </div>
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
+                                                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                                                      percentage >= 85 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+                                                   }`}>
+                                                      <div className={`w-1.5 h-1.5 rounded-full ${percentage >= 85 ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                                                      {percentage >= 85 ? '容量即將爆滿' : '正常'}
+                                                   </span>
+                                                </td>
+                                             </tr>
+                                          );
+                                       })}
+                                    </tbody>
+                                 </table>
+                                 
+                                 {totalMatrixPages > 1 && (
+                                    <div className="flex justify-center items-center gap-4 mt-6 p-4">
+                                       <button disabled={matrixPage === 1} onClick={() => setMatrixPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                       <span className="text-xs font-bold text-slate-400">{matrixPage} / {totalMatrixPages}</span>
+                                       <button disabled={matrixPage === totalMatrixPages} onClick={() => setMatrixPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                    </div>
+                                 )}
+                              </>
+                           );
+                        })()}
+                     </div>
+                  </div>
+
+                  {/* Storage Bills Verification Table */}
+                  <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
+                     <div>
+                        <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-rose-500 underline-offset-8">宮廟空間擴充帳單審核</h4>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Storage Payments Verification</p>
+                     </div>
+                     <div className="overflow-x-auto">
+                        {(() => {
+                           const totalBillPages = Math.max(1, Math.ceil(storageBills.length / 12));
+                           const paginatedBills = storageBills.slice((storageBillPage - 1) * 12, storageBillPage * 12);
+                           
+                           return (
+                              <>
+                                 <table className="w-full text-left border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-50/50">
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">日期</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">宮廟名稱</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">費用項目</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">金額</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                       {paginatedBills.map((b) => (
+                                          <tr key={b.id} className="hover:bg-slate-50/30 transition-all">
+                                             <td className="px-8 py-6 text-xs text-slate-500 font-bold">{new Date(b.createdAt).toLocaleDateString()}</td>
+                                             <td className="px-8 py-6 text-sm font-black text-slate-800 tracking-tight italic">{b.templeName}</td>
+                                             <td className="px-8 py-6 text-xs font-bold text-slate-600">{b.itemName}</td>
+                                             <td className="px-8 py-6 text-sm font-black text-rose-600">NT$ {b.amount.toLocaleString()}</td>
+                                             <td className="px-8 py-6 text-right">
+                                                {b.status === 'Paid' ? (
+                                                   <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">已付款</span>
+                                                ) : (
+                                                   <button 
+                                                      onClick={async () => {
+                                                         if (window.confirm('確定已收到此筆雲端空間擴展費用？')) {
+                                                            const m = await import('@/app/actions');
+                                                            const res = await m.verifyStorageBill(b.id);
+                                                            if (res.success) {
+                                                               setStorageBills(prev => prev.map(pb => pb.id === b.id ? { ...pb, status: 'Paid' } : pb));
+                                                               alert('審核成功');
+                                                            } else alert(res.error);
+                                                         }
+                                                      }}
+                                                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-sm"
+                                                   >
+                                                      確認付款
+                                                   </button>
+                                                )}
+                                             </td>
+                                          </tr>
+                                       ))}
+                                       {storageBills.length === 0 && (
+                                          <tr><td colSpan={5} className="px-8 py-10 text-center text-xs text-slate-400">目前沒有待處理的帳單</td></tr>
+                                       )}
+                                    </tbody>
+                                 </table>
+                                 
+                                 {totalBillPages > 1 && (
+                                    <div className="flex justify-center items-center gap-4 mt-6 p-4">
+                                       <button disabled={storageBillPage === 1} onClick={() => setStorageBillPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                       <span className="text-xs font-bold text-slate-400">{storageBillPage} / {totalBillPages}</span>
+                                       <button disabled={storageBillPage === totalBillPages} onClick={() => setStorageBillPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                    </div>
+                                 )}
+                              </>
+                           );
+                        })()}
+                     </div>
+                  </div>
+               </div>
+            )}
 
            {/* --- 4. RESOURCES SYNC (TOOLS) --- */}
            {activeTab === 'tools' && (
@@ -2673,10 +2766,18 @@ export default function SuperAdminClient({
                                     <option value="">-- 選擇空間方案 --</option>
                                     {storagePlans.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sizeGb}GB)</option>)}
                                   </select>
+                                  <select 
+                                    className="text-xs border border-slate-200 rounded px-2 py-1 w-20"
+                                    value={adminUpgradeStorageCycle}
+                                    onChange={e => setAdminUpgradeStorageCycle(e.target.value as any)}
+                                  >
+                                    <option value="Monthly">月繳</option>
+                                    <option value="Yearly">年繳</option>
+                                  </select>
                                   <button 
                                     onClick={async () => {
                                       if (!adminUpgradeStoragePlanId) return alert('請選擇方案');
-                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId, 'Monthly', false);
+                                      await upgradeTempleStorage(viewingAccountDetail.id, adminUpgradeStoragePlanId, adminUpgradeStorageCycle, false);
                                       const newData = await fetchTempleStorages();
                                       setTempleStorages(newData);
                                       setAdminUpgradeStoragePlanId('');
