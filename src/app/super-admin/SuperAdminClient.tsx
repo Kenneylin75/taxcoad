@@ -54,6 +54,9 @@ export default function SuperAdminClient({
   const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>('dashboard');
   const [analytics, setAnalytics] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
+  
+  // AI Table Pagination State
+  const [aiAnalyticsPage, setAiAnalyticsPage] = useState(1);
   const [logs, setLogs] = useState<any[]>([]);
   const [finance, setFinance] = useState<any>(null);
   const [financeMonth, setFinanceMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });

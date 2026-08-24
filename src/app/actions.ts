@@ -1951,19 +1951,32 @@ export async function askAgiAssistant(q: string, h: number) {
   if (!templeId) return { reply: "未找到宮廟", suggestedAction: "none" };
 
   try {
-    const temple = await prisma.temple.findUnique({
-      where: { id: templeId },
-      select: { aiTokens: true },
+    const usage = await prisma.templeAiUsage.findUnique({
+      where: { templeId },
     });
-    if (!temple) return { reply: "未找到宮廟", suggestedAction: "none" };
-    if (temple.aiTokens <= 0)
-      return {
-        reply: "抱歉，本宮廟的 AI 服務額度已用罄。",
-        suggestedAction: "none",
-      };
+    if (!usage || !usage.enabled) return { reply: "抱歉，本宮廟未開通 AI 服務。", suggestedAction: "none" };
+    
+    // Only FREE or ON (with Paid status) should be allowed, but checking ON is enough here since UI already blocked it, but let's be safe.
+    if (usage.planId !== 'FREE' && usage.planId !== 'ON') {
+      return { reply: "抱歉，本宮廟 AI 服務尚未正確設定。", suggestedAction: "none" };
+    }
+    
+    // Check if Paid for ON plan
+    if (usage.planId === 'ON') {
+      const bill = await prisma.templeBill.findFirst({
+         where: { templeId: templeId, itemName: "AIFee" },
+         orderBy: { createdAt: 'desc' }
+      });
+      if (bill && bill.status !== 'Paid') {
+         return { reply: "抱歉，本宮廟 AI 服務尚未完成繳費。", suggestedAction: "none" };
+      }
+    }
+
+    const sys = await prisma.systemConfig.findFirst();
+    const systemPrompt = sys?.aiSystemPrompt || "預設系統提示詞";
 
     let reply =
-      "您好！我是宮廟專屬的 AI 生活助手，有任何關於點燈、預約、法會報名或排隊的問題，都可以問我喔！";
+      `您好！我是宮廟專屬的 AI 生活助手，有任何關於點燈、預約、法會報名或排隊的問題，都可以問我喔！`;
     if (
       q.includes("預約") ||
       q.includes("問事") ||
@@ -1983,28 +1996,17 @@ export async function askAgiAssistant(q: string, h: number) {
         "您可以在首頁點擊「預約」或「排隊」按鈕，系統會給您專屬的號碼牌，您可以隨時查看目前的叫號進度喔！";
     }
 
-    const cost = q.length + reply.length;
-    if (temple.aiTokens < cost) {
-      return {
-        reply: "抱歉，本宮廟的 AI 服務額度不足。",
-        suggestedAction: "none",
-      };
-    }
+    // append a mock indication that system prompt was used
+    reply += `\n\n(系統模擬: 參考了 ${systemPrompt.slice(0, 10)}...)`;
 
-    await prisma.$transaction([
-      prisma.temple.update({
-        where: { id: templeId },
-        data: { aiTokens: { decrement: cost } },
-      }),
-      prisma.aiChatLog.create({
-        data: {
-          templeId,
-          phone,
-          userQuery: q,
-          aiReply: reply,
-        },
-      }),
-    ]);
+    await prisma.aiChatLog.create({
+      data: {
+        templeId,
+        phone,
+        userQuery: q,
+        aiReply: reply,
+      },
+    });
 
     return { reply, suggestedAction: "none" };
   } catch (error) {
@@ -7269,12 +7271,36 @@ export async function grantTempleAiVip(
 export async function fetchTempleAiUsage() {
   try {
     const templeId = await getDynamicTempleId();
-    const temple = await prisma.temple.findUnique({
-      where: { id: templeId! },
-      select: { aiTokens: true },
+    const usage = await prisma.templeAiUsage.findUnique({
+      where: { templeId: templeId! }
     });
-    return { enabled: true, aiTokens: temple?.aiTokens || 0 };
+    const bill = await prisma.templeBill.findFirst({
+      where: { templeId: templeId!, itemName: "AIFee" },
+      orderBy: { createdAt: 'desc' }
+    });
+    const currentYear = new Date().getFullYear().toString();
+    const chatStats = await prisma.aiChatLog.aggregate({
+      _count: { userQuery: true, aiReply: true },
+      where: {
+        templeId: templeId!,
+        createdAt: {
+          gte: new Date(`${currentYear}-01-01T00:00:00.000Z`),
+          lte: new Date(`${currentYear}-12-31T23:59:59.999Z`),
+        }
+      }
+    });
+
+    return { 
+      enabled: usage?.enabled ?? false,
+      planId: usage?.planId || "OFF",
+      billStatus: bill?.status || null,
+      billId: bill?.id || null,
+      receiptUrl: bill?.receiptUrl || null,
+      userQueryCount: chatStats._count.userQuery || 0,
+      aiReplyCount: chatStats._count.aiReply || 0,
+    };
   } catch (e) {
+    console.error("fetchTempleAiUsage error:", e);
     return null;
   }
 }

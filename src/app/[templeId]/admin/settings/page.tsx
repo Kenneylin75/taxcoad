@@ -424,44 +424,77 @@ export default function AdvancedSettingsPage() {
                <div className="space-y-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 shadow-inner">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                      <span>當前方案</span>
-                     <span className="text-slate-800">{aiInfo.isVip ? '無限使用方案 (系統授權)' : aiInfo.planName}</span>
+                     <span className="text-slate-800">
+                        {aiInfo.planId === 'FREE' ? '免費使用方案 (僅限最高權限)' : aiInfo.planId === 'ON' ? '付費開通方案' : '未開通'}
+                     </span>
                   </div>
 
-                  <div className="space-y-2">
-                     <div className="flex justify-between text-[11px] font-black italic">
-                        <span className="text-slate-800">{aiInfo.isVip ? '免費無限' : `${aiInfo.usedCount} 次已使用`}</span>
-                        <span className="text-slate-400">{aiInfo.isVip ? '無限制' : `配額 ${aiInfo.chatLimit} 次`}</span>
+                  {aiInfo.planId === 'ON' && (
+                     <div className="space-y-4">
+                        <div className="flex justify-between text-[11px] font-black italic">
+                           <span className="text-slate-800">繳費狀態</span>
+                           <span className={aiInfo.billStatus === 'Paid' ? 'text-emerald-500' : aiInfo.billStatus === 'PendingVerification' || aiInfo.billStatus === 'Pending' ? 'text-amber-500' : 'text-rose-500'}>
+                              {aiInfo.billStatus === 'Paid' ? '✅ 已核銷' : aiInfo.billStatus === 'PendingVerification' || aiInfo.billStatus === 'Pending' ? '⏳ 審核中' : '⚠️ 尚未繳費'}
+                           </span>
+                        </div>
+                        
+                        {(aiInfo.billStatus === 'Unpaid' || aiInfo.billStatus === 'Pending') && aiInfo.billId && (
+                           <div className="mt-4 p-4 bg-white rounded-xl border border-rose-100 shadow-sm space-y-3">
+                              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">需上傳匯款證明才能正式啟用</p>
+                              <input type="text" id="aiBankLast5" placeholder="請輸入帳戶後五碼" className="w-full text-xs p-2 border border-slate-200 rounded-lg" maxLength={5} />
+                              <button 
+                                 onClick={async () => {
+                                    const input = document.getElementById('aiBankLast5');
+                                    const last5 = input ? input.value : '';
+                                    if(last5.length !== 5) return alert('請輸入正確的帳戶後五碼');
+                                    
+                                    const inputNode = document.createElement('input');
+                                    inputNode.type = 'file';
+                                    inputNode.accept = 'image/*';
+                                    inputNode.onchange = async (e) => {
+                                       const file = e.target.files[0];
+                                       if(!file) return;
+                                       setIsPaying(true);
+                                       try {
+                                          const formData = new FormData();
+                                          formData.append('file', file);
+                                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                          const { url } = await res.json();
+                                          if(url) {
+                                             const { uploadTempleBillReceipt } = await import('@/app/actions');
+                                             await uploadTempleBillReceipt(aiInfo.billId, url, last5);
+                                             alert('上傳成功！等待管理員審核。');
+                                             window.location.reload();
+                                          }
+                                       } catch (err) {
+                                          alert('上傳失敗');
+                                       } finally {
+                                          setIsPaying(false);
+                                       }
+                                    };
+                                    inputNode.click();
+                                 }}
+                                 disabled={isPaying}
+                                 className="w-full py-2 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black rounded-lg transition-colors"
+                              >
+                                 {isPaying ? '上傳中...' : '上傳匯款截圖與後五碼'}
+                              </button>
+                           </div>
+                        )}
                      </div>
-                     {!aiInfo.isVip && (
-                       <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
-                          <div 
-                             className={`h-full rounded-full transition-all ${
-                                (aiInfo.usedCount / aiInfo.chatLimit) * 100 >= 85 ? 'bg-rose-500 animate-pulse' : 'bg-fuchsia-500'
-                             }`}
-                             style={{ width: `${Math.min((aiInfo.usedCount / aiInfo.chatLimit) * 100, 100)}%` }}
-                          ></div>
-                       </div>
-                     )}
-                     <p className="text-[8px] font-bold text-slate-400 italic">
-                        到期日: {aiInfo.isVip ? '永久有效' : new Date(aiInfo.expiryDate).toLocaleDateString()} 
-                        {(!aiInfo.isVip && new Date(aiInfo.expiryDate).getTime() < Date.now()) && <span className="text-rose-500 ml-1">(已過期)</span>}
-                     </p>
-                  </div>
+                  )}
 
-                  <button 
-                     onClick={() => {
-                        if (aiInfo.isVip) return;
-                        setIsAiModalOpen(true);
-                     }}
-                     disabled={aiInfo.isVip}
-                     className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
-                        aiInfo.isVip 
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
-                        : 'bg-slate-900 text-fuchsia-400 shadow-md hover:bg-slate-800 hover:-translate-y-0.5'
-                     }`}
-                  >
-                     {aiInfo.isVip ? '⭐ 已由系統開通無限使用，無須升級' : '升級與續約方案'}
-                  </button>
+                  <div className="space-y-2 mt-4 pt-4 border-t border-slate-200">
+                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">今年度使用統計</p>
+                     <div className="flex justify-between text-[11px] font-black italic">
+                        <span className="text-slate-500">信眾輸入次數</span>
+                        <span className="text-slate-800">{aiInfo.userQueryCount} 次</span>
+                     </div>
+                     <div className="flex justify-between text-[11px] font-black italic">
+                        <span className="text-slate-500">AI 回答次數</span>
+                        <span className="text-fuchsia-600">{aiInfo.aiReplyCount} 次</span>
+                     </div>
+                  </div>
                </div>
             )}
          </div>
