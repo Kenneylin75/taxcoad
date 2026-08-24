@@ -1097,6 +1097,7 @@ export default function SuperAdminClient({
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">日期</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">宮廟名稱</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">費用項目</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">繳費週期與期間</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">金額</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">操作</th>
                                        </tr>
@@ -1107,32 +1108,56 @@ export default function SuperAdminClient({
                                              <td className="px-8 py-6 text-xs text-slate-500 font-bold">{new Date(b.createdAt).toLocaleDateString()}</td>
                                              <td className="px-8 py-6 text-sm font-black text-slate-800 tracking-tight italic">{b.templeName}</td>
                                              <td className="px-8 py-6 text-xs font-bold text-slate-600">{b.itemName}</td>
+                                             <td className="px-8 py-6 text-xs font-bold text-slate-600">
+                                                <div className="flex flex-col gap-1">
+                                                   <span className="font-black text-indigo-600">{b.cycle}</span>
+                                                   <span className="text-[10px] text-slate-400 tracking-wider">{b.period}</span>
+                                                </div>
+                                             </td>
                                              <td className="px-8 py-6 text-sm font-black text-rose-600">NT$ {b.amount.toLocaleString()}</td>
                                              <td className="px-8 py-6 text-right">
-                                                {b.status === 'Paid' ? (
-                                                   <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">已付款</span>
-                                                ) : (
-                                                   <button 
-                                                      onClick={async () => {
-                                                         if (window.confirm('確定已收到此筆雲端空間擴展費用？')) {
-                                                            const m = await import('@/app/actions');
-                                                            const res = await m.verifyStorageBill(b.id);
-                                                            if (res.success) {
-                                                               setStorageBills(prev => prev.map(pb => pb.id === b.id ? { ...pb, status: 'Paid' } : pb));
-                                                               alert('審核成功');
-                                                            } else alert(res.error);
-                                                         }
-                                                      }}
-                                                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-sm"
-                                                   >
-                                                      確認付款
-                                                   </button>
-                                                )}
+                                                <div className="flex items-center justify-end gap-2">
+                                                   {b.bankLast5 && (
+                                                      <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">
+                                                         帳戶末五碼: {b.bankLast5}
+                                                      </span>
+                                                   )}
+                                                   {b.receiptUrl && (
+                                                      <button 
+                                                         onClick={() => {
+                                                            const w = window.open("");
+                                                            if (w) w.document.write(`<img src="${b.receiptUrl}" style="max-width: 100%;" />`);
+                                                         }}
+                                                         className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-bold hover:bg-blue-100 transition-colors"
+                                                      >
+                                                         查看圖片
+                                                      </button>
+                                                   )}
+                                                   {b.status === 'Paid' ? (
+                                                      <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">已付款</span>
+                                                   ) : (
+                                                      <button 
+                                                         onClick={async () => {
+                                                            if (window.confirm('確定已收到此筆雲端空間擴展費用？')) {
+                                                               const m = await import('@/app/actions');
+                                                               const res = await m.verifyStorageBill(b.id);
+                                                               if (res.success) {
+                                                                  setStorageBills(prev => prev.map(pb => pb.id === b.id ? { ...pb, status: 'Paid' } : pb));
+                                                                  alert('審核成功');
+                                                               } else alert(res.error);
+                                                            }
+                                                         }}
+                                                         className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-sm"
+                                                      >
+                                                         確認付款
+                                                      </button>
+                                                   )}
+                                                </div>
                                              </td>
                                           </tr>
                                        ))}
                                        {storageBills.length === 0 && (
-                                          <tr><td colSpan={5} className="px-8 py-10 text-center text-xs text-slate-400">目前沒有待處理的帳單</td></tr>
+                                          <tr><td colSpan={6} className="px-8 py-10 text-center text-xs text-slate-400">目前沒有待處理的帳單</td></tr>
                                        )}
                                     </tbody>
                                  </table>

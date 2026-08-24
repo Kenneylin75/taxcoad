@@ -11880,10 +11880,46 @@ export async function fetchPendingStorageBills() {
           { itemName: "StorageUpgrade" }
         ]
       },
-      include: { temple: true },
+      include: { temple: { include: { templeStorages: true } } },
       orderBy: { createdAt: "desc" }
     });
-    return bills.map((b: any) => ({ ...b, templeName: b.temple?.templeName || b.temple?.name || "未知宮廟" }));
+    return bills.map((b: any) => {
+      const storage = b.temple?.templeStorages;
+      
+      let cycle = "未知";
+      let months = 12;
+      
+      if (b.type === "StorageMonthly" || b.amount === 600) {
+          cycle = "月付";
+          months = 1;
+      } else if (b.amount === 5760 || b.amount > 1000) {
+          cycle = "年付";
+          months = 12;
+      } else {
+          cycle = "月付";
+          months = 1;
+      }
+
+      const start = new Date(b.createdAt);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + months);
+      
+      const period = `${start.getFullYear()}/${String(start.getMonth()+1).padStart(2, '0')}/${String(start.getDate()).padStart(2, '0')} 到 ${end.getFullYear()}/${String(end.getMonth()+1).padStart(2, '0')}/${String(end.getDate()).padStart(2, '0')}`;
+
+      let itemName = b.itemName;
+      if (itemName === 'StorageUpgrade' || itemName === 'StorageMonthly') {
+          const pName = storage?.planId === 'SP-1787242420385' ? 'A方案' : storage?.planName || '未知方案';
+          itemName = `雲端空間專案 - ${pName} (${storage?.planId || '未知編號'})`;
+      }
+
+      return { 
+        ...b, 
+        templeName: b.temple?.templeName || b.temple?.name || "未知宮廟",
+        cycle,
+        period,
+        itemName
+      };
+    });
   } catch (e) {
     console.error("fetchPendingStorageBills error:", e);
     return [];
