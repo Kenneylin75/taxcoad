@@ -273,38 +273,16 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
                </div>
 
                <div className="relative group col-span-2 sm:col-span-1">
-                  <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 生活</p>
-                  <select value={form.aiLife || ''} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
-                     <option value="" disabled>請選擇 AI 生活方案</option>
-                     {aiPlans.map(plan => (
-                        <option key={plan.id} value={plan.id}>{plan.name} (${plan.price}/月)</option>
-                     ))}
-                     {role === 'super-admin' && <option value="Free">無限使用 (Free)</option>}
+                  <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 智能香客管家</p>
+                  <select value={form.aiLife || 'OFF'} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer font-black text-slate-700">
+                     <option value="OFF">關閉 (OFF)</option>
+                     <option value="ON">開啟 (需年費) (ON)</option>
+                     {role === 'super-admin' && <option value="FREE">免費 (Free) - 僅最高權限</option>}
                   </select>
                   <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
                </div>
             </div>
          </div>
-
-              {/* AI Assistant Toggle */}
-              <div className="pt-6 border-t border-slate-50">
-                 <div className="flex items-center justify-between p-6 bg-slate-50/50 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm border border-slate-100">🤖</div>
-                       <div>
-                          <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-widest italic">AI 智能香客管家模組</h4>
-                          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">內建自動客服、語意理解與香客自動應答</p>
-                       </div>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => setForm({...form, enableAi: !form.enableAi})}
-                      className={`w-14 h-8 rounded-full transition-colors relative shadow-inner ${form.enableAi ? 'bg-indigo-500' : 'bg-slate-200'}`}
-                    >
-                      <div className={`absolute top-1 left-1 bg-white w-6 h-6 rounded-full shadow-md transition-transform duration-300 ${form.enableAi ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </button>
-                 </div>
-              </div>
 
         <div className="flex flex-col gap-3 pt-8">
            <button type="submit" disabled={loading} className="w-full py-5 rounded-[24px] font-black text-white bg-slate-900 shadow-xl active:scale-95 transition-all hover:bg-emerald-600 text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">

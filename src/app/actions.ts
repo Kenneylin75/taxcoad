@@ -10902,9 +10902,10 @@ export async function createTempleAccount(data: any) {
   });
 
   let aiPlanId = "OFF";
-  if (isVip || data.aiLife === "FREE") aiPlanId = "FREE";
-  else if (data.aiLife === "ON" || data.enableAi) aiPlanId = "ON";
-  else if (data.aiLife === "OFF" || data.enableAi === false) aiPlanId = "OFF";
+  if (isVip || data.aiLife === "FREE" || data.aiLife === "Free") aiPlanId = "FREE";
+  else if (data.aiLife === "ON") aiPlanId = "ON";
+  else if (data.aiLife === "OFF") aiPlanId = "OFF";
+  else if (data.enableAi) aiPlanId = "ON";
 
   await prisma.templeAiUsage.create({
     data: {
