@@ -136,6 +136,8 @@ export default function SuperAdminClient({
    const [storageBillPage, setStorageBillPage] = useState(1);
    const [storagePreviewImage, setStoragePreviewImage] = useState<string | null>(null);
    const [matrixPage, setMatrixPage] = useState(1);
+   const [financeWithdrawalPage, setFinanceWithdrawalPage] = useState(1);
+   const [financeBillPage, setFinanceBillPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States
    const [templePage, setTemplePage] = useState(1);
@@ -1694,80 +1696,122 @@ export default function SuperAdminClient({
                     </div>
                  </div>
 
-                 {/* 審核中心區塊 */}
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-4">
+                                  {/* 審核中心區塊 */}
+                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 px-4">
                     {/* Super Sales Withdrawals */}
-                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
-                       <div className="flex justify-between items-center">
-                          <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-rose-500 underline-offset-8">超級業務員提領審核</h4>
-                          <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">最多顯示 12 筆</span>
-                       </div>
-                       <div className="space-y-4">
-                          {(() => {
-                             const wList = finance?.superSalesWithdrawals || [];
-                             const pending = wList.filter((w: any) => w.status === 'Pending').slice(0, 12);
-                             
-                             if (pending.length === 0) {
-                               return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的提領</p></div>;
-                             }
-                             return pending.map((w: any) => (
-                               <div key={w.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                                  <div>
-                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date}</p>
-                                     <p className="text-lg font-black text-slate-900">{w.salesName}</p>
+                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
+                       <div>
+                          <div className="flex justify-between items-center mb-8">
+                             <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-rose-500 underline-offset-8">超級業務員提領審核</h4>
+                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">待處理</span>
+                          </div>
+                          <div className="space-y-4">
+                             {(() => {
+                                const wList = finance?.superSalesWithdrawals?.filter((w: any) => w.status === 'Pending') || [];
+                                const totalWPages = Math.max(1, Math.ceil(wList.length / 12));
+                                const pending = wList.slice((financeWithdrawalPage - 1) * 12, financeWithdrawalPage * 12);
+                                
+                                if (pending.length === 0) {
+                                  return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的提領</p></div>;
+                                }
+                                return pending.map((w: any) => (
+                                  <div key={w.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                     <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date}</p>
+                                        <p className="text-lg font-black text-slate-900">{w.salesName}</p>
+                                     </div>
+                                     <div className="flex items-center gap-4">
+                                        <span className="text-rose-500 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
+                                        <button className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all">審核 / 匯款</button>
+                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-4">
-                                     <span className="text-rose-500 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
-                                     <button className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all">審核 / 匯款</button>
-                                  </div>
-                               </div>
-                             ));
-                          })()}
+                                ));
+                             })()}
+                          </div>
                        </div>
+                       
+                       {/* Pagination for Withdrawals */}
+                       {(() => {
+                          const wList = finance?.superSalesWithdrawals?.filter((w: any) => w.status === 'Pending') || [];
+                          const totalWPages = Math.max(1, Math.ceil(wList.length / 12));
+                          if (totalWPages > 1) {
+                             return (
+                                <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                                   <button disabled={financeWithdrawalPage === 1} onClick={() => setFinanceWithdrawalPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                   <span className="text-xs font-bold text-slate-400">{financeWithdrawalPage} / {totalWPages}</span>
+                                   <button disabled={financeWithdrawalPage === totalWPages} onClick={() => setFinanceWithdrawalPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                </div>
+                             );
+                          }
+                          return null;
+                       })()}
                     </div>
 
                     {/* Temple B2B Payments */}
-                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8">
-                       <div className="flex justify-between items-center">
-                          <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">宮廟付款審核 (開辦/月年租)</h4>
-                          <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">最多顯示 12 筆</span>
-                       </div>
-                       <div className="space-y-4">
-                          {(() => {
-                             const bills = (finance?.templeBills || []).filter((b: any) => b.status === 'Paid' || b.status === 'Pending').slice(0, 12);
-                             if (bills.length === 0) {
-                               return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的宮廟付款</p></div>;
-                             }
-                             return bills.map((b: any) => {
-                               const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
-                               return (
-                               <div key={b.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-between gap-4">
-                                  <div className="flex justify-between items-start">
-                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
-                                        <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
-                                        <p className="text-[11px] font-bold text-emerald-600 mt-1">{b.item_name === 'SetupFee' ? '系統開辦費' : '系統租金'}</p>
+                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
+                       <div>
+                          <div className="flex justify-between items-center mb-8">
+                             <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">宮廟付款審核 (開辦/月年租)</h4>
+                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">待處理</span>
+                          </div>
+                          <div className="space-y-4">
+                             {(() => {
+                                const bList = (finance?.templeBills || []).filter((b: any) => b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid');
+                                const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
+                                const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
+                                
+                                if (bills.length === 0) {
+                                  return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的宮廟付款</p></div>;
+                                }
+                                return bills.map((b: any) => {
+                                  const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                  return (
+                                  <div key={b.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-between gap-4">
+                                     <div className="flex justify-between items-start">
+                                        <div>
+                                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
+                                           <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
+                                           <p className="text-[11px] font-bold text-emerald-600 mt-1">{b.item_name === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status}</p>
+                                        </div>
+                                        <span className="text-emerald-500 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
                                      </div>
-                                     <span className="text-emerald-500 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
+                                     <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+                                        <p className="text-[11px] font-bold text-slate-500">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
+                                        {b.receipt_url || b.receiptUrl ? (
+                                           <button 
+                                             onClick={() => {
+                                                setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
+                                                setPreviewModalOpen(true);
+                                             }}
+                                             className="px-4 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
+                                           >查看匯款截圖</button>
+                                        ) : (
+                                           <span className="text-[10px] font-bold text-slate-400">無圖片</span>
+                                        )}
+                                     </div>
                                   </div>
-                                  <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                                     <p className="text-[11px] font-bold text-slate-500">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
-                                     {b.receipt_url || b.receiptUrl ? (
-                                        <button 
-                                          onClick={() => setPreviewImage(b.receipt_url || b.receiptUrl)}
-                                          className="px-4 py-2 bg-slate-200 text-slate-700 rounded-full text-xs font-black uppercase tracking-widest hover:bg-slate-300 transition-all"
-                                        >查看匯款截圖</button>
-                                     ) : (
-                                        <span className="text-[10px] font-bold text-slate-400">無圖片</span>
-                                     )}
-                                  </div>
-                               </div>
-                             )});
-                          })()}
+                                )});
+                             })()}
+                          </div>
                        </div>
+                       
+                       {/* Pagination for Bills */}
+                       {(() => {
+                          const bList = (finance?.templeBills || []).filter((b: any) => b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid');
+                          const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
+                          if (totalBPages > 1) {
+                             return (
+                                <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                                   <button disabled={financeBillPage === 1} onClick={() => setFinanceBillPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                   <span className="text-xs font-bold text-slate-400">{financeBillPage} / {totalBPages}</span>
+                                   <button disabled={financeBillPage === totalBPages} onClick={() => setFinanceBillPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                </div>
+                             );
+                          }
+                          return null;
+                       })()}
                     </div>
                  </div>
-
               </div>
               );
            })()}
