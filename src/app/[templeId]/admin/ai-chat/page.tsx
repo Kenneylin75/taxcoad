@@ -13,8 +13,8 @@ export default async function AiChatPage() {
           <p className="text-slate-500 mt-1">即時查看信眾與 AI 助理的互動對話，了解信眾常見疑問與意圖。</p>
         </div>
         <div className="text-right">
-          <p className="text-sm text-slate-500 font-medium mb-1">剩餘 AI Token 額度</p>
-          <div className="text-3xl font-black text-amber-500">{usage?.aiTokens?.toLocaleString() || 0}</div>
+          <p className="text-sm text-slate-500 font-medium mb-1">本年度 AI 使用次數</p>
+          <div className="text-3xl font-black text-fuchsia-600">{usage?.userQueryCount?.toLocaleString() || 0}</div>
         </div>
       </div>
       
