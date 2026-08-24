@@ -8235,7 +8235,8 @@ export async function fetchDistributorTempleBills(distributorId: string) {
 
     const bills = await prisma.templeBill.findMany({
       where: {
-        OR: [{ templeId: { in: templeIds } }, { payeeId: distributorId }],
+        templeId: { in: templeIds },
+        payeeId: distributorId,
       },
       orderBy: { createdAt: "desc" },
     });
