@@ -429,7 +429,7 @@ export default function DistSalesPage() {
                              </div>
                           )}
                        </div>
-                       <p className="text-[10px] font-bold text-slate-500 mt-1">帳號ID: {app.account || '未設定'}</p>
+                       <p className="text-[10px] font-bold text-slate-500 mt-1">宮廟帳號: {app.account || '未設定'}</p>
                     </div>
                  </div>
               </div>

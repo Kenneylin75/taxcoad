@@ -539,7 +539,7 @@ export default function DistributorClient({
                        </div>
                        <div className="flex flex-col gap-1 mt-0.5">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.city}{app.district} | {app.creatorId || '未設定聯絡人'}</p>
-                          <p className="text-[10px] font-bold text-slate-500">帳號ID: {app.account || '未設定'}</p>
+                          <p className="text-[10px] font-bold text-slate-500">宮廟帳號: {app.account || '未設定'}</p>
                           <p className="text-[10px] font-bold text-slate-500">開設時間: {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : (app.timestamp ? new Date(app.timestamp).toLocaleDateString() : '未記錄')}</p>
                        </div>
                     </div>
