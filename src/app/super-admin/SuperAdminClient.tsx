@@ -225,6 +225,14 @@ export default function SuperAdminClient({
     const fd = new FormData(e.currentTarget);
     const data: any = Object.fromEntries(fd.entries());
     
+    if (data.bankName || data.accountName || data.accountNumber) {
+        data.bankInfo = {
+            bankName: data.bankName || '',
+            accountName: data.accountName || '',
+            accountNumber: data.accountNumber || ''
+        };
+    }
+    
     startTransition(async () => {
       let res: any;
       if (accountType === 'SuperSales') res = await createSuperSalesAccount(data);
