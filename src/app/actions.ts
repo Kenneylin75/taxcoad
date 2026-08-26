@@ -6826,7 +6826,7 @@ export async function approveTempleApplication(appId: string) {
 
     const newTempleId = `temple-${Date.now()}`;
 
-    await prisma.temple.create({
+    const tData = await prisma.temple.create({
       data: {
         id: newTempleId,
         name: app.templeName,
@@ -6838,6 +6838,8 @@ export async function approveTempleApplication(appId: string) {
         paymentCycle: "Monthly",
       },
     });
+
+    await generateInitialBills(tData);
 
     await prisma.templeStorage.create({
       data: {
@@ -7761,7 +7763,12 @@ export async function fetchSuperAdminFinancials() {
   let templeBills: any[] = [];
   try {
     const res = { rows: await prisma.templeBill.findMany() };
-    if (res && res.rows) templeBills = res.rows;
+    if (res && res.rows) {
+      templeBills = res.rows.filter((b: any) => {
+        const t = allTemples.find((temple: any) => temple.id === (b.temple_id || b.templeId));
+        return t && !t.distributorId;
+      });
+    }
   } catch (e) {}
 
   const records: any[] = [];

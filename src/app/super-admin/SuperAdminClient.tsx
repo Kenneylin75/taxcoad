@@ -1806,7 +1806,7 @@ export default function SuperAdminClient({
                                         <div>
                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
                                            <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
-                                           <p className="text-[11px] font-bold text-emerald-600 mt-1">{b.item_name === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status}</p>
+                                           <p className="text-[11px] font-bold text-emerald-600 mt-1">{b.item_name === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status === 'Paid' ? '已付款' : b.status === 'PendingVerification' ? '審核中' : '未付款'}</p>
                                         </div>
                                         <span className="text-emerald-500 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
                                      </div>
