@@ -1791,7 +1791,13 @@ export default function SuperAdminClient({
                           </div>
                           <div className="space-y-4">
                              {(() => {
-                                const bList = (finance?.templeBills || []).filter((b: any) => (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') && b.item_name !== 'AIFee' && b.type !== 'StorageUpgrade' && b.type !== 'AiUpgrade');
+                                const bList = (finance?.templeBills || []).filter((b: any) => {
+                                  const name = b.item_name || b.itemName || '';
+                                  const type = b.type || '';
+                                  return (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
+                                         !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
+                                         !['StorageUpgrade', 'AiUpgrade'].includes(type);
+                                });
                                  const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
                                  const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
                                 
@@ -1806,7 +1812,7 @@ export default function SuperAdminClient({
                                         <div>
                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
                                            <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
-                                           <p className="text-[11px] font-bold text-emerald-600 mt-1">{b.item_name === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status === 'Paid' ? '已付款' : b.status === 'PendingVerification' ? '審核中' : '未付款'}</p>
+                                           <p className="text-[11px] font-bold text-emerald-600 mt-1">{(b.item_name || b.itemName) === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status === 'Paid' ? '已付款' : b.status === 'PendingVerification' ? '審核中' : '未付款'}</p>
                                         </div>
                                         <span className="text-emerald-500 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
                                      </div>
@@ -1843,12 +1849,13 @@ export default function SuperAdminClient({
                        
                        {/* Pagination for Bills */}
                        {(() => {
-                          const bList = (finance?.templeBills || []).filter((b: any) => 
-                               (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') && 
-                               b.item_name !== 'AIFee' && 
-                               b.type !== 'StorageUpgrade' && 
-                               b.type !== 'AiUpgrade'
-                           );
+                          const bList = (finance?.templeBills || []).filter((b: any) => {
+                                  const name = b.item_name || b.itemName || '';
+                                  const type = b.type || '';
+                                  return (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
+                                         !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
+                                         !['StorageUpgrade', 'AiUpgrade'].includes(type);
+                                });
                           const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
                           if (totalBPages > 1) {
                              return (
