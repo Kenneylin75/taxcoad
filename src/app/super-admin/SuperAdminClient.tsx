@@ -40,6 +40,7 @@ import {
   fetchDataBridgeTree,
   approveWithdrawal,
   logoutAccount,
+  approveTempleBill,
   upgradeTempleStorage,
   grantTempleStorageVip,
   purchaseAiPlanByAdmin
@@ -1471,7 +1472,7 @@ export default function SuperAdminClient({
                                      <button 
                                         onClick={async () => {
                                            if (confirm('確定要將此帳單標記為已付款嗎？此操作將開通該宮廟的 AI 服務。')) {
-                                              await fetch('/api/db', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'updateTempleBill', id: b.id, data: { status: 'Paid' } }) });
+                                              await approveTempleBill(b.id);
                                               window.location.reload();
                                            }
                                         }}
@@ -1829,16 +1830,18 @@ export default function SuperAdminClient({
                                         ) : (
                                            <span className="text-[10px] font-bold text-slate-400">無圖片</span>
                                          )}
-                                         {b.status !== 'Paid' && (
+                                         {b.status !== 'Paid' ? (
                                            <button 
                                              onClick={async () => {
                                                 if (confirm('確定要將此帳單標記為已付款嗎？')) {
-                                                   await fetch('/api/db', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'updateTempleBill', id: b.id, data: { status: 'Paid' } }) });
+                                                   await approveTempleBill(b.id);
                                                    window.location.reload();
                                                 }
                                              }}
                                              className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg ml-2"
                                            >標記已付款</button>
+                                         ) : (
+                                           <span className="px-6 py-2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest ml-2">已付款</span>
                                          )}
                                      </div>
                                   </div>
