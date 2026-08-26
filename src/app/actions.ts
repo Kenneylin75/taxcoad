@@ -7882,6 +7882,8 @@ export async function fetchSuperAdminFinancials() {
     wallets: [],
     templePayments,
     superSalesWithdrawals,
+    templeBills,
+    allTemples,
   };
 }
 
