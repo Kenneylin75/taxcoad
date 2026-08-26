@@ -8826,9 +8826,13 @@ export async function approveTempleBill(billId: string) {
 
     const templeId = bill.templeId;
     if (templeId) {
+      const updateData: any = { status: "Active" };
+      if (bill.type !== "StorageUpgrade" && bill.type !== "AiUpgrade" && bill.itemName !== "StorageUpgrade" && bill.itemName !== "AiUpgrade") {
+        updateData.paymentStatus = "Paid";
+      }
       await prisma.temple.update({
         where: { id: templeId },
-        data: { status: "Active" },
+        data: updateData,
       });
     }
 
@@ -10359,9 +10363,7 @@ export async function updateSuperSalesBankInfo(
     await prisma.distributorSales.update({
       where: { id: salesId },
       data: {
-        bankName: bankInfo.bankName,
-        bankAccountName: bankInfo.accountName,
-        bankAccountNumber: bankInfo.accountNumber,
+        bankAccount: bankInfo,
       },
     });
     const { revalidatePath } = require("next/cache");
@@ -10456,12 +10458,20 @@ export async function fetchSuperSalesRegistry(salesId: string) {
       }
       const annualContribution = yearlyRent + setupFee;
 
-      const bills = await prisma.templeBill.findMany({
+      const rawBills = await prisma.templeBill.findMany({
         where: {
           templeId: t.id,
           type: { notIn: ["StorageUpgrade", "AiUpgrade"] }
         },
       });
+      const bills = rawBills
+        .filter(b => b.itemName !== "StorageUpgrade" && b.itemName !== "AiUpgrade")
+        .map(b => ({
+          ...b,
+          createdAt: b.createdAt ? b.createdAt.toISOString() : null,
+          updatedAt: b.updatedAt ? b.updatedAt.toISOString() : null,
+          timestamp: b.timestamp ? (b.timestamp as any).toISOString ? (b.timestamp as any).toISOString() : new Date(b.timestamp as any).toISOString() : null
+        }));
       const now = new Date();
       let lastBillDate = now;
       if (bills && bills.length > 0) {
@@ -11240,7 +11250,7 @@ export async function fetchCommissionHistory(
 
   myTemples.forEach((t) => {
     const bills = listBills.filter(
-      (b) => b.templeId === t.id && b.status !== "Rejected" && b.type !== "StorageUpgrade" && b.type !== "AiUpgrade" && b.payeeRole !== "SuperAdmin",
+      (b) => b.templeId === t.id && b.status !== "Rejected" && b.type !== "StorageUpgrade" && b.type !== "AiUpgrade" && b.itemName !== "StorageUpgrade" && b.itemName !== "AiUpgrade",
     );
 
     bills.forEach((bill) => {
