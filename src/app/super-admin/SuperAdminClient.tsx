@@ -1791,9 +1791,9 @@ export default function SuperAdminClient({
                           </div>
                           <div className="space-y-4">
                              {(() => {
-                                const bList = (finance?.templeBills || []).filter((b: any) => b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid');
-                                const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
-                                const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
+                                const bList = (finance?.templeBills || []).filter((b: any) => (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') && b.item_name !== 'AIFee' && b.type !== 'StorageUpgrade' && b.type !== 'AiUpgrade');
+                                 const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
+                                 const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
                                 
                                 if (bills.length === 0) {
                                   return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的宮廟付款</p></div>;
@@ -1822,7 +1822,18 @@ export default function SuperAdminClient({
                                            >查看匯款截圖</button>
                                         ) : (
                                            <span className="text-[10px] font-bold text-slate-400">無圖片</span>
-                                        )}
+                                         )}
+                                         {b.status !== 'Paid' && (
+                                           <button 
+                                             onClick={async () => {
+                                                if (confirm('確定要將此帳單標記為已付款嗎？')) {
+                                                   await fetch('/api/db', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'updateTempleBill', id: b.id, data: { status: 'Paid' } }) });
+                                                   window.location.reload();
+                                                }
+                                             }}
+                                             className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg ml-2"
+                                           >標記已付款</button>
+                                         )}
                                      </div>
                                   </div>
                                 )});
@@ -1832,7 +1843,12 @@ export default function SuperAdminClient({
                        
                        {/* Pagination for Bills */}
                        {(() => {
-                          const bList = (finance?.templeBills || []).filter((b: any) => b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid');
+                          const bList = (finance?.templeBills || []).filter((b: any) => 
+                               (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') && 
+                               b.item_name !== 'AIFee' && 
+                               b.type !== 'StorageUpgrade' && 
+                               b.type !== 'AiUpgrade'
+                           );
                           const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
                           if (totalBPages > 1) {
                              return (
