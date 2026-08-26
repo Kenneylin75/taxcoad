@@ -4961,30 +4961,31 @@ export async function approveSuperSalesWithdrawal(
 }
 
 export async function requestWithdrawal(salesName: string, amount: number) {
-  return withTempleSession(null, true, async (client) => {
-    const wRes = await client.query(
-      "SELECT balance FROM wallets WHERE name = $1",
-      [salesName],
-    );
-    if ((wRes.rowCount ?? 0) === 0)
-      return { success: false, error: "找不到該錢包帳戶" };
-    const balance = Number(wRes.rows[0].balance);
-    if (amount > balance) return { success: false, error: "餘額不足" };
-
-    await client.query(
-      "UPDATE wallets SET balance = balance - $1 WHERE name = $2",
-      [amount, salesName],
-    );
+  try {
+    const history = await fetchCommissionHistory(salesName);
+    if (amount > history.balance) {
+      return { success: false, error: "餘額不足" };
+    }
 
     const wdId = `WD-${Date.now()}`;
-    await client.query(
-      'INSERT INTO "Withdrawal" (id, "salesName", amount, status, date) VALUES ($1, $2, $3, $4, CURRENT_DATE)',
-      [wdId, salesName, amount, "Pending"],
-    );
+    await prisma.withdrawal.create({
+      data: {
+        id: wdId,
+        salesName,
+        amount,
+        status: "Pending",
+        date: new Date(),
+      }
+    });
 
+    const { revalidatePath } = require("next/cache");
     revalidatePath("/super-admin");
+    revalidatePath("/super-sales");
     return { success: true };
-  });
+  } catch (e) {
+    console.error("requestWithdrawal error:", e);
+    return { success: false, error: String(e) };
+  }
 }
 
 // migrated (await jsonStore.find('password_resets')) to (await jsonStore.find('password_resets'))
@@ -11404,7 +11405,9 @@ export async function fetchCommissionHistory(
       (w) =>
         w.status === "Verified" ||
         w.status === "Approved" ||
-        w.status === "Paid",
+        w.status === "Paid" ||
+        w.status === "Pending" ||
+        w.status === "審核中",
     )
     .reduce((acc, curr) => acc + curr.amount, 0);
 
