@@ -56,6 +56,7 @@ export default function SuperSalesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [viewingTempleDetail, setViewingTempleDetail] = useState<any>(null);
+  const [viewingDistributorDetail, setViewingDistributorDetail] = useState<any>(null);
 
   useEffect(() => {
     fetchSuperSalesProfile(salesId).then(p => {
@@ -216,7 +217,7 @@ export default function SuperSalesPage() {
                          </div>
                       </div>
                    </div>
-                   <button onClick={() => setViewingTempleDetail(item)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all">⋯</button>
+                   <button onClick={() => registryTab === 'temples' ? setViewingTempleDetail(item) : setViewingDistributorDetail(item)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-900 hover:text-white transition-all">⋯</button>
                 </div>
                 
                 {/* Detailed Monitor Info */}
@@ -232,7 +233,7 @@ export default function SuperSalesPage() {
                                <span className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-sm group-hover/card:scale-110 transition-transform">🏛️</span>
                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">宮廟佈建規模</p>
                             </div>
-                            <p className="text-3xl font-black text-slate-900">{item.templeCount || 0} <span className="text-[10px] text-slate-400 font-bold uppercase ml-1">Nodes</span></p>
+                            <p className="text-3xl font-black text-slate-900">{item.templeCount || 0}<span className="text-xl font-bold text-slate-400 mx-1">/</span>{item.nodes || item.quota || 0} <span className="text-[10px] text-slate-400 font-bold uppercase ml-1">Nodes</span></p>
                          </div>
                          <div className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-emerald-200 group/card">
                             <div className="flex items-center gap-2 mb-3">
@@ -947,10 +948,78 @@ export default function SuperSalesPage() {
                    ) : (
                       <div className="py-12 text-center text-slate-400 font-bold">目前無帳單紀錄</div>
                    )}
-                </div>
-             </div>
-          </div>
+                 </div>
+              </div>
+           </div>
         )}
+      {viewingDistributorDetail && (
+         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setViewingDistributorDetail(null)}>
+            <div className="max-w-2xl w-full bg-white p-8 rounded-[40px] shadow-2xl relative space-y-6" onClick={e => e.stopPropagation()}>
+               <button onClick={() => setViewingDistributorDetail(null)} className="absolute top-6 right-6 w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-900 hover:bg-slate-200 transition-all font-black text-xl z-10">✕</button>
+               
+               <div className="space-y-1">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mb-4 shadow-sm border border-emerald-100">🏗️</div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">經銷商基本訊息</h2>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Distributor Details Overview</p>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">名稱 / Name</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.name || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">登入帳號 / Account</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.account || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">合約到期日 / Expiration</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.expirationDate ? viewingDistributorDetail.expirationDate.split('T')[0] : '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">合約總額 / Total Amount</p>
+                     <p className="text-sm font-bold text-slate-900">${(viewingDistributorDetail.setupFee || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">負責人 / Contact</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.contactName || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">聯絡電話 / Phone</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.phone || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 col-span-2">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">聯絡地址 / Address</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.address || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">電子信箱 / Email</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.email || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">狀態 / Status</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.status || '未提供'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">付款週期 / Cycle</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.paymentCycle === 'Yearly' ? '年付 (Yearly)' : '月付 (Monthly)'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">開辦費 / Setup Fee</p>
+                     <p className="text-sm font-bold text-slate-900">${(viewingDistributorDetail.setupFee || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">授權額度 / Quota</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.nodes || viewingDistributorDetail.quota || 0} Nodes</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">加入日期 / Joined Date</p>
+                     <p className="text-sm font-bold text-slate-900">{viewingDistributorDetail.date || '未提供'}</p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      )}
       {viewingTempleDetail && (
          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setViewingTempleDetail(null)}>
             <div className="max-w-2xl w-full bg-white p-8 rounded-[40px] shadow-2xl relative space-y-6" onClick={e => e.stopPropagation()}>

@@ -222,6 +222,7 @@ export default function DistSalesPage() {
 
   const filteredTemples = useMemo(() => {
     return applications.filter(app => {
+      if (app.status === 'Pending') return false;
       const searchName = app.templeName || app.name || '';
       const matchSearch = searchName.includes(templeSearch) || 
                           app.creatorId?.includes(templeSearch) || 

@@ -196,6 +196,7 @@ export default function DistSalesPage() {
 
   const filteredTemples = useMemo(() => {
     return applications.filter(app => {
+      if (app.status === 'Pending') return false;
       const matchSearch = app.templeName.includes(templeSearch) || 
                           app.creatorId?.includes(templeSearch) || 
                           app.contactPhone?.includes(templeSearch);

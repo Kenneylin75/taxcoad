@@ -1513,11 +1513,18 @@ export default function DistributorClient({
                                         {payment.type === 'SetupFee' ? '🚀' : '📅'}
                                      </div>
                                      <div className="overflow-hidden">
-                                        <div className="flex items-center gap-2">
-                                           <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate max-w-[120px] sm:max-w-full">{payment.templeName}</h4>
-                                           <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md uppercase tracking-widest border border-slate-100 whitespace-nowrap shrink-0">
-                                             {payment.type === 'MonthlyFee' ? '月租費' : payment.type === 'YearlyFee' ? '年租費' : payment.type === 'SetupFee' ? '開辦費' : payment.type}
-                                           </span>
+                                        <div className="flex flex-col items-start gap-1">
+                                           <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate max-w-[140px] sm:max-w-full">{payment.templeName}</h4>
+                                           <div className="flex flex-wrap items-center gap-2">
+                                              <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md uppercase tracking-widest border border-slate-100 whitespace-nowrap shrink-0">
+                                                {payment.type === 'MonthlyFee' ? '月租費' : payment.type === 'YearlyFee' ? '年租費' : payment.type === 'SetupFee' ? '開辦費' : payment.type}
+                                              </span>
+                                              {payment.bankLast5 && (
+                                                <span className="text-[10px] font-black text-slate-500 bg-blue-50/50 px-2 py-0.5 rounded-md tracking-widest border border-blue-100 whitespace-nowrap shrink-0">
+                                                  末五碼: {payment.bankLast5}
+                                                </span>
+                                              )}
+                                           </div>
                                         </div>
                                      </div>
                                   </div>

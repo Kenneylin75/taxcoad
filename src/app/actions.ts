@@ -3122,16 +3122,28 @@ export async function fetchTempleStorages() {
     const storages = await prisma.templeStorage.findMany({
       include: { temple: true },
     });
+    const plans = await prisma.storagePlan.findMany();
 
-    return storages.map((r) => ({
-      id: r.id,
-      templeId: r.templeId,
-      templeName: r.temple?.templeName || r.temple?.name,
-      city: r.city,
-      usedBytes: Number(r.usedBytes),
-      quotaGb: Number(r.allocatedBytes) / (1024 * 1024 * 1024),
-      planName: r.planName,
-    }));
+    return storages.map((r) => {
+      let fee = 0;
+      if (r.planId && r.planId !== 'FREE') {
+        const p = plans.find((pl: any) => pl.id === r.planId);
+        if (p) {
+          fee = r.paymentCycle === "Yearly" ? p.priceYearly : p.priceMonthly;
+        }
+      }
+      return {
+        id: r.id,
+        templeId: r.templeId,
+        templeName: r.temple?.templeName || r.temple?.name,
+        city: r.city,
+        usedBytes: Number(r.usedBytes),
+        quotaGb: Number(r.allocatedBytes) / (1024 * 1024 * 1024),
+        planName: r.planName,
+        paymentCycle: r.paymentCycle,
+        fee: fee,
+      };
+    });
   } catch (e) {
     console.error(e);
     return [];
@@ -3734,16 +3746,16 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
     const distSalesIdsForFinance = (
       await prisma.distributorSales.findMany({
         where: { distributorId: distributorId, role: { not: "SuperSales" } },
-        select: { id: true },
+        select: { id: true, commissionRules: true },
       })
-    ).map((s: any) => s.id);
+    );
 
     const myTemples = await prisma.temple.findMany({
       where: {
         status: "Active",
         OR: [
           { distributorId: distributorId },
-          { salesId: { in: distSalesIdsForFinance } },
+          { salesId: { in: distSalesIdsForFinance.map((s: any) => s.id) } },
         ],
       },
     });
@@ -3751,24 +3763,52 @@ export async function fetchDistributorFinanceSummary(distributorId: string) {
     let totalRevenue = 0;
     let totalCommissionPayout = 0;
 
-    const now = new Date();
     const templeIds = myTemples.map((t: any) => t.id);
 
-    let bills: any[] = [];
     if (templeIds.length > 0) {
-      bills = await prisma.templeBill.findMany({
-        where: { templeId: { in: templeIds } },
+      const bills = await prisma.templeBill.findMany({
+        where: { 
+          templeId: { in: templeIds },
+          status: "Paid",
+          OR: [
+            { type: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] } },
+            { itemName: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] } }
+          ]
+        },
       });
-    }
 
-    for (const t of myTemples) {
-      if (!t.setupFee && !t.monthlyRent) continue;
-      const start = t.contractEndDate || t.timestamp || new Date();
-      const diffTime = Math.abs(now.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays > 30) {
-        totalRevenue += t.monthlyRent || 0;
-      }
+      bills.forEach((b: any) => {
+        totalRevenue += b.amount;
+        
+        const temple = myTemples.find((t: any) => t.id === b.templeId);
+        if (temple && temple.salesId) {
+          const sales = distSalesIdsForFinance.find((s: any) => s.id === temple.salesId);
+          if (sales) {
+            let sRules: any = {};
+            if (typeof sales.commissionRules === "string") {
+              try { sRules = JSON.parse(sales.commissionRules); } catch (e) {}
+            } else if (sales.commissionRules) {
+              sRules = sales.commissionRules;
+            }
+            
+            const isSetup = b.itemName === "SetupFee" || b.itemName === "Setup" || b.type === "SetupFee" || b.type === "Setup";
+            let rate = 0;
+            
+            if (isSetup) {
+              rate = sRules.setupFeePercent || sRules.setupRate || 20;
+            } else {
+              const templeStart = temple.createdAt ? new Date(temple.createdAt) : new Date();
+              const billDate = b.createdAt ? new Date(b.createdAt) : new Date();
+              const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
+              
+              if (yearDiff === 0) rate = sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+              else if (yearDiff === 1) rate = sRules.rentYear2Percent || sRules.rentYear2Rate || 10;
+              else rate = sRules.rentYear3PlusPercent || sRules.rentYear3PlusRate || 5;
+            }
+            totalCommissionPayout += (b.amount * rate) / 100;
+          }
+        }
+      });
     }
 
     return {
@@ -7649,7 +7689,14 @@ export async function fetchDistributorSalesPerformance(
 
         if (templeIds.length > 0) {
           const allBills = await prisma.templeBill.findMany({
-            where: { templeId: { in: templeIds }, status: "Paid" },
+            where: { 
+              templeId: { in: templeIds }, 
+              status: "Paid",
+              OR: [
+                { type: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] } },
+                { itemName: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] } }
+              ]
+            },
           });
 
           // Calculate lifetime commission for available balance
@@ -7667,9 +7714,19 @@ export async function fetchDistributorSalesPerformance(
             } else if (s.commissionRules) {
               sRules = s.commissionRules;
             }
-            const rate = isSetup
-              ? sRules.setupFeePercent || sRules.setupRate || 20
-              : sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+            const temple = temples.find((t: any) => t.id === b.templeId);
+            let rate = 0;
+            if (isSetup) {
+              rate = sRules.setupFeePercent || sRules.setupRate || 20;
+            } else {
+              const templeStart = temple && temple.createdAt ? new Date(temple.createdAt) : new Date();
+              const billDate = b.createdAt ? new Date(b.createdAt) : new Date();
+              const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
+              
+              if (yearDiff === 0) rate = sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+              else if (yearDiff === 1) rate = sRules.rentYear2Percent || sRules.rentYear2Rate || 10;
+              else rate = sRules.rentYear3PlusPercent || sRules.rentYear3PlusRate || 5;
+            }
             return sum + (b.amount * rate) / 100;
           }, 0);
 
@@ -7708,9 +7765,19 @@ export async function fetchDistributorSalesPerformance(
             } else if (s.commissionRules) {
               sRules = s.commissionRules;
             }
-            const rate = isSetup
-              ? sRules.setupFeePercent || sRules.setupRate || 20
-              : sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+            const temple = temples.find((t: any) => t.id === b.templeId);
+            let rate = 0;
+            if (isSetup) {
+              rate = sRules.setupFeePercent || sRules.setupRate || 20;
+            } else {
+              const templeStart = temple && temple.createdAt ? new Date(temple.createdAt) : new Date();
+              const billDate = b.createdAt ? new Date(b.createdAt) : new Date();
+              const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
+              
+              if (yearDiff === 0) rate = sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+              else if (yearDiff === 1) rate = sRules.rentYear2Percent || sRules.rentYear2Rate || 10;
+              else rate = sRules.rentYear3PlusPercent || sRules.rentYear3PlusRate || 5;
+            }
             return sum + (b.amount * rate) / 100;
           }, 0);
 
@@ -8436,23 +8503,43 @@ export async function fetchDataBridgeTree() {
       children: [],
     }));
 
-    const distNodes = distributors.map((d: any) => ({
-      id: d.id,
-      name: d.name,
-      account: d.account,
-      type: "distributor",
-      joinedAt: d.createdAt.toISOString(),
-      status: d.status,
-      planName: d.name ? "標準經銷方案" : "標準經銷方案",
-      price: d.setupFee || 1600000,
-      nodes: d.quota,
-      expirationDate: new Date(
-        new Date(d.createdAt).setFullYear(
-          new Date(d.createdAt).getFullYear() + 2,
-        ),
-      ).toISOString(),
-      children: [],
-    }));
+    const distNodes = distributors.map((d: any) => {
+      const app = distApps.find(
+        (a: any) =>
+          (a.account && a.account === d.account) ||
+          (a.name && a.name === d.name),
+      );
+      const appPrice = app ? Number(app.price) : 0;
+      const appYears = app ? Number(app.years) : 0;
+      
+      let durationYears = appYears;
+      if (!durationYears) {
+        if (d.expirationDate && d.createdAt) {
+          durationYears = Math.round((new Date(d.expirationDate).getTime() - new Date(d.createdAt).getTime()) / (1000 * 3600 * 24 * 365.25)) || 1;
+        } else {
+          durationYears = 2;
+        }
+      }
+
+      return {
+        id: d.id,
+        name: d.name,
+        account: d.account,
+        type: "distributor",
+        joinedAt: d.createdAt.toISOString(),
+        status: d.status,
+        planName: "標準經銷方案",
+        price: d.setupFee || appPrice || 1600000,
+        durationYears: durationYears,
+        nodes: d.quota,
+        expirationDate: d.expirationDate || new Date(
+          new Date(d.createdAt).setFullYear(
+            new Date(d.createdAt).getFullYear() + durationYears,
+          ),
+        ).toISOString(),
+        children: [],
+      };
+    });
 
     const distSalesNodes = distSales.map((d: any) => ({
       id: d.id,
@@ -8563,7 +8650,7 @@ export async function fetchDataBridgeTree() {
       const dist = distributors.find((d: any) => d.id === dNode.id);
       if (dist?.superSalesId) {
         const parentSS = superSalesNodes.find(
-          (ss) => ss.id === dist.superSalesId,
+          (ss) => ss.id === dist.superSalesId || ss.name === dist.superSalesId || ss.account === dist.superSalesId,
         );
         if (parentSS) {
           parentSS.children.push(dNode);
@@ -8577,7 +8664,7 @@ export async function fetchDataBridgeTree() {
       );
       if (app && app.submittedBy) {
         const parentSS = superSalesNodes.find(
-          (ss) => ss.id === app.submittedBy,
+          (ss) => ss.id === app.submittedBy || ss.name === app.submittedBy || ss.account === app.submittedBy,
         );
         if (parentSS) {
           parentSS.children.push(dNode);
@@ -9574,7 +9661,7 @@ export async function submitFreeAccountApplication(data: any) {
       })) as any;
       if (p) {
         allocatedBytes = BigInt(20 + p.sizeGb) * 1073741824n; // (20 + sizeGb) * 1024^3
-        storagePlanName = `${20 + p.sizeGb}GB 雲端空間`;
+        storagePlanName = `${p.name} (${20 + p.sizeGb}GB 雲端空間)`;
       }
     }
 
@@ -9589,6 +9676,8 @@ export async function submitFreeAccountApplication(data: any) {
           data.cloudStorage && data.cloudStorage !== "Free"
             ? data.cloudStorage
             : "FREE",
+        paymentCycle: data.cloudStoragePaymentCycle || "Monthly",
+        billingStartDate: new Date(),
       },
     });
 
@@ -9727,6 +9816,7 @@ export async function fetchPendingDistributors() {
         account: a.account,
         password: a.password,
         expirationDate: a.expirationDate,
+        years: a.years,
       }),
     );
     return Array.from(allApps.values());
@@ -9757,6 +9847,22 @@ export async function approveDistributorBySuperAdmin(
     const newQuota =
       overrideQuota !== undefined ? overrideQuota : Number(app.nodes || 100);
 
+    let superSalesId = null;
+    if (app.submittedBy && app.submittedBy !== "System Admin") {
+       const ss = await prisma.distributorSales.findFirst({
+         where: {
+           OR: [{ name: app.submittedBy }, { account: app.submittedBy }]
+         }
+       });
+       if (ss) superSalesId = ss.id;
+       else {
+         const su = await prisma.user.findFirst({
+           where: { role: "SuperSales", OR: [{name: app.submittedBy}, {account: app.submittedBy}] }
+         });
+         if (su) superSalesId = su.id;
+       }
+    }
+
     await prisma.distributor.create({
       data: {
         id: distId,
@@ -9767,12 +9873,13 @@ export async function approveDistributorBySuperAdmin(
         quota: newQuota,
         nodes: newQuota,
         customNodes: newQuota,
-        contactName: app.contact_name || "",
+        setupFee: Number(app.price) || 0,
+        contactName: app.contactName || "",
         contactPhone: app.phone || "",
         email: app.email || "",
         address: app.address || "",
-        superSalesId:
-          app.submittedBy !== "System Admin" ? app.submittedBy : null,
+        superSalesId: superSalesId,
+        expirationDate: app.expirationDate,
         bankCode: app.bankCode || "",
         bankAccount: app.bankAccount || "",
         bankName: app.bankName || "",
@@ -9973,7 +10080,7 @@ export async function fetchAllAccountsForAdmin() {
       joinedAt:
         d.joinedAt ||
         (d.createdAt ? d.createdAt.toISOString().split("T")[0] : "未知"),
-      creatorSalesId: d.creatorSalesId || "SuperAdmin",
+      creatorSalesId: d.superSalesId || "SuperAdmin",
       phone: d.contactPhone || d.phone || "",
       email: d.email || "",
       address: d.address || "",
@@ -9992,6 +10099,7 @@ export async function fetchAllAccountsForAdmin() {
       status: d.status || "Active",
       salesCount: d._count?.sales || 0,
       templesCount: d._count?.temples || 0,
+      expirationDate: d.expirationDate,
     });
   });
 
@@ -10249,17 +10357,25 @@ export async function fetchDistributorCapacity(distId?: string) {
     }).length;
 
     let total = 0;
+    let nextRenewal = "";
     if (distId) {
       const dist = await prisma.distributor.findUnique({
         where: { id: distId },
       });
       total = dist?.quota || 100;
+      if (dist?.expirationDate) {
+        nextRenewal = dist.expirationDate.split('T')[0];
+      } else if (dist?.createdAt) {
+        const d = new Date(dist.createdAt);
+        d.setFullYear(d.getFullYear() + 1);
+        nextRenewal = d.toISOString().split('T')[0];
+      }
     } else {
       const dists = await prisma.distributor.findMany();
       total = dists.reduce((acc, d) => acc + (d.quota || 100), 0);
     }
 
-    return { used, total, isUnlimited: total >= 1000 };
+    return { used, total, isUnlimited: total >= 1000, nextRenewal };
   } catch (error) {
     console.error("fetchDistributorCapacity error:", error);
     return { used: 0, total: 100, isUnlimited: false };
@@ -10294,7 +10410,7 @@ export async function submitDistributorApplication(data: any) {
       data: {
         id: newApp.id,
         name: data.name || "",
-        contactName: data.contactName || "",
+        contactName: data.contactName || data.owner || "",
         phone: data.phone || "",
         email: data.email || "",
         taxId: data.taxId || "",
@@ -10302,6 +10418,7 @@ export async function submitDistributorApplication(data: any) {
         planId: data.planId || "",
         price: Number(data.customPrice) || 0,
         nodes: Number(data.customNodes) || 0,
+        years: Number(data.years) || 2,
         submittedBy: data.submittedBy || "",
         status: "Pending",
         account: safeAccount,
@@ -10421,6 +10538,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     }));
   }
   const resDist = { rows: await prisma.distributor.findMany() };
+  const distApps = await prisma.distributorApplication.findMany();
   if (resDist && resDist.rows) {
     listDistributors = resDist.rows.map((r: any) => ({
       ...r,
@@ -10547,28 +10665,78 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   }
 
   const distributors = listDistributors
-    .filter((d) => d.creatorSalesId === salesId || d.salesId === salesId)
+    .filter((d) => d.superSalesId === salesId || d.superSalesId === name || d.superSalesId === sales?.account)
     .map((d) => {
       const distTemples = listTemples.filter((t) => t.distributorId === d.id);
       const distSales = listSales.filter((s) => s.distributorId === d.id);
-      const totalIncome = distTemples.reduce(
-        (acc, t) => {
-          const rent = Number(t.monthlyRent) || config.fixedMonthlyRent || 3600;
-          const cycle = t.paymentCycle || "Monthly";
-          const yearly = cycle === "Yearly" ? rent * 12 * (1 - yearlyDiscountRate / 100) : rent * 12;
-          return acc + yearly;
-        },
-        0,
-      );
-      const commissionExpense = Math.floor(totalIncome * 0.2); // 預設費用20%
+      let totalIncome = 0;
+      let commissionExpense = 0;
+      
+      distTemples.forEach((t) => {
+        if (t.bills && Array.isArray(t.bills)) {
+          t.bills.forEach((b: any) => {
+            if (b.status === "Paid" && 
+                (b.type === "SetupFee" || b.type === "Setup" || b.type === "MonthlyFee" || b.type === "YearlyFee" || 
+                 b.itemName === "SetupFee" || b.itemName === "Setup" || b.itemName === "MonthlyFee" || b.itemName === "YearlyFee")) {
+              
+              totalIncome += b.amount;
+              
+              // Calculate accurate commission
+              if (t.salesId) {
+                const sales = listSales.find(s => s.id === t.salesId);
+                if (sales) {
+                  let sRules: any = {};
+                  if (typeof sales.commissionRules === "string") {
+                    try { sRules = JSON.parse(sales.commissionRules); } catch(e){}
+                  } else if (sales.commissionRules) {
+                    sRules = sales.commissionRules;
+                  }
+                  
+                  const isSetup = b.type === "SetupFee" || b.type === "Setup" || b.itemName === "SetupFee" || b.itemName === "Setup";
+                  let rate = 0;
+                  
+                  if (isSetup) {
+                    rate = sRules.setupFeePercent || sRules.setupRate || 20;
+                  } else {
+                    const templeStart = t.timestamp ? new Date(t.timestamp) : (t.created_at ? new Date(t.created_at) : new Date());
+                    const billDate = b.createdAt ? new Date(b.createdAt) : new Date();
+                    const yearDiff = billDate.getFullYear() - templeStart.getFullYear();
+                    
+                    if (yearDiff === 0) rate = sRules.rentYear1Percent || sRules.rentYear1Rate || 15;
+                    else if (yearDiff === 1) rate = sRules.rentYear2Percent || sRules.rentYear2Rate || 10;
+                    else rate = sRules.rentYear3PlusPercent || sRules.rentYear3PlusRate || 5;
+                  }
+                  commissionExpense += (b.amount * rate) / 100;
+                }
+              }
+            }
+          });
+        }
+      });
       const netRevenue = totalIncome - commissionExpense;
+      
+      const app = distApps.find(
+        (a: any) =>
+          (a.account && a.account === d.account) ||
+          (a.name && a.name === d.name)
+      );
+      const appPrice = app ? Number(app.price) : 0;
 
       return {
+        ...d,
         id: d.id,
         name: d.name,
+        account: d.account,
         status: d.contractStatus || d.status || "Active",
         plan: d.planName || "標準方案",
-        date: d.joinedAt || "未知",
+        date: d.createdAt ? new Date(d.createdAt).toISOString().split('T')[0] : "未知",
+        contactName: d.contactName || (d as any).contact_name || "",
+        phone: d.phone || d.contactPhone || "",
+        email: d.email || "",
+        address: d.address || "",
+        setupFee: d.setupFee || appPrice || 0,
+        monthlyRent: d.monthlyRent || 0,
+        expirationDate: d.expirationDate || (app ? app.expirationDate : "未知"),
         nodesUsed: distTemples.length,
         templeCount: distTemples.length,
         salesCount: distSales.length,
@@ -10593,13 +10761,13 @@ export async function fetchSuperSalesRegistry(salesId: string) {
 
   let pgPendingDistCount = 0;
   try {
-    const count = await prisma.templeApplication.count({
+    const templeAppCount = await prisma.templeApplication.count({
       where: { salesId: name, status: "Pending" },
     });
-    const res = { rows: [{ count: count }] };
-    if (res && (res as any).rows && (res as any).rows.length > 0) {
-      pgPendingDistCount = parseInt((res as any).rows[0].count);
-    }
+    const distAppCount = await prisma.distributorApplication.count({
+      where: { submittedBy: name, status: "Pending" },
+    });
+    pgPendingDistCount = templeAppCount + distAppCount;
   } catch (e) {
     console.error(e);
   }
@@ -10755,6 +10923,7 @@ export async function createDistributorAccount(data: any) {
         contactPhone: newDist.phone,
         email: newDist.email,
         address: newDist.address,
+        expirationDate: newDist.expirationDate,
         bankCode: newDist.bankInfo?.bankCode || "",
         bankAccount: newDist.bankInfo?.accountNumber || "",
         bankName: newDist.bankInfo?.bankName || "",

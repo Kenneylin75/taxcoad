@@ -1047,6 +1047,7 @@ export default function SuperAdminClient({
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">地區</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">目前容量方案</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">使用進度</th>
+                                          <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">費用</th>
                                           <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">空間狀態</th>
                                        </tr>
                                     </thead>
@@ -1073,7 +1074,13 @@ export default function SuperAdminClient({
                                                       </div>
                                                    </div>
                                                 </td>
-                                                <td className="px-8 py-6 text-right">
+                                                <td className="px-8 py-6">
+                                                    <div className="flex flex-col">
+                                                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{s.paymentCycle === 'Yearly' ? '年付 (Yearly)' : s.paymentCycle === 'Monthly' ? '月付 (Monthly)' : '免費 (Free)'}</span>
+                                                       <span className="text-sm font-bold text-slate-900">${((s as any).fee || 0).toLocaleString()}</span>
+                                                    </div>
+                                                 </td>
+                                                 <td className="px-8 py-6 text-right">
                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
                                                       percentage >= 85 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
                                                    }`}>
