@@ -3136,7 +3136,7 @@ export async function fetchTempleStorages() {
         id: r.id,
         templeId: r.templeId,
         templeName: r.temple?.templeName || r.temple?.name,
-        city: r.city,
+        city: r.city || r.temple?.city || '未提供',
         usedBytes: Number(r.usedBytes),
         quotaGb: Number(r.allocatedBytes) / (1024 * 1024 * 1024),
         planName: r.planName,
@@ -9435,7 +9435,8 @@ export async function generateInitialBills(newTemple: any) {
       });
     }
 
-    const storagePlanId = newTemple.cloudStorage;
+    const tStorage = await prisma.templeStorage.findFirst({ where: { templeId: newTemple.id } });
+    const storagePlanId = tStorage?.planId;
     let plan = null;
     if (storagePlanId && storagePlanId.startsWith("SP-")) {
       plan = (await prisma.storagePlan.findUnique({
@@ -9475,7 +9476,8 @@ export async function generateInitialBills(newTemple: any) {
       }
     }
 
-    let aiPlanId = newTemple.aiPlan;
+    const tAi = await prisma.templeAiUsage.findFirst({ where: { templeId: newTemple.id } });
+    let aiPlanId = tAi?.planId;
     let aiPlanInfo = null;
     if (aiPlanId) {
       aiPlanInfo = (await prisma.aiPlan.findUnique({
@@ -9527,7 +9529,8 @@ export async function generateInitialBills(newTemple: any) {
               data: {
                 id: newBill.id,
                 templeId: newTemple.id,
-                itemName: newBill.type,
+                type: newBill.type,
+                itemName: newBill.itemName || newBill.type,
                 amount: newBill.amount,
                 dueDate: newBill.dueDate,
                 status: "Unpaid",
@@ -9679,6 +9682,7 @@ export async function submitFreeAccountApplication(data: any) {
             : "FREE",
         paymentCycle: data.cloudStoragePaymentCycle || "Monthly",
         billingStartDate: new Date(),
+        city: data.city || "未提供",
       },
     });
 
@@ -12181,19 +12185,9 @@ export async function fetchPendingStorageBills() {
     return bills.map((b: any) => {
       const storage = b.temple?.templeStorages;
       
-      let cycle = "未知";
-      let months = 12;
-      
-      if (b.type === "StorageMonthly" || b.amount === 600) {
-          cycle = "月付";
-          months = 1;
-      } else if (b.amount === 5760 || b.amount > 1000) {
-          cycle = "年付";
-          months = 12;
-      } else {
-          cycle = "月付";
-          months = 1;
-      }
+      const isYearly = storage?.paymentCycle === "Yearly";
+      const cycle = isYearly ? "年付" : "月付";
+      const months = isYearly ? 12 : 1;
 
       const start = new Date(b.createdAt);
       const end = new Date(start);
