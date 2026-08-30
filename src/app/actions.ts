@@ -9390,9 +9390,21 @@ export async function generateInitialBills(newTemple: any) {
   const payeeRole = newTemple.distributorId ? "Distributor" : "SuperAdmin";
   const payeeId = newTemple.distributorId || "system-hq";
 
-  const billDueDate = new Date(newTemple.billingStartDate || Date.now())
+  let billDueDate = new Date(newTemple.billingStartDate || Date.now())
     .toISOString()
     .split("T")[0];
+  let effectiveBillingPeriod = new Date().toISOString().substring(0, 7);
+
+  if (newTemple.freeType === "Trial" && (newTemple.trialMonths || 0) > 0) {
+    const trialDate = newTemple.billingStartDate
+      ? new Date(newTemple.billingStartDate)
+      : new Date(Date.now() + (newTemple.trialMonths || 3) * 30 * 24 * 60 * 60 * 1000);
+    billDueDate = trialDate.toISOString().split("T")[0];
+    const nextMonth = new Date(trialDate);
+    nextMonth.setDate(nextMonth.getDate() + 1);
+    effectiveBillingPeriod = nextMonth.toISOString().substring(0, 7);
+  }
+
   const monthlyRent = newTemple.monthlyRent || 0;
 
   if (newTemple.freeType !== "Permanent") {
@@ -9411,7 +9423,7 @@ export async function generateInitialBills(newTemple: any) {
         templeId: newTemple.id,
         type: rentType,
         amount: rentAmount,
-        billingDate: new Date().toISOString().substring(0, 7),
+        billingDate: effectiveBillingPeriod,
         dueDate: billDueDate,
         status: "Unpaid",
         payeeRole,
