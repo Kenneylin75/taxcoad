@@ -86,7 +86,9 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
     startTransition(async () => {
       const res = await uploadTempleBillReceipt(currentPayingBill.id, receiptImage, bankLast5);
       if (res.success) {
-        alert('已成功上傳匯款憑證與後五碼，等待經銷商確認後即會自動核銷。');
+        const isSuperAdmin = currentPayingBill.payeeRole === 'SuperAdmin' || currentPayingBill.payeeId === 'system-hq';
+        const targetRoleName = isSuperAdmin ? '超級管理員' : '經銷商';
+        alert(`已成功上傳匯款憑證與後五碼，等待${targetRoleName}確認後即會自動核銷。`);
         setPaymentModalOpen(false);
         setReceiptImage(null);
         setBankLast5('');
@@ -592,7 +594,9 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
               ) : (
                  <div className="space-y-4">
                      <div className="bg-red-50/50 border border-red-100 rounded-2xl p-5 space-y-2">
-                        <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">收款方銀行帳戶</p>
+                        <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+                           收款方銀行帳戶（{currentPayingBill.payeeRole === 'SuperAdmin' || currentPayingBill.payeeId === 'system-hq' ? '超級管理員 / 系統總部' : '所屬經銷商'}）
+                        </p>
                         <p className="text-sm font-bold text-slate-700">
                            銀行：{initialData?.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankCode ? `代碼 ${initialData?.payeeSettings?.[currentPayingBill.payeeId || 'superadmin']?.customTransfer?.bankCode}` : (initialData?.payeeInfo?.bankName || '未提供')}
                         </p>

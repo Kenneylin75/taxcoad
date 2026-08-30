@@ -8892,6 +8892,10 @@ export async function uploadTempleBillReceipt(
         bankLast5: bankLast5 || null,
       },
     });
+    try {
+      revalidatePath("/super-admin");
+      revalidatePath("/distributor");
+    } catch(e) {}
     return { success: true };
   } catch (e) {
     return { success: false };
