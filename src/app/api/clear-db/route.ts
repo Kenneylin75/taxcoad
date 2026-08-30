@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 export async function GET() {
+  // 生產環境嚴格封鎖清空資料庫操作
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, error: 'Forbidden: 此端點在正式生產環境中已永久停用。' }, { status: 403 });
+  }
+
   try {
     // 使用 TRUNCATE CASCADE 清空測試資料表與其關聯的所有子資料表
     // 這將會清空宮廟、經銷商、業務以及相關的申請單
