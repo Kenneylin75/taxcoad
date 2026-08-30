@@ -2134,10 +2134,6 @@ export default function DistributorClient({
                {/* eslint-disable-next-line @next/next/no-img-element */}
                <img src={currentReceiptImage || undefined} alt="Receipt" className="max-w-full h-auto object-contain" />
              </div>
-             <div className="grid grid-cols-2 gap-4">
-               <button onClick={() => handleVerifyOrderAction('rejected')} className="py-4 bg-rose-50 text-rose-600 rounded-[20px] font-black tracking-widest hover:bg-rose-600 hover:text-white transition-all text-sm">駁回款項</button>
-               <button onClick={() => handleVerifyOrderAction('paid')} className="py-4 bg-emerald-500 text-white rounded-[20px] font-black tracking-widest hover:bg-emerald-600 transition-all text-sm">確認已收款</button>
-             </div>
            </div>
          </div>
        )}
