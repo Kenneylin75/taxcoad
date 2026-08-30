@@ -9611,7 +9611,7 @@ export async function submitFreeAccountApplication(data: any) {
     role: "Temple",
     status,
     creatorRole: role,
-    creatorId: currentUser.name,
+    creatorId: data.submittedBy || currentUser.name,
     salesId: data.salesId || sales?.id || null,
     distributorId:
       role === "super-admin"
