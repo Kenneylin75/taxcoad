@@ -10541,7 +10541,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   const yearlyDiscountRate = config.yearlyDiscountRate || 20;
 
   /* removed duplicate import */
-  const resTemples = { rows: await prisma.temple.findMany() };
+  const resTemples = { rows: await prisma.temple.findMany({ include: { templeBills: true } }) };
   if (resTemples && resTemples.rows) {
     listTemples = resTemples.rows.map((r: any) => ({
       ...r,
@@ -10554,6 +10554,7 @@ export async function fetchSuperSalesRegistry(salesId: string) {
       paymentCycle: r.paymentCycle || r.payment_cycle,
       paymentStatus: r.paymentStatus || r.payment_status,
       timestamp: r.createdAt || r.created_at,
+      bills: r.templeBills || [],
     }));
   }
   const resDist = { rows: await prisma.distributor.findMany() };
@@ -10759,6 +10760,8 @@ export async function fetchSuperSalesRegistry(salesId: string) {
         nodesUsed: distTemples.length,
         templeCount: distTemples.length,
         salesCount: distSales.length,
+        nodes: d.nodes || d.quota || 100,
+        quota: d.quota || d.nodes || 100,
         revenue: totalIncome,
         expenses: commissionExpense,
         netRevenue: netRevenue,
