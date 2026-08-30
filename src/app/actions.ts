@@ -5078,39 +5078,27 @@ export async function handlePasswordReset(
 export async function fetchNotifications(userRole: string, userName?: string) {
   try {
     let whereClause: any = {};
-    if (userRole !== "SuperAdmin") {
+    if (userName && userRole !== "SuperAdmin") {
       whereClause = {
         OR: [
-          { targetUser: userName },
-          {
-            title: {
-              notIn: [
-                "新宮廟核定申請",
-                "新經銷體系授權申請",
-                "密碼重設申請",
-                "手動獎金撥發通知",
-              ],
-            },
-          },
-          {
-            title: {
-              in: [
-                "新宮廟核定申請",
-                "新經銷體系授權申請",
-                "密碼重設申請",
-                "手動獎金撥發通知",
-              ],
-            },
-            content: { contains: userName || "" },
-          },
-        ],
+          { userId: userName },
+          { content: { contains: userName } }
+        ]
       };
     }
 
-    return await prisma.notification.findMany({
+    const list = await prisma.notification.findMany({
       where: whereClause,
-      orderBy: { date: "desc" },
+      orderBy: { createdAt: "desc" },
     });
+
+    return list.map((n: any) => ({
+      id: n.id,
+      title: "系統通知",
+      content: n.content || "",
+      date: n.createdAt ? new Date(n.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      isRead: n.isRead
+    }));
   } catch (e) {
     console.error(e);
     return [];
