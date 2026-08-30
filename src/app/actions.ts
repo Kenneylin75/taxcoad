@@ -11219,13 +11219,40 @@ export async function fetchAggregatedAnalytics(targetYear?: string) {
       where: { role: "SuperSales" },
     });
 
-    const bills = await prisma.templeBill.findMany({
-      where: { status: "Paid" },
+        // 1. SuperAdmin & SuperSales Temples' Setup/Rent Fee
+    const hqBills = await prisma.templeBill.findMany({
+      where: {
+        status: "Paid",
+        itemName: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] },
+        temple: {
+          OR: [
+            { creatorRole: { in: ["SuperAdmin", "SuperSales"] } },
+            { distributorId: null }
+          ]
+        }
+      },
+      include: { temple: true }
     });
-    const monthlyRevenue = bills.reduce(
-      (sum, b) => sum + Number(b.amount || 0),
-      0,
-    );
+    const hqTempleRevenue = hqBills.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+
+    // 2. Distributor Contract Revenue (Approved)
+    const distApps = await prisma.distributorApplication.findMany({
+      where: { status: "Approved" }
+    });
+    const distRevenue = distApps.reduce((sum, a) => sum + Number(a.price || 0), 0);
+
+    // 3. All temples' Cloud/AI Fees
+    const addOnBills = await prisma.templeBill.findMany({
+      where: {
+        status: "Paid",
+        NOT: {
+          itemName: { in: ["SetupFee", "Setup", "MonthlyFee", "YearlyFee"] }
+        }
+      }
+    });
+    const addOnRevenue = addOnBills.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+
+    const monthlyRevenue = hqTempleRevenue + distRevenue + addOnRevenue;
 
     const temples = await prisma.temple.findMany({
       where: { status: "Active" },
