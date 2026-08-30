@@ -66,83 +66,217 @@ const IconLotus = ({ className }: { className?: string }) => (
 );
 
 function QRScannerComponent({ onScan, onClose }: { onScan: (data: string) => void, onClose: () => void }) {
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
+  const qrCodeInstanceRef = useRef<any>(null);
+  const isStoppingRef = useRef(false);
+
+  // 切換前後相機
+  const handleToggleCamera = async () => {
+    if (isStoppingRef.current) return;
+    const scanner = qrCodeInstanceRef.current;
+    if (scanner && scanner.isScanning) {
+      isStoppingRef.current = true;
+      setIsInitializing(true);
+      try {
+        await scanner.stop();
+        scanner.clear();
+      } catch (err) {
+        console.warn("停止相機時出錯:", err);
+      }
+      isStoppingRef.current = false;
+    }
+
+    if (availableDevices.length > 1) {
+      setCurrentDeviceIndex((prev) => (prev + 1) % availableDevices.length);
+    } else {
+      setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+    }
+  };
+
   useEffect(() => {
-    let html5QrCode: any;
     let isUnmounted = false;
+
     if (typeof window !== 'undefined' && window.isSecureContext === false) {
-      alert("⚠️ 基於瀏覽器安全性限制，相機僅能在 HTTPS 安全連線或 localhost 下開啟。\n\n建議：若您正在區域網路測試手機版，請使用 ngrok 產生 HTTPS 網址來連線。");
+      alert("⚠️ 基於瀏覽器安全性限制，相機僅能在 HTTPS 安全連線或 localhost 下開啟。\n\n建議：若您正在區域網路測試手機版，請使用 ngrok 或本機 HTTPS 網址連線。");
       onClose();
       return;
     }
 
-    import('html5-qrcode').then(({ Html5Qrcode }) => {
+    import('html5-qrcode').then(async ({ Html5Qrcode }) => {
       if (isUnmounted) return;
-      html5QrCode = new Html5Qrcode("qr-reader");
-      
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length) {
-          let cameraId = devices[0].id;
-          
-          if (devices.length > 1) {
-            const backCamera = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment') || d.label.toLowerCase().includes('rear'));
-            if (backCamera) cameraId = backCamera.id;
-          }
 
-          html5QrCode.start(
-            cameraId,
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            (decodedText: string) => {
-              if (isUnmounted) return;
-              html5QrCode.stop().then(() => {
-                html5QrCode.clear();
-                onScan(decodedText);
-              }).catch(console.error);
-            },
-            (error: any) => { /* ignore */ }
-          ).catch((err: any) => {
-            console.warn("相機啟動完全失敗", err);
-            if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
-              alert("相機權限被拒絕，請至瀏覽器設定中允許相機存取。");
-            } else {
-              alert("相機啟動失敗，請確認相機功能是否正常，或嘗試使用其他瀏覽器。");
-            }
-            onClose();
+      // 取得可用相機清單供進階切換
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (!isUnmounted && devices && devices.length > 0) {
+          setAvailableDevices(devices);
+        }
+      } catch (e) {
+        console.warn("取得相機清單提示:", e);
+      }
+
+      const readerElement = document.getElementById("qr-reader");
+      if (!readerElement || isUnmounted) return;
+
+      const html5QrCode = new Html5Qrcode("qr-reader");
+      qrCodeInstanceRef.current = html5QrCode;
+
+      const qrConfig = {
+        fps: 15,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const edge = Math.floor(minEdge * 0.75);
+          return { width: Math.max(edge, 180), height: Math.max(edge, 180) };
+        },
+        aspectRatio: 1.0,
+      };
+
+      const onScanSuccess = (decodedText: string) => {
+        if (isUnmounted) return;
+        if (html5QrCode.isScanning) {
+          html5QrCode.stop().then(() => {
+            html5QrCode.clear();
+            onScan(decodedText);
+          }).catch(() => {
+            onScan(decodedText);
           });
         } else {
-          alert("找不到可用的相機裝置，請確認相機是否已連接。");
-          onClose();
+          onScan(decodedText);
         }
-      }).catch(err => {
-        console.warn("取得相機清單失敗", err);
-        alert("無法存取相機，請至瀏覽器設定中允許相機存取權限。");
-        onClose();
-      });
+      };
+
+      const startScanner = async () => {
+        setIsInitializing(true);
+        try {
+          // 1. 若有選定的 deviceId（來自切換）則優先使用 deviceId
+          if (availableDevices.length > 1 && availableDevices[currentDeviceIndex]?.id) {
+            await html5QrCode.start(
+              availableDevices[currentDeviceIndex].id,
+              qrConfig,
+              onScanSuccess,
+              () => {}
+            );
+          } else {
+            // 2. 預設使用標準 facingMode: "environment"（強制手機後置鏡頭）
+            try {
+              await html5QrCode.start(
+                { facingMode: facingMode },
+                qrConfig,
+                onScanSuccess,
+                () => {}
+              );
+            } catch (envErr) {
+              console.warn(`以 facingMode=${facingMode} 啟動失敗，嘗試備用鏡頭啟動...`, envErr);
+              // 3. Fallback 到前置鏡頭或第一個可用相機
+              const fallbackCamera = facingMode === 'environment' ? 'user' : 'environment';
+              await html5QrCode.start(
+                { facingMode: fallbackCamera },
+                qrConfig,
+                onScanSuccess,
+                () => {}
+              );
+            }
+          }
+          if (!isUnmounted) setIsInitializing(false);
+        } catch (err: any) {
+          console.warn("相機啟動失敗:", err);
+          if (!isUnmounted) {
+            setIsInitializing(false);
+            if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
+              alert("相機權限被拒絕，請至瀏覽器設定中允許相機存取權限。");
+            } else {
+              alert("無法開啟後置相機，請確認相機功能正常或允許瀏覽器權限。");
+            }
+          }
+        }
+      };
+
+      startScanner();
     });
 
     return () => {
       isUnmounted = true;
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().then(() => html5QrCode.clear()).catch(console.error);
+      const scanner = qrCodeInstanceRef.current;
+      if (scanner && scanner.isScanning) {
+        scanner.stop().then(() => {
+          try { scanner.clear(); } catch(e) {}
+        }).catch(console.error);
       }
     };
-  }, [onScan]);
+  }, [facingMode, currentDeviceIndex, onScan, onClose]);
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto overflow-hidden rounded-[30px] bg-black">
-      <div id="qr-reader" className="w-full h-full text-white [&>div]:border-none"></div>
-      
-      {/* Fallback mock input (for debugging on PC) */}
-      <input 
-        type="text" 
-        placeholder="模擬掃碼輸入 (PC測試用)" 
-        className="w-full p-3 mt-4 text-black text-sm rounded-xl border border-gray-200"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            onScan(e.currentTarget.value);
-            e.currentTarget.value = '';
-          }
-        }}
-      />
+    <div className="flex flex-col items-center w-full max-w-[320px] mx-auto space-y-4">
+      {/* 鏡頭控制列 */}
+      <div className="flex items-center justify-between w-full px-2">
+        <span className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          {facingMode === 'environment' ? '📷 後置相機 (預設)' : '🤳 前置相機'}
+        </span>
+
+        <button
+          type="button"
+          onClick={handleToggleCamera}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white text-xs font-medium backdrop-blur-md border border-white/20 transition-all active:scale-95 shadow-sm"
+          title="切換相機"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          切換鏡頭
+        </button>
+      </div>
+
+      {/* 掃描區域視窗 */}
+      <div className="relative w-full aspect-square overflow-hidden rounded-[28px] bg-black/90 border-2 border-white/20 shadow-2xl">
+        <div id="qr-reader" className="w-full h-full text-white [&>div]:border-none [&_video]:object-cover"></div>
+
+        {/* 掃描框動畫與邊角設計 */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-8">
+          <div className="relative w-full h-full border border-white/20 rounded-2xl">
+            {/* 四角定位框 */}
+            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg"></div>
+            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg"></div>
+            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg"></div>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg"></div>
+
+            {/* 動態雷射光掃描線 */}
+            {!isInitializing && (
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-[scan_2s_ease-in-out_infinite]"></div>
+            )}
+          </div>
+        </div>
+
+        {/* 初始化中提示 */}
+        {isInitializing && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-white">
+            <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-xs font-medium text-white/80">正在啟動相機...</p>
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-white/60 text-center">
+        請將現場報到/排隊 QR Code 對準框線即可自動掃描
+      </p>
+
+      {/* 備用手動輸入（便於在電腦測試） */}
+      <div className="w-full pt-1">
+        <input 
+          type="text" 
+          placeholder="模擬掃碼輸入 (PC 測試用，按 Enter 送出)" 
+          className="w-full px-3.5 py-2.5 bg-white/10 hover:bg-white/15 focus:bg-white/20 text-white placeholder-white/40 text-xs rounded-xl border border-white/20 focus:border-emerald-400 outline-none transition-all"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+              onScan(e.currentTarget.value.trim());
+              e.currentTarget.value = '';
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -1995,14 +2129,14 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
   );
 
   const renderScanModal = () => (
-    <div className="fixed inset-0 z-[500] bg-black/95 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
-       <div className="w-full max-w-sm space-y-12">
-          <div className="text-center space-y-4">
-             <div className="w-20 h-20 bg-red-600 rounded-3xl mx-auto flex items-center justify-center text-white text-3xl shadow-2xl animate-pulse">
+    <div className="fixed inset-0 z-[500] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+       <div className="w-full max-w-sm flex flex-col items-center space-y-6">
+          <div className="text-center space-y-2">
+             <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-rose-500 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-rose-500/20">
                 📷
              </div>
-             <h3 className="text-2xl font-black text-white italic tracking-tighter">現場掃碼報到</h3>
-             <p className="text-sm font-bold text-red-400 uppercase tracking-widest">Secure Check-in Scanner</p>
+             <h3 className="text-xl font-black text-white tracking-wide">現場掃碼報到 / 排隊</h3>
+             <p className="text-xs font-semibold text-rose-300/80">請將鏡頭對準廟方現場 QR Code</p>
           </div>
 
           <QRScannerComponent 
@@ -2013,8 +2147,12 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
              onClose={() => setIsScanning(false)} 
           />
 
-          <button onClick={() => setIsScanning(false)} className="w-full py-4 text-white font-black text-xs uppercase tracking-widest opacity-50 hover:opacity-100">
-             取消掃描
+          <button 
+            type="button"
+            onClick={() => setIsScanning(false)} 
+            className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white font-bold text-xs tracking-wider transition-all border border-white/10"
+          >
+             ✕ 關閉相機
           </button>
        </div>
     </div>
