@@ -8571,6 +8571,7 @@ export async function fetchDataBridgeTree() {
         }
       }
 
+            const isHQFree = t.creatorRole === "SuperAdmin" || (!t.distributorId && !t.salesId && !t.superSalesId);
       const rent = Number(t.monthlyRent) || config?.fixedMonthlyRent || 3600;
       const price = t.paymentCycle === "Yearly" ? Math.round(rent * 12 * (1 - yearlyDiscountRate / 100)) : rent;
 
@@ -8581,20 +8582,20 @@ export async function fetchDataBridgeTree() {
       joinedAt: t.createdAt.toISOString(),
       status: t.status,
       planName:
-        t.freeType === "Trial"
-          ? "免費體驗方案"
-          : t.freeType === "Permanent"
-            ? "永久免費"
+        isHQFree || t.freeType === "Permanent"
+          ? "免費使用"
+          : t.freeType === "Trial"
+            ? "免費體驗方案"
             : t.paymentCycle === "Yearly"
               ? "年付優惠方案"
               : "月付標準方案",
-      price,
+      price: isHQFree || t.freeType === "Permanent" ? 0 : price,
       freeType: t.freeType,
       plan: t.plan,
       paymentCycle: t.paymentCycle,
       billingStartDate: t.billingStartDate,
-      paymentStatus: pStatus,
-      billingPeriod: bPeriod,
+      paymentStatus: isHQFree || t.freeType === "Permanent" ? '' : pStatus,
+      billingPeriod: isHQFree || t.freeType === "Permanent" ? '' : bPeriod,
     }});
 
     // Build hierarchy
