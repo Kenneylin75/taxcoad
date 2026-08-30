@@ -1710,41 +1710,41 @@ export default function SuperAdminClient({
                     </div>
                  </div>
 
-                 {/* Top 2x2 Summary Grid */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
-                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-indigo-500/20 transition-all duration-500"></div>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月宮廟信眾總收入 (B2C)</p>
-                       <h4 className="text-3xl font-black text-slate-900">$${b2cIncome.toLocaleString()}</h4>
-                       <p className={`text-xs font-bold ${Number(b2cMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {Number(b2cMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(b2cMom))}% vs 上月
-                       </p>
-                    </div>
-                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-amber-500/20 transition-all duration-500"></div>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月宮廟月/年租總收 (B2B)</p>
-                       <h4 className="text-3xl font-black text-slate-900">$${b2bIncome.toLocaleString()}</h4>
-                       <p className={`text-xs font-bold ${Number(b2bMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {Number(b2bMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(b2bMom))}% vs 上月
-                       </p>
-                    </div>
-                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-sky-500/20 transition-all duration-500"></div>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月雲端空間收入 (SaaS)</p>
-                       <h4 className="text-3xl font-black text-slate-900">$${storageIncome.toLocaleString()}</h4>
-                       <p className={`text-xs font-bold ${Number(storageMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {Number(storageMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(storageMom))}% vs 上月
-                       </p>
-                    </div>
-                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
-                       <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-purple-500/20 transition-all duration-500"></div>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月開辦費總結算</p>
-                       <h4 className="text-3xl font-black text-slate-900">$${setupIncome.toLocaleString()}</h4>
-                       <p className={`text-xs font-bold ${Number(setupMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {Number(setupMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(setupMom))}% vs 上月
-                       </p>
-                    </div>
-                 </div>
+                  {/* Top 2x2 Summary Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
+                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-indigo-500/20 transition-all duration-500"></div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月宮廟信眾總收入 (B2C)</p>
+                        <h4 className="text-3xl font-black text-slate-900">NT$ {b2cIncome.toLocaleString()}</h4>
+                        <p className={`text-xs font-bold ${Number(b2cMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                           {Number(b2cMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(b2cMom))}% vs 上月
+                        </p>
+                     </div>
+                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-amber-500/20 transition-all duration-500"></div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月宮廟月/年租總收 (B2B)</p>
+                        <h4 className="text-3xl font-black text-slate-900">NT$ {b2bIncome.toLocaleString()}</h4>
+                        <p className={`text-xs font-bold ${Number(b2bMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                           {Number(b2bMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(b2bMom))}% vs 上月
+                        </p>
+                     </div>
+                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-sky-500/20 transition-all duration-500"></div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月雲端空間收入 (SaaS)</p>
+                        <h4 className="text-3xl font-black text-slate-900">NT$ {storageIncome.toLocaleString()}</h4>
+                        <p className={`text-xs font-bold ${Number(storageMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                           {Number(storageMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(storageMom))}% vs 上月
+                        </p>
+                     </div>
+                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-[40px] -mr-10 -mt-10 group-hover:bg-purple-500/20 transition-all duration-500"></div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">當月開辦費總結算</p>
+                        <h4 className="text-3xl font-black text-slate-900">NT$ {setupIncome.toLocaleString()}</h4>
+                        <p className={`text-xs font-bold ${Number(setupMom) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                           {Number(setupMom) >= 0 ? '↑' : '↓'} {Math.abs(Number(setupMom))}% vs 上月
+                        </p>
+                     </div>
+                  </div>
 
                  {/* Charts Container */}
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 px-4">

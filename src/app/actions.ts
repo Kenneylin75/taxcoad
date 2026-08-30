@@ -7815,74 +7815,159 @@ export async function fetchDistributorSalesPerformance(
   }
 }
 export async function fetchSuperAdminFinancials() {
-  // 取得宮廟與帳單狀態
+  // 取得所有宮廟資料
   let allTemples: any[] = [];
   try {
     allTemples = await prisma.temple.findMany();
   } catch (e) {
-    console.error(e);
+    console.error("fetchSuperAdminFinancials allTemples error:", e);
   }
 
+  // 1. 取得所有 B2B 宮廟帳單
   let templeBills: any[] = [];
   try {
-    const res = { rows: await prisma.templeBill.findMany() };
-    if (res && res.rows) {
-      templeBills = res.rows.filter((b: any) => {
-        const t = allTemples.find((temple: any) => temple.id === (b.temple_id || b.templeId));
-        return t && !t.distributorId;
-      });
-    }
-  } catch (e) {}
+    templeBills = await prisma.templeBill.findMany();
+  } catch (e) {
+    console.error("fetchSuperAdminFinancials templeBills error:", e);
+  }
+
+  // 2. 取得所有 B2C 信眾財務紀錄
+  let financeRecords: any[] = [];
+  try {
+    financeRecords = await prisma.financeRecord.findMany({
+      where: { type: "INCOME" },
+    });
+  } catch (e) {
+    console.error("fetchSuperAdminFinancials financeRecords error:", e);
+  }
+
+  // 3. 取得所有點燈已繳費紀錄 (補充 B2C 數據)
+  let lampRecords: any[] = [];
+  try {
+    lampRecords = await prisma.lampRecord.findMany({
+      where: {
+        paymentStatus: { in: ["Paid", "Confirmed", "Success"] },
+      },
+    });
+  } catch (e) {
+    console.error("fetchSuperAdminFinancials lampRecords error:", e);
+  }
 
   const records: any[] = [];
+
+  // A. 處理 B2B 帳單紀錄 (已繳費)
   templeBills
     .filter((b) => b.status === "Paid")
     .forEach((b) => {
-      const bDate = b.created_at || b.timestamp;
+      const bDate = b.createdAt || b.timestamp || b.billingDate;
+      const dateStr =
+        bDate instanceof Date
+          ? bDate.toISOString().split("T")[0]
+          : bDate
+            ? String(bDate).split("T")[0]
+            : new Date().toISOString().split("T")[0];
+
       const t = allTemples.find(
-        (temple: any) => temple.id === (b.temple_id || b.templeId),
+        (temple: any) => temple.id === (b.templeId || (b as any).temple_id),
       );
+
+      let category = "RENT_FEE";
+      const itemNameLower = (b.itemName || (b as any).item_name || b.type || "").toLowerCase();
+      if (itemNameLower.includes("setup") || itemNameLower.includes("開辦")) {
+        category = "SETUP_FEE";
+      } else if (itemNameLower.includes("storage") || itemNameLower.includes("空間")) {
+        category = "STORAGE_FEE";
+      }
+
       records.push({
         id: b.id,
-        date:
-          bDate instanceof Date
-            ? bDate.toISOString().split("T")[0]
-            : bDate
-              ? String(bDate).split("T")[0]
-              : new Date().toISOString().split("T")[0],
+        date: dateStr,
         type: "INCOME",
         amount: Number(b.amount || 0),
-        category:
-          b.item_name === "SetupFee" || b.type === "Setup"
-            ? "AUTH_FEE"
-            : "SYSTEM_FEE",
-        description: `${t?.templeName || t?.name || "未知宮廟"} - ${b.item_name === "SetupFee" || b.type === "Setup" ? "開辦費" : "系統費用"}`,
+        category,
+        region: t?.city || "全區",
+        description: `${t?.templeName || t?.name || "宮廟"} - ${category === "SETUP_FEE" ? "開辦費" : category === "STORAGE_FEE" ? "空間租費" : "系統月/年租金"}`,
       });
     });
 
-  const allWithdrawals = await fetchAllWithdrawals();
+  // B. 處理 B2C 信眾財務收入紀錄
+  financeRecords.forEach((f) => {
+    const fDate = f.date || f.createdAt;
+    const dateStr =
+      fDate instanceof Date
+        ? fDate.toISOString().split("T")[0]
+        : fDate
+          ? String(fDate).split("T")[0]
+          : new Date().toISOString().split("T")[0];
 
+    const t = allTemples.find((temple: any) => temple.id === f.templeId);
+
+    records.push({
+      id: f.id,
+      date: dateStr,
+      type: "INCOME_B2C",
+      amount: Number(f.amount || 0),
+      category: "DEVOTEE_FEE",
+      region: t?.city || "全區",
+      description: `${t?.templeName || t?.name || "宮廟"} - 信眾結緣 (${f.description || f.category || "點燈/祈福"})`,
+    });
+  });
+
+  // C. 處理 LampRecord (若未包含在 financeRecords)
+  lampRecords.forEach((l) => {
+    const lDate = l.createdAt || l.startDate;
+    const dateStr =
+      lDate instanceof Date
+        ? lDate.toISOString().split("T")[0]
+        : lDate
+          ? String(lDate).split("T")[0]
+          : new Date().toISOString().split("T")[0];
+
+    const t = allTemples.find((temple: any) => temple.id === l.templeId);
+
+    // 避免重複計算已寫入 financeRecords 的項目
+    const exists = records.some(
+      (r) => r.id === l.id || (r.description && r.description.includes(l.id)),
+    );
+    if (!exists) {
+      records.push({
+        id: l.id,
+        date: dateStr,
+        type: "INCOME_B2C",
+        amount: Number(l.actualPrice || 0),
+        category: "DEVOTEE_FEE",
+        region: t?.city || "全區",
+        description: `${t?.templeName || t?.name || "宮廟"} - ${l.categoryName || "光明燈"}安奉 (${l.applicantName || "信眾"})`,
+      });
+    }
+  });
+
+  // D. 處理超級業務員提領支出
+  const allWithdrawals = await fetchAllWithdrawals();
   allWithdrawals
     .filter((w: any) => w.status === "Approved" || w.status === "Verified")
     .forEach((w: any) => {
       const wDate = w.timestamp || w.created_at || w.date;
+      const dateStr =
+        wDate instanceof Date
+          ? wDate.toISOString().split("T")[0]
+          : wDate
+            ? String(wDate).split("T")[0]
+            : new Date().toISOString().split("T")[0];
+
       records.push({
         id: w.id,
-        date:
-          wDate instanceof Date
-            ? wDate.toISOString().split("T")[0]
-            : wDate
-              ? String(wDate).split("T")[0]
-              : new Date().toISOString().split("T")[0],
+        date: dateStr,
         type: "EXPENSE",
         amount: Number(w.amount || 0),
         category: "COMMISSION",
-        description: `業務提領 - ${w.salesName}`,
+        region: "總部",
+        description: `業務提領撥款 - ${w.salesName}`,
       });
     });
 
   const totalRevenue = records
-    .filter((r) => r.type === "INCOME")
+    .filter((r) => r.type === "INCOME" || r.type === "INCOME_B2C")
     .reduce((s, r) => s + r.amount, 0);
   const totalCommission = records
     .filter((r) => r.type === "EXPENSE")
@@ -7904,7 +7989,6 @@ export async function fetchSuperAdminFinancials() {
           b.status === "Pending" ||
           b.status === "PendingVerification",
       );
-      const hasUnpaid = unpaidBills.length > 0;
       const isPending = unpaidBills.some(
         (b) => b.status === "PendingVerification" || b.status === "Pending",
       );
@@ -7932,16 +8016,18 @@ export async function fetchSuperAdminFinancials() {
               : isPaid
                 ? "Paid"
                 : "Unpaid",
-        unpaidAmount: unpaidBills.reduce((s, b) => s + Number(b.amount), 0),
+        unpaidAmount: unpaidBills.reduce((s, b) => s + Number(b.amount || 0), 0),
         bills: bills,
         billingStartDate: t.billingStartDate,
         freeType: t.freeType,
         joinedAt: t.timestamp || t.created_at || new Date().toISOString(),
       };
     });
+
   const superSalesWithdrawals = allWithdrawals.filter(
     (w: any) => w.role === "SuperSales" || w.role === "SuperSalesRole",
   );
+
   return {
     records: records.slice().reverse(),
     summary: {
