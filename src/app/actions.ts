@@ -10019,11 +10019,20 @@ export async function fetchAllAccountsForAdmin() {
     });
   });
 
+    // Get distributor count and temple count for each SuperSales
+  const allDistributors = await prisma.distributor.findMany({
+    select: { id: true, superSalesId: true, _count: { select: { sales: true, temples: true } } }
+  });
+
   // SuperSales (Legacy from User)
   let pgSuperSales = await prisma.user.findMany({
     where: { role: "SuperSales" },
   });
   pgSuperSales.forEach((s) => {
+    const ownDistributors = allDistributors.filter(d => d.superSalesId === s.id);
+    const distributorCount = ownDistributors.length;
+    const distSalesCount = ownDistributors.reduce((acc, d) => acc + (d._count?.sales || 0), 0);
+    const networkTemplesCount = ownDistributors.reduce((acc, d) => acc + (d._count?.temples || 0), 0);
     accounts.push({
       ...s,
       id: s.id,
@@ -10031,6 +10040,9 @@ export async function fetchAllAccountsForAdmin() {
       role: "SuperSales",
       account: s.account,
       status: s.status || "Active",
+      salesCount: distributorCount + distSalesCount,
+      distributorsCount: distributorCount,
+      templesCount: networkTemplesCount,
     });
   });
 
@@ -10041,11 +10053,6 @@ export async function fetchAllAccountsForAdmin() {
       _count: { select: { temples: true } }
     }
   });
-  
-  // Get distributor count for each SuperSales
-  const allDistributors = await prisma.distributor.findMany({
-    select: { id: true, superSalesId: true, _count: { select: { sales: true } } }
-  });
 
   pgSuperSalesNew.forEach((s) => {
     // Count distributors that belong to this SuperSales
@@ -10053,6 +10060,7 @@ export async function fetchAllAccountsForAdmin() {
     const distributorCount = ownDistributors.length;
     // Count all sales belonging to those distributors
     const distSalesCount = ownDistributors.reduce((acc, d) => acc + (d._count?.sales || 0), 0);
+    const networkTemplesCount = ownDistributors.reduce((acc, d) => acc + (d._count?.temples || 0), 0);
     accounts.push({
       ...s,
       id: s.id,
@@ -10061,7 +10069,8 @@ export async function fetchAllAccountsForAdmin() {
       account: s.account,
       status: s.status || "Active",
       salesCount: distributorCount + distSalesCount,
-      templesCount: s._count?.temples || 0,
+      distributorsCount: distributorCount,
+      templesCount: (s._count?.temples || 0) + networkTemplesCount,
     });
   });
 
