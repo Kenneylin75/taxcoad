@@ -1260,7 +1260,7 @@ export default function SuperAdminClient({
                     {mediaList.map((tool, i) => (
                        <div key={i} className="bg-white rounded-[60px] border border-slate-100 shadow-sm overflow-hidden group hover:shadow-2xl transition-all">
                           <div className="aspect-video relative bg-slate-100 overflow-hidden">
-                             <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000 opacity-80" />
+                             {tool.thumbnail ? <img src={tool.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000 opacity-80" /> : <div className="w-full h-full bg-slate-200"></div>}
                              <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
                                 <span className="text-4xl">
                                    {tool.type === 'video' ? '▶️' : tool.type === 'photo' ? '🖼️' : tool.type === 'document' ? '📄' : '📝'}
