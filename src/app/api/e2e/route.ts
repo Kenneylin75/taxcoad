@@ -12,6 +12,7 @@ import {
   requestWithdrawal,
   fetchDistributorCapacity
 } from '@/app/actions';
+// @ts-ignore
 import { Solar } from 'lunar-javascript';
 
 export async function GET(req: Request) {
