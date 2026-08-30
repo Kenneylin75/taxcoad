@@ -6871,12 +6871,19 @@ export async function approveTempleApplication(appId: string) {
       data: {
         id: newTempleId,
         name: app.templeName,
+        templeName: app.templeName,
         city: "台北市",
         status: "Active",
+        distributorId: app.distributorId || null,
         salesId: app.salesId,
+        creatorRole: app.creatorRole || "dist-sales",
+        creatorId: app.salesId,
         setupFee: app.setupFee,
         monthlyRent: app.monthlyFee,
         paymentCycle: "Monthly",
+        freeType: "Normal",
+        trialMonths: 0,
+        billingStartDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -9622,12 +9629,14 @@ export async function submitFreeAccountApplication(data: any) {
         : data.distributorId || sales?.distributorId || null,
     timestamp: new Date().toISOString(),
     billingStartDate:
-      data.freeType === "Trial"
+      data.freeType === "Permanent"
+        ? undefined
+        : data.freeType === "Trial" && parseInt(data.trialMonths || "0") > 0
         ? new Date(
             Date.now() +
               parseInt(data.trialMonths || "0") * 30 * 24 * 60 * 60 * 1000,
           ).toISOString()
-        : new Date().toISOString(),
+        : new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     paymentStatus: "PendingPayment",
   };
   await null;
@@ -9638,14 +9647,22 @@ export async function submitFreeAccountApplication(data: any) {
       data: {
         id: newTemple.id,
         name: newTemple.templeName || newTemple.name,
+        templeName: newTemple.templeName || newTemple.name,
         city: newTemple.city || "未設定",
         address: newTemple.address || "",
         status: newTemple.status,
         salesId: newTemple.salesId,
         distributorId: newTemple.distributorId,
+        superSalesId: data.superSalesId || null,
         setupFee: newTemple.setupFee ?? 12000,
         monthlyRent: newTemple.monthlyRent || 0,
         paymentCycle: newTemple.paymentCycle,
+        freeType: newTemple.freeType || "Normal",
+        trialMonths: newTemple.trialMonths || 0,
+        billingStartDate: newTemple.billingStartDate
+          ? new Date(newTemple.billingStartDate)
+          : undefined,
+        bankAccount: data.bankAccount || null,
         account: newTemple.account,
         password: newTemple.password,
         phone: newTemple.templePhone || newTemple.contactPhone || "",

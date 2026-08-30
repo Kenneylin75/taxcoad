@@ -52,7 +52,19 @@ export default function SuperAdminClient({
 }: { 
   initialStats: any, initialAccounts: any[], initialPlans: any[], initialMedia: any[], initialTemples: any[], initialWithdrawals?: any[], initialStorageBills?: any[]
 }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('superAdmin_activeTab');
+      if (saved) return saved as any;
+    }
+    return 'dashboard';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('superAdmin_activeTab', activeTab);
+    }
+  }, [activeTab]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
   
@@ -63,6 +75,7 @@ export default function SuperAdminClient({
   const [financeMonth, setFinanceMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
   const [templePaymentMonth, setTemplePaymentMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
   
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<any>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [withdrawalProofs, setWithdrawalProofs] = useState<{[key:string]: string}>({});
@@ -803,13 +816,41 @@ export default function SuperAdminClient({
                              </div>
                           </div>
                           <div className="flex gap-6">
-                              <button onClick={() => approveTempleBySuperAdmin(app.id).then(()=>window.location.reload())} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
-                              <button onClick={() => {
-                                 const reason = prompt('請填寫駁回原因：');
-                                 if (reason !== null) {
-                                    rejectTempleBySuperAdmin(app.id).then(()=>window.location.reload());
-                                 }
-                              }} className="px-10 py-5 bg-rose-500 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-rose-600 transition-all">駁回</button>
+                              <button 
+                                disabled={actionLoadingId === app.id}
+                                onClick={async () => {
+                                   if (actionLoadingId) return;
+                                   setActionLoadingId(app.id);
+                                   try {
+                                      await approveTempleBySuperAdmin(app.id);
+                                      window.location.reload();
+                                   } finally {
+                                      setActionLoadingId(null);
+                                   }
+                                }} 
+                                className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
+                              >
+                                 {actionLoadingId === app.id ? '處理中...' : '核准授權'}
+                              </button>
+                              <button 
+                                disabled={actionLoadingId === app.id}
+                                onClick={async () => {
+                                   if (actionLoadingId) return;
+                                   const reason = prompt('請填寫駁回原因：');
+                                   if (reason !== null) {
+                                      setActionLoadingId(app.id);
+                                      try {
+                                         await rejectTempleBySuperAdmin(app.id);
+                                         window.location.reload();
+                                      } finally {
+                                         setActionLoadingId(null);
+                                      }
+                                   }
+                                }} 
+                                className="px-10 py-5 bg-rose-500 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-rose-600 transition-all disabled:opacity-50"
+                              >
+                                 駁回
+                              </button>
                            </div>
                        </div>
                     ))}
@@ -839,13 +880,41 @@ export default function SuperAdminClient({
                               </div>
                            </div>
                            <div className="flex gap-6">
-                              <button onClick={() => approveDistributorBySuperAdmin(app.id).then(()=>window.location.reload())} className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all">核准授權</button>
-                              <button onClick={() => {
-                                 const reason = prompt('請填寫駁回原因：');
-                                 if (reason !== null) {
-                                    rejectDistributorBySuperAdmin(app.id, reason).then(()=>window.location.reload());
-                                 }
-                              }} className="px-10 py-5 bg-rose-500 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-rose-600 transition-all">駁回</button>
+                              <button 
+                                disabled={actionLoadingId === app.id}
+                                onClick={async () => {
+                                   if (actionLoadingId) return;
+                                   setActionLoadingId(app.id);
+                                   try {
+                                      await approveDistributorBySuperAdmin(app.id);
+                                      window.location.reload();
+                                   } finally {
+                                      setActionLoadingId(null);
+                                   }
+                                }} 
+                                className="px-10 py-5 bg-emerald-600 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
+                              >
+                                 {actionLoadingId === app.id ? '處理中...' : '核准授權'}
+                              </button>
+                              <button 
+                                disabled={actionLoadingId === app.id}
+                                onClick={async () => {
+                                   if (actionLoadingId) return;
+                                   const reason = prompt('請填寫駁回原因：');
+                                   if (reason !== null) {
+                                      setActionLoadingId(app.id);
+                                      try {
+                                         await rejectDistributorBySuperAdmin(app.id, reason);
+                                         window.location.reload();
+                                      } finally {
+                                         setActionLoadingId(null);
+                                      }
+                                   }
+                                }} 
+                                className="px-10 py-5 bg-rose-500 text-white rounded-[30px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-rose-600 transition-all disabled:opacity-50"
+                              >
+                                 駁回
+                              </button>
                            </div>
                         </div>
                      ))}
