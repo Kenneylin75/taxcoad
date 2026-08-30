@@ -52,18 +52,17 @@ export default function SuperAdminClient({
 }: { 
   initialStats: any, initialAccounts: any[], initialPlans: any[], initialMedia: any[], initialTemples: any[], initialWithdrawals?: any[], initialStorageBills?: any[]
 }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('superAdmin_activeTab');
-      if (saved) return saved as any;
-    }
-    return 'dashboard';
-  });
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'approvals' | 'tools' | 'finance' | 'bridge' | 'logs' | 'settings' | 'space' | 'ai' | 'b2b_payment'>('dashboard');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('superAdmin_activeTab', activeTab);
+    const saved = localStorage.getItem('superAdmin_activeTab');
+    if (saved) {
+      setActiveTab(saved as any);
     }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('superAdmin_activeTab', activeTab);
   }, [activeTab]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);

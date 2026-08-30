@@ -23,18 +23,17 @@ export default function DistributorClient({
   initialProfile: any, initialTeam: any[], initialApps: any[], initialCapacity: any, initialCommission: any,
   initialTemples?: any[], initialVisits?: any[], initialTools?: any[], initialFinancials?: any, initialLogs?: any[]
 }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'temples' | 'team' | 'approvals' | 'calendar' | 'financials' | 'tools' | 'profile' | 'logs' | 'b2b_payment' | 'temple_payments'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('distributor_activeTab');
-      if (saved) return saved as any;
-    }
-    return 'overview';
-  });
+  const [activeTab, setActiveTab] = useState<'overview' | 'temples' | 'team' | 'approvals' | 'calendar' | 'financials' | 'tools' | 'profile' | 'logs' | 'b2b_payment' | 'temple_payments'>('overview');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('distributor_activeTab', activeTab);
+    const saved = localStorage.getItem('distributor_activeTab');
+    if (saved) {
+      setActiveTab(saved as any);
     }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('distributor_activeTab', activeTab);
   }, [activeTab]);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [templeSearch, setTempleSearch] = useState("");

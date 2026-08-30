@@ -23,18 +23,17 @@ export default function SuperSalesPage() {
   const params = useParams();
   const salesId = params.salesId as string;
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'apply' | 'registry' | 'performance' | 'tools' | 'profile' | 'records'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('superSales_activeTab');
-      if (saved) return saved as any;
-    }
-    return 'overview';
-  });
+  const [activeTab, setActiveTab] = useState<'overview' | 'apply' | 'registry' | 'performance' | 'tools' | 'profile' | 'records'>('overview');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('superSales_activeTab', activeTab);
+    const saved = localStorage.getItem('superSales_activeTab');
+    if (saved) {
+      setActiveTab(saved as any);
     }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('superSales_activeTab', activeTab);
   }, [activeTab]);
   const [applyType, setApplyType] = useState<'temple' | 'distributor'>('temple');
   const [registryTab, setRegistryTab] = useState<'temples' | 'distributors'>('temples');
