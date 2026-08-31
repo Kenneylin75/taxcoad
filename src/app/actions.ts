@@ -4872,10 +4872,12 @@ export async function fetchAllWithdrawals() {
 
     const salesRecords = await prisma.distributorSales.findMany();
     const salesMap = new Map();
+    const salesBankMap = new Map<string, any>();
     salesRecords.forEach((s) => {
-      if (s.name) salesMap.set(s.name, s.role);
-      if (s.id) salesMap.set(s.id, s.role);
-      if (s.account) salesMap.set(s.account, s.role);
+      const bank = s.bankAccount || null;
+      if (s.name) { salesMap.set(s.name, s.role); salesBankMap.set(s.name, bank); }
+      if (s.id) { salesMap.set(s.id, s.role); salesBankMap.set(s.id, bank); }
+      if (s.account) { salesMap.set(s.account, s.role); salesBankMap.set(s.account, bank); }
     });
 
     // Get distinct sales names to find their wallet roles
@@ -4887,15 +4889,25 @@ export async function fetchAllWithdrawals() {
     });
     const walletRoleMap = new Map(wallets.map((w) => [w.name, w.role]));
 
-    const allWithdrawals = withdrawals.map((w: any) => ({
-      id: w.id,
-      salesName: w.salesName,
-      amount: Number(w.amount || 0),
-      status: w.status,
-      receiptUrl: w.receiptUrl,
-      date: w.date instanceof Date ? w.date.toISOString().split("T")[0] : String(w.date || w.createdAt || "").split("T")[0],
-      role: salesMap.get(w.salesName) || walletRoleMap.get(w.salesName) || "SuperSales",
-    }));
+    const allWithdrawals = withdrawals.map((w: any) => {
+      const bankRaw = salesBankMap.get(w.salesName);
+      let bankAccount: any = null;
+      if (bankRaw) {
+        try {
+          bankAccount = typeof bankRaw === 'string' ? JSON.parse(bankRaw) : bankRaw;
+        } catch (e) { bankAccount = null; }
+      }
+      return {
+        id: w.id,
+        salesName: w.salesName,
+        amount: Number(w.amount || 0),
+        status: w.status,
+        receiptUrl: w.receiptUrl,
+        date: w.date instanceof Date ? w.date.toISOString().split("T")[0] : String(w.date || w.createdAt || "").split("T")[0],
+        role: salesMap.get(w.salesName) || walletRoleMap.get(w.salesName) || "SuperSales",
+        bankAccount,
+      };
+    });
 
     // 過濾掉「經銷業務員」的提領申請，只留給對應的經銷商審核
     return allWithdrawals.filter(

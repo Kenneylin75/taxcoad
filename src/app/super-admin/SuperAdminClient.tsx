@@ -153,7 +153,7 @@ export default function SuperAdminClient({
    const [storagePreviewImage, setStoragePreviewImage] = useState<string | null>(null);
    const [matrixPage, setMatrixPage] = useState(1);
    const [financeWithdrawalPage, setFinanceWithdrawalPage] = useState(1);
-   const [withdrawalModal, setWithdrawalModal] = useState<{id: string, salesName: string, amount: number} | null>(null);
+   const [withdrawalModal, setWithdrawalModal] = useState<{id: string, salesName: string, amount: number, bankAccount?: any} | null>(null);
    const [withdrawalReceiptUrl, setWithdrawalReceiptUrl] = useState('');
    const [financeBillPage, setFinanceBillPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
@@ -1843,6 +1843,28 @@ export default function SuperAdminClient({
                             <p className="text-lg font-black text-rose-500 italic">NT$ {withdrawalModal.amount.toLocaleString()}</p>
                           </div>
                         </div>
+                        {/* 收款銀行帳戶 */}
+                        {withdrawalModal.bankAccount ? (
+                          <div className="bg-indigo-50 rounded-3xl p-5 space-y-2 border border-indigo-100">
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">收款銀行帳戶</p>
+                            <div className="flex justify-between items-center">
+                              <p className="text-xs font-bold text-slate-500">銀行</p>
+                              <p className="text-sm font-black text-slate-900">{withdrawalModal.bankAccount.bankName || '—'}</p>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <p className="text-xs font-bold text-slate-500">戶名</p>
+                              <p className="text-sm font-black text-slate-900">{withdrawalModal.bankAccount.accountName || '—'}</p>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <p className="text-xs font-bold text-slate-500">帳號</p>
+                              <p className="text-sm font-black text-indigo-700 tracking-widest">{withdrawalModal.bankAccount.accountNumber || '—'}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50 rounded-3xl p-4 border border-amber-100">
+                            <p className="text-xs font-bold text-amber-600">⚠️ 業務員尚未設定收款帳戶，請聯繫確認後再行匯款。</p>
+                          </div>
+                        )}
                         <div className="space-y-3">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">匯款憑證網址（選填）</label>
                           <input
@@ -1916,7 +1938,7 @@ export default function SuperAdminClient({
                                           id={`approve-wd-btn-${w.id}`}
                                           onClick={() => {
                                             setWithdrawalReceiptUrl('');
-                                            setWithdrawalModal({ id: w.id, salesName: w.salesName, amount: w.amount });
+                                            setWithdrawalModal({ id: w.id, salesName: w.salesName, amount: w.amount, bankAccount: w.bankAccount || null });
                                           }}
                                           className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer">
                                           審核 / 匯款
