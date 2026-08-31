@@ -4870,6 +4870,14 @@ export async function fetchAllWithdrawals() {
       orderBy: { createdAt: "desc" },
     });
 
+    const salesRecords = await prisma.distributorSales.findMany();
+    const salesMap = new Map();
+    salesRecords.forEach((s) => {
+      if (s.name) salesMap.set(s.name, s.role);
+      if (s.id) salesMap.set(s.id, s.role);
+      if (s.account) salesMap.set(s.account, s.role);
+    });
+
     // Get distinct sales names to find their wallet roles
     const salesNames = [
       ...new Set(withdrawals.map((w: any) => w.salesName).filter(Boolean)),
@@ -4882,11 +4890,11 @@ export async function fetchAllWithdrawals() {
     const allWithdrawals = withdrawals.map((w: any) => ({
       id: w.id,
       salesName: w.salesName,
-      amount: w.amount,
+      amount: Number(w.amount || 0),
       status: w.status,
       receiptUrl: w.receiptUrl,
-      date: w.date || w.createdAt.toISOString().split("T")[0],
-      role: walletRoleMap.get(w.salesName),
+      date: w.date instanceof Date ? w.date.toISOString().split("T")[0] : String(w.date || w.createdAt || "").split("T")[0],
+      role: salesMap.get(w.salesName) || walletRoleMap.get(w.salesName) || "SuperSales",
     }));
 
     // 過濾掉「經銷業務員」的提領申請，只留給對應的經銷商審核
@@ -5000,21 +5008,36 @@ export async function approveSuperSalesWithdrawal(
   }
 }
 
-export async function requestWithdrawal(salesName: string, amount: number) {
+export async function requestWithdrawal(salesIdentifier: string, amount: number) {
   try {
-    const history = await fetchCommissionHistory(salesName);
-    if (amount > history.balance) {
-      return { success: false, error: "餘額不足" };
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return { success: false, error: "請輸入有效的提領金額" };
     }
+
+    const history = await fetchCommissionHistory(salesIdentifier, "", "");
+    if (amount > history.balance) {
+      return { success: false, error: `餘額不足 (目前可提領餘額: $${history.balance.toLocaleString()})` };
+    }
+
+    const sales = await prisma.distributorSales.findFirst({
+      where: {
+        OR: [
+          { id: salesIdentifier },
+          { name: salesIdentifier },
+          { account: salesIdentifier },
+        ]
+      }
+    });
+    const finalSalesName = sales ? sales.name : salesIdentifier;
 
     const wdId = `WD-${Date.now()}`;
     await prisma.withdrawal.create({
       data: {
         id: wdId,
-        salesName,
+        salesName: finalSalesName,
         amount,
         status: "Pending",
-        date: new Date(),
+        date: new Date().toISOString().split("T")[0],
       }
     });
 
@@ -5022,9 +5045,9 @@ export async function requestWithdrawal(salesName: string, amount: number) {
     revalidatePath("/super-admin");
     revalidatePath("/super-sales");
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
     console.error("requestWithdrawal error:", e);
-    return { success: false, error: String(e) };
+    return { success: false, error: e?.message || String(e) };
   }
 }
 
@@ -11504,19 +11527,19 @@ export async function fetchCommissionHistory(
     amount: r.amount,
   }));
 
-  const sales = listSales.find((s) => s.id === salesId);
-  const salesName = sales?.name;
+  const sales = listSales.find((s) => s.id === salesId || s.name === salesId || s.account === salesId);
+  const targetSalesId = sales ? sales.id : salesId;
+  const targetSalesName = sales ? sales.name : salesId;
 
   const myTemples: any[] = [];
   for (const t of listTemples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
-    if (
-      (creatorInfo && creatorInfo.salesName === salesName) ||
-      t.salesId === salesId
-    ) {
-      if (t.status === "Active") {
-        myTemples.push(t);
-      }
+    const isMyTemple =
+      (creatorInfo && (creatorInfo.salesName === targetSalesName || creatorInfo.salesId === targetSalesId)) ||
+      t.salesId === targetSalesId ||
+      t.superSalesId === targetSalesId;
+    if (isMyTemple && t.status === "Active") {
+      myTemples.push(t);
     }
   }
 
@@ -11529,7 +11552,7 @@ export async function fetchCommissionHistory(
   const revenueRecords: any[] = [];
 
   console.log(
-    `[DEBUG] fetchCommissionHistory salesId: ${salesId}, salesName: ${salesName}, year: ${year}, month: ${month}`,
+    `[DEBUG] fetchCommissionHistory salesId: ${salesId}, targetSalesId: ${targetSalesId}, targetSalesName: ${targetSalesName}, year: ${year}, month: ${month}`,
   );
   console.log(
     `[DEBUG] fetchCommissionHistory found temples: ${myTemples.length}`,
@@ -11538,7 +11561,7 @@ export async function fetchCommissionHistory(
     `[DEBUG] fetchCommissionHistory total bills before filter: ${listBills.length}`,
   );
 
-  const overrides = salesName ? [][salesName] : null;
+  const overrides = targetSalesName ? ({} as any)[targetSalesName] : null;
   const config = await fetchSystemConfig();
   const rawRules =
     sales?.commissionRules || overrides || config.defaultSuperSalesRates;
@@ -11668,7 +11691,12 @@ export async function fetchCommissionHistory(
   let myBonuses = [];
   try {
     const rows = await prisma.bonusRequest.findMany({
-      where: { salesId, status: "Approved" },
+      where: {
+        OR: [
+          { salesId: targetSalesId, status: "Approved" },
+          { salesName: targetSalesName, status: "Approved" },
+        ],
+      },
     });
     if (rows) {
       myBonuses = rows.map((r: any) => ({
@@ -11703,21 +11731,47 @@ export async function fetchCommissionHistory(
   });
 
   let myWithdrawals: any[] = [];
-  /* removed duplicate import */
-  const rows = await prisma.bonusRequest.findMany({
-    where: { salesId },
-    orderBy: { createdAt: "desc" },
-  });
-  const myBonusRequests = (rows || []).map((r: any) => ({
-    id: r.id,
-    salesName: r.salesName,
-    amount: r.amount,
-    date: r.date instanceof Date ? r.date.toISOString().split("T")[0] : r.date,
-    status: r.status,
-    receiptUrl: r.receiptUrl,
-    method: r.method,
-  }));
-  myWithdrawals = [...myWithdrawals, ...myBonusRequests];
+  try {
+    const wdRows = await prisma.withdrawal.findMany({
+      where: {
+        OR: [
+          { salesName: targetSalesName },
+          { salesName: targetSalesId },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const myWds = (wdRows || []).map((r: any) => ({
+      id: r.id,
+      salesName: r.salesName,
+      amount: Number(r.amount || 0),
+      date: r.date instanceof Date ? r.date.toISOString().split("T")[0] : String(r.date || r.createdAt || "").split("T")[0],
+      status: r.status,
+      receiptUrl: r.receiptUrl,
+    }));
+
+    const bonusRows = await prisma.bonusRequest.findMany({
+      where: {
+        OR: [
+          { salesId: targetSalesId },
+          { salesName: targetSalesName },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const myBonusRequests = (bonusRows || []).map((r: any) => ({
+      id: r.id,
+      salesName: r.salesName,
+      amount: Number(r.amount || 0),
+      date: r.date instanceof Date ? r.date.toISOString().split("T")[0] : String(r.date || r.createdAt || "").split("T")[0],
+      status: r.status,
+      receiptUrl: r.receiptUrl,
+      method: r.method,
+    }));
+    myWithdrawals = [...myWds, ...myBonusRequests];
+  } catch (e) {
+    console.error("fetchCommissionHistory withdrawals query error:", e);
+  }
 
   const pendingRequests = myWithdrawals.filter(
     (w) => w.status === "Pending" || w.status === "審核中",

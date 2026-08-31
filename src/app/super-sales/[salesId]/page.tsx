@@ -396,12 +396,16 @@ export default function SuperSalesPage() {
                 <form onSubmit={async (e) => {
                    e.preventDefault();
                    setIsWithdrawing(true);
-                   const res = await requestWithdrawal(salesName, parseInt(withdrawalAmount));
+                   const res = await requestWithdrawal(salesId, parseInt(withdrawalAmount));
                    setIsWithdrawing(false);
-                   if (res.success) {
+                   if (res && res.success) {
+                      fetchEarningsStats(salesId).then(setEarnings);
+                      const d = new Date();
+                      fetchCommissionHistory(salesId, d.getFullYear().toString(), String(d.getMonth() + 1).padStart(2, '0')).then(setCommissionHistory);
+                      setWithdrawalAmount("");
                       setSubmitted(true);
                    } else {
-                      alert("提領失敗：" + res.error);
+                      alert("提領失敗：" + (res?.error || "未知錯誤"));
                    }
                 }} className="space-y-6">
                    <div className="space-y-3">
