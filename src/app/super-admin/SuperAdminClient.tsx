@@ -1848,7 +1848,29 @@ export default function SuperAdminClient({
                                      </div>
                                      <div className="flex items-center gap-4">
                                         <span className="text-rose-500 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
-                                        <button className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all">審核 / 匯款</button>
+                                        <button 
+                                          onClick={() => {
+                                            const receipt = prompt("請輸入匯款憑證網址 (選填，若無請直接點擊確定):");
+                                            if (receipt === null) return;
+                                            startTransition(async () => {
+                                              const { approveSuperSalesWithdrawal, fetchSuperAdminFinancials } = await import('../actions');
+                                              const res = await approveSuperSalesWithdrawal(w.id, receipt);
+                                              if (res.success) {
+                                                alert("已成功標記為已匯款！");
+                                                fetchSuperAdminFinancials().then(data => {
+                                                  setFinance((prev: any) => ({ 
+                                                    ...prev, 
+                                                    superSalesWithdrawals: data.superSalesWithdrawals 
+                                                  }));
+                                                });
+                                              } else {
+                                                alert("審核失敗，請稍後再試。");
+                                              }
+                                            });
+                                          }}
+                                          className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer">
+                                          審核 / 匯款
+                                        </button>
                                      </div>
                                   </div>
                                 ));
