@@ -356,7 +356,14 @@ export default function SuperAdminClient({
              { id: 'space', label: '雲端空間管理', icon: '☁️', count: storageBills.filter(b => b.status === 'Unpaid').length },
              { id: 'ai', label: 'AI 引擎與方案管理', icon: '🤖' },
              { id: 'tools', label: '資源同步', icon: '🔄' },
-             { id: 'finance', label: '財務中心', icon: '💰', count: (finance?.superSalesWithdrawals || []).filter((w: any) => w.status === 'Pending').length + (finance?.templeBills || []).filter((b: any) => b.status === 'Pending' || b.status === 'Unpaid').length },
+             { id: 'finance', label: '財務中心', icon: '💰', count: (finance?.superSalesWithdrawals || []).filter((w: any) => w.status === 'Pending').length + (finance?.templeBills || []).filter((b: any) => {
+                const name = b.item_name || b.itemName || '';
+                const type = b.type || '';
+                const isRentOrSetup = !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
+                                      !['StorageUpgrade', 'AiUpgrade'].includes(type) &&
+                                      !name.includes('空間') && !name.includes('Storage') && !name.includes('AI');
+                return (b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') && isRentOrSetup;
+              }).length },
              { id: 'bridge', label: '數據橋接', icon: '🌐' },
              { id: 'logs', label: '系統日誌', icon: '📝' },
              { id: 'settings', label: '系統參數', icon: '⚙️' },
