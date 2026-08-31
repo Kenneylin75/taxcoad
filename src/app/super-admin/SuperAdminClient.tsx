@@ -153,6 +153,8 @@ export default function SuperAdminClient({
    const [storagePreviewImage, setStoragePreviewImage] = useState<string | null>(null);
    const [matrixPage, setMatrixPage] = useState(1);
    const [financeWithdrawalPage, setFinanceWithdrawalPage] = useState(1);
+   const [withdrawalModal, setWithdrawalModal] = useState<{id: string, salesName: string, amount: number} | null>(null);
+   const [withdrawalReceiptUrl, setWithdrawalReceiptUrl] = useState('');
    const [financeBillPage, setFinanceBillPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States
@@ -1822,7 +1824,69 @@ export default function SuperAdminClient({
                     </div>
                  </div>
 
-                                  {/* 審核中心區塊 */}
+                  
+                                  {/* 提領審核 Modal */}
+                  {withdrawalModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWithdrawalModal(null)}>
+                      <div className="bg-white rounded-[48px] p-12 shadow-2xl w-full max-w-md space-y-8 animate-in slide-in-from-bottom-4 duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em]">超級業務員提領審核</p>
+                          <h3 className="text-2xl font-black text-slate-900 tracking-tight">確認匯款</h3>
+                        </div>
+                        <div className="bg-slate-50 rounded-3xl p-6 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <p className="text-sm font-bold text-slate-500">業務員</p>
+                            <p className="text-sm font-black text-slate-900">{withdrawalModal.salesName}</p>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <p className="text-sm font-bold text-slate-500">提領金額</p>
+                            <p className="text-lg font-black text-rose-500 italic">NT$ {withdrawalModal.amount.toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">匯款憑證網址（選填）</label>
+                          <input
+                            id="withdrawal-receipt-input"
+                            type="text"
+                            placeholder="請貼上匯款截圖或轉帳憑證連結"
+                            value={withdrawalReceiptUrl}
+                            onChange={e => setWithdrawalReceiptUrl(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div className="flex gap-4">
+                          <button
+                            onClick={() => setWithdrawalModal(null)}
+                            className="flex-1 py-4 rounded-2xl border border-slate-200 text-slate-500 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
+                            取消
+                          </button>
+                          <button
+                            id="confirm-withdrawal-btn"
+                            onClick={async () => {
+                              const { approveSuperSalesWithdrawal, fetchSuperAdminFinancials } = await import('../actions');
+                              const res = await approveSuperSalesWithdrawal(withdrawalModal.id, withdrawalReceiptUrl);
+                              if (res.success) {
+                                setWithdrawalModal(null);
+                                fetchSuperAdminFinancials().then(data => {
+                                  setFinance((prev: any) => ({
+                                    ...prev,
+                                    superSalesWithdrawals: data.superSalesWithdrawals,
+                                    templeBills: data.templeBills,
+                                  }));
+                                });
+                              } else {
+                                alert('審核失敗，請稍後再試。');
+                              }
+                            }}
+                            className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white text-sm font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200/50 cursor-pointer">
+                            確認匯款 ✓
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* 審核中心區塊 */}
                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 px-4">
                     {/* Super Sales Withdrawals */}
                     <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
@@ -1849,24 +1913,10 @@ export default function SuperAdminClient({
                                      <div className="flex items-center gap-4">
                                         <span className="text-rose-500 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
                                         <button 
+                                          id={`approve-wd-btn-${w.id}`}
                                           onClick={() => {
-                                            const receipt = prompt("請輸入匯款憑證網址 (選填，若無請直接點擊確定):");
-                                            if (receipt === null) return;
-                                            startTransition(async () => {
-                                              const { approveSuperSalesWithdrawal, fetchSuperAdminFinancials } = await import('../actions');
-                                              const res = await approveSuperSalesWithdrawal(w.id, receipt);
-                                              if (res.success) {
-                                                alert("已成功標記為已匯款！");
-                                                fetchSuperAdminFinancials().then(data => {
-                                                  setFinance((prev: any) => ({ 
-                                                    ...prev, 
-                                                    superSalesWithdrawals: data.superSalesWithdrawals 
-                                                  }));
-                                                });
-                                              } else {
-                                                alert("審核失敗，請稍後再試。");
-                                              }
-                                            });
+                                            setWithdrawalReceiptUrl('');
+                                            setWithdrawalModal({ id: w.id, salesName: w.salesName, amount: w.amount });
                                           }}
                                           className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer">
                                           審核 / 匯款
