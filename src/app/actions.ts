@@ -8996,7 +8996,7 @@ export async function uploadTempleBillReceipt(
 export async function approveTempleBill(billId: string) {
   try {
     const bill = await prisma.templeBill.findUnique({ where: { id: billId } });
-    if (!bill) return { success: false };
+    if (!bill) return { success: false, error: "找不到該帳單" };
 
     await prisma.templeBill.update({
       where: { id: billId },
@@ -9005,17 +9005,13 @@ export async function approveTempleBill(billId: string) {
 
     const templeId = bill.templeId;
     if (templeId) {
-      const updateData: any = { status: "Active" };
-      if (bill.type !== "StorageUpgrade" && bill.type !== "AiUpgrade" && bill.itemName !== "StorageUpgrade" && bill.itemName !== "AiUpgrade") {
-        updateData.paymentStatus = "Paid";
-      }
       await prisma.temple.update({
         where: { id: templeId },
-        data: updateData,
+        data: { status: "Active" },
       });
     }
 
-    const temple = await prisma.temple.findUnique({ where: { id: templeId! } });
+    const temple = templeId ? await prisma.temple.findUnique({ where: { id: templeId } }) : null;
 
     // --- LOGIC FOR UPGRADES ---
     if (bill.type === "StorageUpgrade" || bill.type === "AiUpgrade") {
@@ -9043,17 +9039,17 @@ export async function approveTempleBill(billId: string) {
         },
       });
 
-      if (bill.type === "StorageUpgrade" && planId) {
-        await upgradeTempleStorage(bill.templeId!, planId, "Monthly", true);
-      } else if (bill.type === "AiUpgrade" && planId) {
+      if (bill.type === "StorageUpgrade" && planId && bill.templeId) {
+        await upgradeTempleStorage(bill.templeId, planId, "Monthly", true);
+      } else if (bill.type === "AiUpgrade" && planId && bill.templeId) {
         let usage = await prisma.templeAiUsage.findUnique({
-          where: { templeId: bill.templeId! },
+          where: { templeId: bill.templeId },
         });
         const thirtyDaysLater = new Date();
         thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
         if (usage) {
           await prisma.templeAiUsage.update({
-            where: { templeId: bill.templeId! },
+            where: { templeId: bill.templeId },
             data: {
               planId,
               expiryDate: thirtyDaysLater,
@@ -9064,7 +9060,7 @@ export async function approveTempleBill(billId: string) {
         } else {
           await prisma.templeAiUsage.create({
             data: {
-              templeId: bill.templeId!,
+              templeId: bill.templeId,
               enabled: true,
               planId,
               usedCount: 0,
@@ -9094,11 +9090,9 @@ export async function approveTempleBill(billId: string) {
           if (commissionAmt > 0) {
             await prisma.commission.create({
               data: {
-                salesId: salesPerson.id,
-                templeId: temple.id,
-                billId: bill.id,
+                sales: { connect: { id: salesPerson.id } },
                 amount: commissionAmt,
-                date: new Date(),
+                status: "Approved",
               },
             });
 
@@ -9130,10 +9124,13 @@ export async function approveTempleBill(billId: string) {
         }
       }
     }
+
+    revalidatePath("/super-admin");
+    revalidatePath("/distributor");
     return { success: true };
-  } catch (e) {
-    console.error(e);
-    return { success: false };
+  } catch (e: any) {
+    console.error("approveTempleBill error:", e);
+    return { success: false, error: e?.message || String(e) };
   }
 }
 

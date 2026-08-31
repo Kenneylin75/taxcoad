@@ -1554,12 +1554,16 @@ export default function SuperAdminClient({
                                      <button 
                                         onClick={async () => {
                                            if (confirm('確定要將此帳單標記為已付款嗎？此操作將開通該宮廟的 AI 服務。')) {
-                                              await approveTempleBill(b.id);
-                                              setFinance((prev: any) => {
-                                                if (!prev) return prev;
-                                                const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
-                                                return { ...prev, templeBills: newBills };
-                                              });
+                                              const res = await approveTempleBill(b.id);
+                                                    if (res && res.success) {
+                                                       setFinance((prev: any) => {
+                                                         if (!prev) return prev;
+                                                         const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
+                                                         return { ...prev, templeBills: newBills };
+                                                       });
+                                                    } else {
+                                                       alert('標記失敗: ' + (res?.error || '請檢查連線'));
+                                                    }
                                            }
                                         }}
                                         className="px-6 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
@@ -1919,13 +1923,17 @@ export default function SuperAdminClient({
                                          {b.status !== 'Paid' ? (
                                            <button 
                                              onClick={async () => {
-                                                if (confirm('確定要將此帳單標記為已付款嗎？')) {
-                                                   await approveTempleBill(b.id);
-                                              setFinance((prev: any) => {
-                                                if (!prev) return prev;
-                                                const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
-                                                return { ...prev, templeBills: newBills };
-                                              });
+                                                if (true) {
+                                                   const res = await approveTempleBill(b.id);
+                                                    if (res && res.success) {
+                                                       setFinance((prev: any) => {
+                                                         if (!prev) return prev;
+                                                         const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
+                                                         return { ...prev, templeBills: newBills };
+                                                       });
+                                                    } else {
+                                                       alert('標記失敗: ' + (res?.error || '請檢查連線'));
+                                                    }
                                                 }
                                              }}
                                              className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg ml-2"
