@@ -2095,7 +2095,7 @@ export default function SuperAdminClient({
                                  )}
                                  {node.type === 'temple' && (
                                     (() => {
-                                       if (node.price <= 0 || node.planName === '永久免費' || node.freeType === 'Permanent') {
+                                       if (node.freeType === 'Permanent' || node.planName === '永久免費' || (node.price <= 0 && node.freeType !== 'Trial')) {
                                           return <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-sm font-black">免費帳戶</span>;
                                        }
 
@@ -2103,7 +2103,7 @@ export default function SuperAdminClient({
                                        const start = node.billingStartDate ? new Date(node.billingStartDate) : new Date(node.joinedAt);
                                        const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
                                        
-                                       if (diffDays > 0 && !node.billingPeriod) {
+                                       if (node.freeType === 'Trial' && diffDays > 0) {
                                           return <span className="text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm">剩餘 {diffDays} 天試用</span>;
                                        } else {
                                           let periodStr = '';
@@ -2118,7 +2118,7 @@ export default function SuperAdminClient({
 
                                           const paidStr = node.paymentStatus === 'Paid' ? '已付款' : '未付款';
                                           const colorClass = node.paymentStatus === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
-                                          return <span className={`${colorClass} px-1.5 py-0.5 rounded border shadow-sm`}>${periodStr} ${paidStr}</span>;
+                                          return <span className={`${colorClass} px-1.5 py-0.5 rounded border shadow-sm`}>{periodStr} {paidStr}</span>;
                                        }
                                     })()
                                  )}

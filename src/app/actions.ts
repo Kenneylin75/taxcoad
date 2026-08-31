@@ -8652,32 +8652,37 @@ export async function fetchDataBridgeTree() {
         }
       }
 
-            const isHQFree = t.creatorRole === "SuperAdmin" || (!t.distributorId && !t.salesId && !t.superSalesId);
+      const isPermanentFree = t.freeType === "Permanent" || (Number(t.monthlyRent) === 0 && t.freeType !== "Trial" && t.freeType !== "Normal");
+      const isTrial = t.freeType === "Trial";
       const rent = Number(t.monthlyRent) || config?.fixedMonthlyRent || 3600;
-      const price = t.paymentCycle === "Yearly" ? Math.round(rent * 12 * (1 - yearlyDiscountRate / 100)) : rent;
+      const calculatedPrice = t.paymentCycle === "Yearly" ? Math.round(rent * 12 * (1 - yearlyDiscountRate / 100)) : rent;
+      const price = isPermanentFree ? 0 : calculatedPrice;
+
+      let planName = "月付標準方案";
+      if (isPermanentFree) {
+        planName = "永久免費";
+      } else if (t.paymentCycle === "Yearly") {
+        planName = "年付優惠方案";
+      } else {
+        planName = "月付標準方案";
+      }
 
       return {
-      id: t.id,
-      name: t.name || t.templeName || "未知宮廟",
-      type: "temple",
-      joinedAt: t.createdAt.toISOString(),
-      status: t.status,
-      planName:
-        isHQFree || t.freeType === "Permanent"
-          ? "免費使用"
-          : t.freeType === "Trial"
-            ? "免費體驗方案"
-            : t.paymentCycle === "Yearly"
-              ? "年付優惠方案"
-              : "月付標準方案",
-      price: isHQFree || t.freeType === "Permanent" ? 0 : price,
-      freeType: t.freeType,
-      plan: t.plan,
-      paymentCycle: t.paymentCycle,
-      billingStartDate: t.billingStartDate,
-      paymentStatus: isHQFree || t.freeType === "Permanent" ? '' : pStatus,
-      billingPeriod: isHQFree || t.freeType === "Permanent" ? '' : bPeriod,
-    }});
+        id: t.id,
+        name: t.name || t.templeName || "未知宮廟",
+        type: "temple",
+        joinedAt: t.createdAt.toISOString(),
+        status: t.status,
+        planName,
+        price,
+        freeType: t.freeType,
+        plan: t.plan,
+        paymentCycle: t.paymentCycle,
+        billingStartDate: t.billingStartDate,
+        paymentStatus: isPermanentFree ? '' : pStatus,
+        billingPeriod: isPermanentFree ? '' : bPeriod,
+      };
+    });
 
     // Build hierarchy
     templeNodes.forEach((tNode: any) => {
