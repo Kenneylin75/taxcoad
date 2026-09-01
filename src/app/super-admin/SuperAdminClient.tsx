@@ -219,19 +219,29 @@ export default function SuperAdminClient({
   
   
   const handleClearFakeDistributors = async () => {
-    if (confirm("確定要清空所有的經銷商假資料嗎？這將會從資料庫中刪除所有的經銷商與業務。")) {
-      try {
-        const res = await fetch('/api/clear-db');
-        const data = await res.json();
-        if (data.success) {
-          alert("清空成功！");
-          window.location.reload();
-        } else {
-          alert("清空失敗：" + data.error);
-        }
-      } catch (e: any) {
-        alert("清空失敗：" + e.message);
+    const input = prompt(
+      "⚠️【重要安全提示】\n此操作將會清空所有宮廟、經銷商、業務及相關測試資料！\n\n如確定執行，請在下方輸入確認代碼「CLEAR-ALL」："
+    );
+    if (!input) return;
+    if (input.trim().toUpperCase() !== 'CLEAR-ALL') {
+      alert("❌ 安全確認代碼不符合，操作已取消。");
+      return;
+    }
+    try {
+      const res = await fetch('/api/clear-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmCode: input.trim().toUpperCase() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ " + (data.message || "已成功清空所有測試資料！"));
+        window.location.reload();
+      } else {
+        alert("清空失敗：" + data.error);
       }
+    } catch (e: any) {
+      alert("清空失敗：" + e.message);
     }
   };
 
