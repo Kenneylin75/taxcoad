@@ -5015,8 +5015,11 @@ export async function approveSuperSalesWithdrawal(
       where: { id: withdrawalId },
       data: { status: "Approved", receiptUrl, bankLast5: bankLast5 || null },
     });
+    revalidatePath("/super-admin");
+    revalidatePath("/super-sales");
     return { success: true };
   } catch (e) {
+    console.error("approveSuperSalesWithdrawal error:", e);
     return { success: false };
   }
 }

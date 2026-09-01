@@ -1827,9 +1827,10 @@ export default function SuperAdminClient({
 
                   
                                   {/* 提領審核 Modal */}
+                  {/* 提領審核 Modal */}
                   {withdrawalModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWithdrawalModal(null)}>
-                      <div className="bg-white rounded-[48px] p-12 shadow-2xl w-full max-w-md space-y-8 animate-in slide-in-from-bottom-4 duration-300" onClick={e => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setWithdrawalModal(null)}>
+                      <div className="bg-white rounded-[48px] p-8 md:p-12 shadow-2xl w-full max-w-lg space-y-6 animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="space-y-2">
                           <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.3em]">超級業務員提領審核</p>
                           <h3 className="text-2xl font-black text-slate-900 tracking-tight">確認匯款</h3>
@@ -1866,28 +1867,111 @@ export default function SuperAdminClient({
                             <p className="text-xs font-bold text-amber-600">⚠️ 業務員尚未設定收款帳戶，請聯繫確認後再行匯款。</p>
                           </div>
                         )}
-                        <div className="space-y-3">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">匯款憑證網址（選填）</label>
+
+                        {/* 總部匯出帳號後 5 碼 */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2">
+                            <span>💳 總部匯出帳號後 5 碼（選填）</span>
+                          </label>
                           <input
-                            id="withdrawal-receipt-input"
+                            id="withdrawal-bank-last5-input"
                             type="text"
-                            placeholder="請貼上匯款截圖或轉帳憑證連結"
-                            value={withdrawalReceiptUrl}
-                            onChange={e => setWithdrawalReceiptUrl(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                            maxLength={5}
+                            placeholder="請輸入匯款轉出帳號後 5 碼 (例如: 12345)"
+                            value={withdrawalBankLast5}
+                            onChange={e => setWithdrawalBankLast5(e.target.value.replace(/\D/g, ''))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:border-indigo-400 focus:bg-white tracking-widest transition-all"
                           />
                         </div>
-                        <div className="flex gap-4">
+
+                        {/* 匯款憑證截圖上傳 */}
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center justify-between">
+                            <span>📸 上傳匯款截圖 / 憑證（選填）</span>
+                            {withdrawalReceiptUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setWithdrawalReceiptUrl('')}
+                                className="text-rose-500 text-[10px] hover:underline font-bold">
+                                移除圖片
+                              </button>
+                            )}
+                          </label>
+
+                          {withdrawalReceiptUrl ? (
+                            <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 p-2 group">
+                              <img
+                                src={withdrawalReceiptUrl}
+                                alt="匯款截圖預覽"
+                                className="w-full h-44 object-contain rounded-xl bg-slate-100"
+                              />
+                              <div className="mt-2 flex justify-between items-center px-2">
+                                <span className="text-[11px] font-bold text-emerald-600">✓ 已附加匯款憑證截圖</span>
+                                <label className="text-xs font-black text-indigo-600 hover:text-indigo-800 cursor-pointer">
+                                  更換圖片
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = () => setWithdrawalReceiptUrl(reader.result as string);
+                                        reader.readAsDataURL(file);
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          ) : (
+                            <label className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/30 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all">
+                              <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xl font-bold">
+                                📷
+                              </div>
+                              <p className="text-xs font-black text-slate-700">點擊此處上傳匯款截圖檔案</p>
+                              <p className="text-[10px] text-slate-400 font-bold">支援 JPG, PNG, WEBP (自動轉為憑證存入)</p>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = () => setWithdrawalReceiptUrl(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+
+                          {/* 手動輸入網址備用 */}
+                          <div className="pt-1">
+                            <input
+                              id="withdrawal-receipt-input"
+                              type="text"
+                              placeholder="或貼上外部圖片網址連結..."
+                              value={withdrawalReceiptUrl.startsWith('data:') ? '' : withdrawalReceiptUrl}
+                              onChange={e => setWithdrawalReceiptUrl(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium outline-none focus:border-indigo-400 focus:bg-white transition-all text-slate-600"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-4 pt-2">
                           <button
                             onClick={() => setWithdrawalModal(null)}
-                            className="flex-1 py-4 rounded-2xl border border-slate-200 text-slate-500 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
+                            className="flex-1 py-4 rounded-2xl border border-slate-200 text-slate-500 text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all cursor-pointer">
                             取消
                           </button>
                           <button
                             id="confirm-withdrawal-btn"
                             onClick={async () => {
                               const { approveSuperSalesWithdrawal, fetchSuperAdminFinancials } = await import('../actions');
-                              const res = await approveSuperSalesWithdrawal(withdrawalModal.id, withdrawalReceiptUrl);
+                              const res = await approveSuperSalesWithdrawal(withdrawalModal.id, withdrawalReceiptUrl, withdrawalBankLast5);
                               if (res.success) {
                                 setWithdrawalModal(null);
                                 fetchSuperAdminFinancials().then(data => {
@@ -1939,6 +2023,7 @@ export default function SuperAdminClient({
                                           id={`approve-wd-btn-${w.id}`}
                                           onClick={() => {
                                             setWithdrawalReceiptUrl('');
+                                            setWithdrawalBankLast5('');
                                             setWithdrawalModal({ id: w.id, salesName: w.salesName, amount: w.amount, bankAccount: w.bankAccount || null });
                                           }}
                                           className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer">
