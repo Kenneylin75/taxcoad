@@ -2095,8 +2095,8 @@ export default function SuperAdminClient({
                                       const wDate = w.date || (w.created_at ? w.created_at.split('T')[0] : '');
                                       return wDate.startsWith(superSalesWdHistoryMonth);
                                    });
-                                   const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
-                                   const records = hList.slice((superSalesWdHistoryPage - 1) * 10, superSalesWdHistoryPage * 10);
+                                   const totalHPages = Math.max(1, Math.ceil(hList.length / 6));
+                                   const records = hList.slice((superSalesWdHistoryPage - 1) * 6, superSalesWdHistoryPage * 6);
                                    
                                    if (records.length === 0) {
                                      return (
@@ -2148,13 +2148,13 @@ export default function SuperAdminClient({
                                 const wDate = w.date || (w.created_at ? w.created_at.split('T')[0] : '');
                                 return wDate.startsWith(superSalesWdHistoryMonth);
                              });
-                             const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
+                             const totalHPages = Math.max(1, Math.ceil(hList.length / 6));
                              if (totalHPages > 1) {
                                 return (
                                    <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
-                                      <button disabled={superSalesWdHistoryPage === 1} onClick={() => setSuperSalesWdHistoryPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
-                                      <span className="text-xs font-bold text-slate-400">{superSalesWdHistoryPage} / {totalHPages}</span>
-                                      <button disabled={superSalesWdHistoryPage === totalHPages} onClick={() => setSuperSalesWdHistoryPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                      <button disabled={superSalesWdHistoryPage === 1} onClick={() => setSuperSalesWdHistoryPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:hover:bg-slate-100 transition-all cursor-pointer">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-500">第 {superSalesWdHistoryPage} / {totalHPages} 頁 <span className="text-slate-400 font-normal">(共 {hList.length} 筆)</span></span>
+                                      <button disabled={superSalesWdHistoryPage === totalHPages} onClick={() => setSuperSalesWdHistoryPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:hover:bg-slate-100 transition-all cursor-pointer">下一頁</button>
                                    </div>
                                 );
                              }
@@ -2297,8 +2297,8 @@ export default function SuperAdminClient({
                                       const bDate = b.billing_date || b.billingDate || (b.created_at ? b.created_at.split('T')[0] : (b.timestamp ? b.timestamp.split('T')[0] : ''));
                                       return bDate.startsWith(templePaymentHistoryMonth);
                                    });
-                                   const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
-                                   const bills = hList.slice((templePaymentHistoryPage - 1) * 10, templePaymentHistoryPage * 10);
+                                   const totalHPages = Math.max(1, Math.ceil(hList.length / 6));
+                                   const bills = hList.slice((templePaymentHistoryPage - 1) * 6, templePaymentHistoryPage * 6);
                                    
                                    if (bills.length === 0) {
                                      return (
@@ -2358,13 +2358,13 @@ export default function SuperAdminClient({
                                 const bDate = b.billing_date || b.billingDate || (b.created_at ? b.created_at.split('T')[0] : (b.timestamp ? b.timestamp.split('T')[0] : ''));
                                 return bDate.startsWith(templePaymentHistoryMonth);
                              });
-                             const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
+                             const totalHPages = Math.max(1, Math.ceil(hList.length / 6));
                              if (totalHPages > 1) {
                                 return (
                                    <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
-                                      <button disabled={templePaymentHistoryPage === 1} onClick={() => setTemplePaymentHistoryPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
-                                      <span className="text-xs font-bold text-slate-400">{templePaymentHistoryPage} / {totalHPages}</span>
-                                      <button disabled={templePaymentHistoryPage === totalHPages} onClick={() => setTemplePaymentHistoryPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                      <button disabled={templePaymentHistoryPage === 1} onClick={() => setTemplePaymentHistoryPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:hover:bg-slate-100 transition-all cursor-pointer">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-500">第 {templePaymentHistoryPage} / {totalHPages} 頁 <span className="text-slate-400 font-normal">(共 {hList.length} 筆)</span></span>
+                                      <button disabled={templePaymentHistoryPage === totalHPages} onClick={() => setTemplePaymentHistoryPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:hover:bg-slate-100 transition-all cursor-pointer">下一頁</button>
                                    </div>
                                 );
                              }
