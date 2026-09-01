@@ -157,6 +157,16 @@ export default function SuperAdminClient({
    const [withdrawalReceiptUrl, setWithdrawalReceiptUrl] = useState('');
    const [withdrawalBankLast5, setWithdrawalBankLast5] = useState('');
    const [financeBillPage, setFinanceBillPage] = useState(1);
+    const [superSalesWdHistoryMonth, setSuperSalesWdHistoryMonth] = useState(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [superSalesWdHistoryPage, setSuperSalesWdHistoryPage] = useState(1);
+    const [templePaymentHistoryMonth, setTemplePaymentHistoryMonth] = useState(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [templePaymentHistoryPage, setTemplePaymentHistoryPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States
    const [templePage, setTemplePage] = useState(1);
@@ -1998,171 +2008,374 @@ export default function SuperAdminClient({
 
                 {/* 審核中心區塊 */}
                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 px-4">
-                    {/* Super Sales Withdrawals */}
-                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
-                       <div>
-                          <div className="flex justify-between items-center mb-8">
-                             <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-rose-500 underline-offset-8">超級業務員提領審核</h4>
-                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">待處理</span>
-                          </div>
-                          <div className="space-y-4">
-                             {(() => {
-                                const wList = finance?.superSalesWithdrawals?.filter((w: any) => w.status === 'Pending') || [];
-                                const totalWPages = Math.max(1, Math.ceil(wList.length / 12));
-                                const pending = wList.slice((financeWithdrawalPage - 1) * 12, financeWithdrawalPage * 12);
-                                
-                                if (pending.length === 0) {
-                                  return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的提領</p></div>;
-                                }
-                                return pending.map((w: any) => (
-                                  <div key={w.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date}</p>
-                                        <p className="text-lg font-black text-slate-900">{w.salesName}</p>
+                    {/* COLUMN 1: 超級業務員提領 (待處理 + 歷史紀錄) */}
+                    <div className="space-y-12">
+                       {/* 1. Super Sales Withdrawals (待處理) */}
+                       <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
+                          <div>
+                             <div className="flex justify-between items-center mb-8">
+                                <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-rose-500 underline-offset-8">超級業務員提領審核</h4>
+                                <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">待處理</span>
+                             </div>
+                             <div className="space-y-4">
+                                {(() => {
+                                   const wList = finance?.superSalesWithdrawals?.filter((w: any) => w.status === 'Pending') || [];
+                                   const totalWPages = Math.max(1, Math.ceil(wList.length / 12));
+                                   const pending = wList.slice((financeWithdrawalPage - 1) * 12, financeWithdrawalPage * 12);
+                                   
+                                   if (pending.length === 0) {
+                                     return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的提領</p></div>;
+                                   }
+                                   return pending.map((w: any) => (
+                                     <div key={w.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                        <div>
+                                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date}</p>
+                                           <p className="text-lg font-black text-slate-900">{w.salesName}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                           <span className="text-rose-500 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
+                                           <button 
+                                             id={`approve-wd-btn-${w.id}`}
+                                             onClick={() => {
+                                               setWithdrawalReceiptUrl('');
+                                               setWithdrawalBankLast5('');
+                                               setWithdrawalModal({ id: w.id, salesName: w.salesName, amount: w.amount, bankAccount: w.bankAccount || null });
+                                             }}
+                                             className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer">
+                                             審核 / 匯款
+                                           </button>
+                                        </div>
                                      </div>
-                                     <div className="flex items-center gap-4">
-                                        <span className="text-rose-500 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
-                                        <button 
-                                          id={`approve-wd-btn-${w.id}`}
-                                          onClick={() => {
-                                            setWithdrawalReceiptUrl('');
-                                            setWithdrawalBankLast5('');
-                                            setWithdrawalModal({ id: w.id, salesName: w.salesName, amount: w.amount, bankAccount: w.bankAccount || null });
-                                          }}
-                                          className="px-4 py-2 bg-slate-900 text-white rounded-full text-xs font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer">
-                                          審核 / 匯款
-                                        </button>
-                                     </div>
-                                  </div>
-                                ));
-                             })()}
+                                   ));
+                                })()}
+                             </div>
                           </div>
+                          
+                          {/* Pagination for Withdrawals */}
+                          {(() => {
+                             const wList = finance?.superSalesWithdrawals?.filter((w: any) => w.status === 'Pending') || [];
+                             const totalWPages = Math.max(1, Math.ceil(wList.length / 12));
+                             if (totalWPages > 1) {
+                                return (
+                                   <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                                      <button disabled={financeWithdrawalPage === 1} onClick={() => setFinanceWithdrawalPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-400">{financeWithdrawalPage} / {totalWPages}</span>
+                                      <button disabled={financeWithdrawalPage === totalWPages} onClick={() => setFinanceWithdrawalPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                   </div>
+                                );
+                             }
+                             return null;
+                          })()}
                        </div>
-                       
-                       {/* Pagination for Withdrawals */}
-                       {(() => {
-                          const wList = finance?.superSalesWithdrawals?.filter((w: any) => w.status === 'Pending') || [];
-                          const totalWPages = Math.max(1, Math.ceil(wList.length / 12));
-                          if (totalWPages > 1) {
-                             return (
-                                <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
-                                   <button disabled={financeWithdrawalPage === 1} onClick={() => setFinanceWithdrawalPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
-                                   <span className="text-xs font-bold text-slate-400">{financeWithdrawalPage} / {totalWPages}</span>
-                                   <button disabled={financeWithdrawalPage === totalWPages} onClick={() => setFinanceWithdrawalPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+
+                       {/* 2. Super Sales Withdrawals History (歷史紀錄) */}
+                       <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
+                          <div>
+                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                                <div className="flex items-center gap-3">
+                                   <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-rose-400 underline-offset-8">超級業務員提領歷史紀錄</h4>
+                                   <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full uppercase tracking-widest">已核銷</span>
                                 </div>
-                             );
-                          }
-                          return null;
-                       })()}
+                                {/* 現代化年月選擇器 (非下拉選單) */}
+                                <div className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-2xl border border-slate-200 shadow-inner transition-all">
+                                   <span className="text-slate-400 text-sm">📅</span>
+                                   <input 
+                                      type="month" 
+                                      value={superSalesWdHistoryMonth} 
+                                      onChange={e => { setSuperSalesWdHistoryMonth(e.target.value); setSuperSalesWdHistoryPage(1); }}
+                                      className="text-xs font-black text-slate-800 bg-transparent outline-none cursor-pointer tracking-wider"
+                                   />
+                                </div>
+                             </div>
+                             <div className="space-y-4">
+                                {(() => {
+                                   const hList = (finance?.superSalesWithdrawals || []).filter((w: any) => {
+                                      if (w.status !== 'Approved' && w.status !== 'Paid') return false;
+                                      if (!superSalesWdHistoryMonth) return true;
+                                      const wDate = w.date || (w.created_at ? w.created_at.split('T')[0] : '');
+                                      return wDate.startsWith(superSalesWdHistoryMonth);
+                                   });
+                                   const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
+                                   const records = hList.slice((superSalesWdHistoryPage - 1) * 10, superSalesWdHistoryPage * 10);
+                                   
+                                   if (records.length === 0) {
+                                     return (
+                                        <div className="py-12 text-center bg-slate-50/50 rounded-[30px] border border-dashed border-slate-200">
+                                           <span className="text-3xl block mb-2 opacity-30">📁</span>
+                                           <p className="text-xs font-bold text-slate-400">此月份無提領歷史紀錄</p>
+                                        </div>
+                                     );
+                                   }
+                                   return records.map((w: any) => (
+                                     <div key={w.id} className="bg-slate-50/80 p-6 rounded-[30px] border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-slate-50 transition-all">
+                                        <div className="space-y-1">
+                                           <div className="flex items-center gap-2">
+                                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{w.date || (w.created_at ? w.created_at.split('T')[0] : '')}</span>
+                                              <span className="text-[9px] font-black text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">已撥款</span>
+                                           </div>
+                                           <p className="text-base font-black text-slate-900">{w.salesName}</p>
+                                           <p className="text-[11px] font-bold text-slate-500">
+                                              匯款帳號後五碼: <span className="font-black text-slate-800 tracking-widest">{w.bankLast5 || '未記錄'}</span>
+                                           </p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                           <span className="text-slate-900 text-lg font-black italic">NT$ {(w.amount || 0).toLocaleString()}</span>
+                                           {w.receiptUrl ? (
+                                              <button 
+                                                onClick={() => {
+                                                   setPreviewImage({ url: w.receiptUrl, templeName: `業務員：${w.salesName}`, bankLast5: w.bankLast5 || '無' });
+                                                   setPreviewModalOpen(true);
+                                                }}
+                                                className="px-4 py-2 bg-white text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm cursor-pointer"
+                                              >
+                                                查看憑證
+                                              </button>
+                                           ) : (
+                                              <span className="text-[10px] font-bold text-slate-300">無憑證</span>
+                                           )}
+                                        </div>
+                                     </div>
+                                   ));
+                                })()}
+                             </div>
+                          </div>
+                          
+                          {/* Pagination for History */}
+                          {(() => {
+                             const hList = (finance?.superSalesWithdrawals || []).filter((w: any) => {
+                                if (w.status !== 'Approved' && w.status !== 'Paid') return false;
+                                if (!superSalesWdHistoryMonth) return true;
+                                const wDate = w.date || (w.created_at ? w.created_at.split('T')[0] : '');
+                                return wDate.startsWith(superSalesWdHistoryMonth);
+                             });
+                             const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
+                             if (totalHPages > 1) {
+                                return (
+                                   <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                                      <button disabled={superSalesWdHistoryPage === 1} onClick={() => setSuperSalesWdHistoryPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-400">{superSalesWdHistoryPage} / {totalHPages}</span>
+                                      <button disabled={superSalesWdHistoryPage === totalHPages} onClick={() => setSuperSalesWdHistoryPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                   </div>
+                                );
+                             }
+                             return null;
+                          })()}
+                       </div>
                     </div>
 
-                    {/* Temple B2B Payments */}
-                    <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
-                       <div>
-                          <div className="flex justify-between items-center mb-8">
-                             <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">宮廟付款審核 (開辦/月年租)</h4>
-                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">待處理</span>
-                          </div>
-                          <div className="space-y-4">
-                             {(() => {
-                                const bList = (finance?.templeBills || []).filter((b: any) => {
-                                  const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
-                                  const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
-                                  if (isDistributorBill) return false;
-                                  const name = b.item_name || b.itemName || '';
-                                  const type = b.type || '';
-                                  return (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
-                                         !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
-                                         !['StorageUpgrade', 'AiUpgrade'].includes(type);
-                                });
-                                 const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
-                                 const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
-                                
-                                if (bills.length === 0) {
-                                  return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的宮廟付款</p></div>;
-                                }
-                                return bills.map((b: any) => {
-                                  const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
-                                  return (
-                                  <div key={b.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-between gap-4">
-                                     <div className="flex justify-between items-start">
-                                        <div>
-                                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
-                                           <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
-                                           <p className="text-[11px] font-bold text-emerald-600 mt-1">{(b.item_name || b.itemName) === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status === 'Paid' ? '已付款' : b.status === 'PendingVerification' ? '審核中' : '未付款'}</p>
+                    {/* COLUMN 2: 宮廟付款審核 (待處理 + 歷史紀錄) */}
+                    <div className="space-y-12">
+                       {/* 1. Temple B2B Payments (待處理) */}
+                       <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
+                          <div>
+                             <div className="flex justify-between items-center mb-8">
+                                <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">宮廟付款審核 (開辦/月年租)</h4>
+                                <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-4 py-2 rounded-full uppercase tracking-widest">待處理</span>
+                             </div>
+                             <div className="space-y-4">
+                                {(() => {
+                                   const bList = (finance?.templeBills || []).filter((b: any) => {
+                                     const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                     const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                                     if (isDistributorBill) return false;
+                                     const name = b.item_name || b.itemName || '';
+                                     const type = b.type || '';
+                                     return (b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
+                                            !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
+                                            !['StorageUpgrade', 'AiUpgrade'].includes(type);
+                                   });
+                                    const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
+                                    const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
+                                   
+                                   if (bills.length === 0) {
+                                     return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的宮廟付款</p></div>;
+                                   }
+                                   return bills.map((b: any) => {
+                                     const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                     return (
+                                     <div key={b.id} className="bg-slate-50 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-between gap-4">
+                                        <div className="flex justify-between items-start">
+                                           <div>
+                                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
+                                              <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
+                                              <p className="text-[11px] font-bold text-emerald-600 mt-1">{(b.item_name || b.itemName) === 'SetupFee' ? '系統開辦費' : '系統租金'} - {b.status === 'PendingVerification' ? '審核中' : '未付款'}</p>
+                                           </div>
+                                           <span className="text-emerald-500 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
                                         </div>
-                                        <span className="text-emerald-500 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
+                                        <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+                                           <p className="text-[11px] font-bold text-slate-500">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
+                                           {b.receipt_url || b.receiptUrl ? (
+                                              <button 
+                                                onClick={() => {
+                                                   setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
+                                                   setPreviewModalOpen(true);
+                                                }}
+                                                className="px-4 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
+                                              >查看匯款截圖</button>
+                                           ) : (
+                                              <span className="text-[10px] font-bold text-slate-400">無圖片</span>
+                                            )}
+                                            <button 
+                                              onClick={async () => {
+                                                 const res = await approveTempleBill(b.id);
+                                                 if (res && res.success) {
+                                                    setFinance((prev: any) => {
+                                                      if (!prev) return prev;
+                                                      const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
+                                                      return { ...prev, templeBills: newBills };
+                                                    });
+                                                 } else {
+                                                    alert('標記失敗: ' + (res?.error || '請檢查連線'));
+                                                 }
+                                              }}
+                                              className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg ml-2"
+                                            >標記已付款</button>
+                                        </div>
                                      </div>
-                                     <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                                        <p className="text-[11px] font-bold text-slate-500">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
-                                        {b.receipt_url || b.receiptUrl ? (
-                                           <button 
-                                             onClick={() => {
-                                                setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
-                                                setPreviewModalOpen(true);
-                                             }}
-                                             className="px-4 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
-                                           >查看匯款截圖</button>
-                                        ) : (
-                                           <span className="text-[10px] font-bold text-slate-400">無圖片</span>
-                                         )}
-                                         {b.status !== 'Paid' ? (
-                                           <button 
-                                             onClick={async () => {
-                                                if (true) {
-                                                   const res = await approveTempleBill(b.id);
-                                                    if (res && res.success) {
-                                                       setFinance((prev: any) => {
-                                                         if (!prev) return prev;
-                                                         const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
-                                                         return { ...prev, templeBills: newBills };
-                                                       });
-                                                    } else {
-                                                       alert('標記失敗: ' + (res?.error || '請檢查連線'));
-                                                    }
-                                                }
-                                             }}
-                                             className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg ml-2"
-                                           >標記已付款</button>
-                                         ) : (
-                                           <span className="px-6 py-2 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest ml-2">已付款</span>
-                                         )}
-                                     </div>
-                                  </div>
-                                )});
-                             })()}
+                                   )});
+                                })()}
+                             </div>
                           </div>
+                          
+                          {/* Pagination for Bills */}
+                          {(() => {
+                             const bList = (finance?.templeBills || []).filter((b: any) => {
+                                     const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                     const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                                     if (isDistributorBill) return false;
+                                     const name = b.item_name || b.itemName || '';
+                                     const type = b.type || '';
+                                     return (b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
+                                            !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
+                                            !['StorageUpgrade', 'AiUpgrade'].includes(type);
+                                   });
+                             const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
+                             if (totalBPages > 1) {
+                                return (
+                                   <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                                      <button disabled={financeBillPage === 1} onClick={() => setFinanceBillPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-400">{financeBillPage} / {totalBPages}</span>
+                                      <button disabled={financeBillPage === totalBPages} onClick={() => setFinanceBillPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                   </div>
+                                );
+                             }
+                             return null;
+                          })()}
                        </div>
-                       
-                       {/* Pagination for Bills */}
-                       {(() => {
-                          const bList = (finance?.templeBills || []).filter((b: any) => {
-                                  const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
-                                  const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
-                                  if (isDistributorBill) return false;
-                                  const name = b.item_name || b.itemName || '';
-                                  const type = b.type || '';
-                                  return (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
-                                         !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
-                                         !['StorageUpgrade', 'AiUpgrade'].includes(type);
-                                });
-                          const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
-                          if (totalBPages > 1) {
-                             return (
-                                <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
-                                   <button disabled={financeBillPage === 1} onClick={() => setFinanceBillPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
-                                   <span className="text-xs font-bold text-slate-400">{financeBillPage} / {totalBPages}</span>
-                                   <button disabled={financeBillPage === totalBPages} onClick={() => setFinanceBillPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+
+                       {/* 2. Temple B2B Payments History (歷史紀錄) */}
+                       <div className="bg-white p-12 rounded-[60px] border border-slate-100 shadow-sm space-y-8 flex flex-col justify-between">
+                          <div>
+                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                                <div className="flex items-center gap-3">
+                                   <h4 className="text-xl font-black text-slate-900 italic uppercase tracking-tighter underline decoration-4 decoration-emerald-500 underline-offset-8">宮廟付款歷史紀錄 (開辦/月年租)</h4>
+                                   <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full uppercase tracking-widest">已入帳</span>
                                 </div>
-                             );
-                          }
-                          return null;
-                       })()}
+                                {/* 現代化年月選擇器 (非下拉選單) */}
+                                <div className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-2xl border border-slate-200 shadow-inner transition-all">
+                                   <span className="text-slate-400 text-sm">📅</span>
+                                   <input 
+                                      type="month" 
+                                      value={templePaymentHistoryMonth} 
+                                      onChange={e => { setTemplePaymentHistoryMonth(e.target.value); setTemplePaymentHistoryPage(1); }}
+                                      className="text-xs font-black text-slate-800 bg-transparent outline-none cursor-pointer tracking-wider"
+                                   />
+                                </div>
+                             </div>
+                             <div className="space-y-4">
+                                {(() => {
+                                   const hList = (finance?.templeBills || []).filter((b: any) => {
+                                      const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                      const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                                      if (isDistributorBill) return false;
+                                      const name = b.item_name || b.itemName || '';
+                                      const type = b.type || '';
+                                      if (['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) || ['StorageUpgrade', 'AiUpgrade'].includes(type)) return false;
+                                      if (b.status !== 'Paid') return false;
+                                      
+                                      if (!templePaymentHistoryMonth) return true;
+                                      const bDate = b.billing_date || b.billingDate || (b.created_at ? b.created_at.split('T')[0] : (b.timestamp ? b.timestamp.split('T')[0] : ''));
+                                      return bDate.startsWith(templePaymentHistoryMonth);
+                                   });
+                                   const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
+                                   const bills = hList.slice((templePaymentHistoryPage - 1) * 10, templePaymentHistoryPage * 10);
+                                   
+                                   if (bills.length === 0) {
+                                     return (
+                                        <div className="py-12 text-center bg-slate-50/50 rounded-[30px] border border-dashed border-slate-200">
+                                           <span className="text-3xl block mb-2 opacity-30">📁</span>
+                                           <p className="text-xs font-bold text-slate-400">此月份無宮廟付款歷史紀錄</p>
+                                        </div>
+                                     );
+                                   }
+                                   return bills.map((b: any) => {
+                                     const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                     return (
+                                     <div key={b.id} className="bg-slate-50/80 p-6 rounded-[30px] border border-slate-100 flex flex-col justify-between gap-4 hover:bg-slate-50 transition-all">
+                                        <div className="flex justify-between items-start">
+                                           <div>
+                                              <div className="flex items-center gap-2">
+                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
+                                                 <span className="text-[9px] font-black text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">已入帳</span>
+                                              </div>
+                                              <p className="text-base font-black text-slate-900 mt-1">{t?.name || t?.templeName || '未知宮廟'}</p>
+                                              <p className="text-[11px] font-bold text-emerald-600 mt-0.5">{(b.item_name || b.itemName) === 'SetupFee' ? '系統開辦費' : '系統租金'}</p>
+                                           </div>
+                                           <span className="text-emerald-600 text-lg font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-3 border-t border-slate-200/60">
+                                           <p className="text-[11px] font-bold text-slate-500">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
+                                           {b.receipt_url || b.receiptUrl ? (
+                                              <button 
+                                                onClick={() => {
+                                                   setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
+                                                   setPreviewModalOpen(true);
+                                                }}
+                                                className="px-4 py-2 bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm cursor-pointer"
+                                              >查看匯款截圖</button>
+                                           ) : (
+                                              <span className="text-[10px] font-bold text-slate-300">無圖片</span>
+                                           )}
+                                        </div>
+                                     </div>
+                                   )});
+                                })()}
+                             </div>
+                          </div>
+                          
+                          {/* Pagination for Temple History */}
+                          {(() => {
+                             const hList = (finance?.templeBills || []).filter((b: any) => {
+                                const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                                if (isDistributorBill) return false;
+                                const name = b.item_name || b.itemName || '';
+                                const type = b.type || '';
+                                if (['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) || ['StorageUpgrade', 'AiUpgrade'].includes(type)) return false;
+                                if (b.status !== 'Paid') return false;
+                                
+                                if (!templePaymentHistoryMonth) return true;
+                                const bDate = b.billing_date || b.billingDate || (b.created_at ? b.created_at.split('T')[0] : (b.timestamp ? b.timestamp.split('T')[0] : ''));
+                                return bDate.startsWith(templePaymentHistoryMonth);
+                             });
+                             const totalHPages = Math.max(1, Math.ceil(hList.length / 10));
+                             if (totalHPages > 1) {
+                                return (
+                                   <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
+                                      <button disabled={templePaymentHistoryPage === 1} onClick={() => setTemplePaymentHistoryPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-400">{templePaymentHistoryPage} / {totalHPages}</span>
+                                      <button disabled={templePaymentHistoryPage === totalHPages} onClick={() => setTemplePaymentHistoryPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                   </div>
+                                );
+                             }
+                             return null;
+                          })()}
+                       </div>
                     </div>
                  </div>
-              </div>
-              );
-           })()}
+               </div>
+               );
+            })()}
            {activeTab === 'bridge' && (() => {
               const todayStr = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' });
                 

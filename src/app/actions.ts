@@ -4903,6 +4903,7 @@ export async function fetchAllWithdrawals() {
         amount: Number(w.amount || 0),
         status: w.status,
         receiptUrl: w.receiptUrl,
+        bankLast5: w.bankLast5,
         date: w.date instanceof Date ? w.date.toISOString().split("T")[0] : String(w.date || w.createdAt || "").split("T")[0],
         role: salesMap.get(w.salesName) || walletRoleMap.get(w.salesName) || "SuperSales",
         bankAccount,
