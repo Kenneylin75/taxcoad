@@ -1257,20 +1257,75 @@ export default function DistributorClient({
                           </div>
                        ))}
                        {uploadingBonusId && (
-                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-2xl z-[500] flex items-center justify-center p-4">
-                            <div className="bg-white w-full max-w-sm rounded-[40px] p-10 shadow-2xl space-y-6">
-                               <h3 className="text-xl font-black text-slate-900">上傳匯款圖片</h3>
-                               <p className="text-xs text-slate-500">請上傳匯款憑證，完成核銷作業。</p>
-                               <input type="file" accept="image/*" onChange={onReceiptFileChange} className="w-full text-xs" />
-                               {receiptBase64 && <img src={receiptBase64} alt="Receipt Preview" className="w-full h-32 object-cover rounded-2xl" />}
-                               <input type="text" placeholder="請輸入匯款後五碼" value={uploadingBankLast5} onChange={(e) => setUploadingBankLast5(e.target.value.replace(/\D/g, '').slice(0, 5))} className="w-full text-xs p-3 border border-slate-200 rounded-xl" maxLength={5} />
-                               <div className="flex gap-4">
-                                  <button onClick={() => { setUploadingBonusId(null); setReceiptBase64(''); setUploadingBankLast5(''); }} className="flex-1 py-4 bg-slate-100 rounded-full text-xs font-black text-slate-500">取消</button>
-                                  <button onClick={() => handleReconcileBonus(uploadingBonusId)} className="flex-1 py-4 bg-blue-600 rounded-full text-xs font-black text-white">確認已匯款</button>
+                         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-white w-full max-w-sm rounded-[36px] p-8 shadow-2xl space-y-6 border border-slate-100">
+                               <div className="space-y-1 text-center sm:text-left">
+                                  <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                                     <span>📸</span> 上傳匯款圖片
+                                  </h3>
+                                  <p className="text-xs font-bold text-slate-400">請上傳匯款憑證截圖，完成獎金核銷作業。</p>
                                </div>
-                            </div>
-                         </div>
+
+                               <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-slate-200 hover:border-blue-500 rounded-[28px] cursor-pointer bg-slate-50/70 hover:bg-blue-50/30 transition-all overflow-hidden relative group">
+                                  {receiptBase64 ? (
+                                     <div className="relative w-full h-full flex items-center justify-center p-2">
+                                        <img src={receiptBase64} alt="Receipt Preview" className="w-full h-full object-contain rounded-2xl" />
+                                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl backdrop-blur-xs">
+                                           <p className="text-white text-xs font-black bg-slate-900/90 px-4 py-2 rounded-full shadow-md">更換圖片</p>
+                                        </div>
+                                     </div>
+                                  ) : (
+                                     <div className="flex flex-col items-center justify-center py-6 text-center space-y-2.5 px-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-inner">
+                                           📤
+                                        </div>
+                                        <div>
+                                           <p className="text-xs font-black text-slate-800">點擊上傳匯款憑證截圖</p>
+                                           <p className="text-[10px] text-slate-400 font-bold mt-0.5">支援 JPG, PNG 格式圖片</p>
+                                        </div>
+                                     </div>
+                                  )}
+                                  <input type="file" accept="image/*" onChange={onReceiptFileChange} className="hidden" />
+                               </label>
+
+                               <div className="space-y-1.5">
+                                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">匯款帳號後五碼 (5位數字)</label>
+                                  <div className="relative">
+                                     <input
+                                       type="text"
+                                       placeholder="例如：12345"
+                                       value={uploadingBankLast5}
+                                       onChange={(e) => setUploadingBankLast5(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                                       className="w-full text-sm font-black tracking-widest px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                                       maxLength={5}
+                                     />
+                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
+                                        {uploadingBankLast5.length}/5
+                                     </span>
+                                  </div>
+                               </div>
+
+                               <div className="flex gap-3 pt-2">
+                                  <button
+                                     type="button"
+                                     onClick={() => { setUploadingBonusId(null); setReceiptBase64(''); setUploadingBankLast5(''); }}
+                                     className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xs font-black text-slate-600 transition-all active:scale-95"
+                                  >
+                                     取消
+                                  </button>
+                                  <button
+                                     type="button"
+                                     onClick={() => handleReconcileBonus(uploadingBonusId)}
+                                     disabled={!receiptBase64 || uploadingBankLast5.length !== 5}
+                                     className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 rounded-2xl text-xs font-black text-white shadow-lg shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                                  >
+                                     確認已匯款
+                                  </button>
+                                </div>
+                             </div>
+                          </div>
                        )}
+
                     </div>
                   )}
                </div>
