@@ -68,6 +68,7 @@ export default function SuperSalesPage() {
   });
   const [viewingTempleDetail, setViewingTempleDetail] = useState<any>(null);
   const [viewingDistributorDetail, setViewingDistributorDetail] = useState<any>(null);
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSuperSalesProfile(salesId).then(p => {
@@ -479,20 +480,8 @@ export default function SuperSalesPage() {
                                </span>
                                {(w.receiptUrl || w.receipt_url) && (
                                   <button
-                                     onClick={() => {
-                                        const url = w.receiptUrl || w.receipt_url;
-                                        if (url.startsWith('data:')) {
-                                           const newTab = window.open();
-                                           if (newTab) {
-                                              newTab.document.body.innerHTML = `<img src="${url}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />`;
-                                           } else {
-                                              alert('請允許瀏覽器彈出視窗');
-                                           }
-                                        } else {
-                                           window.open(url, '_blank');
-                                        }
-                                     }}
-                                     className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+                                     onClick={() => setViewingReceiptUrl(w.receiptUrl || w.receipt_url)}
+                                     className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors cursor-pointer"
                                   >
                                      查看匯款憑證 &rarr;
                                   </button>
@@ -1095,6 +1084,43 @@ export default function SuperSalesPage() {
             </div>
          </div>
       )}
+
+       {/* 匯款憑證燈箱彈窗 */}
+       {viewingReceiptUrl && (
+          <div 
+             className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200" 
+             onClick={() => setViewingReceiptUrl(null)}
+          >
+             <div 
+                className="relative max-w-lg w-full bg-white rounded-[32px] p-6 shadow-2xl space-y-4 border border-slate-100 animate-in zoom-in-95 duration-200" 
+                onClick={e => e.stopPropagation()}
+             >
+                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                   <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                      <span>🖼️</span> 匯款憑證截圖
+                   </h3>
+                   <button 
+                      onClick={() => setViewingReceiptUrl(null)} 
+                      className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center font-black transition-all active:scale-90"
+                   >
+                      ✕
+                   </button>
+                </div>
+
+                <div className="max-h-[70vh] overflow-auto rounded-2xl bg-slate-50 p-2 flex items-center justify-center border border-slate-100">
+                   <img src={viewingReceiptUrl} alt="Receipt" className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-sm" />
+                </div>
+
+                <button 
+                   type="button" 
+                   onClick={() => setViewingReceiptUrl(null)} 
+                   className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-black transition-all active:scale-95 shadow-md shadow-slate-900/10"
+                >
+                   關閉視窗
+                </button>
+             </div>
+          </div>
+       )}
 </div>
   );
 }
