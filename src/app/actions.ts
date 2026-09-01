@@ -7851,6 +7851,26 @@ export async function fetchDistributorSalesPerformance(
   }
 }
 export async function fetchSuperAdminFinancials() {
+  // 輔助函式：標準化日期至台灣時區 (UTC+8) YYYY-MM-DD
+  const toTwDateString = (dateInput: any): string => {
+    if (!dateInput) {
+      const twNow = new Date(Date.now() + 8 * 3600 * 1000);
+      return twNow.toISOString().split("T")[0];
+    }
+    if (typeof dateInput === "string") {
+      const trimmed = dateInput.trim();
+      if (/^\d{4}-\d{2}$/.test(trimmed)) return `${trimmed}-01`;
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.substring(0, 10);
+    }
+    const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (isNaN(d.getTime())) {
+      const twNow = new Date(Date.now() + 8 * 3600 * 1000);
+      return twNow.toISOString().split("T")[0];
+    }
+    const twTime = new Date(d.getTime() + 8 * 3600 * 1000);
+    return twTime.toISOString().split("T")[0];
+  };
+
   // 取得所有宮廟資料
   let allTemples: any[] = [];
   try {
@@ -7889,30 +7909,69 @@ export async function fetchSuperAdminFinancials() {
     console.error("fetchSuperAdminFinancials lampRecords error:", e);
   }
 
+  // 4. 取得所有已繳費/已完成的預約服務 (補充 B2C 數據)
+  let appointments: any[] = [];
+  try {
+    appointments = await prisma.appointment.findMany({
+      where: {
+        OR: [
+          { paymentStatus: { in: ["Paid", "Confirmed", "Success"] } },
+          { status: "Completed" },
+        ],
+      },
+    });
+  } catch (e) {
+    console.error("fetchSuperAdminFinancials appointments error:", e);
+  }
+
+  // 5. 取得所有已繳費的活動報名 (補充 B2C 數據)
+  let eventRegistrations: any[] = [];
+  try {
+    eventRegistrations = await prisma.eventRegistration.findMany({
+      where: {
+        paymentStatus: { in: ["Paid", "Confirmed", "Success"] },
+      },
+    });
+  } catch (e) {
+    console.error("fetchSuperAdminFinancials eventRegistrations error:", e);
+  }
+
+  // 6. 取得所有經銷商合約費用 (補充 B2B 數據)
+  let distributorContracts: any[] = [];
+  try {
+    distributorContracts = await prisma.distributorContract.findMany();
+  } catch (e) {
+    console.error("fetchSuperAdminFinancials distributorContracts error:", e);
+  }
+
   const records: any[] = [];
+  const recordedIds = new Set<string>();
 
   // A. 處理 B2B 帳單紀錄 (已繳費)
   templeBills
     .filter((b) => b.status === "Paid")
     .forEach((b) => {
-      const bDate = b.createdAt || b.timestamp || b.billingDate;
-      const dateStr =
-        bDate instanceof Date
-          ? bDate.toISOString().split("T")[0]
-          : bDate
-            ? String(bDate).split("T")[0]
-            : new Date().toISOString().split("T")[0];
+      // 優先採用帳單所屬期別 (billingDate 如 2026-09 -> 2026-09-01)，確保當月單據計入當月報表
+      let dateStr = "";
+      if (b.billingDate && /^\d{4}-\d{2}/.test(b.billingDate)) {
+        dateStr = b.billingDate.length === 7 ? `${b.billingDate}-01` : b.billingDate.substring(0, 10);
+      } else {
+        dateStr = toTwDateString(b.createdAt || b.timestamp);
+      }
 
       const t = allTemples.find(
         (temple: any) => temple.id === (b.templeId || (b as any).temple_id),
       );
 
       let category = "RENT_FEE";
-      const itemNameLower = (b.itemName || (b as any).item_name || b.type || "").toLowerCase();
-      if (itemNameLower.includes("setup") || itemNameLower.includes("開辦")) {
+      const typeLower = (b.type || "").toLowerCase();
+      const itemNameLower = (b.itemName || (b as any).item_name || "").toLowerCase();
+      if (typeLower.includes("setup") || itemNameLower.includes("setup") || itemNameLower.includes("開辦")) {
         category = "SETUP_FEE";
-      } else if (itemNameLower.includes("storage") || itemNameLower.includes("空間")) {
+      } else if (typeLower.includes("storage") || itemNameLower.includes("storage") || itemNameLower.includes("空間")) {
         category = "STORAGE_FEE";
+      } else if (typeLower.includes("ai") || itemNameLower.includes("ai")) {
+        category = "STORAGE_FEE"; // SaaS 雲端服務分類
       }
 
       records.push({
@@ -7922,20 +7981,31 @@ export async function fetchSuperAdminFinancials() {
         amount: Number(b.amount || 0),
         category,
         region: t?.city || "全區",
-        description: `${t?.templeName || t?.name || "宮廟"} - ${category === "SETUP_FEE" ? "開辦費" : category === "STORAGE_FEE" ? "空間租費" : "系統月/年租金"}`,
+        description: `${t?.templeName || t?.name || "宮廟"} - ${category === "SETUP_FEE" ? "開辦費" : category === "STORAGE_FEE" ? "雲端空間/AI" : "系統月/年租金"}`,
       });
+      recordedIds.add(b.id);
     });
 
-  // B. 處理 B2C 信眾財務收入紀錄
-  financeRecords.forEach((f) => {
-    const fDate = f.date || f.createdAt;
-    const dateStr =
-      fDate instanceof Date
-        ? fDate.toISOString().split("T")[0]
-        : fDate
-          ? String(fDate).split("T")[0]
-          : new Date().toISOString().split("T")[0];
+  // B. 處理經銷商合約開辦/擴充收益 (B2B)
+  distributorContracts.forEach((c) => {
+    if (c.amount > 0) {
+      const dateStr = toTwDateString(c.date);
+      records.push({
+        id: c.id,
+        date: dateStr,
+        type: "INCOME",
+        amount: Number(c.amount || 0),
+        category: "SETUP_FEE",
+        region: "總部經銷",
+        description: `經銷商簽約/擴充費用 (${c.type === "ADD_QUOTA" ? "擴充節點" : "加盟開辦"})`,
+      });
+      recordedIds.add(c.id);
+    }
+  });
 
+  // C. 處理 B2C 信眾財務收入紀錄
+  financeRecords.forEach((f) => {
+    const dateStr = toTwDateString(f.date || f.createdAt);
     const t = allTemples.find((temple: any) => temple.id === f.templeId);
 
     records.push({
@@ -7945,27 +8015,17 @@ export async function fetchSuperAdminFinancials() {
       amount: Number(f.amount || 0),
       category: "DEVOTEE_FEE",
       region: t?.city || "全區",
-      description: `${t?.templeName || t?.name || "宮廟"} - 信眾結緣 (${f.description || f.category || "點燈/祈福"})`,
+      description: `${t?.templeName || t?.name || "宮廟"} - 信眾結緣 (${f.description || f.category || "點燈/祈福/香油錢"})`,
     });
+    recordedIds.add(f.id);
   });
 
-  // C. 處理 LampRecord (若未包含在 financeRecords)
+  // D. 處理 LampRecord (點燈)
   lampRecords.forEach((l) => {
-    const lDate = l.createdAt || l.startDate;
-    const dateStr =
-      lDate instanceof Date
-        ? lDate.toISOString().split("T")[0]
-        : lDate
-          ? String(lDate).split("T")[0]
-          : new Date().toISOString().split("T")[0];
+    if (!recordedIds.has(l.id)) {
+      const dateStr = toTwDateString(l.startDate || l.createdAt);
+      const t = allTemples.find((temple: any) => temple.id === l.templeId);
 
-    const t = allTemples.find((temple: any) => temple.id === l.templeId);
-
-    // 避免重複計算已寫入 financeRecords 的項目
-    const exists = records.some(
-      (r) => r.id === l.id || (r.description && r.description.includes(l.id)),
-    );
-    if (!exists) {
       records.push({
         id: l.id,
         date: dateStr,
@@ -7973,23 +8033,56 @@ export async function fetchSuperAdminFinancials() {
         amount: Number(l.actualPrice || 0),
         category: "DEVOTEE_FEE",
         region: t?.city || "全區",
-        description: `${t?.templeName || t?.name || "宮廟"} - ${l.categoryName || "光明燈"}安奉 (${l.applicantName || "信眾"})`,
+        description: `${t?.templeName || t?.name || "宮廟"} - ${l.categoryName || "光明燈"}安奉 (${l.applicantName || l.guestName || "信眾"})`,
       });
+      recordedIds.add(l.id);
     }
   });
 
-  // D. 處理超級業務員提領支出
+  // E. 處理 Appointment (預約問事/法會服務)
+  appointments.forEach((a) => {
+    if (!recordedIds.has(a.id) && (a.amount || 0) > 0) {
+      const dateStr = toTwDateString(a.date || a.createdAt);
+      const t = allTemples.find((temple: any) => temple.id === a.templeId);
+
+      records.push({
+        id: a.id,
+        date: dateStr,
+        type: "INCOME_B2C",
+        amount: Number(a.amount || 0),
+        category: "DEVOTEE_FEE",
+        region: t?.city || "全區",
+        description: `${t?.templeName || t?.name || "宮廟"} - 預約服務 (${a.service || "問事/法會"})`,
+      });
+      recordedIds.add(a.id);
+    }
+  });
+
+  // F. 處理 EventRegistration (活動報名)
+  eventRegistrations.forEach((er) => {
+    if (!recordedIds.has(er.id) && (er.actualPrice || 0) > 0) {
+      const dateStr = toTwDateString(er.createdAt);
+      const t = allTemples.find((temple: any) => temple.id === er.templeId);
+
+      records.push({
+        id: er.id,
+        date: dateStr,
+        type: "INCOME_B2C",
+        amount: Number(er.actualPrice || 0),
+        category: "DEVOTEE_FEE",
+        region: t?.city || "全區",
+        description: `${t?.templeName || t?.name || "宮廟"} - 活動報名 (${er.guestName || "信眾"})`,
+      });
+      recordedIds.add(er.id);
+    }
+  });
+
+  // G. 處理超級業務員提領支出
   const allWithdrawals = await fetchAllWithdrawals();
   allWithdrawals
     .filter((w: any) => w.status === "Approved" || w.status === "Verified")
     .forEach((w: any) => {
-      const wDate = w.timestamp || w.created_at || w.date;
-      const dateStr =
-        wDate instanceof Date
-          ? wDate.toISOString().split("T")[0]
-          : wDate
-            ? String(wDate).split("T")[0]
-            : new Date().toISOString().split("T")[0];
+      const dateStr = toTwDateString(w.date || w.created_at || w.timestamp);
 
       records.push({
         id: w.id,

@@ -1664,22 +1664,22 @@ export default function SuperAdminClient({
               // Calculate B2C (Devotee)
               const b2cIncome = currentMonthRecords.filter((r: any) => r.category === 'DEVOTEE_FEE').reduce((s: number, r: any) => s + r.amount, 0);
               const prevB2cIncome = prevMonthRecords.filter((r: any) => r.category === 'DEVOTEE_FEE').reduce((s: number, r: any) => s + r.amount, 0);
-              const b2cMom = prevB2cIncome ? ((b2cIncome - prevB2cIncome) / prevB2cIncome * 100).toFixed(1) : '100.0';
+              const b2cMom = prevB2cIncome ? ((b2cIncome - prevB2cIncome) / prevB2cIncome * 100).toFixed(1) : (b2cIncome > 0 ? '100.0' : '0.0');
 
               // Calculate B2B Rent + Setup
               const b2bIncome = currentMonthRecords.filter((r: any) => r.category === 'RENT_FEE' || r.category === 'SETUP_FEE').reduce((s: number, r: any) => s + r.amount, 0);
               const prevB2bIncome = prevMonthRecords.filter((r: any) => r.category === 'RENT_FEE' || r.category === 'SETUP_FEE').reduce((s: number, r: any) => s + r.amount, 0);
-              const b2bMom = prevB2bIncome ? ((b2bIncome - prevB2bIncome) / prevB2bIncome * 100).toFixed(1) : '100.0';
+              const b2bMom = prevB2bIncome ? ((b2bIncome - prevB2bIncome) / prevB2bIncome * 100).toFixed(1) : (b2bIncome > 0 ? '100.0' : '0.0');
 
               // Calculate Cloud Storage
               const storageIncome = currentMonthRecords.filter((r: any) => r.category === 'STORAGE_FEE').reduce((s: number, r: any) => s + r.amount, 0);
               const prevStorageIncome = prevMonthRecords.filter((r: any) => r.category === 'STORAGE_FEE').reduce((s: number, r: any) => s + r.amount, 0);
-              const storageMom = prevStorageIncome ? ((storageIncome - prevStorageIncome) / prevStorageIncome * 100).toFixed(1) : '100.0';
+              const storageMom = prevStorageIncome ? ((storageIncome - prevStorageIncome) / prevStorageIncome * 100).toFixed(1) : (storageIncome > 0 ? '100.0' : '0.0');
 
               // Calculate Setup Fee separately
               const setupIncome = currentMonthRecords.filter((r: any) => r.category === 'SETUP_FEE').reduce((s: number, r: any) => s + r.amount, 0);
               const prevSetupIncome = prevMonthRecords.filter((r: any) => r.category === 'SETUP_FEE').reduce((s: number, r: any) => s + r.amount, 0);
-              const setupMom = prevSetupIncome ? ((setupIncome - prevSetupIncome) / prevSetupIncome * 100).toFixed(1) : '100.0';
+              const setupMom = prevSetupIncome ? ((setupIncome - prevSetupIncome) / prevSetupIncome * 100).toFixed(1) : (setupIncome > 0 ? '100.0' : '0.0');
 
               const dynTotalRevenue = currentMonthRecords.filter((r: any) => r.type === 'INCOME' || r.type === 'INCOME_B2C').reduce((s: number, r: any) => s + r.amount, 0);
               const dynTotalCommission = currentMonthRecords.filter((r: any) => r.type === 'EXPENSE').reduce((s: number, r: any) => s + r.amount, 0);
