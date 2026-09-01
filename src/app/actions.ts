@@ -7952,7 +7952,25 @@ export async function fetchSuperAdminFinancials() {
 
   // A. 處理 B2B 帳單紀錄 (已繳費)
   templeBills
-    .filter((b) => b.status === "Paid")
+    .filter((b) => {
+      if (b.status !== "Paid") return false;
+      const t = allTemples.find(
+        (temple: any) => temple.id === (b.templeId || (b as any).temple_id),
+      );
+      const typeLower = (b.type || "").toLowerCase();
+      const itemNameLower = (b.itemName || (b as any).item_name || "").toLowerCase();
+      const isStorageOrAi =
+        typeLower.includes("storage") ||
+        itemNameLower.includes("storage") ||
+        itemNameLower.includes("空間") ||
+        typeLower.includes("ai") ||
+        itemNameLower.includes("ai");
+      // 空間與 AI 升級一律歸總部收益；租金與開辦費僅計入非經銷商之直營/超業開設宮廟
+      if (isStorageOrAi) return true;
+      const isDistributorBill =
+        b.payeeRole === "Distributor" || (t && (t.distributorId || t.salesId));
+      return !isDistributorBill;
+    })
     .forEach((b) => {
       // 優先採用帳單所屬期別 (billingDate 如 2026-09 -> 2026-09-01)，確保當月單據計入當月報表
       let dateStr = "";

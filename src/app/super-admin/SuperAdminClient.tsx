@@ -360,6 +360,9 @@ export default function SuperAdminClient({
              { id: 'ai', label: 'AI 引擎與方案管理', icon: '🤖' },
              { id: 'tools', label: '資源同步', icon: '🔄' },
              { id: 'finance', label: '財務中心', icon: '💰', count: (finance?.superSalesWithdrawals || []).filter((w: any) => w.status === 'Pending').length + (finance?.templeBills || []).filter((b: any) => {
+                const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                if (isDistributorBill) return false;
                 const name = b.item_name || b.itemName || '';
                 const type = b.type || '';
                 const isRentOrSetup = !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
@@ -2063,6 +2066,9 @@ export default function SuperAdminClient({
                           <div className="space-y-4">
                              {(() => {
                                 const bList = (finance?.templeBills || []).filter((b: any) => {
+                                  const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                  const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                                  if (isDistributorBill) return false;
                                   const name = b.item_name || b.itemName || '';
                                   const type = b.type || '';
                                   return (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
@@ -2131,6 +2137,9 @@ export default function SuperAdminClient({
                        {/* Pagination for Bills */}
                        {(() => {
                           const bList = (finance?.templeBills || []).filter((b: any) => {
+                                  const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                  const isDistributorBill = b.payeeRole === 'Distributor' || (t && (t.distributorId || t.salesId));
+                                  if (isDistributorBill) return false;
                                   const name = b.item_name || b.itemName || '';
                                   const type = b.type || '';
                                   return (b.status === 'Paid' || b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
