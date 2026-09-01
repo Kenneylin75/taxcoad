@@ -169,10 +169,13 @@ export default function SuperAdminClient({
     const [templePaymentHistoryPage, setTemplePaymentHistoryPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States
+   const [accountPageSize, setAccountPageSize] = useState<number>(12);
+   const [templeSearch, setTempleSearch] = useState('');
+   const [distributorSearch, setDistributorSearch] = useState('');
+   const [superSalesSearch, setSuperSalesSearch] = useState('');
    const [templePage, setTemplePage] = useState(1);
    const [distributorPage, setDistributorPage] = useState(1);
    const [superSalesPage, setSuperSalesPage] = useState(1);
-   const ITEMS_PER_PAGE = 12;
 
    
    // Distributor Contract Modal States
@@ -334,18 +337,48 @@ export default function SuperAdminClient({
   };
 
   if (!config || !analytics) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-10 h-10 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div></div>;
-  // Pagination Calculations
-  const allTemples = initialAccounts.filter((a: any) => a.role === 'Temple');
-  const templeTotalPages = Math.max(1, Math.ceil(allTemples.length / ITEMS_PER_PAGE));
-  const pagedTemples = allTemples.slice((templePage - 1) * ITEMS_PER_PAGE, templePage * ITEMS_PER_PAGE);
+  // Pagination & Search Filter Calculations
+  const filteredTemples = initialAccounts
+    .filter((a: any) => a.role === 'Temple')
+    .filter((a: any) => {
+      if (!templeSearch.trim()) return true;
+      const q = templeSearch.toLowerCase();
+      return (
+        (a.name || '').toLowerCase().includes(q) ||
+        (a.templeName || '').toLowerCase().includes(q) ||
+        (a.account || '').toLowerCase().includes(q)
+      );
+    });
+  const templeTotalPages = Math.max(1, Math.ceil(filteredTemples.length / accountPageSize));
+  const pagedTemples = filteredTemples.slice((templePage - 1) * accountPageSize, templePage * accountPageSize);
 
-  const allDistributors = initialAccounts.filter((a: any) => a.role === 'Distributor');
-  const distributorTotalPages = Math.max(1, Math.ceil(allDistributors.length / ITEMS_PER_PAGE));
-  const pagedDistributors = allDistributors.slice((distributorPage - 1) * ITEMS_PER_PAGE, distributorPage * ITEMS_PER_PAGE);
+  const filteredDistributors = initialAccounts
+    .filter((a: any) => a.role === 'Distributor')
+    .filter((a: any) => {
+      if (!distributorSearch.trim()) return true;
+      const q = distributorSearch.toLowerCase();
+      return (
+        (a.name || '').toLowerCase().includes(q) ||
+        (a.templeName || '').toLowerCase().includes(q) ||
+        (a.account || '').toLowerCase().includes(q)
+      );
+    });
+  const distributorTotalPages = Math.max(1, Math.ceil(filteredDistributors.length / accountPageSize));
+  const pagedDistributors = filteredDistributors.slice((distributorPage - 1) * accountPageSize, distributorPage * accountPageSize);
 
-  const allSuperSales = initialAccounts.filter((a: any) => a.role === 'SuperSales');
-  const superSalesTotalPages = Math.max(1, Math.ceil(allSuperSales.length / ITEMS_PER_PAGE));
-  const pagedSuperSales = allSuperSales.slice((superSalesPage - 1) * ITEMS_PER_PAGE, superSalesPage * ITEMS_PER_PAGE);
+  const filteredSuperSales = initialAccounts
+    .filter((a: any) => a.role === 'SuperSales')
+    .filter((a: any) => {
+      if (!superSalesSearch.trim()) return true;
+      const q = superSalesSearch.toLowerCase();
+      return (
+        (a.name || '').toLowerCase().includes(q) ||
+        (a.templeName || '').toLowerCase().includes(q) ||
+        (a.account || '').toLowerCase().includes(q)
+      );
+    });
+  const superSalesTotalPages = Math.max(1, Math.ceil(filteredSuperSales.length / accountPageSize));
+  const pagedSuperSales = filteredSuperSales.slice((superSalesPage - 1) * accountPageSize, superSalesPage * accountPageSize);
 
 
   return (
@@ -544,10 +577,38 @@ export default function SuperAdminClient({
                  {accountSubTab === 'SuperSales' && (
 <>
                  <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
                        <div className="flex items-center gap-4"><div className="w-2 h-8 bg-indigo-500 rounded-full"></div><h3 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">超級業務體系</h3></div>
-  <button onClick={() => {setAccountType('SuperSales'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-indigo-600 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm mx-4">+ 開通超級業務</button>
-                       <div className="relative"><input type="text" placeholder="快速搜尋業務..." className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-indigo-500 transition-all"/><span className="absolute right-4 top-3.5 text-slate-400">🔍</span></div>
+                       <div className="flex items-center gap-4 flex-wrap">
+                          <button onClick={() => {setAccountType('SuperSales'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-indigo-600 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm">+ 開通超級業務</button>
+                          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2 shadow-xs">
+                             <span className="text-[11px] font-bold text-slate-400">每頁</span>
+                             <select 
+                                value={accountPageSize} 
+                                onChange={(e) => {
+                                   setAccountPageSize(Number(e.target.value));
+                                   setSuperSalesPage(1);
+                                   setDistributorPage(1);
+                                   setTemplePage(1);
+                                }}
+                                className="bg-transparent text-slate-800 font-black text-xs outline-none cursor-pointer"
+                             >
+                                <option value={12}>12 筆</option>
+                                <option value={50}>50 筆</option>
+                                <option value={100}>100 筆</option>
+                             </select>
+                          </div>
+                          <div className="relative">
+                             <input 
+                                type="text" 
+                                placeholder="快速搜尋業務..." 
+                                value={superSalesSearch}
+                                onChange={(e) => { setSuperSalesSearch(e.target.value); setSuperSalesPage(1); }}
+                                className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-indigo-500 transition-all"
+                             />
+                             <span className="absolute right-4 top-3.5 text-slate-400">🔍</span>
+                          </div>
+                       </div>
                     </div>
                     <table className="w-full bg-white rounded-[40px] shadow-sm overflow-hidden text-left border-collapse">
                        <thead className="bg-slate-50 border-b border-slate-100">
@@ -612,6 +673,28 @@ export default function SuperAdminClient({
                           ))}
                        </tbody>
                     </table>
+                    {/* SuperSales Pagination Footer */}
+                    <div className="flex items-center justify-between px-8 py-4 bg-white rounded-b-[40px] border-t border-slate-100 shadow-xs">
+                       <span className="text-xs font-bold text-slate-400">
+                          第 <span className="text-slate-900 font-black">{superSalesPage}</span> / <span className="text-slate-900 font-black">{superSalesTotalPages}</span> 頁 (共 <span className="text-slate-900 font-black">{filteredSuperSales.length}</span> 筆)
+                       </span>
+                       <div className="flex items-center gap-3">
+                          <button
+                             onClick={() => setSuperSalesPage(p => Math.max(1, p - 1))}
+                             disabled={superSalesPage <= 1}
+                             className={`px-6 py-2 rounded-full text-xs font-black transition-all ${superSalesPage <= 1 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-sm'}`}
+                          >
+                             上一頁
+                          </button>
+                          <button
+                             onClick={() => setSuperSalesPage(p => Math.min(superSalesTotalPages, p + 1))}
+                             disabled={superSalesPage >= superSalesTotalPages}
+                             className={`px-6 py-2 rounded-full text-xs font-black transition-all ${superSalesPage >= superSalesTotalPages ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-sm'}`}
+                          >
+                             下一頁
+                          </button>
+                       </div>
+                    </div>
                  </section>
 </>
 )}
@@ -619,11 +702,39 @@ export default function SuperAdminClient({
 {accountSubTab === 'Distributor' && (
 <>
                  <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
                        <div className="flex items-center gap-4"><div className="w-2 h-8 bg-emerald-500 rounded-full"></div><h3 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">經銷商代理體系</h3></div>
-  <button onClick={() => {setAccountType('Distributor'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-emerald-600 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm mx-4">+ 開通經銷商</button>
-  <button onClick={handleClearFakeDistributors} className="px-6 py-2 bg-red-500 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-sm mr-4">清空測試資料</button>
-                       <div className="relative"><input type="text" placeholder="快速搜尋經銷商..." className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-emerald-500 transition-all"/><span className="absolute right-4 top-3.5 text-slate-400">🔍</span></div>
+                       <div className="flex items-center gap-4 flex-wrap">
+                          <button onClick={() => {setAccountType('Distributor'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-emerald-600 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm">+ 開通經銷商</button>
+                          <button onClick={handleClearFakeDistributors} className="px-6 py-2 bg-red-500 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-red-600 transition-all shadow-sm">清空測試資料</button>
+                          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2 shadow-xs">
+                             <span className="text-[11px] font-bold text-slate-400">每頁</span>
+                             <select 
+                                value={accountPageSize} 
+                                onChange={(e) => {
+                                   setAccountPageSize(Number(e.target.value));
+                                   setSuperSalesPage(1);
+                                   setDistributorPage(1);
+                                   setTemplePage(1);
+                                }}
+                                className="bg-transparent text-slate-800 font-black text-xs outline-none cursor-pointer"
+                             >
+                                <option value={12}>12 筆</option>
+                                <option value={50}>50 筆</option>
+                                <option value={100}>100 筆</option>
+                             </select>
+                          </div>
+                          <div className="relative">
+                             <input 
+                                type="text" 
+                                placeholder="快速搜尋經銷商..." 
+                                value={distributorSearch}
+                                onChange={(e) => { setDistributorSearch(e.target.value); setDistributorPage(1); }}
+                                className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-emerald-500 transition-all"
+                             />
+                             <span className="absolute right-4 top-3.5 text-slate-400">🔍</span>
+                          </div>
+                       </div>
                     </div>
                     <table className="w-full bg-white rounded-[40px] shadow-sm overflow-hidden text-left border-collapse">
                        <thead className="bg-slate-50 border-b border-slate-100">
@@ -693,6 +804,28 @@ export default function SuperAdminClient({
                           ))}
                        </tbody>
                     </table>
+                    {/* Distributor Pagination Footer */}
+                    <div className="flex items-center justify-between px-8 py-4 bg-white rounded-b-[40px] border-t border-slate-100 shadow-xs">
+                       <span className="text-xs font-bold text-slate-400">
+                          第 <span className="text-slate-900 font-black">{distributorPage}</span> / <span className="text-slate-900 font-black">{distributorTotalPages}</span> 頁 (共 <span className="text-slate-900 font-black">{filteredDistributors.length}</span> 筆)
+                       </span>
+                       <div className="flex items-center gap-3">
+                          <button
+                             onClick={() => setDistributorPage(p => Math.max(1, p - 1))}
+                             disabled={distributorPage <= 1}
+                             className={`px-6 py-2 rounded-full text-xs font-black transition-all ${distributorPage <= 1 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-emerald-600 shadow-sm'}`}
+                          >
+                             上一頁
+                          </button>
+                          <button
+                             onClick={() => setDistributorPage(p => Math.min(distributorTotalPages, p + 1))}
+                             disabled={distributorPage >= distributorTotalPages}
+                             className={`px-6 py-2 rounded-full text-xs font-black transition-all ${distributorPage >= distributorTotalPages ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-emerald-600 shadow-sm'}`}
+                          >
+                             下一頁
+                          </button>
+                       </div>
+                    </div>
                  </section>
 </>
 )}
@@ -700,10 +833,38 @@ export default function SuperAdminClient({
 {accountSubTab === 'Temple' && (
 <>
                  <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
                        <div className="flex items-center gap-4"><div className="w-2 h-8 bg-amber-500 rounded-full"></div><h3 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">宮廟營運列表</h3></div>
-  <button onClick={() => {setAccountType('Temple'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-amber-500 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-sm mx-4">+ 開通宮廟</button>
-                       <div className="relative"><input type="text" placeholder="快速搜尋宮廟..." className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-amber-500 transition-all"/><span className="absolute right-4 top-3.5 text-slate-400">🔍</span></div>
+                       <div className="flex items-center gap-4 flex-wrap">
+                          <button onClick={() => {setAccountType('Temple'); setIsAccountModalOpen(true)}} className="px-6 py-2 bg-amber-500 text-white rounded-[20px] text-[11px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-sm">+ 開通宮廟</button>
+                          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2 shadow-xs">
+                             <span className="text-[11px] font-bold text-slate-400">每頁</span>
+                             <select 
+                                value={accountPageSize} 
+                                onChange={(e) => {
+                                   setAccountPageSize(Number(e.target.value));
+                                   setSuperSalesPage(1);
+                                   setDistributorPage(1);
+                                   setTemplePage(1);
+                                }}
+                                className="bg-transparent text-slate-800 font-black text-xs outline-none cursor-pointer"
+                             >
+                                <option value={12}>12 筆</option>
+                                <option value={50}>50 筆</option>
+                                <option value={100}>100 筆</option>
+                             </select>
+                          </div>
+                          <div className="relative">
+                             <input 
+                                type="text" 
+                                placeholder="快速搜尋宮廟..." 
+                                value={templeSearch}
+                                onChange={(e) => { setTempleSearch(e.target.value); setTemplePage(1); }}
+                                className="w-64 bg-slate-50 border border-slate-100 rounded-full px-6 py-3 text-[11px] font-bold focus:outline-none focus:border-amber-500 transition-all"
+                             />
+                             <span className="absolute right-4 top-3.5 text-slate-400">🔍</span>
+                          </div>
+                       </div>
                     </div>
                     <table className="w-full bg-white rounded-[40px] shadow-sm overflow-hidden text-left border-collapse">
                        <thead className="bg-slate-50 border-b border-slate-100">
@@ -719,7 +880,7 @@ export default function SuperAdminClient({
                        <tbody className="divide-y divide-slate-50">
                           {pagedTemples.map((acc: any, idx: number) => (
                             <tr key={acc.id} className="hover:bg-slate-50/30 transition-all group">
-                               <td className="px-12 py-8 text-lg font-black text-slate-400 tracking-tight italic">No.{String(idx+1).padStart(4, '0')}</td>
+                               <td className="px-12 py-8 text-lg font-black text-slate-400 tracking-tight italic">No.{String((templePage - 1) * accountPageSize + idx + 1).padStart(4, '0')}</td>
                                <td className="px-12 py-8 text-lg font-black text-slate-800 tracking-tight italic">{acc.name || acc.templeName || '宮廟管理員'}</td>
                                <td className="px-12 py-8 text-[13px] font-bold text-slate-400 uppercase">{acc.account || `USR-${acc.id}`}</td>
                                <td className="px-12 py-8">
@@ -801,6 +962,28 @@ export default function SuperAdminClient({
                           ))}
                        </tbody>
                     </table>
+                    {/* Temple Pagination Footer */}
+                    <div className="flex items-center justify-between px-8 py-4 bg-white rounded-b-[40px] border-t border-slate-100 shadow-xs">
+                       <span className="text-xs font-bold text-slate-400">
+                          第 <span className="text-slate-900 font-black">{templePage}</span> / <span className="text-slate-900 font-black">{templeTotalPages}</span> 頁 (共 <span className="text-slate-900 font-black">{filteredTemples.length}</span> 筆)
+                       </span>
+                       <div className="flex items-center gap-3">
+                          <button
+                             onClick={() => setTemplePage(p => Math.max(1, p - 1))}
+                             disabled={templePage <= 1}
+                             className={`px-6 py-2 rounded-full text-xs font-black transition-all ${templePage <= 1 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-amber-500 shadow-sm'}`}
+                          >
+                             上一頁
+                          </button>
+                          <button
+                             onClick={() => setTemplePage(p => Math.min(templeTotalPages, p + 1))}
+                             disabled={templePage >= templeTotalPages}
+                             className={`px-6 py-2 rounded-full text-xs font-black transition-all ${templePage >= templeTotalPages ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-amber-500 shadow-sm'}`}
+                          >
+                             下一頁
+                          </button>
+                       </div>
+                    </div>
                  </section>
 </>
 )}
