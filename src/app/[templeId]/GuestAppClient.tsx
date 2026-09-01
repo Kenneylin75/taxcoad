@@ -1323,12 +1323,15 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                     🗑️
                   </button>
                 )}
-                <button 
-                  onClick={(e) => { e.stopPropagation(); alert(`已複製連結：${file.url}`); }}
-                  className="p-2 text-gray-400 hover:text-gray-950 font-bold"
+                <a 
+                  href={`${file.url}${file.url?.includes('?') ? '&' : '?'}download=1&filename=${encodeURIComponent(file.name || 'file')}`}
+                  download={file.name || 'file'}
+                  onClick={(e) => e.stopPropagation()}
+                  title="下載原檔"
+                  className="p-2 text-gray-400 hover:text-red-700 font-bold text-sm"
                 >
-                  🔗
-                </button>
+                  📥
+                </a>
               </div>
             </div>
           ))}
@@ -1481,9 +1484,7 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
               <img 
                 src={previewFile.url} 
                 className="max-w-full max-h-[40vh] object-contain rounded-2xl shadow-sm border border-gray-100" 
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1543884149-bc91b61972ec?auto=format&fit=crop&q=80";
-                }}
+                alt={previewFile.name || '照片預覽'}
               />
             ) : previewFile.type === 'video' ? (
               <div className="w-full aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-sm">
@@ -1492,12 +1493,6 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                   controls 
                   autoPlay
                   className="w-full h-full object-contain"
-                  onError={(e) => {
-                    const target = e.target as HTMLVideoElement;
-                    if (target.getAttribute('data-error-handled')) return;
-                    target.setAttribute('data-error-handled', 'true');
-                    target.src = "https://www.w3schools.com/html/mov_bbb.mp4";
-                  }}
                 />
               </div>
             ) : (
@@ -1526,18 +1521,15 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
           </div>
           
           <footer className="px-5 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
-            <button 
-              onClick={() => {
-                const link = document.createElement('a');
-                link.href = previewFile.url;
-                link.download = previewFile.name;
-                link.target = '_blank';
-                link.click();
-              }}
-              className="flex-1 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-colors shadow-sm active:scale-95 text-center"
+            <a 
+              href={`${previewFile.url}${previewFile.url?.includes('?') ? '&' : '?'}download=1&filename=${encodeURIComponent(previewFile.name || 'file')}`}
+              download={previewFile.name || 'file'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-colors shadow-sm active:scale-95 text-center flex items-center justify-center gap-2"
             >
               📥 下載/開啟原檔
-            </button>
+            </a>
           </footer>
         </div>
       </div>

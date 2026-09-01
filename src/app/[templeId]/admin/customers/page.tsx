@@ -371,12 +371,7 @@ function DeepFileCenterContent() {
               <img 
                 src={previewFile.url} 
                 className="max-w-full max-h-[50vh] object-contain rounded-3xl shadow-md border border-slate-100" 
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (target.getAttribute('data-error-handled')) return;
-                  target.setAttribute('data-error-handled', 'true');
-                  target.src = "https://images.unsplash.com/photo-1543884149-bc91b61972ec?auto=format&fit=crop&q=80";
-                }}
+                alt={previewFile.name || '照片預覽'}
               />
             ) : previewFile.type === 'video' ? (
               <div className="w-full aspect-video rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-md">
@@ -385,12 +380,6 @@ function DeepFileCenterContent() {
                   controls 
                   autoPlay
                   className="w-full h-full object-contain"
-                  onError={(e) => {
-                    const target = e.target as HTMLVideoElement;
-                    if (target.getAttribute('data-error-handled')) return;
-                    target.setAttribute('data-error-handled', 'true');
-                    target.src = "https://www.w3schools.com/html/mov_bbb.mp4";
-                  }}
                 />
               </div>
             ) : (
@@ -407,9 +396,9 @@ function DeepFileCenterContent() {
                    <iframe src={previewFile.url} className="w-full flex-1 bg-white" title={previewFile.name} />
                 ) : (
                    <div className="flex-1 p-10 flex flex-col items-center justify-center text-slate-500 space-y-4">
-                      <div className="text-6xl opacity-20">🗂️</div>
-                      <p className="font-bold text-sm">本格式暫不支援直接預覽，請點擊下方按鈕下載或開啟原檔</p>
-                      <p className="text-xs text-slate-400 font-mono">File: {previewFile.name}</p>
+                      <div className="text-6xl opacity-30">📁</div>
+                      <p className="font-bold text-sm text-slate-800">{previewFile.name || '專屬文件檔案'}</p>
+                      <p className="text-xs text-slate-400 font-mono">請點擊下方按鈕直接下載或開啟原檔</p>
                    </div>
                 )}
               </div>
@@ -417,18 +406,15 @@ function DeepFileCenterContent() {
           </div>
           
           <footer className="p-8 border-t-2 border-slate-100 bg-slate-50 flex gap-4 shrink-0">
-            <button 
-              onClick={() => {
-                const link = document.createElement('a');
-                link.href = previewFile.url;
-                link.download = previewFile.name;
-                link.target = '_blank';
-                link.click();
-              }}
-              className="flex-1 py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 text-center"
+            <a 
+              href={`${previewFile.url}${previewFile.url?.includes('?') ? '&' : '?'}download=1&filename=${encodeURIComponent(previewFile.name || 'file')}`}
+              download={previewFile.name || 'file'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl active:scale-95 text-center flex items-center justify-center gap-2"
             >
               📥 下載 / 在新分頁開啟檔案原檔
-            </button>
+            </a>
           </footer>
         </div>
       </div>
