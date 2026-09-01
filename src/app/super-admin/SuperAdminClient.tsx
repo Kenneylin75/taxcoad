@@ -155,6 +155,7 @@ export default function SuperAdminClient({
    const [financeWithdrawalPage, setFinanceWithdrawalPage] = useState(1);
    const [withdrawalModal, setWithdrawalModal] = useState<{id: string, salesName: string, amount: number, bankAccount?: any} | null>(null);
    const [withdrawalReceiptUrl, setWithdrawalReceiptUrl] = useState('');
+   const [withdrawalBankLast5, setWithdrawalBankLast5] = useState('');
    const [financeBillPage, setFinanceBillPage] = useState(1);
    const [newPassword, setNewPassword] = useState('');
    // Pagination States

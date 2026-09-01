@@ -5008,11 +5008,12 @@ export async function fetchEarningsStats(salesId: string = "超級精英業務")
 export async function approveSuperSalesWithdrawal(
   withdrawalId: string,
   receiptUrl: string,
+  bankLast5: string = "",
 ) {
   try {
     await prisma.withdrawal.update({
       where: { id: withdrawalId },
-      data: { status: "Approved", receiptUrl },
+      data: { status: "Approved", receiptUrl, bankLast5: bankLast5 || null },
     });
     return { success: true };
   } catch (e) {

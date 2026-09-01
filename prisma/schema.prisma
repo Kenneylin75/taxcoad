@@ -903,6 +903,7 @@ model Withdrawal {
   status     String   @default("Pending")
   date       String?
   receiptUrl String?  @map("receipt_url")
+  bankLast5  String?  @map("bank_last5")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
