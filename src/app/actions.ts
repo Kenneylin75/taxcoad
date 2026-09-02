@@ -10181,6 +10181,26 @@ export async function submitFreeAccountApplication(data: any) {
     await generateInitialBills(newTemple);
   }
 
+  if (newTemple.salesId) {
+    const freeTypeText = newTemple.freeType === 'Trial' ? `試用${newTemple.trialMonths}個月` : (newTemple.freeType === 'Permanent' ? '永久免費' : '標準月租');
+    await logDistSalesAction(
+      newTemple.salesId,
+      "開通宮廟帳戶",
+      newTemple.templeName || newTemple.name,
+      `成功建立宮廟帳號: ${newTemple.account} (${freeTypeText})`,
+      data.submittedBy || '經銷業務'
+    );
+  }
+  if (newTemple.distributorId) {
+    await logDistributorAction(
+      newTemple.distributorId,
+      "開通宮廟帳戶",
+      newTemple.templeName || newTemple.name,
+      data.submittedBy || "經銷業務",
+      `建立宮廟帳號: ${newTemple.account}`
+    );
+  }
+
   // Create Notification for Super Admin
   await null;
 
@@ -10784,6 +10804,30 @@ export async function fetchEContracts() {
 }
 
 export async function submitEContract(fd: any) {
+  try {
+    if (fd && (fd.salesId || fd.salesName)) {
+      const sales = await prisma.distributorSales.findFirst({
+        where: {
+          OR: [
+            { id: fd.salesId || '' },
+            { name: fd.salesName || '' },
+            { account: fd.salesName || '' }
+          ]
+        }
+      });
+      if (sales) {
+        await logDistSalesAction(
+          sales.id,
+          "簽署電子合約",
+          fd.templeName || "宮廟服務合約",
+          `簽署合約範本: ${fd.templateName || '標準服務合約 V4 (Official)'}`,
+          fd.salesName || sales.name
+        );
+      }
+    }
+  } catch (e) {
+    console.error("submitEContract log error:", e);
+  }
   return { success: true };
 }
 
@@ -12599,13 +12643,26 @@ export async function updateDistributorContract(
 export async function logDistSalesAction(salesId: string, action: string, target?: string, details?: string, operator?: string) {
   try {
     if (!salesId) return;
+    const sales = await prisma.distributorSales.findFirst({
+      where: {
+        OR: [
+          { id: salesId },
+          { account: salesId },
+          { name: salesId }
+        ]
+      },
+      select: { id: true, name: true }
+    });
+    const actualSalesId = sales ? sales.id : salesId;
+    const actualOperator = operator || sales?.name || "經銷業務";
+
     await prisma.distSalesLog.create({
       data: {
-        salesId,
+        salesId: actualSalesId,
         action,
         target,
         details,
-        operator,
+        operator: actualOperator,
       },
     });
   } catch (e) {
@@ -12613,10 +12670,49 @@ export async function logDistSalesAction(salesId: string, action: string, target
   }
 }
 
+export async function logDistSalesLogin(salesId: string, operator?: string) {
+  try {
+    if (!salesId) return { success: false };
+    await logDistSalesAction(salesId, "登入業務中心", "業務管理後台", "經銷業務登入成功", operator);
+    return { success: true };
+  } catch (e) {
+    console.error("logDistSalesLogin error:", e);
+    return { success: false };
+  }
+}
+
+export async function logSalesToolDownload(salesId: string, toolTitle: string, fileName?: string) {
+  try {
+    if (!salesId) return { success: false };
+    await logDistSalesAction(salesId, "下載業務工具素材", toolTitle, `下載行銷工具檔案: ${fileName || toolTitle}`);
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
+}
+
 export async function fetchDistSalesLogs(salesId: string) {
   try {
+    if (!salesId) return [];
+    const sales = await prisma.distributorSales.findFirst({
+      where: {
+        OR: [
+          { id: salesId },
+          { account: salesId },
+          { name: salesId }
+        ]
+      },
+      select: { id: true }
+    });
+    const actualSalesId = sales ? sales.id : salesId;
+
     const records = await prisma.distSalesLog.findMany({
-      where: { salesId },
+      where: {
+        OR: [
+          { salesId: actualSalesId },
+          { salesId: salesId }
+        ]
+      },
       orderBy: { createdAt: "desc" },
     });
     return records.map(r => ({

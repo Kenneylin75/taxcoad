@@ -16,7 +16,9 @@ import {
   updateDistSalesBankInfo, requestBonus,
   fetchRentPlans,
   fetchTempleBills,
-  fetchDistSalesLogs
+  fetchDistSalesLogs,
+  logDistSalesLogin,
+  logSalesToolDownload
 } from "@/app/actions";
 import { TAIWAN_CITIES } from "@/app/shared-types";
 import TempleApplicationForm from "@/app/components/TempleApplicationForm";
@@ -121,15 +123,16 @@ export default function DistSalesPage() {
   const [bankForm, setBankForm] = useState({ bankCode: '', bankName: '', accountName: '', accountNo: '' });
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
-  const [logDateFilter, setLogDateFilter] = useState(
-    new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
-  );
+  const [logDateFilter, setLogDateFilter] = useState<string>("");
 
   const loadData = async () => {
     const profData = await fetchSalesProfileById(salesId);
     if (!profData) return;
     setProfile(profData);
     setSalesName(profData.name);
+    
+    // Auto track sales login
+    logDistSalesLogin(salesId, profData.name);
     
     const currentName = profData.name;
 
@@ -1005,8 +1008,15 @@ export default function DistSalesPage() {
                {activeTab === 'profile' && '個人中心'}
             </h1>
          </div>
-         <button onClick={() => setIsLogModalOpen(true)} className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-black shadow-xl rotate-3 hover:scale-105 transition-all active:scale-95 hover:shadow-blue-500/50 hover:bg-blue-600">
-            {profile?.name?.substring(0, 1)}
+         <button 
+           onClick={async () => {
+             setIsLogModalOpen(true);
+             const l = await fetchDistSalesLogs(salesId);
+             setLogs(l || []);
+           }} 
+           className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-black shadow-xl rotate-3 hover:scale-105 transition-all active:scale-95 hover:shadow-blue-500/50 hover:bg-blue-600"
+         >
+            {profile?.name?.substring(0, 1) || '業'}
          </button>
       </div>
 
@@ -1410,40 +1420,74 @@ export default function DistSalesPage() {
               <div className="flex justify-between items-center mb-6 shrink-0">
                 <div className="space-y-1">
                   <h3 className="text-2xl font-black text-slate-900 tracking-tighter italic">操作紀錄日誌</h3>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Operation History Logs</p>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Operation History Logs ({logs.length})</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setLogDateFilter("")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${!logDateFilter ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  >
+                    全部
+                  </button>
                   <input 
                     type="date" 
                     value={logDateFilter}
                     onChange={(e) => setLogDateFilter(e.target.value)}
-                    className="px-3 py-1.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 focus:outline-none focus:border-blue-500 bg-slate-50"
+                    className={`px-3 py-1.5 border rounded-xl text-xs font-bold text-slate-600 focus:outline-none focus:border-blue-500 bg-slate-50 ${logDateFilter ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'}`}
                   />
-                  <button onClick={() => setIsLogModalOpen(false)} className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all">✕</button>
+                  <button onClick={() => setIsLogModalOpen(false)} className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all font-bold">✕</button>
                 </div>
               </div>
               
               <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pr-2">
-                {logs.filter((l: any) => {
-                  const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                  return localDate === logDateFilter;
-                }).length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 font-bold text-sm">選擇的日期尚無操作紀錄</div>
-                ) : (
-                  logs.filter((l: any) => {
+                {(() => {
+                  const filteredLogs = logs.filter((l: any) => {
+                    if (!logDateFilter) return true;
                     const localDate = new Date(new Date(l.createdAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
                     return localDate === logDateFilter;
-                  }).map((log: any) => (
-                    <div key={log.id} className="bg-slate-50 p-4 rounded-3xl border border-slate-100/50 hover:bg-white hover:shadow-xl transition-all flex flex-col gap-2">
-                      <div className="flex justify-between items-start">
-                         <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full">{log.action}</span>
-                         <span className="text-[10px] font-bold text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
+                  });
+
+                  if (filteredLogs.length === 0) {
+                    return (
+                      <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
+                        <span className="text-3xl">📜</span>
+                        <p className="text-slate-400 font-bold text-sm">
+                          {logDateFilter ? `${logDateFilter} 尚無操作紀錄` : '目前尚無任何操作紀錄'}
+                        </p>
+                        {logDateFilter && (
+                          <button 
+                            onClick={() => setLogDateFilter("")}
+                            className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black hover:bg-blue-100 transition-all"
+                          >
+                            查看所有歷史紀錄 ({logs.length})
+                          </button>
+                        )}
                       </div>
-                      {log.target && <p className="text-sm font-black text-slate-900">目標: {log.target}</p>}
-                      {log.details && <p className="text-xs font-bold text-slate-500">{log.details}</p>}
-                    </div>
-                  ))
-                )}
+                    );
+                  }
+
+                  return filteredLogs.map((log: any) => {
+                    let badgeColor = "bg-slate-900 text-white";
+                    if (log.action?.includes('開通')) badgeColor = "bg-emerald-600 text-white";
+                    else if (log.action?.includes('登入')) badgeColor = "bg-blue-600 text-white";
+                    else if (log.action?.includes('拜訪')) badgeColor = "bg-purple-600 text-white";
+                    else if (log.action?.includes('提領') || log.action?.includes('獎金')) badgeColor = "bg-amber-600 text-white";
+                    else if (log.action?.includes('合約')) badgeColor = "bg-indigo-600 text-white";
+                    else if (log.action?.includes('工具') || log.action?.includes('素材')) badgeColor = "bg-sky-600 text-white";
+                    else if (log.action?.includes('帳戶') || log.action?.includes('銀行')) badgeColor = "bg-rose-600 text-white";
+
+                    return (
+                      <div key={log.id} className="bg-slate-50 p-4 rounded-3xl border border-slate-100/60 hover:bg-white hover:shadow-xl transition-all flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                           <span className={`${badgeColor} text-[10px] font-black px-3 py-1 rounded-full shadow-sm`}>{log.action}</span>
+                           <span className="text-[10px] font-bold text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
+                        </div>
+                        {log.target && <p className="text-sm font-black text-slate-900">目標: {log.target}</p>}
+                        {log.details && <p className="text-xs font-bold text-slate-500">{log.details}</p>}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>
