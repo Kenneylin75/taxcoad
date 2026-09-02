@@ -3577,28 +3577,39 @@ export default function SuperAdminClient({
 
                          {/* 宮廟獨立雲端儲存數據 */}
                          <div className="mt-6 pt-4 border-t border-slate-200">
-                            <h4 className="text-xs font-black text-slate-800 uppercase mb-3">宮廟獨立雲端儲存數據</h4>
+                            <h4 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center justify-between">
+                               <span>宮廟獨立雲端儲存數據</span>
+                               {(() => {
+                                  const storage = templeStorages.find(s => s.templeId === viewingAccountDetail.id);
+                                  return storage?.paymentCycle ? (
+                                     <span className="text-[10px] font-bold text-slate-400">
+                                        週期: {storage.paymentCycle === 'Yearly' ? '年繳' : '月繳'}
+                                     </span>
+                                  ) : null;
+                               })()}
+                            </h4>
                             {(() => {
                                const storage = templeStorages.find(s => s.templeId === viewingAccountDetail.id);
+                               const capacity = storage?.quotaGb || storage?.capacityGb || 20;
                                return storage ? (
-                                  <div className="bg-slate-50 rounded-xl p-4">
+                                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/60">
                                      <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-500">目前方案: <strong className="text-slate-800">{storage.planName}</strong></span>
-                                        <span className="text-xs font-bold text-slate-700">用量: {storage.isVip ? '無限使用' : `${((storage.usedBytes || 0) / 1e9).toFixed(2)} GB / ${storage.capacityGb || 0} GB`}</span>
+                                        <span className="text-xs text-slate-600 font-bold">目前方案: <strong className="text-slate-900 font-black">{storage.planName || '標準空間'}</strong></span>
+                                        <span className="text-xs font-black text-slate-800">用量: {storage.isVip || storage.planName?.includes('無限') ? '無限使用 (VIP)' : `${((storage.usedBytes || 0) / (1024 * 1024 * 1024)).toFixed(2)} GB / ${capacity} GB`}</span>
                                      </div>
-                                     {!storage.isVip && (
-                                        <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2 overflow-hidden">
-                                           <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, ((storage.usedBytes || 0) / ((storage.capacityGb || 1) * 1e9)) * 100)}%` }}></div>
+                                     {!storage.isVip && !storage.planName?.includes('無限') && (
+                                        <div className="w-full bg-slate-200 rounded-full h-2 mt-2 overflow-hidden">
+                                           <div className="bg-indigo-500 h-2 rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(2, ((storage.usedBytes || 0) / (capacity * 1024 * 1024 * 1024)) * 100))}%` }}></div>
                                         </div>
                                      )}
                                   </div>
-                               ) : <p className="text-xs text-slate-400">尚未啟用獨立儲存空間</p>;
+                               ) : <p className="text-xs text-slate-400 italic">尚未啟用獨立儲存空間 (預設 20GB)</p>;
                             })()}
                             
                             {/* SuperAdmin 專屬升級介面 */}
                             <div className="mt-3 flex gap-2 items-center">
                                   <select 
-                                    className="text-xs border border-slate-200 rounded px-2 py-1 flex-1"
+                                    className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 flex-1 bg-white font-medium"
                                     value={adminUpgradeStoragePlanId}
                                     onChange={e => setAdminUpgradeStoragePlanId(e.target.value)}
                                   >
@@ -3606,7 +3617,7 @@ export default function SuperAdminClient({
                                     {storagePlans.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sizeGb}GB)</option>)}
                                   </select>
                                   <select 
-                                    className="text-xs border border-slate-200 rounded px-2 py-1 w-20"
+                                    className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 w-20 bg-white font-medium"
                                     value={adminUpgradeStorageCycle}
                                     onChange={e => setAdminUpgradeStorageCycle(e.target.value as any)}
                                   >
@@ -3622,7 +3633,7 @@ export default function SuperAdminClient({
                                       setAdminUpgradeStoragePlanId('');
                                       alert('空間方案已升級');
                                     }}
-                                    className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-100"
+                                    className="px-3.5 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-black hover:bg-indigo-100 transition-all shadow-sm"
                                   >套用</button>
                                   <button 
                                     onClick={async () => {
@@ -3631,57 +3642,76 @@ export default function SuperAdminClient({
                                       setTempleStorages(newData);
                                       alert('已開通免費無限空間 (VIP)');
                                     }}
-                                    className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100"
-                                  >設為無限免費</button>
+                                    className="px-3.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-100 transition-all shadow-sm"
+                                  >設為無限免費 (VIP)</button>
                                </div>
                          </div>
 
-                         {/* 宮廟 AI 助理數據 */}
+                         {/* 宮廟 AI 助理數據 (AI 生活管家) */}
                          <div className="mt-6 pt-4 border-t border-slate-200">
-                            <h4 className="text-xs font-black text-slate-800 uppercase mb-3">宮廟 AI 助理數據</h4>
+                            <div className="flex justify-between items-center mb-3">
+                               <h4 className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5">
+                                  <span>🤖 AI 智能生活管家數據</span>
+                               </h4>
+                            </div>
+
                             {(() => {
                                const ai = allTempleAiUsage.find(a => a.templeId === viewingAccountDetail.id);
-                               return ai ? (
-                                  <div className="bg-slate-50 rounded-xl p-4">
-                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-500">目前方案: <strong className="text-slate-800">{ai.planName}</strong></span>
-                                        <span className="text-xs font-bold text-slate-700">用量: {ai.isVip ? '無限使用' : `${ai.usedTokens || 0} / ${ai.monthlyTokenLimit || 0} Tokens`}</span>
+                               const isEnabled = ai ? !!ai.enabled : true;
+                               return (
+                                  <div className="space-y-3">
+                                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/60 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                           <span className="text-xs text-slate-600 font-bold">
+                                              服務狀態: <strong className="text-slate-900 font-black">{ai?.validity || '⚪ 尚未初始化'}</strong>
+                                           </span>
+                                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${isEnabled ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-200 text-slate-600'}`}>
+                                              {isEnabled ? '🟢 服務開啟中' : '⚪ 服務已關閉'}
+                                           </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
+                                           <div className="bg-white p-2.5 rounded-lg border border-slate-100">
+                                              <span className="text-[10px] text-slate-400 font-bold block">💬 信眾提問次數</span>
+                                              <span className="text-sm font-black text-slate-800">{ai?.userQueryCount || ai?.queryCount || 0} 次</span>
+                                           </div>
+                                           <div className="bg-white p-2.5 rounded-lg border border-slate-100">
+                                              <span className="text-[10px] text-slate-400 font-bold block">🤖 AI 回應次數</span>
+                                              <span className="text-sm font-black text-indigo-600">{ai?.aiReplyCount || ai?.usedCount || 0} 次</span>
+                                           </div>
+                                        </div>
+                                     </div>
+
+                                     {/* 超管 AI 操作列 */}
+                                     <div className="flex gap-2 items-center">
+                                        <button
+                                           onClick={async () => {
+                                              const nextState = !isEnabled;
+                                              const { toggleTempleAiStatusByAdmin } = await import('@/app/actions');
+                                              await toggleTempleAiStatusByAdmin(viewingAccountDetail.id, nextState);
+                                              const newData = await fetchAllTempleAiUsage();
+                                              setAllTempleAiUsage(newData);
+                                              alert(`AI 生活管家已${nextState ? '開啟' : '關閉'}`);
+                                           }}
+                                           className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all shadow-sm ${isEnabled ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'}`}
+                                        >
+                                           {isEnabled ? '⏹️ 關閉 AI 服務' : '▶️ 開啟 AI 服務'}
+                                        </button>
+                                        <button
+                                           onClick={async () => {
+                                              await grantTempleAiVip(viewingAccountDetail.id);
+                                              const newData = await fetchAllTempleAiUsage();
+                                              setAllTempleAiUsage(newData);
+                                              alert('已將此宮廟設為 AI 永久免費 VIP');
+                                           }}
+                                           className="px-4 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-100 border border-rose-200 transition-all shadow-sm"
+                                        >
+                                           ⭐ 設為永久免費 VIP
+                                        </button>
                                      </div>
                                   </div>
-                               ) : <p className="text-xs text-slate-400">尚未啟用 AI 助理</p>;
+                               );
                             })()}
-                            
-                            {/* SuperAdmin 專屬 AI 升級介面 */}
-                            <div className="mt-3 flex gap-2 items-center">
-                                  <select 
-                                    className="text-xs border border-slate-200 rounded px-2 py-1 flex-1"
-                                    value={adminUpgradeAiPlanId}
-                                    onChange={e => setAdminUpgradeAiPlanId(e.target.value)}
-                                  >
-                                    <option value="">-- 選擇 AI 方案 --</option>
-                                    {aiPlans.map(p => <option key={p.id} value={p.id}>{p.name} ({p.tokenLimit} Tokens)</option>)}
-                                  </select>
-                                  <button 
-                                    onClick={async () => {
-                                      if (!adminUpgradeAiPlanId) return alert('請選擇方案');
-                                      await purchaseAiPlanByAdmin(viewingAccountDetail.id, adminUpgradeAiPlanId);
-                                      const newData = await fetchAllTempleAiUsage();
-                                      setAllTempleAiUsage(newData);
-                                      setAdminUpgradeAiPlanId('');
-                                      alert('AI 方案已升級');
-                                    }}
-                                    className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded text-xs font-bold hover:bg-indigo-100"
-                                  >套用</button>
-                                  <button 
-                                    onClick={async () => {
-                                      await grantTempleAiVip(viewingAccountDetail.id);
-                                      const newData = await fetchAllTempleAiUsage();
-                                      setAllTempleAiUsage(newData);
-                                      alert('已開通免費無限 AI (VIP)');
-                                    }}
-                                    className="px-3 py-1 bg-rose-50 text-rose-600 rounded text-xs font-bold hover:bg-rose-100"
-                                  >設為無限免費</button>
-                               </div>
                          </div>
 
                        </>

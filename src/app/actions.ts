@@ -7564,6 +7564,26 @@ export async function toggleTempleAiStatus(enabled: boolean) {
   }
 }
 
+export async function toggleTempleAiStatusByAdmin(templeId: string, enabled: boolean) {
+  try {
+    const existing = await prisma.templeAiUsage.findFirst({ where: { templeId } });
+    if (existing) {
+      await prisma.templeAiUsage.update({
+        where: { id: existing.id },
+        data: { enabled },
+      });
+    } else {
+      await prisma.templeAiUsage.create({
+        data: { templeId, enabled, planId: 'ON', usedCount: 0 },
+      });
+    }
+    return { success: true };
+  } catch (e) {
+    console.error("toggleTempleAiStatusByAdmin error:", e);
+    return { success: false };
+  }
+}
+
 export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
   try {
     const templeId = await getDynamicTempleId();
