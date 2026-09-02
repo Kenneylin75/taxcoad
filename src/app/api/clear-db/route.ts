@@ -22,6 +22,8 @@ export async function POST(req: Request) {
     await prisma.$executeRawUnsafe('TRUNCATE "temple_bills" CASCADE').catch(() => {});
     await prisma.$executeRawUnsafe('TRUNCATE "distributor_withdrawals" CASCADE').catch(() => {});
     await prisma.$executeRawUnsafe('TRUNCATE "distributor_contracts" CASCADE').catch(() => {});
+    await prisma.$executeRawUnsafe('TRUNCATE "BonusRequest" CASCADE').catch(() => {});
+    await prisma.$executeRawUnsafe('TRUNCATE "sales_visits" CASCADE').catch(() => {});
     
     // 清除非超級管理員的使用者
     await prisma.$executeRawUnsafe(

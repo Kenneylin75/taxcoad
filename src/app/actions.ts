@@ -9670,14 +9670,15 @@ export async function generateInitialBills(newTemple: any) {
         timestamp: new Date().toISOString(),
       });
     }
+    const isTrial = newTemple.freeType === "Trial" && (newTemple.trialMonths || 0) > 0;
     if (setupFee > 0) {
       billsToInsert.push({
         id: `BILL-SETUP-${Date.now()}`,
         templeId: newTemple.id,
         type: "SetupFee",
         amount: setupFee,
-        billingDate: new Date().toISOString().substring(0, 7),
-        dueDate: new Date().toISOString().split("T")[0],
+        billingDate: isTrial ? effectiveBillingPeriod : new Date().toISOString().substring(0, 7),
+        dueDate: isTrial ? billDueDate : new Date().toISOString().split("T")[0],
         status: "Unpaid",
         payeeRole,
         payeeId,
@@ -10831,16 +10832,29 @@ export async function fetchSuperSalesRegistry(salesId: string) {
     }));
   }
 
-  const sales = listSales.find((s) => s.id === salesId);
-  const name = sales?.name;
+  const sales = listSales.find((s) => s.id === salesId || s.account === salesId || s.name === salesId);
+  const name = sales?.name || salesId;
 
   const temples = [];
   for (const t of listTemples) {
     const creatorInfo = await getTempleCreatorInfo(t.id);
-    if (
-      (creatorInfo && creatorInfo.salesName === name) ||
-      t.salesId === salesId
-    ) {
+    const isOwner =
+      (creatorInfo && (creatorInfo.salesName === name || creatorInfo.salesName === sales?.account || creatorInfo.salesId === salesId)) ||
+      t.salesId === salesId ||
+      t.salesId === sales?.account ||
+      t.salesId === name ||
+      t.creatorId === salesId ||
+      t.creatorId === name ||
+      t.creatorId === sales?.account ||
+      (t as any).superSalesId === salesId ||
+      (t as any).superSalesId === sales?.account ||
+      (t as any).superSalesId === name;
+
+    if (isOwner) {
+      // 只有非 Pending (已核准 Active) 的宮廟才計入「開發宮廟」正式名單
+      if (t.status === "Pending") {
+        continue;
+      }
       let yearlyRent = 0;
       let setupFee = 0;
       if (t.freeType !== "Permanent") {
@@ -11027,10 +11041,19 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   for (const t of listTemples) {
     if (t.status === "Pending") {
       const creatorInfo = await getTempleCreatorInfo(t.id);
-      if (
-        (creatorInfo && creatorInfo.salesName === name) ||
-        t.salesId === salesId
-      ) {
+      const isOwner =
+        (creatorInfo && (creatorInfo.salesName === name || creatorInfo.salesName === sales?.account || creatorInfo.salesId === salesId)) ||
+        t.salesId === salesId ||
+        t.salesId === sales?.account ||
+        t.salesId === name ||
+        t.creatorId === salesId ||
+        t.creatorId === name ||
+        t.creatorId === sales?.account ||
+        (t as any).superSalesId === salesId ||
+        (t as any).superSalesId === sales?.account ||
+        (t as any).superSalesId === name;
+
+      if (isOwner) {
         pendingTempleCount++;
       }
     }
@@ -11039,10 +11062,24 @@ export async function fetchSuperSalesRegistry(salesId: string) {
   let pgPendingDistCount = 0;
   try {
     const templeAppCount = await prisma.templeApplication.count({
-      where: { salesId: name, status: "Pending" },
+      where: {
+        status: "Pending",
+        OR: [
+          { salesId: salesId },
+          { salesId: name },
+          { salesId: sales?.account || "" },
+        ]
+      },
     });
     const distAppCount = await prisma.distributorApplication.count({
-      where: { submittedBy: name, status: "Pending" },
+      where: {
+        status: "Pending",
+        OR: [
+          { submittedBy: salesId },
+          { submittedBy: name },
+          { submittedBy: sales?.account || "" },
+        ]
+      },
     });
     pgPendingDistCount = templeAppCount + distAppCount;
   } catch (e) {
@@ -11820,10 +11857,8 @@ export async function fetchCommissionHistory(
   try {
     const rows = await prisma.bonusRequest.findMany({
       where: {
-        OR: [
-          { salesId: targetSalesId, status: "Approved" },
-          { salesName: targetSalesName, status: "Approved" },
-        ],
+        salesId: targetSalesId,
+        status: "Approved",
       },
     });
     if (rows) {
@@ -11862,10 +11897,7 @@ export async function fetchCommissionHistory(
   try {
     const wdRows = await prisma.withdrawal.findMany({
       where: {
-        OR: [
-          { salesName: targetSalesName },
-          { salesName: targetSalesId },
-        ],
+        salesName: targetSalesId,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -11880,10 +11912,7 @@ export async function fetchCommissionHistory(
 
     const bonusRows = await prisma.bonusRequest.findMany({
       where: {
-        OR: [
-          { salesId: targetSalesId },
-          { salesName: targetSalesName },
-        ],
+        salesId: targetSalesId,
       },
       orderBy: { createdAt: "desc" },
     });

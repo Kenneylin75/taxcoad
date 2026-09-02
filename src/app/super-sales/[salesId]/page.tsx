@@ -212,7 +212,7 @@ export default function SuperSalesPage() {
        </div>
 
        <div className="space-y-4">
-          {(registryTab === 'temples' ? registry.temples : registry.distributors).map((item: any, idx: number) => (
+          {(registryTab === 'temples' ? registry.temples.filter((t: any) => t.status === 'Active' || t.status !== 'Pending') : registry.distributors).map((item: any, idx: number) => (
              <div key={idx} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 hover:border-indigo-200 transition-all">
                 <div className="flex justify-between items-start">
                    <div className="flex items-center gap-5">
