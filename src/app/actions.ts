@@ -3567,6 +3567,7 @@ export async function fetchSystemConfig() {
     const defaultConfig = {
       fixedMonthlyRent: 3600,
       yearlyDiscountRate: 20,
+      aiMonthlyFee: 1200,
       aiAnnualFee: 12000,
       aiSystemPrompt: "您好！你現在是本宮廟的專屬 AI 助理。你的語氣要慈悲、莊嚴。當信眾詢問服務時，你要引導他們使用系統內的「點燈」、「預約」或「法會報名」功能。請勿回答與宗教或本宮廟無關的政治議題。",
       defaultSuperSalesRates: {
@@ -5159,12 +5160,33 @@ export async function uploadCustomerMedia(
     const templeId = await getDynamicTempleId();
     if (!templeId) return { success: false, error: "未指定宮廟" };
 
-    const storage = await prisma.templeStorage.findUnique({
+    let storage = await prisma.templeStorage.findUnique({
       where: { templeId },
     });
+    if (!storage) {
+      storage = await prisma.templeStorage.create({
+        data: {
+          templeId,
+          allocatedBytes: BigInt(20 * 1024 * 1024 * 1024), // 20GB
+          usedBytes: BigInt(0),
+          planName: '基礎免費 20GB 空間',
+        }
+      });
+    }
     if (storage) {
       if (Number(storage.usedBytes) >= Number(storage.allocatedBytes)) {
-        return { success: false, error: "宮廟雲端空間已滿，無法上傳檔案。" };
+        try {
+          await prisma.templeNotification.create({
+            data: {
+              templeId,
+              title: "⚠️ 雲端儲存空間已滿提醒",
+              content: `您的宮廟專屬雲端儲存空間配額 (${Number(storage.allocatedBytes) / (1024 * 1024 * 1024)}GB) 已達上限，信眾與廟方暫時無法上傳新檔案，請至「系統進階配置」升級雲端空間方案。`,
+              type: "SYSTEM",
+              isRead: false,
+            }
+          });
+        } catch (e) {}
+        return { success: false, error: "宮廟雲端空間已滿，請升級雲端空間方案。" };
       }
     }
 
@@ -7294,29 +7316,87 @@ export async function fetchAllTempleAiUsage() {
     const startDate = new Date(`${currentYear}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${currentYear}-12-31T23:59:59.999Z`);
     
-    const logs = await prisma.aiChatLog.groupBy({
-      by: ['templeId'],
-      where: {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
+    let logs: any[] = [];
+    try {
+      logs = await prisma.aiChatLog.groupBy({
+        by: ['templeId'],
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
         },
+        _count: {
+          userQuery: true,
+          aiReply: true,
+        },
+      });
+    } catch (e) {}
+
+    const allBills = await prisma.templeBill.findMany({
+      where: {
+        OR: [
+          { type: 'AIFee' },
+          { type: 'AiUpgrade' },
+          { itemName: { contains: 'AI' } }
+        ]
       },
-      _count: {
-        userQuery: true,
-        aiReply: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
     return usages.map(u => {
       const log = logs.find(l => l.templeId === u.templeId);
+      const temple = u.temple;
+      const isPermanentFree = temple?.freeType === 'Permanent' || u.isVip;
+      
+      let isTrial = false;
+      let trialEndStr = '';
+      if (!isPermanentFree && temple?.freeType === 'Trial' && (temple?.trialMonths || 0) > 0) {
+        const createdDate = new Date(temple.timestamp || temple.createdAt || Date.now());
+        const endFreeDate = new Date(createdDate);
+        endFreeDate.setDate(endFreeDate.getDate() + (temple.trialMonths || 3) * 30);
+        if (new Date() < endFreeDate) {
+          isTrial = true;
+          trialEndStr = endFreeDate.toISOString().split('T')[0];
+        }
+      }
+
+      const bill = allBills.find(b => b.templeId === u.templeId);
+      const isPaid = isPermanentFree || isTrial || bill?.status === 'Paid';
+      
+      let validity = '⚪ 已停用';
+      if (isPermanentFree) {
+        validity = '⭐ 永久免費 VIP';
+      } else if (isTrial) {
+        validity = `🎁 免費試用中 (${trialEndStr} 止)`;
+      } else if (u.enabled) {
+        if (isPaid) {
+          const cycle = temple?.paymentCycle === 'Yearly' ? '年度有效' : '月度有效';
+          validity = `🟢 ${cycle} (已付款)`;
+        } else {
+          validity = '⚠️ 待繳費';
+        }
+      }
+
       return {
         ...u,
-        userQueryCount: log?._count.userQuery || 0,
-        aiReplyCount: log?._count.aiReply || 0,
+        templeName: temple?.name || temple?.templeName || '未知宮廟',
+        planName: isPermanentFree ? '永久免費 VIP' : isTrial ? '免費試用體驗' : 'AI 智能香客管家',
+        validity,
+        isTrial,
+        isPermanentFree,
+        isPaid,
+        paymentCycle: temple?.paymentCycle || 'Monthly',
+        billStatus: bill?.status || (isPaid ? 'Paid' : 'Unpaid'),
+        billAmount: bill?.amount || 12000,
+        userQueryCount: log?._count?.userQuery || 0,
+        aiReplyCount: log?._count?.aiReply || 0,
+        tokensUsed: u.tokensUsed || 0,
+        queryCount: u.queryCount || 0,
       };
     });
   } catch (e) {
+    console.error("fetchAllTempleAiUsage error:", e);
     return [];
   }
 }
@@ -7332,11 +7412,11 @@ export async function grantTempleAiVip(
     if (existing) {
       await prisma.templeAiUsage.update({
         where: { id: existing.id },
-        data: { planId: isVip ? "VIP-AI" : "FREE" },
+        data: { isVip, planId: isVip ? "FREE" : "ON", enabled: true },
       });
     } else {
       await prisma.templeAiUsage.create({
-        data: { templeId, planId: isVip ? "VIP-AI" : "FREE", usedCount: 0 },
+        data: { templeId, isVip, planId: isVip ? "FREE" : "ON", enabled: true, usedCount: 0 },
       });
     }
     return { success: true };
@@ -7349,33 +7429,113 @@ export async function grantTempleAiVip(
 export async function fetchTempleAiUsage() {
   try {
     const templeId = await getDynamicTempleId();
-    const usage = await prisma.templeAiUsage.findUnique({
-      where: { templeId: templeId! }
+    if (!templeId) return null;
+
+    const temple = await prisma.temple.findUnique({ where: { id: templeId } });
+
+    let usage = await prisma.templeAiUsage.findFirst({
+      where: { templeId: templeId }
     });
+    if (!usage) {
+      const isPerm = temple?.freeType === 'Permanent';
+      usage = await prisma.templeAiUsage.create({
+        data: { templeId, enabled: true, planId: isPerm ? 'FREE' : 'ON', isVip: isPerm }
+      });
+    }
+
     const bill = await prisma.templeBill.findFirst({
-      where: { templeId: templeId!, itemName: "AIFee" },
+      where: {
+        templeId: templeId,
+        OR: [
+          { type: "AIFee" },
+          { type: "AiUpgrade" },
+          { itemName: { contains: "AI" } }
+        ]
+      },
       orderBy: { createdAt: 'desc' }
     });
-    const currentYear = new Date().getFullYear().toString();
-    const chatStats = await prisma.aiChatLog.aggregate({
-      _count: { userQuery: true, aiReply: true },
-      where: {
-        templeId: templeId!,
-        createdAt: {
-          gte: new Date(`${currentYear}-01-01T00:00:00.000Z`),
-          lte: new Date(`${currentYear}-12-31T23:59:59.999Z`),
-        }
+
+    const isPermanentFree = temple?.freeType === 'Permanent' || usage?.isVip;
+    let isTrial = false;
+    let trialEndStr = '';
+    if (!isPermanentFree && temple?.freeType === 'Trial' && (temple?.trialMonths || 0) > 0) {
+      const createdDate = new Date(temple.timestamp || temple.createdAt || Date.now());
+      const endFreeDate = new Date(createdDate);
+      endFreeDate.setDate(endFreeDate.getDate() + (temple.trialMonths || 3) * 30);
+      if (new Date() < endFreeDate) {
+        isTrial = true;
+        trialEndStr = endFreeDate.toISOString().split('T')[0];
       }
-    });
+    }
+
+    const isPaid = isPermanentFree || isTrial || bill?.status === 'Paid';
+    const isYearly = temple?.paymentCycle === 'Yearly';
+
+    // Period calculation
+    const baseDate = new Date();
+    const periodStartMonth = baseDate.toISOString().substring(0, 7);
+    const nextYearDate = new Date(baseDate);
+    nextYearDate.setFullYear(nextYearDate.getFullYear() + 1);
+    const periodEndMonth = nextYearDate.toISOString().substring(0, 7);
+
+    const periodStartDate = baseDate.toISOString().split('T')[0];
+    const nextMonthDate = new Date(baseDate);
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+    const periodEndDate = nextMonthDate.toISOString().split('T')[0];
+
+    const periodString = isYearly 
+      ? `${periodStartMonth} ~ ${periodEndMonth}`
+      : `${periodStartDate} ~ ${periodEndDate}`;
+
+    let validity = '⚪ 已停用 (OFF)';
+    if (isPermanentFree) {
+      validity = '⭐ 永久免費 VIP (無限使用)';
+    } else if (isTrial) {
+      validity = `🎁 免費試用中 (至 ${trialEndStr} 止，免收費)`;
+    } else if (usage?.enabled) {
+      if (isPaid) {
+        validity = `🟢 正常運作中 (效期: ${periodString})`;
+      } else {
+        validity = '⚠️ 待繳費';
+      }
+    }
+
+    const currentYear = new Date().getFullYear().toString();
+    let chatStats = { _count: { userQuery: 0, aiReply: 0 } };
+    try {
+      const res = await prisma.aiChatLog.aggregate({
+        _count: { userQuery: true, aiReply: true },
+        where: {
+          templeId: templeId,
+          createdAt: {
+            gte: new Date(`${currentYear}-01-01T00:00:00.000Z`),
+            lte: new Date(`${currentYear}-12-31T23:59:59.999Z`),
+          }
+        }
+      });
+      if (res) chatStats = res as any;
+    } catch (e) {}
+
+    const sys = await prisma.systemConfig.findFirst();
+    const expectedAmount = isYearly ? (sys?.aiAnnualFee || 12000) : (sys?.aiMonthlyFee || 1200);
 
     return { 
-      enabled: usage?.enabled ?? false,
-      planId: usage?.planId || "OFF",
-      billStatus: bill?.status || null,
+      enabled: usage?.enabled ?? true,
+      isVip: isPermanentFree,
+      isTrial,
+      trialEndStr,
+      isPaid,
+      paymentCycle: isYearly ? 'Yearly' : 'Monthly',
+      periodString,
+      validity,
+      planId: usage?.planId || "ON",
+      planName: isPermanentFree ? '永久免費 VIP' : isTrial ? '免費試用體驗' : 'AI 智能香客管家',
+      billStatus: isPaid ? 'Paid' : (bill?.status || 'Unpaid'),
       billId: bill?.id || null,
+      billAmount: bill?.amount || expectedAmount,
       receiptUrl: bill?.receiptUrl || null,
-      userQueryCount: chatStats._count.userQuery || 0,
-      aiReplyCount: chatStats._count.aiReply || 0,
+      userQueryCount: chatStats._count?.userQuery || 0,
+      aiReplyCount: chatStats._count?.aiReply || 0,
     };
   } catch (e) {
     console.error("fetchTempleAiUsage error:", e);
@@ -7386,10 +7546,18 @@ export async function fetchTempleAiUsage() {
 export async function toggleTempleAiStatus(enabled: boolean) {
   try {
     const templeId = await getDynamicTempleId();
-    await prisma.templeAiUsage.update({
-      where: { templeId: templeId! },
-      data: { enabled },
-    });
+    if (!templeId) return { success: false };
+    const existing = await prisma.templeAiUsage.findFirst({ where: { templeId } });
+    if (existing) {
+      await prisma.templeAiUsage.update({
+        where: { id: existing.id },
+        data: { enabled },
+      });
+    } else {
+      await prisma.templeAiUsage.create({
+        data: { templeId, enabled, planId: 'ON' },
+      });
+    }
     return { success: true };
   } catch (e) {
     return { success: false };
@@ -7399,18 +7567,22 @@ export async function toggleTempleAiStatus(enabled: boolean) {
 export async function purchaseAiPlan(planId: string, paymentMethod?: string) {
   try {
     const templeId = await getDynamicTempleId();
-    const sys = await prisma.systemConfig.findFirst();
-    const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
-    if (!plan) return { success: false };
+    if (!templeId) return { success: false };
+    const plan = await prisma.aiPlan.findUnique({ where: { id: planId } });
+    const amount = plan?.price || 12000;
 
     await prisma.templeBill.create({
       data: {
-        id: `bill-${Date.now()}`,
-        templeId: templeId!,
-        amount: plan.price,
+        id: `BILL-AI-${Date.now()}`,
+        templeId: templeId,
+        amount: amount,
         type: "AiUpgrade",
-        status: "PendingPayment",
-        date: new Date(),
+        itemName: plan ? `AI引擎方案 - ${plan.name}` : "AIFee",
+        status: "Unpaid",
+        payeeRole: "SuperAdmin",
+        payeeId: "system-hq",
+        billingDate: new Date().toISOString().substring(0, 7),
+        dueDate: new Date().toISOString().split("T")[0],
       },
     });
     return { success: true };
@@ -8669,17 +8841,15 @@ export async function grantTempleStorageVip(
 
 export async function purchaseAiPlanByAdmin(templeId: string, planId: string) {
   try {
-    const sys = await prisma.systemConfig.findFirst();
-    const plan = sys?.aiPlans?.find((p: any) => p.id === planId);
-    if (!plan) return { success: false };
-
+    const plan = await prisma.aiPlan.findUnique({ where: { id: planId } });
     await prisma.templeAiUsage.upsert({
       where: { templeId },
-      update: { planId, enabled: true },
-      create: { templeId, planId, enabled: true, usedCount: 0 },
+      update: { planId, enabled: true, isVip: false },
+      create: { templeId, planId, enabled: true, isVip: false, usedCount: 0 },
     });
     return { success: true };
   } catch (e) {
+    console.error("purchaseAiPlanByAdmin error:", e);
     return { success: false };
   }
 }
@@ -9728,35 +9898,23 @@ export async function generateInitialBills(newTemple: any) {
     }
 
     const tAi = await prisma.templeAiUsage.findFirst({ where: { templeId: newTemple.id } });
-    let aiPlanId = tAi?.planId;
-    let aiPlanInfo = null;
-    if (aiPlanId) {
-      aiPlanInfo = (await prisma.aiPlan.findUnique({
-        where: { id: aiPlanId },
-      })) as any;
-    }
-    if (!aiPlanInfo) {
-      // Fetch cheapest AI plan
-      const aiPlans = (await prisma.aiPlan.findMany({
-        orderBy: { price: "asc" },
-      })) as any[];
-      if (aiPlans && aiPlans.length > 0) {
-        aiPlanInfo = aiPlans[0];
-      }
-    }
-    if (aiPlanInfo) {
+    if (tAi && tAi.enabled && tAi.planId !== 'OFF' && !tAi.isVip) {
+      const isTrial = newTemple.freeType === "Trial" && (newTemple.trialMonths || 0) > 0;
+      const isYearly = newTemple.paymentCycle === "Yearly";
       const aiFee = isYearly
-        ? aiPlanInfo.price * 12 * (1 - (config?.yearlyDiscountRate || 20) / 100)
-        : aiPlanInfo.price;
+        ? (config?.aiAnnualFee || 12000)
+        : (config?.aiMonthlyFee || 1200);
+      const cycleLabel = isYearly ? "年繳" : "月繳";
+
       if (aiFee > 0) {
         billsToInsert.push({
           id: `BILL-AI-${Date.now()}`,
           templeId: newTemple.id,
-          type: "AiUpgrade",
-          itemName: "AI引擎方案 - " + aiPlanInfo.name,
+          type: "AIFee",
+          itemName: `AI 智能生活管家服務費 (${cycleLabel})`,
           amount: aiFee,
-          billingDate: new Date().toISOString().substring(0, 7),
-          dueDate: billDueDate,
+          billingDate: isTrial ? effectiveBillingPeriod : new Date().toISOString().substring(0, 7),
+          dueDate: isTrial ? billDueDate : new Date().toISOString().split("T")[0],
           status: "Unpaid",
           payeeRole: "SuperAdmin",
           payeeId: "system-hq",
@@ -9947,13 +10105,14 @@ export async function submitFreeAccountApplication(data: any) {
       },
     });
 
-    let isAiVip = data.aiLife === "Free" || data.freeType === "Permanent";
-    let aiPlanId = isAiVip ? "VIP-AI" : data.aiLife ? data.aiLife : "FREE";
+    const isAiVip = data.freeType === "Permanent";
+    const isAiEnabled = data.aiLife !== "OFF";
+    const aiPlanId = isAiVip ? "FREE" : (data.freeType === "Trial" ? "FREE" : (isAiEnabled ? "ON" : "OFF"));
     await prisma.templeAiUsage.create({
       data: {
         templeId: newTemple.id,
         planId: aiPlanId,
-        enabled: data.enableAi ?? true,
+        enabled: isAiEnabled,
         usedCount: 0,
         isVip: isAiVip,
       },

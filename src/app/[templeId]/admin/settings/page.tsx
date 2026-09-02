@@ -408,97 +408,86 @@ export default function AdvancedSettingsPage() {
          <div className="space-y-6">
             {/* Sidebar: AI Assistant Manager */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-            <div className="flex items-center gap-3">
-               <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-sm shadow-inner">🤖</div>
-               <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">AI 智能香客管家</h3>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">SaaS AI Assistant Status</p>
-               </div>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                       <div className="w-8 h-8 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-sm shadow-inner">🤖</div>
+                       <div>
+                          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">AI 智能香客管家</h3>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">SaaS AI Assistant Module</p>
+                       </div>
+                    </div>
+                    {aiInfo && (
+                       <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${aiInfo.enabled ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                          {aiInfo.enabled ? '🟢 運作中' : '⚪ 已暫停'}
+                       </span>
+                    )}
+                 </div>
+
+                 {aiInfo ? (
+                    <div className="space-y-5 bg-slate-50/50 p-4 rounded-xl border border-slate-100 shadow-inner">
+                       <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-500">服務狀態</span>
+                          <span className="font-black text-slate-800 text-[11px]">
+                             {aiInfo.validity || (aiInfo.isVip ? '⭐ 永久免費 VIP' : aiInfo.isTrial ? '🎁 免費試用中' : '🟢 運作中')}
+                          </span>
+                       </div>
+
+                       <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-700">功能開關</span>
+                          <button
+                             onClick={async () => {
+                                const { toggleTempleAiStatus } = await import('@/app/actions');
+                                const res = await toggleTempleAiStatus(!aiInfo.enabled);
+                                if (res.success) {
+                                   setAiInfo({ ...aiInfo, enabled: !aiInfo.enabled });
+                                }
+                             }}
+                             className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all ${aiInfo.enabled ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'}`}
+                          >
+                             {aiInfo.enabled ? '暫停 AI 服務' : '開啟 AI 服務'}
+                          </button>
+                       </div>
+
+                       {/* 繳費與效期提示 */}
+                       {!aiInfo.isVip && !aiInfo.isTrial && (
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 text-xs">
+                             <div className="flex justify-between items-center">
+                                <span className="font-bold text-slate-500">付費週期: <strong className="text-slate-800">{aiInfo.paymentCycle === 'Yearly' ? '年繳' : '月繳'}</strong></span>
+                                <span className={`font-black text-[11px] ${aiInfo.billStatus === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                   {aiInfo.billStatus === 'Paid' ? '✅ 已繳費生效' : '⚠️ 尚未繳費'}
+                                </span>
+                             </div>
+                             {aiInfo.billStatus !== 'Paid' && (
+                                <a 
+                                   href={`/${currentTempleId}/admin/billing?view=expenses`}
+                                   className="block w-full py-2 bg-slate-900 hover:bg-amber-600 text-white text-center rounded-lg font-black text-xs transition-colors shadow-sm mt-2"
+                                >
+                                   前往帳務管理繳納 AI 服務費 ➔
+                                </a>
+                             )}
+                          </div>
+                       )}
+
+                       {/* 對話統計 */}
+                       <div className="space-y-2 pt-3 border-t border-slate-200/60">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">今年度信眾對話統計</p>
+                          <div className="flex justify-between text-xs font-bold">
+                             <span className="text-slate-500">信眾提問次數</span>
+                             <span className="text-slate-900 font-black">{aiInfo.userQueryCount || 0} 次</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-bold">
+                             <span className="text-slate-500">AI 智能回覆次數</span>
+                             <span className="text-amber-600 font-black">{aiInfo.aiReplyCount || 0} 次</span>
+                          </div>
+                       </div>
+                    </div>
+                 ) : (
+                    <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                       <p className="text-[10px] font-bold text-slate-400">載入 AI 數據中...</p>
+                    </div>
+                 )}
             </div>
 
-            {!settings.modules.agi ? (
-               <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                  <p className="text-[10px] font-bold text-slate-400">模組尚未啟用，請從左側開啟</p>
-               </div>
-            ) : aiInfo && (
-               <div className="space-y-6 bg-slate-50/50 p-4 rounded-xl border border-slate-100 shadow-inner">
-                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                     <span>當前方案</span>
-                     <span className="text-slate-800">
-                        {aiInfo.planId === 'FREE' ? '免費使用方案 (僅限最高權限)' : aiInfo.planId === 'ON' ? '付費開通方案' : '未開通'}
-                     </span>
-                  </div>
-
-                  {aiInfo.planId === 'ON' && (
-                     <div className="space-y-4">
-                        <div className="flex justify-between text-[11px] font-black italic">
-                           <span className="text-slate-800">繳費狀態</span>
-                           <span className={aiInfo.billStatus === 'Paid' ? 'text-emerald-500' : aiInfo.billStatus === 'PendingVerification' || aiInfo.billStatus === 'Pending' ? 'text-amber-500' : 'text-rose-500'}>
-                              {aiInfo.billStatus === 'Paid' ? '✅ 已核銷' : aiInfo.billStatus === 'PendingVerification' || aiInfo.billStatus === 'Pending' ? '⏳ 審核中' : '⚠️ 尚未繳費'}
-                           </span>
-                        </div>
-                        
-                        {(aiInfo.billStatus === 'Unpaid' || aiInfo.billStatus === 'Pending') && aiInfo.billId && (
-                           <div className="mt-4 p-4 bg-white rounded-xl border border-rose-100 shadow-sm space-y-3">
-                              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">需上傳匯款證明才能正式啟用</p>
-                              <input type="text" id="aiBankLast5" placeholder="請輸入帳戶後五碼" className="w-full text-xs p-2 border border-slate-200 rounded-lg" maxLength={5} />
-                              <button 
-                                 onClick={async () => {
-                                    const input = document.getElementById('aiBankLast5');
-                                    const last5 = input ? input.value : '';
-                                    if(last5.length !== 5) return alert('請輸入正確的帳戶後五碼');
-                                    
-                                    const inputNode = document.createElement('input');
-                                    inputNode.type = 'file';
-                                    inputNode.accept = 'image/*';
-                                    inputNode.onchange = async (e) => {
-                                       const file = e.target.files[0];
-                                       if(!file) return;
-                                       setIsPaying(true);
-                                       try {
-                                          const formData = new FormData();
-                                          formData.append('file', file);
-                                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                          const { url } = await res.json();
-                                          if(url) {
-                                             const { uploadTempleBillReceipt } = await import('@/app/actions');
-                                             await uploadTempleBillReceipt(aiInfo.billId, url, last5);
-                                             alert('上傳成功！等待管理員審核。');
-                                             window.location.reload();
-                                          }
-                                       } catch (err) {
-                                          alert('上傳失敗');
-                                       } finally {
-                                          setIsPaying(false);
-                                       }
-                                    };
-                                    inputNode.click();
-                                 }}
-                                 disabled={isPaying}
-                                 className="w-full py-2 bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black rounded-lg transition-colors"
-                              >
-                                 {isPaying ? '上傳中...' : '上傳匯款截圖與後五碼'}
-                              </button>
-                           </div>
-                        )}
-                     </div>
-                  )}
-
-                  <div className="space-y-2 mt-4 pt-4 border-t border-slate-200">
-                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">今年度使用統計</p>
-                     <div className="flex justify-between text-[11px] font-black italic">
-                        <span className="text-slate-500">信眾輸入次數</span>
-                        <span className="text-slate-800">{aiInfo.userQueryCount} 次</span>
-                     </div>
-                     <div className="flex justify-between text-[11px] font-black italic">
-                        <span className="text-slate-500">AI 回答次數</span>
-                        <span className="text-fuchsia-600">{aiInfo.aiReplyCount} 次</span>
-                     </div>
-                  </div>
-               </div>
-            )}
-         </div>
-         {/* Sidebar: Cloud Storage & Quota Manager */}
          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
                <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-sm shadow-inner">☁️</div>

@@ -991,12 +991,13 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-6 h-6"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               </button>
               
-              {serviceSettings?.modules?.agi && templeAiUsage && templeAiUsage.enabled && (templeAiUsage.planId === 'FREE' || (templeAiUsage.planId === 'ON' && templeAiUsage.billStatus === 'Paid')) && (
+              {((serviceSettings?.modules?.agi ?? true) && (templeAiUsage?.enabled ?? true) && (templeAiUsage?.isVip || templeAiUsage?.planId === 'FREE' || templeAiUsage?.billStatus === 'Paid' || templeAiUsage?.planId === 'ON' || !templeAiUsage)) && (
                 <button 
                   onClick={() => setIsAgiModalOpen(true)}
-                  className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white active:scale-90 transition-all shadow-md border border-white/20"
+                  title="AI 智能生活管家"
+                  className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 hover:from-amber-600 hover:to-amber-400 flex items-center justify-center text-white active:scale-90 transition-all shadow-lg border border-white/30"
                 >
-                  <span className="text-xl">✨</span>
+                  <span className="text-xl animate-pulse">✨</span>
                 </button>
               )}
 

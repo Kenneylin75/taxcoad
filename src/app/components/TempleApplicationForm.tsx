@@ -255,9 +255,9 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
                   <div className="relative flex-1">
                      <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">雲端空間</p>
                      <select value={form.cloudStorage || ''} onChange={e => setForm({...form, cloudStorage: e.target.value})} className="app-input-v7 appearance-none cursor-pointer">
-                        <option value="" disabled>請選擇雲端空間方案</option>
+                        <option value="">基礎免費 20GB 空間 (預設)</option>
                         {storagePlans.map(plan => (
-                           <option key={plan.id} value={plan.id}>{plan.name} (${plan.priceMonthly}/月)</option>
+                           <option key={plan.id} value={plan.id}>{plan.name} ({plan.sizeGb}GB, ${plan.priceMonthly}/月)</option>
                         ))}
                         {role === 'super-admin' && <option value="Free">無限使用 (Free)</option>}
                      </select>
@@ -272,15 +272,15 @@ export default function TempleApplicationForm({ role, submittedBy, distributorId
                   </div>
                </div>
 
-               <div className="relative group col-span-2 sm:col-span-1">
-                  <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 智能香客管家</p>
-                  <select value={form.aiLife || 'OFF'} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer font-black text-slate-700">
-                     <option value="OFF">關閉 (OFF)</option>
-                     <option value="ON">開啟 (需年費) (ON)</option>
-                     {role === 'super-admin' && <option value="FREE">免費 (Free) - 僅最高權限</option>}
-                  </select>
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
-               </div>
+                <div className="relative group col-span-2 sm:col-span-1">
+                   <p className="absolute left-5 -top-2 bg-white px-2 text-[9px] font-black text-slate-400 uppercase tracking-widest z-10">AI 智能香客管家</p>
+                   <select value={form.aiLife || 'ON'} onChange={e => setForm({...form, aiLife: e.target.value})} className="app-input-v7 appearance-none cursor-pointer font-black text-slate-700">
+                      <option value="ON">開啟 AI 智能香客管家 (預設開啟)</option>
+                      <option value="OFF">關閉 (不啟用)</option>
+                   </select>
+                   <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 text-[8px]">▼</span>
+                   <p className="text-[9px] text-slate-400 mt-1 pl-1 font-bold">※ 試用期內免費體驗；超管免費帳戶永久免費</p>
+                </div>
             </div>
          </div>
 

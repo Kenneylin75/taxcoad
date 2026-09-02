@@ -208,9 +208,11 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
       case 'MONTHFEE': return '系統月租費';
       case 'YearlyFee': 
       case 'YEARFEE': return '系統年租費';
-      case 'StorageUpgrade': return '空間擴展費';
-      case 'AgiService': return 'AGI 智能管家流量';
-      default: return type;
+      case 'StorageUpgrade': return '雲端儲存空間擴展費';
+      case 'AIFee':
+      case 'AiUpgrade':
+      case 'AgiService': return '🤖 AI 智能生活管家服務費';
+      default: return (type && (type.includes('AI') || type.includes('Ai'))) ? '🤖 AI 智能生活管家服務費' : type;
     }
   };
 

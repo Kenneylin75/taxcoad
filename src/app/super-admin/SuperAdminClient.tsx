@@ -1702,17 +1702,48 @@ export default function SuperAdminClient({
                        <div className="flex justify-between items-end mb-8">
                          <div>
                            <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tighter">AI 模組全局定價</h4>
-                           <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">Global SaaS Pricing</p>
+                           <p className="text-[11px] font-bold text-slate-500 mt-1 tracking-widest uppercase">Global SaaS AI Engine Pricing</p>
                          </div>
+                         <button 
+                           onClick={async () => {
+                             const { updateSystemConfig } = await import('@/app/actions');
+                             await updateSystemConfig({ aiMonthlyFee: config?.aiMonthlyFee || 1200, aiAnnualFee: config?.aiAnnualFee || 12000 });
+                             alert('✨ AI 模組月繳與年繳定價已成功儲存！');
+                           }}
+                           className="px-6 py-2.5 bg-slate-900 hover:bg-fuchsia-600 text-white rounded-xl text-xs font-black tracking-widest uppercase transition-all shadow-md"
+                         >
+                           儲存 AI 定價 💾
+                         </button>
                        </div>
 
-                       <div className="flex flex-col bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-8 max-w-md">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">AI 模組一年費用 (NT$)</label>
-                          <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-xl px-4 focus-within:border-fuchsia-400 focus-within:ring-4 focus-within:ring-fuchsia-500/10 transition-all">
-                             <span className="text-fuchsia-500 font-black text-xl">$</span>
-                             <input type="number" value={config?.aiAnnualFee || 0} onChange={e => setConfig({...config, aiAnnualFee: Number(e.target.value)})} className="w-full bg-transparent py-4 text-3xl font-black text-slate-800 outline-none" />
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+                          <div className="flex flex-col bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-6">
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">AI 模組月繳費用 (NT$ / 月)</label>
+                             <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 focus-within:border-fuchsia-400 focus-within:ring-4 focus-within:ring-fuchsia-500/10 transition-all">
+                                <span className="text-fuchsia-500 font-black text-lg">$</span>
+                                <input 
+                                  type="number" 
+                                  value={config?.aiMonthlyFee ?? 1200} 
+                                  onChange={e => setConfig({...config, aiMonthlyFee: Number(e.target.value)})} 
+                                  className="w-full bg-transparent py-3 text-2xl font-black text-slate-800 outline-none" 
+                                />
+                             </div>
+                             <p className="text-[9px] text-slate-400 mt-3 font-bold">月租宮廟開通 AI 時適用。</p>
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-4 font-bold">當宮廟開啟 AI 功能時，系統將自動以此金額產出一張「AIFee」年度帳單。</p>
+
+                          <div className="flex flex-col bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl p-6">
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">AI 模組年繳費用 (NT$ / 年)</label>
+                             <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 focus-within:border-fuchsia-400 focus-within:ring-4 focus-within:ring-fuchsia-500/10 transition-all">
+                                <span className="text-fuchsia-500 font-black text-lg">$</span>
+                                <input 
+                                  type="number" 
+                                  value={config?.aiAnnualFee ?? 12000} 
+                                  onChange={e => setConfig({...config, aiAnnualFee: Number(e.target.value)})} 
+                                  className="w-full bg-transparent py-3 text-2xl font-black text-slate-800 outline-none" 
+                                />
+                             </div>
+                             <p className="text-[9px] text-slate-400 mt-3 font-bold">年租宮廟開通 AI 時適用。</p>
+                          </div>
                        </div>
                     </div>
                  </div>
@@ -1730,57 +1761,64 @@ export default function SuperAdminClient({
                        
                        <div className="space-y-4">
                           {(() => {
-                             const aiBills = (finance?.templeBills || []).filter((b: any) => b.item_name === 'AIFee' && (b.status === 'Pending' || b.status === 'Unpaid'));
-                             
-                             if (aiBills.length === 0) {
-                               return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的 AI 帳單</p></div>;
-                             }
-                             return aiBills.map((b: any) => {
-                               const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
-                               return (
-                               <div key={b.id} className="bg-white p-6 rounded-[20px] border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-500/5 transition-all">
-                                  <div>
-                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
-                                     <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
-                                     <p className="text-[11px] font-bold text-emerald-600 mt-1">AI 模組年度授權費</p>
-                                  </div>
-                                  <div className="text-right">
-                                     <span className="text-emerald-500 text-xl font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
-                                     <p className="text-[11px] font-bold text-slate-500 mt-1">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
-                                  </div>
-                                  <div className="flex gap-2">
-                                     {b.receipt_url || b.receiptUrl ? (
-                                        <button 
-                                          onClick={() => {
-                                             setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
-                                             setPreviewModalOpen(true);
-                                          }}
-                                          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-sm"
-                                        >查看匯款截圖</button>
-                                     ) : (
-                                        <span className="text-[10px] font-bold text-slate-400 px-4 py-2">無圖片</span>
-                                     )}
-                                     <button 
-                                        onClick={async () => {
-                                           if (confirm('確定要將此帳單標記為已付款嗎？此操作將開通該宮廟的 AI 服務。')) {
-                                              const res = await approveTempleBill(b.id);
-                                                    if (res && res.success) {
-                                                       setFinance((prev: any) => {
-                                                         if (!prev) return prev;
-                                                         const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
-                                                         return { ...prev, templeBills: newBills };
-                                                       });
-                                                    } else {
-                                                       alert('標記失敗: ' + (res?.error || '請檢查連線'));
-                                                    }
-                                           }
-                                        }}
-                                        className="px-6 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
-                                     >標記已付款</button>
-                                  </div>
-                               </div>
-                             )});
-                          })()}
+                              const aiBills = (finance?.templeBills || []).filter((b: any) => 
+                                (b.item_name === 'AIFee' || b.type === 'AIFee' || b.type === 'AiUpgrade' || b.itemName?.includes('AI') || b.item_name?.includes('AI')) && 
+                                (b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification')
+                              );
+                              
+                              if (aiBills.length === 0) {
+                                return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的 AI 帳單</p></div>;
+                              }
+                              return aiBills.map((b: any) => {
+                                const t = finance?.allTemples?.find((x: any) => x.id === (b.temple_id || b.templeId));
+                                return (
+                                <div key={b.id} className="bg-white p-6 rounded-[20px] border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-500/5 transition-all">
+                                   <div>
+                                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{b.created_at ? b.created_at.split('T')[0] : (b.timestamp?.split('T')[0] || '')}</p>
+                                      <p className="text-lg font-black text-slate-900">{t?.name || t?.templeName || '未知宮廟'}</p>
+                                      <p className="text-[11px] font-bold text-emerald-600 mt-1">{b.item_name || b.itemName || 'AI 智能生活管家服務費'}</p>
+                                      {b.billingDate && <p className="text-[10px] font-bold text-slate-400 mt-0.5">計費週期: {b.billingDate}</p>}{b.billing_date && <p className="text-[10px] font-bold text-slate-400 mt-0.5">計費週期: {b.billing_date}</p>}
+                                   </div>
+                                   <div className="text-right">
+                                      <span className="text-emerald-500 text-xl font-black italic">NT$ {(b.amount || 0).toLocaleString()}</span>
+                                      <p className="text-[11px] font-bold text-slate-500 mt-1">匯款後五碼: <span className="font-black text-slate-900 tracking-widest">{b.bank_last5 || b.bankLast5 || '未提供'}</span></p>
+                                   </div>
+                                   <div className="flex gap-2">
+                                      {(b.receipt_url || b.receiptUrl) ? (
+                                         <button 
+                                           onClick={() => {
+                                              setPreviewImage({ url: b.receipt_url || b.receiptUrl, templeName: t?.name || t?.templeName || '未知宮廟', bankLast5: b.bank_last5 || b.bankLast5 });
+                                              setPreviewModalOpen(true);
+                                           }}
+                                           className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-sm"
+                                         >查看匯款截圖</button>
+                                      ) : (
+                                         <span className="text-[10px] font-bold text-slate-400 px-4 py-2">無圖片</span>
+                                      )}
+                                      <button 
+                                         onClick={async () => {
+                                            if (confirm('確定要將此帳單標記為已付款嗎？此操作將開通該宮廟的 AI 服務。')) {
+                                               const res = await approveTempleBill(b.id);
+                                                     if (res && res.success) {
+                                                        setFinance((prev: any) => {
+                                                          if (!prev) return prev;
+                                                          const newBills = prev.templeBills?.map((tb: any) => tb.id === b.id ? { ...tb, status: 'Paid' } : tb);
+                                                          return { ...prev, templeBills: newBills };
+                                                        });
+                                                        const newAiUsage = await fetchAllTempleAiUsage();
+                                                        setAllTempleAiUsage(newAiUsage);
+                                                        alert('審核通過！AI 服務已開通。');
+                                                     } else {
+                                                        alert('標記失敗: ' + (res?.error || '請檢查連線'));
+                                                     }
+                                            }
+                                         }}
+                                         className="px-6 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg"
+                                      >標記已付款</button>
+                                   </div>
+                                </div>
+                              )});
+                           })()}
                        </div>
                     </div>
                  </div>
@@ -1799,7 +1837,7 @@ export default function SuperAdminClient({
                          <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
                                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">宮廟名稱</th>
-                               <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">當前狀態</th>
+                               <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">服務狀態 / 效期</th>
                                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">今年度 AI 回答總次數</th>
                                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">今年度信眾輸入總次數</th>
                             </tr>
@@ -1811,11 +1849,6 @@ export default function SuperAdminClient({
                                if (pagedUsages.length === 0) return <tr><td colSpan={4} className="text-center py-8 text-xs font-bold text-slate-400">目前沒有資料</td></tr>;
                                
                                return pagedUsages.map((u: any, i: number) => {
-                                  let statusBadge = <span className="px-3 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-full text-[9px] font-black tracking-widest uppercase">關閉 (OFF)</span>;
-                                  if (u.planId === 'ON') statusBadge = <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[9px] font-black tracking-widest uppercase">開啟 (ON)</span>;
-                                  if (u.planId === 'FREE') statusBadge = <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 rounded-full text-[9px] font-black tracking-widest uppercase">免費 (FREE)</span>;
-                                  if (u.isVip) statusBadge = <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 rounded-full text-[9px] font-black tracking-widest uppercase">無限免費 (VIP)</span>;
-                                  
                                   return (
                                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
@@ -1829,7 +1862,9 @@ export default function SuperAdminClient({
                                               </div>
                                            </div>
                                         </td>
-                                        <td className="px-6 py-4">{statusBadge}</td>
+                                        <td className="px-6 py-4">
+                                           <span className="font-bold text-xs text-slate-700">{u.validity || (u.enabled ? '🟢 運作中' : '⚪ 已停用')}</span>
+                                        </td>
                                         <td className="px-6 py-4 text-center text-sm font-black text-slate-700">{u.aiReplyCount || 0}</td>
                                         <td className="px-6 py-4 text-center text-sm font-black text-slate-700">{u.userQueryCount || 0}</td>
                                      </tr>

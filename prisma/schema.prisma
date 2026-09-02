@@ -260,7 +260,7 @@ model Temple {
   services            Service[]
   slots               Slot[]
   syncQueues          SyncQueue[]
-  aiUsages            TempleAiUsage[]
+  aiUsage             TempleAiUsage?
   templeNotifications TempleNotification[]
   paymentConfig       TemplePaymentConfig?
   templeStorages      TempleStorage?
@@ -811,7 +811,7 @@ model AiApiModel {
 
 model TempleAiUsage {
   id         String    @id @default(cuid())
-  templeId   String    @map("temple_id")
+  templeId   String    @unique @map("temple_id")
   tokensUsed Int       @default(0) @map("tokens_used")
   queryCount Int       @default(0) @map("query_count")
   month      String?
