@@ -235,7 +235,7 @@ export default function AdvancedSettingsPage() {
             <button 
               onClick={() => {
                 startTransition(async () => {
-                  const res = await updateTempleBasicInfo(basicInfo, window.location.pathname.split('/')[1]);
+                  const res = await updateTempleBasicInfo({ ...basicInfo, phone: basicInfo?.templePhone || basicInfo?.phone }, window.location.pathname.split('/')[1]);
                   if (res.success) alert('宮廟基本資料已更新！');
                 });
               }}

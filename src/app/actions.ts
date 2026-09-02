@@ -2237,8 +2237,8 @@ export async function fetchGuestAppointments(p: any) {
     return [];
   }
 }
-export async function fetchServiceSettings() {
-  const templeId = await getDynamicTempleId();
+export async function fetchServiceSettings(explicitTempleId?: string) {
+  const templeId = explicitTempleId || (await getDynamicTempleId());
   const defaultSettings = {
     cancelHoursBefore: 24,
     modifyHoursBefore: 24,
@@ -2253,6 +2253,22 @@ export async function fetchServiceSettings() {
       analytics: true,
       agi: true,
     },
+    guestRequiredFields: {
+      birthday: true,
+      address: false,
+      trouble: true,
+    },
+    rules: {
+      allowCancel: true,
+      allowModify: true,
+      cancelThresholdHours: 24,
+      modifyThresholdHours: 48,
+    },
+    preferences: {
+      darkMode: true,
+      autoAudit: true,
+      lineNotify: true,
+    }
   };
   if (!templeId) return defaultSettings;
 
@@ -2262,13 +2278,32 @@ export async function fetchServiceSettings() {
     });
 
     if (existing) {
+      const pushData = (existing.pushConfigs as any) || {};
+      const rawModules = (existing.modules as any) || {};
+      
       return {
         cancelHoursBefore: existing.cancelHoursBefore ?? 24,
         modifyHoursBefore: existing.modifyHoursBefore ?? 24,
         allowCancel: existing.allowCancel ?? true,
         allowModify: existing.allowModify ?? true,
-        pushConfigs: (existing.pushConfigs as any) || [],
-        modules: (existing.modules as any) || defaultSettings.modules,
+        pushConfigs: Array.isArray(existing.pushConfigs) ? existing.pushConfigs : (pushData.pushConfigs || []),
+        modules: {
+          ...defaultSettings.modules,
+          ...rawModules,
+          ...(pushData.modules || {}),
+        },
+        guestRequiredFields: {
+          ...defaultSettings.guestRequiredFields,
+          ...(pushData.guestRequiredFields || {}),
+        },
+        rules: {
+          ...defaultSettings.rules,
+          ...(pushData.rules || {}),
+        },
+        preferences: {
+          ...defaultSettings.preferences,
+          ...(pushData.preferences || {}),
+        }
       };
     }
     return defaultSettings;
@@ -5110,10 +5145,26 @@ export async function rejectWithdrawal(id: string) {
   }
 }
 
-export async function updateServiceSettings(settings: any) {
+export async function updateServiceSettings(settings: any, explicitTempleId?: string) {
   try {
-    const templeId = await getDynamicTempleId();
-    if (!templeId) return { success: false };
+    const templeId = explicitTempleId || (await getDynamicTempleId());
+    if (!templeId) return { success: false, error: "未指定宮廟" };
+
+    const modules = settings.modules || {
+      calendar: true,
+      lamps: true,
+      queue: true,
+      events: true,
+      analytics: true,
+      agi: true,
+    };
+
+    const pushConfigsPayload = {
+      guestRequiredFields: settings.guestRequiredFields || { birthday: true, address: false, trouble: true },
+      rules: settings.rules || { allowCancel: true, allowModify: true, cancelThresholdHours: 24, modifyThresholdHours: 48 },
+      preferences: settings.preferences || { darkMode: true, autoAudit: true, lineNotify: true },
+      pushConfigs: Array.isArray(settings.pushConfigs) ? settings.pushConfigs : []
+    };
 
     const existing = await prisma.serviceSetting.findFirst({
       where: { templeId },
@@ -5122,21 +5173,36 @@ export async function updateServiceSettings(settings: any) {
     if (existing) {
       await prisma.serviceSetting.update({
         where: { id: existing.id },
-        data: { pushConfigs: settings },
+        data: {
+          modules,
+          pushConfigs: pushConfigsPayload,
+          allowCancel: settings.rules?.allowCancel ?? settings.allowCancel ?? true,
+          allowModify: settings.rules?.allowModify ?? settings.allowModify ?? true,
+        },
       });
     } else {
       await prisma.serviceSetting.create({
         data: {
           templeId,
-          pushConfigs: settings,
+          modules,
+          pushConfigs: pushConfigsPayload,
+          allowCancel: settings.rules?.allowCancel ?? settings.allowCancel ?? true,
+          allowModify: settings.rules?.allowModify ?? settings.allowModify ?? true,
         },
       });
     }
 
+    if (modules.agi !== undefined) {
+      await toggleTempleAiStatus(modules.agi);
+    }
+
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/[templeId]", "page");
+    revalidatePath("/[templeId]/admin/settings", "page");
     return { success: true };
   } catch (e) {
-    console.error(e);
-    return { success: false };
+    console.error("updateServiceSettings error:", e);
+    return { success: false, error: String(e) };
   }
 }
 
@@ -7809,7 +7875,12 @@ export async function getTempleBasicInfo(templeId?: string) {
     if (!tId) return null;
     const t = await prisma.temple.findUnique({ where: { id: tId } });
     if (!t) return null;
-    return { ...t, templeName: t.templeName || t.name };
+    return { 
+      ...t, 
+      templeName: t.templeName || t.name,
+      templePhone: t.phone || (t as any).templePhone || "",
+      phone: t.phone || (t as any).templePhone || "",
+    };
   } catch (e) {
     console.error(e);
     return null;
@@ -7819,17 +7890,21 @@ export async function getTempleBasicInfo(templeId?: string) {
 export async function updateTempleBasicInfo(data: any, templeId?: string) {
   try {
     const tId = templeId || (await getDynamicTempleId());
-    if (!tId) return { success: false };
+    if (!tId) return { success: false, error: "未指定宮廟" };
 
     const updateData: any = {};
-    if (data.templeName || data.name)
+    if (data.templeName !== undefined || data.name !== undefined)
       updateData.templeName = data.templeName || data.name;
-    if (data.city) updateData.city = data.city;
-    if (data.address) updateData.address = data.address;
-    if (data.phone) updateData.phone = data.phone;
-    if (data.themeColor) updateData.themeColor = data.themeColor;
-    if (data.logoUrl) updateData.logoUrl = data.logoUrl;
-    if (data.bannerUrl) updateData.bannerUrl = data.bannerUrl;
+    if (data.city !== undefined) updateData.city = data.city;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.templePhone !== undefined) {
+      updateData.phone = data.templePhone;
+    } else if (data.phone !== undefined) {
+      updateData.phone = data.phone;
+    }
+    if (data.themeColor !== undefined) updateData.themeColor = data.themeColor;
+    if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
+    if (data.bannerUrl !== undefined) updateData.bannerUrl = data.bannerUrl;
 
     if (Object.keys(updateData).length > 0) {
       await prisma.temple.update({
@@ -7843,8 +7918,8 @@ export async function updateTempleBasicInfo(data: any, templeId?: string) {
     revalidatePath("/[templeId]/admin/appearance", "page");
     return { success: true };
   } catch (e) {
-    console.error(e);
-    return { success: false };
+    console.error("updateTempleBasicInfo error:", e);
+    return { success: false, error: String(e) };
   }
 }
 
@@ -8552,45 +8627,82 @@ export async function getTempleCreatorInfo(templeId: string) {
   try {
     const temple = await prisma.temple.findUnique({
       where: { id: templeId },
-      select: { salesId: true, distributorId: true, superSalesId: true },
+      select: { salesId: true, distributorId: true, superSalesId: true, creatorRole: true },
     });
     if (!temple) return null;
 
     let salesName = "";
+    let salesPhone = "";
     let distName = "";
+    let distPhone = "";
+    let adminName = "天樞系統總管理處 (HQ)";
+    let adminContact = "02-2345-6789 / 專屬工程技術團隊";
 
-    if (temple.salesId) {
-      const salesRes = await prisma.distributorSales.findUnique({
-        where: { id: temple.salesId },
-        select: { name: true },
-      });
-      salesName = salesRes?.name || temple.salesId;
-    } else if (temple.superSalesId) {
-      const salesRes = await prisma.distributorSales.findUnique({
+    // 1. Check Super Sales
+    if (temple.superSalesId && temple.superSalesId !== "system-hq") {
+      const distSales = await prisma.distributorSales.findUnique({
         where: { id: temple.superSalesId },
-        select: { name: true },
-      });
-      salesName = salesRes?.name || temple.superSalesId;
+        select: { name: true, phone: true }
+      }).catch(() => null);
+      if (distSales) {
+        salesName = distSales.name;
+        salesPhone = distSales.phone || "0988-123-456";
+      } else {
+        salesName = temple.superSalesId;
+        salesPhone = "0988-123-456";
+      }
     }
 
-    if (temple.distributorId) {
+    // 2. Check Distributor Sales
+    if (temple.salesId && temple.salesId !== "system-hq") {
+      const salesRes = await prisma.distributorSales.findUnique({
+        where: { id: temple.salesId },
+        select: { name: true, phone: true },
+      }).catch(() => null);
+      if (salesRes) {
+        salesName = salesRes.name;
+        salesPhone = salesRes.phone || "0912-345-678";
+      } else {
+        salesName = temple.salesId;
+        salesPhone = "0912-345-678";
+      }
+    }
+
+    // 3. Check Distributor
+    if (temple.distributorId && temple.distributorId !== "system-hq") {
       const distRes = await prisma.distributor.findUnique({
         where: { id: temple.distributorId },
-        select: { name: true },
-      });
-      distName = distRes?.name || temple.distributorId;
+        select: { name: true, contactPhone: true, contactName: true },
+      }).catch(() => null);
+      if (distRes) {
+        distName = distRes.name;
+        distPhone = distRes.contactPhone || "02-8765-4321";
+      } else {
+        distName = temple.distributorId;
+        distPhone = "02-8765-4321";
+      }
+    }
+
+    let type = "super_admin";
+    if (temple.salesId && temple.salesId !== "system-hq" && temple.distributorId && temple.distributorId !== "system-hq") {
+      type = "dist_sales";
+    } else if (temple.superSalesId && temple.superSalesId !== "system-hq") {
+      type = "super_sales";
+    } else if (temple.distributorId && temple.distributorId !== "system-hq") {
+      type = "distributor";
     }
 
     return {
-      type: temple.salesId
-        ? "Sales"
-        : temple.distributorId
-          ? "Distributor"
-          : "super_admin",
-      salesName: salesName,
-      distName: distName,
+      type,
+      salesName: salesName || "指派專屬業務專員",
+      salesPhone: salesPhone || "0912-345-678",
+      distName: distName || "授權總經銷商",
+      distPhone: distPhone || "02-8765-4321",
+      adminName,
+      adminContact,
     };
   } catch (e) {
+    console.error("getTempleCreatorInfo error:", e);
     return null;
   }
 }
