@@ -3117,48 +3117,77 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
       {/* AGI Chat Assistant Modal */}
       {isAgiModalOpen && (
-        <div className="fixed inset-0 z-[200] flex flex-col bg-gray-100 animate-in slide-in-from-bottom duration-300 overflow-hidden">
-          <header className="bg-white border-b border-gray-200 h-14 flex items-center justify-between px-4 sticky top-0 z-10">
+        <div className="fixed inset-0 z-[200] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300 overflow-hidden">
+          <header className="bg-gradient-to-r from-red-800 to-amber-700 text-white h-16 flex items-center justify-between px-5 sticky top-0 z-10 shadow-md">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-sm">✨</div>
-              <h3 className="text-lg font-bold text-gray-900">生活助理</h3>
+              <div className="w-9 h-9 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-amber-300 text-base shadow-inner border border-white/20">✨</div>
+              <div>
+                <h3 className="text-base font-black tracking-tight">{templeInfo?.templeName || '宮廟'} AI 智慧香客管家</h3>
+                <p className="text-[10px] text-amber-200 font-bold opacity-90">信仰導引 · 解難指引 · 專屬服務</p>
+              </div>
             </div>
-            <button onClick={() => setIsAgiModalOpen(false)} className="p-2 -mr-2 text-gray-400 active:text-gray-900 active:bg-gray-100 rounded-full transition-colors">✕</button>
+            <button onClick={() => setIsAgiModalOpen(false)} className="w-8 h-8 flex items-center justify-center bg-white/10 active:bg-white/20 rounded-full text-white/80 hover:text-white transition-all text-sm">✕</button>
           </header>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {chatHistory.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-4 rounded-2xl max-w-[85%] text-sm font-bold shadow-sm ${
+                <div className={`p-4 rounded-2xl max-w-[88%] text-sm font-bold shadow-xs leading-relaxed ${
                   msg.role === 'user' 
-                    ? 'bg-amber-100 text-amber-900 rounded-tr-sm' 
-                    : 'bg-white text-gray-800 rounded-tl-sm border border-gray-100'
+                    ? 'bg-amber-500 text-white rounded-tr-xs' 
+                    : 'bg-white text-slate-800 rounded-tl-xs border border-slate-200/80 shadow-sm'
                 }`}>
-                  {msg.text}
+                  <p className="whitespace-pre-wrap">{msg.text}</p>
                 </div>
               </div>
             ))}
             {agiIsThinking && (
               <div className="flex justify-start">
-                <div className="bg-white p-4 rounded-2xl rounded-tl-sm border border-gray-100 flex gap-2 items-center shadow-sm">
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                <div className="bg-white p-4 rounded-2xl rounded-tl-xs border border-slate-200/80 flex gap-2 items-center shadow-sm">
+                  <span className="text-xs font-black text-amber-600">智慧大腦開導中</span>
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                 </div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
+
+          {/* Quick Prompt Chips */}
+          <div className="px-4 py-2 bg-white/80 backdrop-blur-sm border-t border-slate-100 flex gap-2 overflow-x-auto no-scrollbar">
+            {[
+              { label: '🏮 祈福點燈推薦', prompt: '請問有哪些祈福點燈可以選擇？如何為家人祈求平安？' },
+              { label: '📅 線上預約問事', prompt: '我想預約問事/收驚服務，請問有開放哪些時段？' },
+              { label: '🪔 近期法會活動', prompt: '請問最近有舉辦什麼法會活動？如何報名？' },
+              { label: '🧘 心情煩悶想聊聊', prompt: '我最近工作和生活壓力好大，心情很煩悶，想請神明指點迷津...' }
+            ].map((chip, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleAgiSubmit(undefined, chip.prompt)}
+                disabled={agiIsThinking}
+                className="shrink-0 px-3 py-1.5 bg-amber-50 border border-amber-200/80 text-amber-900 rounded-full text-xs font-bold hover:bg-amber-100 active:scale-95 transition-all shadow-2xs disabled:opacity-50"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
           
-          <div className="p-4 bg-white border-t border-gray-200 pb-safe">
-            <form onSubmit={handleAgiSubmit} className="flex gap-3">
+          <div className="p-4 bg-white border-t border-slate-200 pb-safe shadow-lg">
+            <form onSubmit={handleAgiSubmit} className="flex gap-2.5 items-center">
               <input 
                 value={agiInput} 
                 onChange={(e) => setAgiInput(e.target.value)} 
-                className="flex-1 app-input rounded-full py-3 px-5 text-sm" 
-                placeholder="請輸入您的問題..." 
+                className="flex-1 bg-slate-100 border border-slate-200 rounded-full py-3 px-5 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-amber-500 transition-all shadow-inner" 
+                placeholder="請輸入您的問題或心情..." 
               />
-              <button type="submit" className="w-12 h-12 bg-red-700 text-white rounded-full flex items-center justify-center shadow-md active:bg-red-800 transition-colors">➔</button>
+              <button 
+                type="submit" 
+                disabled={!agiInput.trim() || agiIsThinking}
+                className="w-12 h-12 bg-gradient-to-tr from-amber-600 to-amber-500 text-white rounded-full flex items-center justify-center shadow-md active:scale-95 disabled:opacity-50 transition-all"
+              >
+                ➔
+              </button>
             </form>
           </div>
         </div>

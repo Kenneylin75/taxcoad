@@ -87,6 +87,8 @@ export default function SuperAdminClient({
   const [storagePlans, setStoragePlans] = useState<any[]>([]);
   const [aiPlans, setAiPlans] = useState<any[]>([]);
   const [aiModels, setAiModels] = useState<any[]>([]);
+  const [chatTestResult, setChatTestResult] = useState<{ testing: boolean; message?: string; error?: string } | null>(null);
+  const [ocrTestResult, setOcrTestResult] = useState<{ testing: boolean; message?: string; error?: string } | null>(null);
   const [b2bPayment, setB2bPayment] = useState<any>({
     enabledMethods: [],
     ecpay: { merchantId: '', hashKey: '', hashIV: '' },
@@ -1681,44 +1683,105 @@ export default function SuperAdminClient({
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
-                         {/* Core Engines (Combined into a cleaner layout) */}
+                         {/* Core Engines (Intelligent Chat Brain) */}
                          <div className="bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 p-8 rounded-3xl space-y-6">
-                            <div className="flex items-center gap-3 mb-2">
-                               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-100">🧠</div>
-                               <div>
-                                  <h5 className="text-slate-800 font-black italic text-lg">對話大腦引擎 (主對話)</h5>
-                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Intelligent QA Chat</p>
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                               <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-100">🧠</div>
+                                  <div>
+                                     <h5 className="text-slate-800 font-black italic text-lg">對話大腦引擎 (主對話)</h5>
+                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Intelligent QA Chat</p>
+                                  </div>
                                </div>
+                               <button 
+                                  onClick={async () => {
+                                     setChatTestResult({ testing: true });
+                                     const { testAiConnection } = await import('@/app/actions');
+                                     const res = await testAiConnection(config?.aiEndpoints?.chatApiUrl || '', config?.aiEndpoints?.chatApiKey || '');
+                                     if (res.success) {
+                                        setChatTestResult({ testing: false, message: res.message });
+                                     } else {
+                                        setChatTestResult({ testing: false, error: res.error });
+                                     }
+                                  }}
+                                  disabled={chatTestResult?.testing}
+                                  className="px-3.5 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                               >
+                                  {chatTestResult?.testing ? '⚡ 測試中...' : '⚡ 測試連線'}
+                               </button>
                             </div>
                             <div className="space-y-4">
                                <div>
-                                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API URL</label>
+                                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API URL (OpenAI / DeepSeek / Claude 相容格式)</label>
                                   <input value={config?.aiEndpoints?.chatApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiUrl: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all" placeholder="https://api.openai.com/v1/chat/completions" />
                                </div>
                                <div>
                                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API Key</label>
                                   <input type="password" value={config?.aiEndpoints?.chatApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, chatApiKey: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all" placeholder="sk-..." />
                                </div>
+                               {chatTestResult?.message && (
+                                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                                     <span>🟢</span>
+                                     <span>{chatTestResult.message}</span>
+                                  </div>
+                               )}
+                               {chatTestResult?.error && (
+                                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                                     <span>🔴</span>
+                                     <span>連線異常：{chatTestResult.error}</span>
+                                  </div>
+                               )}
                             </div>
                          </div>
                          
+                         {/* OCR Engine */}
                          <div className="bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 p-8 rounded-3xl space-y-6">
-                            <div className="flex items-center gap-3 mb-2">
-                               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-100">👁️</div>
-                               <div>
-                                  <h5 className="text-slate-800 font-black italic text-lg">視覺識別引擎 (OCR)</h5>
-                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Vision & Scanning</p>
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                               <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm border border-slate-100">👁️</div>
+                                  <div>
+                                     <h5 className="text-slate-800 font-black italic text-lg">視覺識別引擎 (OCR)</h5>
+                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Vision & Scanning</p>
+                                  </div>
                                </div>
+                               <button 
+                                  onClick={async () => {
+                                     setOcrTestResult({ testing: true });
+                                     const { testAiConnection } = await import('@/app/actions');
+                                     const res = await testAiConnection(config?.aiEndpoints?.ocrApiUrl || '', config?.aiEndpoints?.ocrApiKey || '');
+                                     if (res.success) {
+                                        setOcrTestResult({ testing: false, message: res.message });
+                                     } else {
+                                        setOcrTestResult({ testing: false, error: res.error });
+                                     }
+                                  }}
+                                  disabled={ocrTestResult?.testing}
+                                  className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-600 hover:text-white rounded-xl text-xs font-black transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                               >
+                                  {ocrTestResult?.testing ? '⚡ 測試中...' : '⚡ 測試連線'}
+                               </button>
                             </div>
                             <div className="space-y-4">
                                <div>
-                                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API URL</label>
+                                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API URL (OCR / Vision Endpoint)</label>
                                   <input value={config?.aiEndpoints?.ocrApiUrl || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiUrl: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 transition-all" placeholder="https://api.openai.com/v1/chat/completions" />
                                </div>
                                <div>
                                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">API Key</label>
                                   <input type="password" value={config?.aiEndpoints?.ocrApiKey || ''} onChange={e => setConfig({...config, aiEndpoints: {...config?.aiEndpoints, ocrApiKey: e.target.value}})} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 transition-all" placeholder="sk-..." />
                                </div>
+                               {ocrTestResult?.message && (
+                                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                                     <span>🟢</span>
+                                     <span>{ocrTestResult.message}</span>
+                                  </div>
+                               )}
+                               {ocrTestResult?.error && (
+                                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                                     <span>🔴</span>
+                                     <span>連線異常：{ocrTestResult.error}</span>
+                                  </div>
+                               )}
                             </div>
                          </div>
                       </div>

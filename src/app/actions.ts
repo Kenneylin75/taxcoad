@@ -1943,7 +1943,7 @@ export async function updateGuestSettings(settings: any) {
     return { success: false };
   }
 }
-export async function askAgiAssistant(q: string, h: number) {
+export async function askAgiAssistant(q: string, history?: any) {
   const store = await cookies();
   const templeId = await getDynamicTempleId();
   const phone = store.get(`guestPhone_${templeId}`)?.value || "unknown";
@@ -1954,15 +1954,13 @@ export async function askAgiAssistant(q: string, h: number) {
     const usage = await prisma.templeAiUsage.findUnique({
       where: { templeId },
     });
-    if (!usage || !usage.enabled) return { reply: "抱歉，本宮廟未開通 AI 服務。", suggestedAction: "none" };
+    if (!usage || !usage.enabled) return { reply: "抱歉，本宮廟目前尚未開通 AI 智慧助理服務。", suggestedAction: "none" };
     
-    // Only FREE or ON (with Paid status) should be allowed, but checking ON is enough here since UI already blocked it, but let's be safe.
-    if (usage.planId !== 'FREE' && usage.planId !== 'ON') {
+    if (usage.planId !== 'FREE' && usage.planId !== 'ON' && !usage.isVip) {
       return { reply: "抱歉，本宮廟 AI 服務尚未正確設定。", suggestedAction: "none" };
     }
     
-    // Check if Paid for ON plan
-    if (usage.planId === 'ON') {
+    if (usage.planId === 'ON' && !usage.isVip) {
       const bill = await prisma.templeBill.findFirst({
          where: { templeId: templeId, itemName: "AIFee" },
          orderBy: { createdAt: 'desc' }
@@ -1972,33 +1970,148 @@ export async function askAgiAssistant(q: string, h: number) {
       }
     }
 
-    const sys = await prisma.systemConfig.findFirst();
-    const systemPrompt = sys?.aiSystemPrompt || "預設系統提示詞";
+    // 1. 取得宮廟背景與即時服務資訊 (RAG Context)
+    const temple = await prisma.temple.findUnique({ where: { id: templeId } });
+    const templeName = temple?.templeName || temple?.name || "本宮廟";
+    const templeAddress = temple?.address || temple?.city || "台灣";
+    const templePhone = temple?.phone || "洽詢廟方櫃檯";
 
-    let reply =
-      `您好！我是宮廟專屬的 AI 生活助手，有任何關於點燈、預約、法會報名或排隊的問題，都可以問我喔！`;
-    if (
-      q.includes("預約") ||
-      q.includes("問事") ||
-      q.includes("收驚") ||
-      q.includes("掛號")
-    ) {
-      reply =
-        "您可以點擊下方的「服務預約」按鈕，我們提供收驚、問事等服務，並且可以線上排隊喔！";
-    } else if (q.includes("點燈") || q.includes("燈")) {
-      reply =
-        "我們有光明燈、太歲燈、財神燈等多種選擇，您可以點擊「服務預約」或「線上點燈」來了解詳情與報名喔！";
-    } else if (q.includes("法會") || q.includes("普渡")) {
-      reply =
-        "近期的法會活動可以透過「法會報名」按鈕查看，點擊進去就能看到時間與詳細內容了。";
-    } else if (q.includes("排隊")) {
-      reply =
-        "您可以在首頁點擊「預約」或「排隊」按鈕，系統會給您專屬的號碼牌，您可以隨時查看目前的叫號進度喔！";
+    const [services, lamps, events, waitingQueues] = await Promise.all([
+      prisma.service.findMany({ where: { templeId } }).catch(() => []),
+      prisma.lampCategory.findMany({ where: { templeId } }).catch(() => []),
+      prisma.event.findMany({ where: { templeId } }).catch(() => []),
+      prisma.queueTicket.count({ where: { templeId, status: { in: ["Waiting", "Pending", "Registered"] } } }).catch(() => 0),
+    ]);
+
+    let serviceSummary = `\n【${templeName} 目前開放之即時服務與項目】\n`;
+    if (services && services.length > 0) {
+      serviceSummary += `・線上預約問事/服務項目：${services.map((s: any) => `${s.name}${s.price ? ` ($${s.price})` : ''}`).join('、')}（引導點擊主畫面的「預約」或「服務預約」）\n`;
+    }
+    if (lamps && lamps.length > 0) {
+      serviceSummary += `・祈福點燈種類：${lamps.map((l: any) => `${l.name}${l.price ? ` ($${l.price})` : ''}`).join('、')}（引導點擊主畫面的「點燈」或「祈福點燈」）\n`;
+    }
+    if (events && events.length > 0) {
+      serviceSummary += `・近期法會活動：${events.slice(0, 5).map((e: any) => `${e.title || e.name || '法會'}`).join('、')}（引導點擊主畫面的「法會」或「活動報名」）\n`;
+    }
+    serviceSummary += `・現場排隊狀況：目前有 ${waitingQueues} 人在等候叫號（引導點擊主畫面的「排隊」查看叫號）\n`;
+    serviceSummary += `・宮廟地址：${templeAddress}，電話：${templePhone}\n`;
+
+    const systemPromptText = `您是【${templeName}】的專屬「AI 智能香客管家 / 信仰智慧導引大腦」。
+請遵守以下最高準則：
+1. 【語氣與風格】：溫暖、慈悲、具同理心、莊嚴，以傳統信仰的慈悲智慧撫慰信眾的心靈，為其排憂解難、指引迷津。
+2. 【排憂解惑】：當信眾傾訴生活壓力、事業挫折、家庭糾紛、身體欠安或運勢低潮時，請先以慈悲溫暖的話語給予心理安撫與正向鼓勵。
+3. 【精準功能導流】：在安撫後，請結合以下宮廟即時服務，精準指引信眾使用介面功能：
+   - 若有問事、收驚、心靈解惑需求：引導點擊「預約」按鈕。
+   - 若想祈求平安、財運、考運、消災解厄：引導點擊「點燈」按鈕（推薦適合的燈種如光明燈、財神燈、文昌燈、太歲燈）。
+   - 若想參加法會祈福：引導點擊「法會」報名。
+   - 若在現場等待：引導點擊「排隊」查看即時叫號進度。
+4. 【邊界控制】：請勿討論政治、娛樂八卦或任何與宮廟信仰無關的話題，始終將話題收斂在宮廟服務與信仰安頓。
+5. 【回覆長度】：繁體中文回覆，長度適中（約 100~250 字），條理清晰，並在文末親切提示信眾操作按鈕。
+${serviceSummary}`;
+
+    // 2. 取得系統設定中的外部 AI API 端點與模型池
+    const sys = await prisma.systemConfig.findFirst({ where: { key: "global" } });
+    const configValue = (sys?.value || {}) as any;
+    const aiEndpoints = configValue.aiEndpoints || {};
+    const aiModels = Array.isArray(configValue.aiModels) ? configValue.aiModels : [];
+
+    let reply = "";
+
+    // 格式化歷史紀錄
+    let formattedHistory: any[] = [];
+    if (Array.isArray(history)) {
+      formattedHistory = history.slice(-6).map((h: any) => ({
+        role: h.role === 'user' ? 'user' : 'assistant',
+        content: h.text || h.content || ''
+      }));
     }
 
-    // append a mock indication that system prompt was used
-    reply += `\n\n(系統模擬: 參考了 ${systemPrompt.slice(0, 10)}...)`;
+    const messages = [
+      { role: "system", content: systemPromptText },
+      ...formattedHistory,
+      { role: "user", content: q }
+    ];
 
+    // 嘗試調用主端點 (Chat API)
+    if (aiEndpoints.chatApiUrl && aiEndpoints.chatApiUrl.trim()) {
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (aiEndpoints.chatApiKey && aiEndpoints.chatApiKey.trim()) {
+          headers["Authorization"] = `Bearer ${aiEndpoints.chatApiKey.trim()}`;
+        }
+        const resp = await fetch(aiEndpoints.chatApiUrl.trim(), {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages,
+            temperature: 0.7,
+            max_tokens: 600,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (resp.ok) {
+          const data = await resp.json();
+          reply = data.choices?.[0]?.message?.content || "";
+        } else {
+          console.warn("Primary AI endpoint failed with status:", resp.status);
+        }
+      } catch (err) {
+        console.warn("Primary AI endpoint fetch error:", err);
+      }
+    }
+
+    // 若主端點失敗或未設定，嘗試備用模型池 (Fallback Pool)
+    if (!reply && aiModels.length > 0) {
+      const enabledFallbacks = aiModels.filter((m: any) => m.isEnabled && m.apiKey);
+      for (const fb of enabledFallbacks) {
+        try {
+          const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${fb.apiKey.trim()}`,
+            },
+            body: JSON.stringify({
+              model: fb.name || "gpt-4o-mini",
+              messages,
+              temperature: 0.7,
+              max_tokens: 600,
+            }),
+            signal: AbortSignal.timeout(12000),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            reply = data.choices?.[0]?.message?.content || "";
+            if (reply) break;
+          }
+        } catch (fbErr) {
+          console.warn(`Fallback model ${fb.name} error:`, fbErr);
+        }
+      }
+    }
+
+    // 若外部 API 均未配置或失敗，提供智能在地情境回覆 (Graceful Intelligent Fallback)
+    if (!reply) {
+      if (q.includes("預約") || q.includes("問事") || q.includes("收驚") || q.includes("改運") || q.includes("時段")) {
+        const sNames = services.length > 0 ? `目前提供【${services.map((s: any) => s.name).join('、')}】等項目。` : "廟方提供各項問事解惑與收驚服務。";
+        reply = `信眾您好，心中若有罣礙疑惑，神明慈悲定能指引光明。${sNames}您可以直接點擊主畫面的「預約」按鈕，選擇合適的時段前來參拜問事。祝您順心平安！`;
+      } else if (q.includes("點燈") || q.includes("燈") || q.includes("光明") || q.includes("太歲") || q.includes("財神") || q.includes("文昌")) {
+        const lNames = lamps.length > 0 ? `目前提供【${lamps.map((l: any) => l.name).join('、')}】。` : "我們提供光明燈、安太歲、文昌燈等多種祈福點燈。";
+        reply = `平安！點上一盞心燈，照亮前程祈求福澤。${templeName}${lNames}您可以點擊主畫面「點燈」按鈕，為自己與家人填寫資料登記點燈。祝您闔家平安！`;
+      } else if (q.includes("法會") || q.includes("活動") || q.includes("普渡") || q.includes("祭典")) {
+        reply = `平安！參加法會共沐神恩、祈安植福。歡迎您點擊主畫面「法會」按鈕查看近期舉行的法會儀軌與線上報名詳情。`;
+      } else if (q.includes("排隊") || q.includes("號碼") || q.includes("叫號")) {
+        reply = `目前現場等候人數為 ${waitingQueues} 人。若您已在現場或準備前往，您可以點擊「排隊」按鈕查看即時叫號進度或抽取號碼牌。`;
+      } else if (q.includes("壓力") || q.includes("難過") || q.includes("累") || q.includes("煩") || q.includes("怎麼辦") || q.includes("生病") || q.includes("失業")) {
+        reply = `信眾辛苦了，人生難免遇到波折起伏，請先深呼吸放鬆心情。神明常佑善心人，一切困境終會化解。若心神不寧，建議您可以點擊「預約」前來【${templeName}】向神明參拜祈求收驚解厄，或點擊「點燈」點一盞平安光明燈護佑元辰光彩。我們隨時為您祈福！`;
+      } else {
+        reply = `平安！我是【${templeName}】的專屬 AI 智慧管家。神明慈悲護佑，若您想辦理祈福點燈、線上問事預約、法會報名或查看現場排隊，都可以隨時告訴我，或點擊主畫面相應的功能按鈕喔！`;
+      }
+    }
+
+    // 紀錄對話日誌
     await prisma.aiChatLog.create({
       data: {
         templeId,
@@ -2010,8 +2123,38 @@ export async function askAgiAssistant(q: string, h: number) {
 
     return { reply, suggestedAction: "none" };
   } catch (error) {
-    console.error("Failed to log AI chat:", error);
-    return { reply: "系統發生錯誤，請稍後再試。", suggestedAction: "none" };
+    console.error("Failed in askAgiAssistant:", error);
+    return { reply: "系統繁忙中，請稍後再試。", suggestedAction: "none" };
+  }
+}
+
+export async function testAiConnection(apiUrl: string, apiKey: string) {
+  if (!apiUrl || !apiUrl.trim()) return { success: false, error: '請輸入 API URL' };
+  const startTime = Date.now();
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey && apiKey.trim()) {
+      headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+    }
+    const res = await fetch(apiUrl.trim(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Ping" }],
+        max_tokens: 10,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const latency = Date.now() - startTime;
+    if (res.ok) {
+      return { success: true, latency, message: `連線成功！回應時間: ${latency}ms` };
+    } else {
+      const errText = await res.text();
+      return { success: false, latency, error: `HTTP ${res.status}: ${errText.slice(0, 100)}` };
+    }
+  } catch (e: any) {
+    return { success: false, error: e.name === "TimeoutError" ? "連線逾時 (超時 8 秒)" : String(e.message || e) };
   }
 }
 
