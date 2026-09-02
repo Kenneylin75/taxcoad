@@ -758,10 +758,12 @@ export default function GuestAppClient({ templeId, forceLogin, templeInfo }: { t
 
 
 
-  const handleAgiSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!agiInput.trim() || agiIsThinking) return;
-    const query = agiInput;
+  const handleAgiSubmit = async (e?: React.FormEvent, customQuery?: string) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    const query = (customQuery || agiInput).trim();
+    if (!query || agiIsThinking) return;
     setAgiInput("");
     setChatHistory(prev => [...prev, { role: 'user', text: query }]);
     setAgiIsThinking(true);
