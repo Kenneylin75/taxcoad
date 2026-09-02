@@ -927,18 +927,46 @@ export default function SuperAdminClient({
                                   </div>
                                </td>
                                <td className="px-12 py-8">
-                                  <button 
-                                     onClick={async () => {
-                                        if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
-                                           const { updateAccountStatus } = await import('../actions');
-                                           await updateAccountStatus(acc.id, 'Temple', (!acc.status || acc.status==='Active') ? 'Inactive' : 'Active');
-                                           window.location.reload();
+                                  <div className="flex flex-col gap-1.5 items-start">
+                                     <button 
+                                        onClick={async () => {
+                                           if(confirm(`確定要${!acc.status || acc.status==='Active' ? '關閉' : '開啟'}此帳戶嗎？`)){
+                                              const { updateAccountStatus } = await import('../actions');
+                                              await updateAccountStatus(acc.id, 'Temple', (!acc.status || acc.status==='Active') ? 'Inactive' : 'Active');
+                                              window.location.reload();
+                                           }
+                                        }}
+                                        className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic transition-all ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
+                                     >
+                                        {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
+                                     </button>
+
+                                     {/* 試用期動態倒數或永久免費標籤 */}
+                                     {(() => {
+                                        if (acc.freeType === 'Permanent' || acc.planName === '永久免費') {
+                                           return <span className="px-2.5 py-0.5 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 rounded-full text-[9px] font-black tracking-widest uppercase shadow-sm">⭐ 永久免費帳戶</span>;
                                         }
-                                     }}
-                                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic transition-all ${(!acc.status || acc.status==='Active') ? 'bg-emerald-50 text-emerald-600 hover:bg-rose-50 hover:text-rose-600' : 'bg-rose-50 text-rose-600 hover:bg-emerald-50 hover:text-emerald-600'}`}
-                                  >
-                                     {(!acc.status || acc.status==='Active') ? '🟢 啟用中 (Active)' : '🔴 已停權 (Inactive)'}
-                                  </button>
+                                        if (acc.freeType === 'Trial' && (acc.trialMonths || 0) > 0) {
+                                           const created = new Date(acc.createdAt || acc.timestamp || acc.joinedAt || Date.now());
+                                           let trialEnd: Date;
+                                           if (acc.billingStartDate && new Date(acc.billingStartDate) > created) {
+                                              trialEnd = new Date(acc.billingStartDate);
+                                           } else {
+                                              trialEnd = new Date(created);
+                                              trialEnd.setDate(trialEnd.getDate() + (acc.trialMonths || 3) * 30);
+                                           }
+                                           const now = new Date();
+                                           const diffDays = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                           
+                                           if (diffDays > 0) {
+                                              return <span className="px-2.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-full text-[9px] font-black tracking-widest shadow-sm">🎁 剩餘 {diffDays} 天試用</span>;
+                                           } else {
+                                              return <span className="px-2.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-full text-[9px] font-black tracking-widest shadow-sm">⚠️ 試用已到期</span>;
+                                           }
+                                        }
+                                        return null;
+                                     })()}
+                                  </div>
                                </td>
                                <td className="px-12 py-8 text-right">
                                   <div className="flex items-center justify-end gap-3">
@@ -2744,27 +2772,38 @@ export default function SuperAdminClient({
                                           return <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-sm font-black">免費帳戶</span>;
                                        }
 
-                                       const now = new Date();
-                                       const start = node.billingStartDate ? new Date(node.billingStartDate) : new Date(node.joinedAt);
-                                       const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 3600 * 24));
-                                       
-                                       if (node.freeType === 'Trial' && diffDays > 0) {
-                                          return <span className="text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm">剩餘 {diffDays} 天試用</span>;
-                                       } else {
-                                          let periodStr = '';
-                                          if (node.billingPeriod) {
-                                             const [bYear, bMonth] = node.billingPeriod.split('-');
-                                             periodStr = node.paymentCycle === 'Yearly' ? `${bYear}年` : `${bYear}/${parseInt(bMonth, 10)}月`;
-                                          } else {
-                                             const month = now.getMonth() + 1;
-                                             const year = now.getFullYear();
-                                             periodStr = node.paymentCycle === 'Yearly' ? `${year}年` : `${year}/${month}月`;
-                                          }
+                                         const created = new Date(node.createdAt || node.timestamp || node.joinedAt || Date.now());
+                                         let trialEnd: Date;
+                                         if (node.billingStartDate && new Date(node.billingStartDate) > created) {
+                                            trialEnd = new Date(node.billingStartDate);
+                                         } else {
+                                            trialEnd = new Date(created);
+                                            trialEnd.setDate(trialEnd.getDate() + (node.trialMonths || 3) * 30);
+                                         }
+                                         const now = new Date();
+                                         const diffDays = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                         
+                                         if (node.freeType === 'Trial') {
+                                            if (diffDays > 0) {
+                                               return <span className="text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shadow-sm font-black">剩餘 {diffDays} 天試用</span>;
+                                            } else {
+                                               return <span className="text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 shadow-sm font-black">⚠️ 試用已到期</span>;
+                                            }
+                                         } else {
+                                            let periodStr = '';
+                                            if (node.billingPeriod) {
+                                               const [bYear, bMonth] = node.billingPeriod.split('-');
+                                               periodStr = node.paymentCycle === 'Yearly' ? `${bYear}年` : `${bYear}/${parseInt(bMonth, 10)}月`;
+                                            } else {
+                                               const month = now.getMonth() + 1;
+                                               const year = now.getFullYear();
+                                               periodStr = node.paymentCycle === 'Yearly' ? `${year}年` : `${year}/${month}月`;
+                                            }
 
-                                          const paidStr = node.paymentStatus === 'Paid' ? '已付款' : '未付款';
-                                          const colorClass = node.paymentStatus === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
-                                          return <span className={`${colorClass} px-1.5 py-0.5 rounded border shadow-sm`}>{periodStr} {paidStr}</span>;
-                                       }
+                                            const paidStr = node.paymentStatus === 'Paid' ? '已付款' : '未付款';
+                                            const colorClass = node.paymentStatus === 'Paid' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-rose-600 bg-rose-50 border-rose-200';
+                                            return <span className={`${colorClass} px-1.5 py-0.5 rounded border shadow-sm`}>{periodStr} {paidStr}</span>;
+                                         }
                                     })()
                                  )}
                               </div>
