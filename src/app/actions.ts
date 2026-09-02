@@ -4338,24 +4338,26 @@ export async function fetchFinancialOverview() {
     if ((temple as any).freeType === "Permanent" || temple.monthlyRent === 0) {
       isPermanentFree = true;
     } else {
-      const trialMonths = temple.trialMonths || temple.freeMonths || 0;
+      const trialMonths = temple.trialMonths || (temple as any).freeMonths || 0;
       if (trialMonths > 0) {
-        const createdDate = new Date(
-          temple.timestamp || temple.created_at || Date.now(),
-        );
-        const endFreeDate = new Date(createdDate);
-        endFreeDate.setDate(endFreeDate.getDate() + trialMonths * 30);
-        const now = new Date();
-        if (now < endFreeDate) {
-          trialDaysRemaining = Math.ceil(
-            (endFreeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-          );
+        const endFreeDate = temple.billingStartDate
+          ? new Date(temple.billingStartDate)
+          : (temple.createdAt ? new Date(new Date(temple.createdAt).getTime() + trialMonths * 30 * 86400000) : null);
+        
+        if (endFreeDate) {
+          const now = new Date();
+          const diffMs = endFreeDate.getTime() - now.getTime();
+          if (diffMs > 0) {
+            trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          } else {
+            trialDaysRemaining = 0;
+          }
         }
       }
     }
 
     // Auto Generate Recurring Bills for existing temples
-    if (!isPermanentFree && trialDaysRemaining === undefined) {
+    if (!isPermanentFree && (trialDaysRemaining === undefined || trialDaysRemaining === 0)) {
       await autoGenerateRecurringBills(temple);
     }
     await autoGenerateStorageBills(temple.id);

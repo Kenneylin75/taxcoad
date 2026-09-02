@@ -285,9 +285,15 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                  </h3>
               </div>
               <div className="mt-5">
-                 <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg border ${(initialData?.pendingExpense || 0) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                    {(initialData?.pendingExpense || 0) > 0 ? '待繳費' : '帳務結清'}
-                 </span>
+                 {initialData?.trialDaysRemaining !== undefined && initialData.trialDaysRemaining > 0 ? (
+                   <span className="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border bg-emerald-50 text-emerald-700 border-emerald-200">
+                      🎁 試用期暫免繳費 (剩餘 {initialData.trialDaysRemaining} 天)
+                   </span>
+                 ) : (
+                   <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg border ${(initialData?.pendingExpense || 0) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                      {(initialData?.pendingExpense || 0) > 0 ? '待繳費' : '帳務結清'}
+                   </span>
+                 )}
               </div>
            </div>
 
@@ -306,10 +312,17 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                  {initialData?.isPermanentFree ? (
                    <h3 className="text-2xl font-black font-serif text-emerald-700">永久免費</h3>
                  ) : initialData?.trialDaysRemaining !== undefined ? (
-                   <>
-                     <h3 className="text-2xl font-black font-serif text-emerald-700">免費試用中</h3>
-                     <p className="text-xs font-bold text-emerald-600">剩餘 {initialData?.trialDaysRemaining} 天</p>
-                   </>
+                   initialData.trialDaysRemaining > 0 ? (
+                     <>
+                       <h3 className="text-2xl font-black font-serif text-emerald-700">免費試用中</h3>
+                       <p className="text-xs font-bold text-emerald-600">剩餘 {initialData.trialDaysRemaining} 天</p>
+                     </>
+                   ) : (
+                     <>
+                       <h3 className="text-2xl font-black font-serif text-amber-700">免費試用已結束</h3>
+                       <p className="text-xs font-bold text-amber-600">請完成首期繳費以延續服務</p>
+                     </>
+                   )
                  ) : (
                    <h3 className="text-2xl font-black font-serif text-slate-700">正式方案計費中</h3>
                  )}
@@ -349,74 +362,57 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                 <table className="w-full text-left border-collapse">
                    <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">項目類別 / 來源</th>
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">支付方式</th>
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">核定金額</th>
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">入帳時間</th>
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">付款帳戶(末五碼)</th>
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">備註</th>
-                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">狀態</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">項目與來源</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">信眾姓名 / 電話</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">實收金額</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">交易時間</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">支付管道</th>
+                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">憑證核銷</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
                      {filteredRevenue.length === 0 ? (
                        <tr>
-                         <td colSpan={7} className="px-6 py-12 text-center text-xs font-bold text-slate-400 bg-slate-50/20">
+                         <td colSpan={6} className="px-6 py-12 text-center text-xs font-bold text-slate-400 bg-slate-50/20">
                            本月份尚無收入紀錄
                          </td>
                        </tr>
                      ) : filteredRevenue.map((rev) => (
-                      <tr key={rev.id} className="hover:bg-slate-50/50 transition-all group">
+                      <tr key={rev.id} className="hover:bg-slate-50/50 transition-all">
                         <td className="px-6 py-4">
                            <div className="flex items-center gap-3">
-                              <span className="text-xl">{getSourceIcon(rev.source)}</span>
+                              <span className="text-xl p-2 bg-slate-50 rounded-xl">{getSourceIcon(rev.source)}</span>
                               <div>
                                  <p className="font-black text-slate-800 text-sm">{rev.title}</p>
-                                 <p className="text-[10px] font-bold text-slate-400">{rev.guestName}</p>
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{rev.source} #{rev.id.substring(0, 8)}</p>
                               </div>
                            </div>
                         </td>
                         <td className="px-6 py-4">
-                           <span className="text-[10px] font-black text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100 uppercase tracking-wider">
-                              {rev.paymentMethod?.toUpperCase() === 'TRANSFER' ? '匯款' : rev.paymentMethod}
-                           </span>
+                           <p className="font-bold text-slate-700 text-xs">{rev.guestName}</p>
                         </td>
                         <td className="px-6 py-4">
                            <div className="flex items-baseline gap-1">
                               <span className="text-[10px] font-bold text-amber-600">NT$</span>
-                              <span className="text-sm font-black text-slate-800 font-serif">{rev.amount.toLocaleString()}</span>
+                              <span className="text-base font-black text-slate-900 font-serif">{rev.amount.toLocaleString()}</span>
                            </div>
                         </td>
                         <td className="px-6 py-4">
-                           <span className="text-xs font-bold text-slate-400 font-mono">{rev.timestamp}</span>
+                           <p className="text-xs font-bold text-slate-500">{rev.timestamp}</p>
                         </td>
                         <td className="px-6 py-4">
-                           <span className="text-xs font-bold text-slate-500 font-mono">{rev.paymentRef ? rev.paymentRef.slice(-5) : '無'}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                           {editingRemarkId === rev.id ? (
-                              <div className="flex items-center gap-2">
-                                <input 
-                                  type="text" 
-                                  value={editingRemarkText}
-                                  onChange={(e) => setEditingRemarkText(e.target.value)}
-                                  maxLength={25}
-                                  className="border border-slate-300 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:border-amber-500 font-bold text-slate-700 bg-white"
-                                  autoFocus
-                                />
-                                <button onClick={() => handleSaveRemark(rev.id, rev.source)} className="text-emerald-600 hover:scale-110 transition-transform">✅</button>
-                                <button onClick={() => setEditingRemarkId(null)} className="text-rose-400 hover:scale-110 transition-transform">❌</button>
-                              </div>
+                           {rev.paymentMethod.includes('LINE') ? (
+                             <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100 flex items-center gap-1 w-fit">
+                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> LINE Pay
+                             </span>
+                           ) : rev.paymentMethod.includes('轉帳') || rev.paymentMethod.includes('匯款') ? (
+                             <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded border border-blue-100 flex items-center gap-1 w-fit">
+                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> 銀行轉帳
+                             </span>
                            ) : (
-                              <div 
-                                className="flex items-center gap-2 cursor-pointer group hover:bg-amber-50 px-2 py-1 rounded transition-colors w-fit"
-                                onClick={() => { setEditingRemarkId(rev.id); setEditingRemarkText(rev.remarks || ''); }}
-                              >
-                                <span className={`text-xs font-bold ${rev.remarks ? 'text-slate-700' : 'text-slate-300'} truncate max-w-[200px]`} title={rev.remarks}>
-                                  {rev.remarks ? (rev.remarks.length > 25 ? rev.remarks.slice(0, 25) + '...' : rev.remarks) : '點擊新增備註'}
-                                </span>
-                                <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
-                              </div>
+                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded flex items-center gap-1 w-fit">
+                               <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> 現金 / 臨櫃
+                             </span>
                            )}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -467,66 +463,78 @@ export default function FinancialManagerClient({ initialData, freeApps, initialD
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {filteredExpenses.map((exp) => (
-                          <tr key={exp.id} className="hover:bg-slate-50/50 transition-all">
-                            <td className="px-6 py-4">
-                               <div>
-                                  <p className="font-black text-slate-800 text-sm">{getExpenseTypeLabel(exp.type)}</p>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Period: {exp.billingDate}</p>
-                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                               <div className="flex items-baseline gap-1">
-                                  <span className="text-[10px] font-bold text-slate-400">NT$</span>
-                                  <span className="text-sm font-black text-slate-800 font-serif">{exp.amount.toLocaleString()}</span>
-                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                               <span className={`text-[10px] font-black px-2 py-1 rounded border ${exp.status === 'Unpaid' ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : exp.status === 'PendingVerification' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                                  {exp.dueDate}
-                               </span>
-                            </td>
-                            <td className="px-6 py-4">
-                               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{exp.payeeName || '系統總部'}</span>
-                            </td>
-                            <td className="px-6 py-4">
-                               {exp.status === 'Paid' ? (
-                                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
-                                     ✓ 已付款
-                                  </span>
-                               ) : exp.status === 'PendingVerification' ? (
-                                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                                     ⏳ 待審核
-                                  </span>
-                               ) : (
-                                  <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded border border-rose-100">
-                                     ! 未付款
-                                  </span>
-                               )}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                               {(exp.status === 'Unpaid' || exp.status === 'PendingVerification') ? (
-                                  <button 
-                                    onClick={() => handlePay(exp)}
-                                    disabled={isPending}
-                                    className="bg-slate-900 text-amber-400 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-900 transition-all disabled:opacity-20"
-                                  >
-                                     {isPending ? "連線中..." : (exp.status === 'PendingVerification' ? "查看審核狀態" : "💳 支付")}
-                                  </button>
-                               ) : (
-                                  exp.receiptUrl ? (
-                                    <button onClick={() => setViewImageUrl(exp.receiptUrl)} className="text-blue-500 hover:text-blue-700 transition-all text-xs font-bold flex items-center justify-end gap-1">
-                                      📄 查看匯款單
-                                    </button>
-                                  ) : (
-                                    <button className="text-slate-300 hover:text-slate-600 transition-all cursor-not-allowed text-xs font-bold flex items-center justify-end gap-1">
-                                      📄 無附件
-                                    </button>
-                                  )
-                               )}
-                            </td>
-                          </tr>
-                        ))}
+                        {filteredExpenses.map((exp) => {
+                          const isTrialActive = (initialData?.trialDaysRemaining !== undefined && initialData.trialDaysRemaining > 0);
+                          return (
+                            <tr key={exp.id} className="hover:bg-slate-50/50 transition-all">
+                              <td className="px-6 py-4">
+                                 <div>
+                                     <p className="font-black text-slate-800 text-sm">{getExpenseTypeLabel(exp.type)}</p>
+                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Period: {exp.billingDate}</p>
+                                 </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                 <div className="flex items-baseline gap-1">
+                                    <span className="text-[10px] font-bold text-slate-400">NT$</span>
+                                    <span className="text-sm font-black text-slate-800 font-serif">{exp.amount.toLocaleString()}</span>
+                                 </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                 <span className={`text-[10px] font-black px-2 py-1 rounded border ${exp.status === 'Unpaid' ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : exp.status === 'PendingVerification' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                    {exp.dueDate}
+                                 </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{exp.payeeName || '系統總部'}</span>
+                              </td>
+                              <td className="px-6 py-4">
+                                 {exp.status === 'Paid' ? (
+                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                                       ✓ 已付款
+                                    </span>
+                                 ) : exp.status === 'PendingVerification' ? (
+                                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                       ⏳ 待審核
+                                    </span>
+                                 ) : (
+                                    <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded border border-rose-100">
+                                       ! 未付款
+                                    </span>
+                                 )}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                 {(exp.status === 'Unpaid' || exp.status === 'PendingVerification') ? (
+                                    isTrialActive ? (
+                                      <span 
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm cursor-not-allowed select-none"
+                                        title={`目前為免費試用期（尚餘 ${initialData.trialDaysRemaining} 天），試用截止日 (${exp.dueDate}) 到期後將開放線上支付。`}
+                                      >
+                                        🎁 試用免費中 (剩餘 {initialData.trialDaysRemaining} 天)
+                                      </span>
+                                    ) : (
+                                      <button 
+                                        onClick={() => handlePay(exp)}
+                                        disabled={isPending}
+                                        className="bg-slate-900 text-amber-400 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-900 transition-all disabled:opacity-20 shadow-md active:scale-95"
+                                      >
+                                         {isPending ? "連線中..." : (exp.status === 'PendingVerification' ? "查看審核狀態" : "💳 支付")}
+                                      </button>
+                                    )
+                                 ) : (
+                                    exp.receiptUrl ? (
+                                      <button onClick={() => setViewImageUrl(exp.receiptUrl)} className="text-blue-500 hover:text-blue-700 transition-all text-xs font-bold flex items-center justify-end gap-1">
+                                        📄 查看匯款單
+                                      </button>
+                                    ) : (
+                                      <button className="text-slate-300 hover:text-slate-600 transition-all cursor-not-allowed text-xs font-bold flex items-center justify-end gap-1">
+                                        📄 無附件
+                                      </button>
+                                    )
+                                 )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                    </table>
                 </div>
