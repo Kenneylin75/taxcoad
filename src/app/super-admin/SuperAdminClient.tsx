@@ -2542,13 +2542,20 @@ export default function SuperAdminClient({
                                      if (isDistributorBill) return false;
                                      const name = b.item_name || b.itemName || '';
                                      const type = b.type || '';
+                                     
+                                     // 檢查試用期或永久免費狀態
+                                     const isPermanent = t?.freeType === 'Permanent';
+                                     const isTrialActive = t && (t.freeType === 'Trial' || (t.trialMonths || 0) > 0) && t.billingStartDate && new Date() < new Date(t.billingStartDate);
+                                     if (isPermanent && b.status !== 'PendingVerification') return false;
+                                     if (isTrialActive && b.status !== 'PendingVerification') return false;
+
                                      return (b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
                                             !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
                                             !['StorageUpgrade', 'AiUpgrade'].includes(type);
                                    });
-                                    const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
-                                    const bills = bList.slice((financeBillPage - 1) * 12, financeBillPage * 12);
-                                   
+                                   const PAGE_SIZE = 6;
+                                   const totalBPages = Math.max(1, Math.ceil(bList.length / PAGE_SIZE));
+                                   const bills = bList.slice((financeBillPage - 1) * PAGE_SIZE, financeBillPage * PAGE_SIZE);
                                    if (bills.length === 0) {
                                      return <div className="py-10 text-center"><span className="text-4xl block mb-4 opacity-30">✅</span><p className="text-sm font-bold text-slate-400">目前沒有待審核的宮廟付款</p></div>;
                                    }
@@ -2607,17 +2614,24 @@ export default function SuperAdminClient({
                                      if (isDistributorBill) return false;
                                      const name = b.item_name || b.itemName || '';
                                      const type = b.type || '';
+                                     
+                                     const isPermanent = t?.freeType === 'Permanent';
+                                     const isTrialActive = t && (t.freeType === 'Trial' || (t.trialMonths || 0) > 0) && t.billingStartDate && new Date() < new Date(t.billingStartDate);
+                                     if (isPermanent && b.status !== 'PendingVerification') return false;
+                                     if (isTrialActive && b.status !== 'PendingVerification') return false;
+
                                      return (b.status === 'Pending' || b.status === 'Unpaid' || b.status === 'PendingVerification') &&
                                             !['AIFee', 'StorageUpgrade', 'AiUpgrade'].includes(name) &&
                                             !['StorageUpgrade', 'AiUpgrade'].includes(type);
                                    });
-                             const totalBPages = Math.max(1, Math.ceil(bList.length / 12));
+                             const PAGE_SIZE = 6;
+                             const totalBPages = Math.max(1, Math.ceil(bList.length / PAGE_SIZE));
                              if (totalBPages > 1) {
                                 return (
                                    <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-slate-100">
-                                      <button disabled={financeBillPage === 1} onClick={() => setFinanceBillPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">上一頁</button>
-                                      <span className="text-xs font-bold text-slate-400">{financeBillPage} / {totalBPages}</span>
-                                      <button disabled={financeBillPage === totalBPages} onClick={() => setFinanceBillPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-50">下一頁</button>
+                                      <button disabled={financeBillPage === 1} onClick={() => setFinanceBillPage(prev => prev - 1)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:hover:bg-slate-100 transition-all cursor-pointer">上一頁</button>
+                                      <span className="text-xs font-bold text-slate-500">第 {financeBillPage} / {totalBPages} 頁 <span className="text-slate-400 font-normal">(共 {bList.length} 筆)</span></span>
+                                      <button disabled={financeBillPage === totalBPages} onClick={() => setFinanceBillPage(prev => prev + 1)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-[10px] font-black uppercase tracking-widest disabled:opacity-40 disabled:hover:bg-slate-100 transition-all cursor-pointer">下一頁</button>
                                    </div>
                                 );
                              }

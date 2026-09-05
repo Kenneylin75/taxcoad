@@ -10141,16 +10141,7 @@ export async function generateInitialBills(newTemple: any) {
         where: { id: storagePlanId },
       })) as any;
     }
-    if (!plan) {
-      // Fetch cheapest storage plan
-      const plans = (await prisma.storagePlan.findMany({
-        orderBy: { priceMonthly: "asc" },
-      })) as any[];
-      if (plans && plans.length > 0) {
-        plan = plans[0];
-      }
-    }
-    if (plan) {
+    if (plan && plan.priceMonthly > 0) {
       const storageFee = isYearly
         ? plan.priceYearly ||
           plan.priceMonthly *
@@ -11827,19 +11818,19 @@ export async function createTempleAccount(data: any) {
     newTemple.plan === "無限使用" ||
     newTemple.cloudStorage?.includes("無限") ||
     newTemple.cloudStorage === "Free" ||
-    !newTemple.cloudStorage;
-  let qGB = 5;
-  let pName = "免費 5GB 空間";
+    newTemple.freeType === "Permanent";
+  let qGB = 20;
+  let pName = "基礎免費 20GB 空間";
   if (isVip) {
     qGB = 20480; // 20TB
     pName = "無限使用";
-  } else if (newTemple.cloudStorage) {
+  } else if (newTemple.cloudStorage && newTemple.cloudStorage !== "Free") {
     let p = (await prisma.storagePlan.findUnique({
       where: { id: newTemple.cloudStorage },
     })) as any;
     if (p) {
-      qGB = p.sizeGb;
-      pName = `${p.sizeGb}GB 雲端空間`;
+      qGB = 20 + p.sizeGb;
+      pName = `${p.name || ''} (${20 + p.sizeGb}GB 雲端空間)`;
     }
   }
   const newStorage = {
