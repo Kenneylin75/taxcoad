@@ -10839,7 +10839,11 @@ export async function fetchAllAccountsForAdmin() {
   });
 
   // Temples
-  let pgTemples = await prisma.temple.findMany();
+  let pgTemples = await prisma.temple.findMany({
+    include: {
+      templeBills: true,
+    },
+  });
 
   const templePromises = pgTemples.map(async (t) => {
     let personnel = await prisma.user.findFirst({
@@ -10847,6 +10851,9 @@ export async function fetchAllAccountsForAdmin() {
       where: { templeId: t.id },
     });
     const creatorInfo = await getTempleCreatorInfo(t.id);
+    const hasUnpaid = (t.templeBills || []).some(
+      (b: any) => b.status === "Unpaid" || b.status === "PendingVerification"
+    );
     return {
       ...t,
       id: t.id,
@@ -10861,6 +10868,8 @@ export async function fetchAllAccountsForAdmin() {
       paymentCycle: t.paymentCycle,
       address: t.address,
       timestamp: t.createdAt,
+      templeBills: t.templeBills || [],
+      hasUnpaidBill: hasUnpaid,
     };
   });
 

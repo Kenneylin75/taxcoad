@@ -179,6 +179,12 @@ export default function SuperAdminClient({
    const [distributorPage, setDistributorPage] = useState(1);
    const [superSalesPage, setSuperSalesPage] = useState(1);
 
+   // Temple Specific Filter States (宮廟營運列表專用篩選與年月查詢)
+   const [templeFilterType, setTempleFilterType] = useState<'ALL' | 'TRIAL' | 'UNPAID' | 'HEADQUARTERS' | 'DISTRIBUTOR'>('ALL');
+   const [templeFilterYear, setTempleFilterYear] = useState<number>(() => new Date().getFullYear());
+   const [templeFilterMonth, setTempleFilterMonth] = useState<number>(() => new Date().getMonth() + 1);
+   const [isTempleDateFilterActive, setIsTempleDateFilterActive] = useState<boolean>(false);
+
    
    // Distributor Contract Modal States
    const [isPlanDetailOpen, setIsPlanDetailOpen] = useState(false);
@@ -349,10 +355,62 @@ export default function SuperAdminClient({
   };
 
   if (!config || !analytics) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-10 h-10 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div></div>;
-  // Pagination & Search Filter Calculations
-  const filteredTemples = initialAccounts
-    .filter((a: any) => a.role === 'Temple')
+  // 宮廟試用剩餘天數計算輔助函式
+  const getTempleTrialDaysLeft = (acc: any): number => {
+    if (acc.freeType !== 'Trial') return 999999;
+    const created = new Date(acc.createdAt || acc.timestamp || acc.joinedAt || Date.now());
+    let trialEnd: Date;
+    if (acc.billingStartDate && new Date(acc.billingStartDate) > created) {
+      trialEnd = new Date(acc.billingStartDate);
+    } else {
+      trialEnd = new Date(created);
+      trialEnd.setDate(trialEnd.getDate() + (acc.trialMonths || 3) * 30);
+    }
+    const now = new Date();
+    return Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // 全量宮廟帳號
+  const allTempleAccounts = initialAccounts.filter((a: any) => a.role === 'Temple');
+
+  // 各維度宮廟計數 (供快捷按鈕 Badge 顯示)
+  const templeFilterCounts = {
+    all: allTempleAccounts.length,
+    trial: allTempleAccounts.filter((a: any) => a.freeType === 'Trial' && (a.trialMonths || 0) > 0 && getTempleTrialDaysLeft(a) > 0).length,
+    unpaid: allTempleAccounts.filter((a: any) => a.freeType !== 'Permanent' && (a.hasUnpaidBill || (a.templeBills && a.templeBills.some((b: any) => b.status === 'Unpaid' || b.status === 'PendingVerification')))).length,
+    headquarters: allTempleAccounts.filter((a: any) => !a.distributorId || a.distributorId === 'system-hq').length,
+    distributor: allTempleAccounts.filter((a: any) => a.distributorId && a.distributorId !== 'system-hq').length,
+  };
+
+  // 宮廟篩選與排序核心邏輯
+  const filteredTemples = allTempleAccounts
     .filter((a: any) => {
+      // 1. 快捷篩選維度
+      if (templeFilterType === 'TRIAL') {
+        const isTrial = a.freeType === 'Trial' && (a.trialMonths || 0) > 0 && getTempleTrialDaysLeft(a) > 0;
+        if (!isTrial) return false;
+      } else if (templeFilterType === 'UNPAID') {
+        const isUnpaid = a.freeType !== 'Permanent' && (a.hasUnpaidBill || (a.templeBills && a.templeBills.some((b: any) => b.status === 'Unpaid' || b.status === 'PendingVerification')));
+        if (!isUnpaid) return false;
+      } else if (templeFilterType === 'HEADQUARTERS') {
+        const isHQ = !a.distributorId || a.distributorId === 'system-hq';
+        if (!isHQ) return false;
+      } else if (templeFilterType === 'DISTRIBUTOR') {
+        const isDist = a.distributorId && a.distributorId !== 'system-hq';
+        if (!isDist) return false;
+      }
+
+      // 2. 開設年月篩選 (比對建立時間 createdAt)
+      if (isTempleDateFilterActive) {
+        const dateVal = a.createdAt || a.timestamp || a.joinedAt;
+        if (!dateVal) return false;
+        const d = new Date(dateVal);
+        if (d.getFullYear() !== templeFilterYear || (d.getMonth() + 1) !== templeFilterMonth) {
+          return false;
+        }
+      }
+
+      // 3. 快速搜尋關鍵字
       if (!templeSearch.trim()) return true;
       const q = templeSearch.toLowerCase();
       return (
@@ -360,7 +418,18 @@ export default function SuperAdminClient({
         (a.templeName || '').toLowerCase().includes(q) ||
         (a.account || '').toLowerCase().includes(q)
       );
+    })
+    .sort((a: any, b: any) => {
+      // 需求 a: 試用期間的宮廟，試用天數少的會自動排在最上面
+      if (templeFilterType === 'TRIAL') {
+        return getTempleTrialDaysLeft(a) - getTempleTrialDaysLeft(b);
+      }
+      // 其他篩選預設依建立時間倒序
+      const tA = new Date(a.createdAt || a.timestamp || a.joinedAt || 0).getTime();
+      const tB = new Date(b.createdAt || b.timestamp || b.joinedAt || 0).getTime();
+      return tB - tA;
     });
+
   const templeTotalPages = Math.max(1, Math.ceil(filteredTemples.length / accountPageSize));
   const pagedTemples = filteredTemples.slice((templePage - 1) * accountPageSize, templePage * accountPageSize);
 
@@ -881,6 +950,199 @@ export default function SuperAdminClient({
                           </div>
                        </div>
                     </div>
+
+                    {/* 宮廟專用快捷維度篩選與開設年月查詢面板 */}
+                    <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-xs space-y-4">
+                       {/* 第一列：快捷維度選擇按鈕 (一鍵切換) */}
+                       <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                             <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider mr-1">篩選維度:</span>
+                             
+                             <button
+                                type="button"
+                                onClick={() => { setTempleFilterType('ALL'); setTemplePage(1); }}
+                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${templeFilterType === 'ALL' ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'}`}
+                             >
+                                <span>全部宮廟</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${templeFilterType === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                                   {templeFilterCounts.all}
+                                </span>
+                             </button>
+
+                             <button
+                                type="button"
+                                onClick={() => { setTempleFilterType('TRIAL'); setTemplePage(1); }}
+                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${templeFilterType === 'TRIAL' ? 'bg-amber-500 text-white shadow-sm' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/80'}`}
+                                title="依試用剩餘天數由少到多自動排序"
+                             >
+                                <span>🎁 試用期間 (天數少優先)</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${templeFilterType === 'TRIAL' ? 'bg-white/25 text-white' : 'bg-amber-200/80 text-amber-800'}`}>
+                                   {templeFilterCounts.trial}
+                                </span>
+                             </button>
+
+                             <button
+                                type="button"
+                                onClick={() => { setTempleFilterType('UNPAID'); setTemplePage(1); }}
+                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${templeFilterType === 'UNPAID' ? 'bg-rose-500 text-white shadow-sm' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/80'}`}
+                             >
+                                <span>⚠️ 尚未付款</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${templeFilterType === 'UNPAID' ? 'bg-white/25 text-white' : 'bg-rose-200/80 text-rose-800'}`}>
+                                   {templeFilterCounts.unpaid}
+                                </span>
+                             </button>
+
+                             <button
+                                type="button"
+                                onClick={() => { setTempleFilterType('HEADQUARTERS'); setTemplePage(1); }}
+                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${templeFilterType === 'HEADQUARTERS' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80'}`}
+                             >
+                                <span>🏛️ 總部 / 超級業務開設</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${templeFilterType === 'HEADQUARTERS' ? 'bg-white/25 text-white' : 'bg-indigo-200/80 text-indigo-800'}`}>
+                                   {templeFilterCounts.headquarters}
+                                </span>
+                             </button>
+
+                             <button
+                                type="button"
+                                onClick={() => { setTempleFilterType('DISTRIBUTOR'); setTemplePage(1); }}
+                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${templeFilterType === 'DISTRIBUTOR' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/80'}`}
+                             >
+                                <span>🏢 經銷商 / 經銷業務開設</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${templeFilterType === 'DISTRIBUTOR' ? 'bg-white/25 text-white' : 'bg-emerald-200/80 text-emerald-800'}`}>
+                                   {templeFilterCounts.distributor}
+                                </span>
+                             </button>
+                          </div>
+
+                          {/* 符合宮廟數 */}
+                          <span className="text-xs font-bold text-slate-400">
+                             共符合 <span className="text-slate-900 font-black">{filteredTemples.length}</span> 間宮廟
+                          </span>
+                       </div>
+
+                       {/* 第二列：開設年月切換器 (非下拉式，左右箭頭切換 / 直接輸入數字) */}
+                       <div className="flex items-center justify-between gap-4 pt-3 border-t border-slate-100 flex-wrap">
+                          <div className="flex items-center gap-3 flex-wrap">
+                             <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <i className="far fa-calendar-alt text-amber-500"></i>
+                                開設年月查詢:
+                             </span>
+
+                             {/* 左右切換按鈕 + 數字輸入框 */}
+                             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${isTempleDateFilterActive ? 'bg-amber-50/60 border-amber-300 ring-2 ring-amber-100' : 'bg-slate-50 border-slate-200/80'}`}>
+                                <button
+                                   type="button"
+                                   onClick={() => {
+                                      setIsTempleDateFilterActive(true);
+                                      setTemplePage(1);
+                                      if (templeFilterMonth <= 1) {
+                                         setTempleFilterYear(y => y - 1);
+                                         setTempleFilterMonth(12);
+                                      } else {
+                                         setTempleFilterMonth(m => m - 1);
+                                      }
+                                   }}
+                                   className="w-8 h-8 rounded-xl bg-white text-slate-700 hover:bg-amber-500 hover:text-white border border-slate-200/80 flex items-center justify-center text-xs font-black transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                   title="切換至上個月"
+                                >
+                                   ◀
+                                </button>
+
+                                {/* 年份直接輸入數字 */}
+                                <div className="flex items-center gap-1 bg-white px-3 py-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                                   <input
+                                      type="number"
+                                      min={2020}
+                                      max={2099}
+                                      value={templeFilterYear}
+                                      onChange={(e) => {
+                                         const val = parseInt(e.target.value);
+                                         if (!isNaN(val)) {
+                                            setTempleFilterYear(val);
+                                            setIsTempleDateFilterActive(true);
+                                            setTemplePage(1);
+                                         }
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 outline-none"
+                                   />
+                                   <span className="text-xs font-bold text-slate-500">年</span>
+                                </div>
+
+                                {/* 月份直接輸入數字 */}
+                                <div className="flex items-center gap-1 bg-white px-3 py-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                                   <input
+                                      type="number"
+                                      min={1}
+                                      max={12}
+                                      value={templeFilterMonth}
+                                      onChange={(e) => {
+                                         const val = parseInt(e.target.value);
+                                         if (!isNaN(val) && val >= 1 && val <= 12) {
+                                            setTempleFilterMonth(val);
+                                            setIsTempleDateFilterActive(true);
+                                            setTemplePage(1);
+                                         }
+                                      }}
+                                      className="w-10 text-center text-xs font-black text-slate-800 outline-none"
+                                   />
+                                   <span className="text-xs font-bold text-slate-500">月</span>
+                                </div>
+
+                                <button
+                                   type="button"
+                                   onClick={() => {
+                                      setIsTempleDateFilterActive(true);
+                                      setTemplePage(1);
+                                      if (templeFilterMonth >= 12) {
+                                         setTempleFilterYear(y => y + 1);
+                                         setTempleFilterMonth(1);
+                                      } else {
+                                         setTempleFilterMonth(m => m + 1);
+                                      }
+                                   }}
+                                   className="w-8 h-8 rounded-xl bg-white text-slate-700 hover:bg-amber-500 hover:text-white border border-slate-200/80 flex items-center justify-center text-xs font-black transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                   title="切換至下個月"
+                                >
+                                   ▶
+                                </button>
+                             </div>
+
+                             {/* 啟用/全部年月切換按鈕 */}
+                             {isTempleDateFilterActive ? (
+                                <button
+                                   type="button"
+                                   onClick={() => {
+                                      setIsTempleDateFilterActive(false);
+                                      setTemplePage(1);
+                                   }}
+                                   className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                   title="取消年月篩選，顯示所有月份"
+                                >
+                                   <span>✖ 清除年月篩選 (顯示全部)</span>
+                                </button>
+                             ) : (
+                                <button
+                                   type="button"
+                                   onClick={() => {
+                                      setIsTempleDateFilterActive(true);
+                                      setTemplePage(1);
+                                   }}
+                                   className="px-3.5 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 text-slate-600 border border-slate-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                >
+                                   <span>點擊啟用年月查詢</span>
+                                </button>
+                             )}
+                          </div>
+
+                          {isTempleDateFilterActive && (
+                             <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
+                                🔍 目前查詢：<span className="font-mono font-black">{templeFilterYear} 年 {String(templeFilterMonth).padStart(2, '0')} 月</span> 開設之宮廟
+                             </span>
+                          )}
+                       </div>
+                    </div>
+
                     <table className="w-full bg-white rounded-3xl shadow-sm overflow-hidden text-left border-collapse">
                        <thead className="bg-slate-50/80 border-b border-slate-200/80">
                           <tr>
